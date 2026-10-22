@@ -2,7 +2,6 @@
   "name": "kaizen-flow",
   "version": "0.1.0",
   "description": "Kaizen workflow: SPs (user stories) + michi (improvement cycle) for Claude Code, Codex and other agent harnesses",
-  "private": true,
   "license": "MIT",
   "bin": { "kaizen": "bin/kaizen.js" },
   "files": ["bin", "core", "adapters", "usage", "README.md", "LICENSE"],

@@ -9,45 +9,9 @@ const CORE_DIR = path.join(PKG, "core");
 const { loadCore } = require("./core.js");
 const { MARKER } = require("../adapters/util.js");
 const { detectMode } = require("./mode.js");
+const { plan, overlay } = require("./sync.js");
 const ADAPTERS = { claude: require("../adapters/claude"), codex: require("../adapters/codex"), "agents-md": require("../adapters/agents-md") };
 const VAULT = process.env.KAIZEN_SOURCE || path.join(require("os").homedir(), "Documents", "Second-Brain");
-
-// origem (no vault) -> destino (no repo alvo)
-const PARTS = [
-  [".claude/skills/michi", ".claude/skills/michi"],
-  [".claude/skills/super-prompt", ".claude/skills/super-prompt"],
-  [".claude/skills/one-shot", ".claude/skills/one-shot"],
-  [".claude/commands/sp.md", ".claude/commands/sp.md"],
-  [".claude/commands/sp-list.md", ".claude/commands/sp-list.md"],
-  [".claude/commands/sp-handoff.md", ".claude/commands/sp-handoff.md"],
-  [".claude/commands/one-shot.md", ".claude/commands/one-shot.md"],
-  ["scripts/sp-list.py", "scripts/sp-list.py"],
-  ["scripts/sp-move.py", "scripts/sp-move.py"],
-  ["scripts/sp-new.py", "scripts/sp-new.py"],
-  ["scripts/sp-validate.py", "scripts/sp-validate.py"],
-  ["scripts/sp-validate-hook.py", "scripts/sp-validate-hook.py"],
-  ["scripts/sp-handoff.py", "scripts/sp-handoff.py"],
-  ["scripts/context-guard.py", "scripts/context-guard.py"],
-  ["scripts/skill-cut.py", "scripts/skill-cut.py"],
-  [".claude/skills/grill-me", ".claude/skills/grill-me"],
-  [".claude/skills/dr", ".claude/skills/dr"],
-  [".claude/skills/dp", ".claude/skills/dp"],
-  [".claude/skills/da", ".claude/skills/da"],
-  [".claude/skills/brainstorm", ".claude/skills/brainstorm"],
-  [".claude/skills/swot", ".claude/skills/swot"],
-  ["scripts/doc-list.py", "scripts/doc-list.py"],
-  ["scripts/doc-move.py", "scripts/doc-move.py"],
-  ["scripts/sp-organize.py", "scripts/sp-organize.py"],
-  ["scripts/kaizen_config.py", "scripts/kaizen_config.py"],
-  ["scripts/test_kaizen_config.py", "scripts/test_kaizen_config.py"],
-  ["scripts/test_sp_list.py", "scripts/test_sp_list.py"],
-  ["scripts/test_sp_move.py", "scripts/test_sp_move.py"],
-  ["scripts/test_sp_new.py", "scripts/test_sp_new.py"],
-  ["scripts/test_sp_validate.py", "scripts/test_sp_validate.py"],
-  ["scripts/test_sp_handoff.py", "scripts/test_sp_handoff.py"],
-  ["scripts/test_sp_organize.py", "scripts/test_sp_organize.py"],
-  ["scripts/test_michi_tree_close.py", "scripts/test_michi_tree_close.py"],
-];
 
 // cpSync recursivo escreve em caminhos com mojibake quando o destino tem Unicode (Node 22, Windows)
 function copy(src, dst) {
@@ -80,10 +44,17 @@ function sanitizeTree(p) {
 }
 
 function sync() {
+  if (!fs.existsSync(VAULT) || !fs.statSync(VAULT).isDirectory()) throw new Error(`fonte do sync não existe: ${VAULT} (defina KAIZEN_SOURCE; só quem mantém o vault precisa de sync, core/ já vem no pacote)`);
+  const { parts, missing, unlisted } = plan(VAULT);
+  if (missing.length) throw new Error(`faltam no vault (${VAULT}): ${missing.join(", ")}`);
   fs.rmSync(CORE_DIR, { recursive: true, force: true });
-  for (const [from, to] of PARTS) copy(path.join(VAULT, from), path.join(CORE_DIR, coreRel(to)));
+  for (const [from, to] of parts) copy(path.join(VAULT, from), path.join(CORE_DIR, coreRel(to)));
   sanitizeTree(CORE_DIR);
-  console.log(`sync: ${PARTS.length} peças de ${VAULT}`);
+  const { stale, orphans } = overlay(CORE_DIR, path.join(PKG, "translations"), argv.includes("--stamp"));
+  for (const u of unlisted) console.warn(`aviso: peça do vault fora do sync: ${u} (acrescente a bin/sync.js ou a SKIP)`);
+  for (const t of stale) console.warn(`aviso: a fonte de ${t} mudou desde a tradução; reveja translations/${t}`);
+  for (const t of orphans) console.warn(`aviso: translations/${t} não tem peça correspondente em core/`);
+  console.log(`sync: ${parts.length} peças de ${VAULT}`);
 }
 
 // escreve ficheiros sem sobrescrever; devolve quantos criou
@@ -130,6 +101,16 @@ function mergeHooks(dest, hooks) {
   fs.writeFileSync(settings, JSON.stringify(cfg, null, 2) + "\n");
 }
 
+// pasta (relativa a dest) vinda de kaizen.config.json; chave em falta, tipo errado ou caminho fora de dest -> defeito
+function configDir(dest, key, fallback) {
+  let cfg = {};
+  try { cfg = JSON.parse(fs.readFileSync(path.join(dest, "kaizen.config.json"), "utf8").replace(/^﻿/, "")); } catch (e) { /* sem config válida: defeitos */ }
+  const v = cfg && typeof cfg === "object" ? cfg[key] : undefined;
+  if (typeof v !== "string" || !v || path.isAbsolute(v)) return fallback;
+  const rel = path.relative(dest, path.resolve(dest, v));
+  return rel.startsWith("..") || path.isAbsolute(rel) ? fallback : v;
+}
+
 function init(target, harness = "claude") {
   const adapter = ADAPTERS[harness];
   if (!adapter) throw new Error(`harness desconhecido: ${harness} (claude|codex|agents-md)`);
@@ -141,8 +122,11 @@ function init(target, harness = "claude") {
   const n = writeFiles(dest, out.files);
   if (out.agents) appendAgents(dest, out.agents);
   if (out.settings) mergeHooks(dest, out.settings.hooks);
-  const sp = path.join(dest, "knowledge", "projects", "kaizen");
-  for (const d of ["sp", "dr", "dp"]) for (const s of ["TODO", "Doing", "Done"]) fs.mkdirSync(path.join(sp, "_default", d, s), { recursive: true });
+  const spRoot = path.join(dest, configDir(dest, "spRoot", "knowledge/projects/kaizen"));
+  // DR/DP seguem docsRoot só se a config o define; sem ele ficam ao lado dos SPs (comportamento anterior)
+  const docsRel = configDir(dest, "docsRoot", "");
+  const docsRoot = docsRel ? path.join(dest, docsRel) : spRoot;
+  for (const d of ["sp", "dr", "dp"]) for (const s of ["TODO", "Doing", "Done"]) fs.mkdirSync(path.join(d === "sp" ? spRoot : docsRoot, "_default", d, s), { recursive: true });
   console.log(`init (${harness}): ${n} peças copiadas para ${dest}`);
   return n;
 }
@@ -198,7 +182,7 @@ function doctor(target, harness = "claude", fix = false) {
   let rc = problems.length ? 1 : 0;
   if (!pythonCmd()) { console.error("falta: Python 3 no PATH (ou KAIZEN_PYTHON)"); rc = 1; }
   else if (!problems.some((p) => p.includes("scripts/"))) rc = py(["scripts/sp-list.py", "--all"], dir) || rc; // os scripts arrancam
-  const root = path.join(dir, "knowledge", "projects", "kaizen");
+  const root = path.join(dir, configDir(dir, "spRoot", "knowledge/projects/kaizen"));
   const sps = [];
   (function walk(d) {
     if (!fs.existsSync(d)) return;
@@ -211,6 +195,7 @@ function doctor(target, harness = "claude", fix = false) {
   if (sps.length && pythonCmd()) rc = py(["scripts/sp-validate.py", ...sps], dir) || rc;
   const m = detectMode();
   console.log(`handoff: ${m.mode} (${m.backend})`);
+  if (harness !== "claude") console.log("context hook: none for this harness (degraded); run the handoff by hand when the context gets long, see the AGENTS.md block");
   console.log(rc === 0 ? `doctor: ok (${sps.length} SPs)` : "doctor: problemas");
   return rc;
 }

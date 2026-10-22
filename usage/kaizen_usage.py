@@ -112,6 +112,7 @@ class ClaudeTranscripts:
 
     def __init__(self, root=None):
         self.root = root or os.path.expanduser("~/.claude/projects")
+        self.unknown = 0  # assistant rows whose usage block is not in the expected shape
 
     def read(self, since=None):
         seen, out = set(), []
@@ -119,7 +120,11 @@ class ClaudeTranscripts:
             sid = os.path.basename(path)[:8]
             for d in _lines(path):
                 m = d.get("message")
-                if d.get("type") != "assistant" or not isinstance(m, dict) or not isinstance(m.get("usage"), dict):
+                if d.get("type") != "assistant" or not isinstance(m, dict):
+                    continue
+                if not isinstance(m.get("usage"), dict):
+                    if m.get("model") != "<synthetic>":
+                        self.unknown += 1
                     continue
                 key = (m.get("id"), d.get("requestId"))
                 if key != (None, None):
@@ -152,6 +157,7 @@ class CodexSessions:
 
     def __init__(self, root=None):
         self.root = root or os.path.expanduser("~/.codex/sessions")
+        self.unknown = 0  # token_count events whose info block is not in the expected shape
 
     def read(self, since=None):
         out = []
@@ -168,7 +174,10 @@ class CodexSessions:
                     model = m if isinstance(m, str) and m else model
                 elif d.get("type") == "event_msg" and p.get("type") == "token_count":
                     info = p.get("info")
+                    if info is None:
+                        continue  # Codex emits token_count with info null before the first request
                     if not isinstance(info, dict) or not isinstance(info.get("last_token_usage"), dict):
+                        self.unknown += 1
                         continue
                     total = info.get("total_token_usage")
                     if total is not None and total == last_total:
@@ -194,7 +203,11 @@ SOURCES = {"claude": ClaudeTranscripts, "codex": CodexSessions}
 def load_records(names, since=None, roots=None):
     recs = []
     for n in names:
-        recs += SOURCES[n]((roots or {}).get(n)).read(since)
+        src = SOURCES[n]((roots or {}).get(n))
+        recs += src.read(since)
+        if src.unknown:
+            print(f"warning: {src.unknown} {n} entries have an unrecognised usage format and were skipped "
+                  f"(the transcript format may have changed)", file=sys.stderr)
     return sorted(recs, key=lambda r: r["ts"])
 
 

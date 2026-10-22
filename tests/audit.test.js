@@ -23,13 +23,17 @@ test("cada padrão proibido plantado é detetado", () => {
     ["windows-user-path", "C:\\Users\\someone\\x"],
     ["wikilink", "see [[note]]"],
     ["verbose-guard", "verbose-guard.py"],
+    ["email", "contact: someone@example.com"],
+    ["token", "key = sk-abcdefghijklmnop1234"],
+    ["token", "ghp_abcdefghijklmnopqrstuvwx"],
+    ["private-key", "-----BEGIN RSA PRIVATE KEY-----"],
   ]) {
     const d = tmp();
     fs.writeFileSync(path.join(d, "f.md"), sample);
     const hits = audit(d);
     assert.ok(hits.some((h) => h.pattern === name), `não detetou ${name}`);
   }
-  assert.strictEqual(PATTERNS.length, 5);
+  assert.strictEqual(PATTERNS.length, 8);
 });
 
 test("ignora node_modules e .git", () => {

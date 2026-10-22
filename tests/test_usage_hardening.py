@@ -21,6 +21,40 @@ def run(*argv):
     return rc, buf.getvalue()
 
 
+class UnknownFormatTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def load(self, name, root):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            recs = ku.load_records([name], roots={name: str(root)})
+        return recs, err.getvalue()
+
+    def test_claude_unrecognised_usage_warns(self):
+        bad = {"type": "assistant", "timestamp": "2026-10-20T10:00:00Z", "message": {"id": "x", "model": "m", "tokens": 5}}
+        jl(self.tmp / "p" / "s.jsonl", [claude_row("2026-10-20T10:00:00Z", "a"), bad])
+        recs, err = self.load("claude", self.tmp)
+        self.assertEqual(len(recs), 1)
+        self.assertIn("1 claude entries", err)
+
+    def test_codex_unrecognised_info_warns_but_null_info_does_not(self):
+        rows = [{"timestamp": "2026-10-20T10:00:01Z", "type": "event_msg",
+                 "payload": {"type": "token_count", "info": {"usage": {"input": 1}}}},
+                {"timestamp": "2026-10-20T10:00:02Z", "type": "event_msg", "payload": {"type": "token_count", "info": None}}]
+        jl(self.tmp / "2026" / "r.jsonl", rows)
+        recs, err = self.load("codex", self.tmp)
+        self.assertEqual(recs, [])
+        self.assertIn("1 codex entries", err)
+
+    def test_known_formats_stay_silent(self):
+        jl(self.tmp / "p" / "s.jsonl", [claude_row("2026-10-20T10:00:00Z", "a")])
+        _, err = self.load("claude", self.tmp)
+        self.assertEqual(err, "")
+
+
 class HardeningTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()

@@ -9,6 +9,9 @@ const PATTERNS = [
   { name: "windows-user-path", re: /C:[\\/]+Users[\\/]/i },
   { name: "wikilink", re: /\[\[[^\][,"]+\]\]/ },
   { name: "verbose-guard", re: /verbose-guard/i },
+  { name: "email", re: /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/ },
+  { name: "token", re: /\b(sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,})/ },
+  { name: "private-key", re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/ },
 ];
 const SKIP_DIRS = new Set([".git", "node_modules"]);
 // o próprio auditor e o seu teste contêm os padrões por definição

@@ -67,7 +67,7 @@ kaizen usage --days 30                                                  # what i
 ## Known limits
 
 - The Codex transcript parser follows the rollout format (`event_msg` / `token_count`, `last_token_usage`) and is tested with synthetic fixtures; if your Codex version logs usage differently, open an issue with an anonymised sample.
-- Codex has no hook system equivalent to Claude Code's: hook behaviours become instructions in `AGENTS.md`.
+- Codex and `agents-md` run without the context-guard hook (degraded on purpose: `context-guard.py` only reads Claude transcripts and this repo does not wire Codex hooks it cannot verify on your version). The `AGENTS.md` block tells the agent to run the handoff by hand when the context gets long, and `kaizen doctor` prints that notice. If your Codex version has hooks, you can point one at a script that reads its rollout; contributions welcome.
 - Cursor, Gemini CLI, opencode and similar are supported only through the `agents-md` fallback.
 - The `new conversation` command used by the Codex handoff (`/new`) is an assumption to verify on your version.
 
