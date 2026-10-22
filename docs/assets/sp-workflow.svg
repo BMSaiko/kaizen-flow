@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="t d">
+  <title id="t">SP workflow</title>
+  <desc id="d">Super Prompt workflow: brainstorm, swot, grill-me and dr feed an 8-section SP that moves TODO, Doing, Done.</desc>
+  <rect width="1200" height="560" rx="24" fill="#0f172a"/>
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<text x="600.0" y="62" text-anchor="middle" font-size="40" font-weight="700" fill="#f8fafc">SP workflow</text>
+<text x="600.0" y="96" text-anchor="middle" font-size="20" fill="#cbd5e1">From an idea to a Super Prompt, then through its lifecycle</text>
+<text x="85" y="142" font-size="16" font-weight="600" fill="#94a3b8">1. BUILD  (/sp, outside michi)</text>
+<rect x="85" y="160" width="220" height="84" rx="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="195.0" y="198.0" text-anchor="middle" font-size="24" font-weight="600" fill="#38bdf8">brainstorm</text><text x="195.0" y="224.0" text-anchor="middle" font-size="16" fill="#cbd5e1">ideas</text>
+<rect x="355" y="160" width="220" height="84" rx="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="465.0" y="198.0" text-anchor="middle" font-size="24" font-weight="600" fill="#38bdf8">swot</text><text x="465.0" y="224.0" text-anchor="middle" font-size="16" fill="#cbd5e1">stress-test</text>
+<rect x="625" y="160" width="220" height="84" rx="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="735.0" y="198.0" text-anchor="middle" font-size="24" font-weight="600" fill="#38bdf8">grill-me</text><text x="735.0" y="224.0" text-anchor="middle" font-size="16" fill="#cbd5e1">align what, why, how</text>
+<rect x="895" y="160" width="220" height="84" rx="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="1005.0" y="198.0" text-anchor="middle" font-size="24" font-weight="600" fill="#38bdf8">dr</text><text x="1005.0" y="224.0" text-anchor="middle" font-size="16" fill="#cbd5e1">real code paths</text>
+<path d="M307 202H345" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M353 202l-10-6v12z" fill="#94a3b8"/>
+<path d="M577 202H615" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M623 202l-10-6v12z" fill="#94a3b8"/>
+<path d="M847 202H885" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M893 202l-10-6v12z" fill="#94a3b8"/>
+<path d="M1005 246V280H600V300" stroke="#94a3b8" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M600 308l-6-10h12z" fill="#94a3b8"/>
+<rect x="200" y="308" width="800" height="100" rx="18" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/><text x="600" y="350" text-anchor="middle" font-size="24" font-weight="600" fill="#a78bfa">Super Prompt: 8 fixed sections</text>
+<text x="600" y="380" text-anchor="middle" font-size="16" fill="#cbd5e1">role · context · objective · success criteria · constraints · seams · steps · done-when</text>
+<text x="85" y="452" font-size="16" font-weight="600" fill="#94a3b8">2. LIFECYCLE  (sp-new, sp-move, sp-list)</text>
+<rect x="85" y="470" width="220" height="60" rx="18" fill="#1e293b" stroke="#94a3b8" stroke-width="2"/><text x="195.0" y="508.0" text-anchor="middle" font-size="24" font-weight="600" fill="#94a3b8">TODO</text><rect x="355" y="470" width="220" height="60" rx="18" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/><text x="465.0" y="508.0" text-anchor="middle" font-size="24" font-weight="600" fill="#a78bfa">Doing</text><text x="465" y="530" /><text x="465" y="506" text-anchor="middle" font-size="0"></text><rect x="625" y="470" width="220" height="60" rx="18" fill="#1e293b" stroke="#34d399" stroke-width="2"/><text x="735.0" y="508.0" text-anchor="middle" font-size="24" font-weight="600" fill="#34d399">Done</text><text x="735" y="530" /><text x="735" y="506" text-anchor="middle" font-size="0"></text><path d="M307 500H345" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M353 500l-10-6v12z" fill="#94a3b8"/><path d="M577 500H615" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M623 500l-10-6v12z" fill="#94a3b8"/><text x="860" y="494" font-size="16" fill="#cbd5e1">handoff appends ## Progresso</text><text x="860" y="518" font-size="16" fill="#cbd5e1">and restarts in a fresh context</text>
+  </g>
+</svg>

@@ -17,6 +17,16 @@ A small workflow for working with coding agents:
 
 Works with **Claude Code** and **Codex CLI** (plus any harness that reads `AGENTS.md`). Node stdlib and Python stdlib only; no telemetry.
 
+## How it works
+
+<p align="center">
+  <img src="docs/assets/sp-workflow.svg" alt="SP workflow: brainstorm, swot, grill-me and dr build an 8-section Super Prompt that moves TODO, Doing, Done" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/assets/michi-cycle.svg" alt="michi cycle: dr, grill, dp, da, gates, report, reflect, commit proposal" width="100%">
+</p>
+
 ## Why it uses fewer tokens and ships more
 
 An analysis of one author's own usage reports (Claude Code, 2026-10-15 to 2026-10-22, one repo, API-equivalent cost):

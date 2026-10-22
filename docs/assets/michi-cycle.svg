@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="t d">
+  <title id="t">michi cycle</title>
+  <desc id="d">michi cycle: dr, grill, dp, da, gates, report, reflect, commit proposal, with handoff and a kaizen loop.</desc>
+  <rect width="1200" height="600" rx="24" fill="#0f172a"/>
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<text x="600.0" y="62" text-anchor="middle" font-size="40" font-weight="700" fill="#f8fafc">michi</text>
+<text x="600.0" y="96" text-anchor="middle" font-size="20" fill="#cbd5e1">The cycle that executes an SP</text>
+<rect x="85" y="140" width="220" height="90" rx="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="195.0" y="181.0" text-anchor="middle" font-size="24" font-weight="600" fill="#38bdf8">1 · dr</text><text x="195.0" y="207.0" text-anchor="middle" font-size="16" fill="#cbd5e1">research</text>
+<path d="M307 185H345" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M353 185l-10-6v12z" fill="#94a3b8"/>
+<rect x="355" y="140" width="220" height="90" rx="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="465.0" y="181.0" text-anchor="middle" font-size="24" font-weight="600" fill="#38bdf8">2 · grill</text><text x="465.0" y="207.0" text-anchor="middle" font-size="16" fill="#cbd5e1">align</text>
+<path d="M577 185H615" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M623 185l-10-6v12z" fill="#94a3b8"/>
+<rect x="625" y="140" width="220" height="90" rx="18" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/><text x="735.0" y="181.0" text-anchor="middle" font-size="24" font-weight="600" fill="#a78bfa">3 · dp</text><text x="735.0" y="207.0" text-anchor="middle" font-size="16" fill="#cbd5e1">TDD-shaped plan</text>
+<path d="M847 185H885" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M893 185l-10-6v12z" fill="#94a3b8"/>
+<rect x="895" y="140" width="220" height="90" rx="18" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/><text x="1005.0" y="181.0" text-anchor="middle" font-size="24" font-weight="600" fill="#a78bfa">4 · da</text><text x="1005.0" y="207.0" text-anchor="middle" font-size="16" fill="#cbd5e1">act, proof per phase</text>
+<rect x="85" y="310" width="220" height="90" rx="18" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/><text x="195.0" y="351.0" text-anchor="middle" font-size="24" font-weight="600" fill="#fbbf24">5 · gates</text><text x="195.0" y="377.0" text-anchor="middle" font-size="16" fill="#cbd5e1">build, tests, lint</text>
+<path d="M307 355H345" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M353 355l-10-6v12z" fill="#94a3b8"/>
+<rect x="355" y="310" width="220" height="90" rx="18" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/><text x="465.0" y="351.0" text-anchor="middle" font-size="24" font-weight="600" fill="#fbbf24">6 · report</text><text x="465.0" y="377.0" text-anchor="middle" font-size="16" fill="#cbd5e1">what, verified, open</text>
+<path d="M577 355H615" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M623 355l-10-6v12z" fill="#94a3b8"/>
+<rect x="625" y="310" width="220" height="90" rx="18" fill="#1e293b" stroke="#34d399" stroke-width="2"/><text x="735.0" y="351.0" text-anchor="middle" font-size="24" font-weight="600" fill="#34d399">7 · reflect</text><text x="735.0" y="377.0" text-anchor="middle" font-size="16" fill="#cbd5e1">patch the workflow</text>
+<path d="M847 355H885" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M893 355l-10-6v12z" fill="#94a3b8"/>
+<rect x="895" y="310" width="220" height="90" rx="18" fill="#1e293b" stroke="#34d399" stroke-width="2"/><text x="1005.0" y="351.0" text-anchor="middle" font-size="24" font-weight="600" fill="#34d399">8 · commit</text><text x="1005.0" y="377.0" text-anchor="middle" font-size="16" fill="#cbd5e1">proposal, never auto</text>
+<path d="M1005 232V262H195V290" stroke="#94a3b8" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M195 310l-6-10h12z" fill="#94a3b8"/>
+<text x="600" y="256" text-anchor="middle" font-size="15" fill="#94a3b8">done phase 4 → verify</text>
+<rect x="85" y="470" width="1030" height="84" rx="18" fill="#1e293b" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="600" y="502" text-anchor="middle" font-size="18" font-weight="600" fill="#f8fafc">Between phases</text>
+<text x="600" y="530" text-anchor="middle" font-size="16" fill="#cbd5e1">context guard at 100K → handoff (progress saved in the SP, fresh session) · reflect every phase → next cycle is cheaper</text>
+  </g>
+</svg>
