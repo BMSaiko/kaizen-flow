@@ -53,6 +53,17 @@ If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the blo
 | Keep a weekly record | `kaizen report --week 2026-W42` | a metrics-only Markdown note in `reportsDir` |
 | Price a model not in the bundled table | add it to your prices file, set `"prices"` in `kaizen.config.json` | cost instead of `n/a` |
 | List my open stories | `kaizen status` | pending SPs by status and priority |
+| Cost of one period only | `kaizen usage --since 2026-10-01` | same tables from that date |
+| Show only one harness | `kaizen usage --source codex --top 10` | Codex only, top 10 sessions |
+| Read transcripts copied from another machine | `kaizen usage --codex-root ./backup/sessions` | totals from that folder |
+| Preview a weekly report without writing | `kaizen report --week 2026-W42 --print` | Markdown on stdout |
+| Write reports somewhere else | `kaizen report --out docs/usage` | `docs/usage/YYYY-WNN.md` |
+| Plan a feature as a story | `python scripts/sp-new.py --project app --slug login --priority P2` | an empty 8-section story in `sp/TODO` |
+| Plan a feature with dependent children | `python scripts/sp-new.py --project app --program billing --children "api,ui:api" --priority P2` | parent + two children, `ui` waits for `api` |
+| Start and finish a story | `python scripts/sp-move.py login doing` / `done --next` | story moves folders; `--next` opens the next child |
+| Check stories are well-formed | `python scripts/sp-validate.py path/to/story.md` | rc 1 if a section is missing |
+| Keep CI honest about leaks | `kaizen audit .` | rc 1 if personal data is found |
+| See what a handoff would do | `python scripts/sp-handoff.py --launch path/to/story.md --dry-run` | the commands, nothing executed |
 | Move to a fresh context mid-story | `sp-handoff` | resume command injected in the pane, or copied to the clipboard |
 
 Bad input (unknown harness, invalid `--since`/`--week`/`--days`, malformed prices or `settings.json`) stops with a one-line message and a non-zero exit; unreadable transcript lines or files are skipped, never fatal.
@@ -69,12 +80,53 @@ Bad input (unknown harness, invalid `--since`/`--week`/`--days`, malformed price
 
 ```sh
 kaizen init [repo] [--harness claude|codex|agents-md]
-kaizen doctor [repo] [--harness h]
+kaizen doctor [repo] [--harness h] [--fix]
 kaizen status [repo]                  # pending SPs
 kaizen usage [--days N | --since YYYY-MM-DD] [--source claude,codex] [--top N]
 kaizen report [--week YYYY-WNN] [--out DIR] [--print]
 kaizen audit [dir]                    # fails if personal data leaks into the repo
 ```
+
+### Command reference
+
+`[repo]` defaults to the current directory. `--harness` defaults to `claude`. Errors stop with one line and a non-zero exit.
+
+| Command | Option | Meaning |
+|---|---|---|
+| `kaizen init [repo]` | `--harness claude\|codex\|agents-md` | Which adapter to install. `claude`: `.claude/` skills, commands, hooks. `codex`: `.agents/skills/`, `.kaizen/commands/`, `AGENTS.md` block. `agents-md`: `AGENTS.md` block + scripts only. Never overwrites; re-running is safe. |
+| `kaizen doctor [repo]` | `--harness h` | Checks the install for that harness, that Python 3 runs the scripts, and that every SP has the 8 sections. Prints `handoff: cli\|app (backend)`. rc 0 = ok. |
+| | `--fix` | Restores what is missing (same as `init`, nothing overwritten), then re-checks. |
+| `kaizen status [repo]` | | Lists all SPs (TODO, Doing, Done) grouped by program. |
+| `kaizen usage` | `--days N` | Last N days (N > 0). |
+| | `--since YYYY-MM-DD` | From that date. Wins over `--days`. |
+| | `--source claude,codex` | Transcript stores to read (default: config `sources`, then both). |
+| | `--top N` | Sessions in the "top sessions" table (default 5). |
+| | `--prices FILE` | Prices JSON (default: config `prices`, then the bundled file). |
+| | `--repo DIR` | Where `kaizen.config.json` lives (default `.`). |
+| | `--claude-root DIR`, `--codex-root DIR` | Override `~/.claude/projects` / `~/.codex/sessions` (other machines, backups, tests). |
+| `kaizen report` | `--week YYYY-WNN` | ISO week to report (default: last closed week). |
+| | `--out DIR` | Output folder (default: config `reportsDir`, then `reports/usage`). |
+| | `--print` | Print instead of writing a file. |
+| | `--source`, `--prices`, `--repo`, `--claude-root`, `--codex-root` | Same as `usage`. |
+| `kaizen audit [dir]` | | Scans for personal data (names, local paths, wikilinks). rc 1 on any hit. |
+| `kaizen sync` | | Maintainers only: refreshes `core/` from the author's vault. Not needed by users. |
+
+### Workflow scripts (installed in `scripts/`)
+
+Run with `python scripts/<name>.py`. Roots come from `kaizen.config.json`.
+
+| Script | Usage | Options |
+|---|---|---|
+| `sp-new.py` | create a story in `sp/TODO` | `--project P --priority P1..P3` (required), `--slug S`, `--parent SLUG`, `--depends-on A B`, `--program SLUG --children "a,b:a,c:a+b"` (parent + children; `b:a` = b depends on a) |
+| `sp-list.py` | list pending stories | `--all` (include Done), `--status todo\|doing`, `--project P`, `--sort priority\|created\|status`, `--reverse`, `--flat`, `--tree`, `--tree-closed SLUG` (close checklist: rc 0 closed, 1 failures, 2 unknown slug) |
+| `sp-move.py` | `<slug> todo\|doing\|done` | `--project P`, `--next` (with `done`: open the next eligible child) |
+| `sp-validate.py` | `<file>...` | checks the 8-section contract, rc 1 on failure |
+| `sp-organize.py` | tidy stories into program folders | `--project P`, `--apply` (default is a dry run) |
+| `sp-handoff.py` | move the story to a fresh context | `--resolve [SLUG]` (find the story), `--write PATH [--file BODY]` (log progress), `--launch PATH` (clear context and resume), plus `--harness claude\|codex`, `--backend wezterm\|tmux\|clipboard`, `--pane ID`, `--dry-run` (print only), `--auto` (no questions; needs a story in Doing) |
+| `doc-list.py` | `dr\|dp` | `--all` |
+| `doc-move.py` | `dr\|dp <slug> todo\|doing\|done` | |
+
+Prompts/commands in the agent: `/michi <story>` (full cycle), `/sp` (build a story), `/sp-list`, `/sp-handoff`, `/one-shot` (a whole program unattended).
 
 ### Usage and cost
 
