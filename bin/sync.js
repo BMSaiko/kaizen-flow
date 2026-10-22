@@ -42,6 +42,23 @@ function plan(vault) {
   return { parts, missing, unlisted };
 }
 
+// true se o caminho do vault (relativo, com "/") é uma peça do sync; usado pelo hook do vault
+function owns(rel) {
+  const m = rel.match(/^\.claude\/skills\/([^/]+)\//);
+  if (m) return SKILLS.includes(m[1]);
+  const c = rel.match(/^\.claude\/commands\/([^/]+)$/);
+  if (c) return COMMAND_RE.test(c[1]);
+  const sc = rel.match(/^scripts\/([^/]+\.py)$/);
+  if (!sc) return false;
+  const n = sc[1];
+  if (SKIP.has(n)) return false;
+  if (SCRIPT_RE.test(n) || SCRIPT_NAMES.includes(n)) return true;
+  const t = n.match(/^test_(.+)\.py$/);
+  if (!t) return false;
+  const base = `${t[1]}.py`;
+  return [base, base.replace(/_/g, "-")].some((x) => SCRIPT_RE.test(x) || SCRIPT_NAMES.includes(x));
+}
+
 const sha = (buf) => crypto.createHash("sha256").update(buf).digest("hex");
 
 // ficheiros em dir (relativos, com "/")
@@ -77,4 +94,4 @@ function overlay(core, tdir, stamp) {
   return { stale, orphans };
 }
 
-module.exports = { plan, overlay, SKILLS };
+module.exports = { plan, overlay, owns, files, sha, SKILLS };

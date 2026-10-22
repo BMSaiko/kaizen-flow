@@ -16,3 +16,12 @@ Thanks for helping. The rules are short:
 - English prose lives in `translations/`: files there overlay the same path in `core/` after every sync. Edit those to change wording.
 - `translations/sources.json` stores the hash of the source each translation was made from; `kaizen sync` warns when the source changed since. After reviewing, run `kaizen sync --stamp`.
 - Changes to scripts or behaviour: open an issue or PR describing them; the maintainer applies them at the source and re-syncs.
+
+### Maintainer flow
+
+1. Edit the piece at the source (skills, commands, scripts of the vault).
+2. `kaizen sync --check` exits 1 and lists every `core/` file that is out of date (it never writes).
+3. `kaizen sync`, then `npm test` and `kaizen audit .`.
+4. Write a `COMMIT_*.md` and wait for the maintainer's confirmation before committing. Nothing here commits or pushes on its own; push only on explicit request.
+
+What counts as a piece is defined once, in `bin/sync.js`. Project SPs stay in the vault and are never mirrored.

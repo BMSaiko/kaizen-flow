@@ -64,3 +64,32 @@ test("overlay sobrepõe a tradução e assinala fonte alterada", () => {
   put(tr, "skills/gone/SKILL.md", "orphan");
   assert.deepStrictEqual(overlay(core, tr, true).orphans, ["skills/gone/SKILL.md"]);
 });
+
+test("sync --check sai 0 com core/ em dia e 1 quando o vault mudou, sem tocar em core/", () => {
+  // cópia do pacote: o teste escreve em core/ e os outros ficheiros de teste correm em paralelo
+  const pkg = tmp();
+  const root = path.join(__dirname, "..");
+  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true });
+  const kz = path.join(pkg, "bin", "kaizen.js");
+  const v = fakeVault();
+  const env = { ...process.env, KAIZEN_SOURCE: v };
+  assert.strictEqual(spawnSync("node", [kz, "sync"], { encoding: "utf8", env }).status, 0);
+  const ok = spawnSync("node", [kz, "sync", "--check"], { encoding: "utf8", env });
+  assert.strictEqual(ok.status, 0, ok.stdout + ok.stderr);
+  put(v, ".claude/skills/michi/SKILL.md", "alterado");
+  const f = path.join(pkg, "core", "skills", "michi", "SKILL.md");
+  const before = fs.readFileSync(f, "utf8");
+  const stale = spawnSync("node", [kz, "sync", "--check"], { encoding: "utf8", env });
+  assert.strictEqual(stale.status, 1);
+  assert.match(stale.stdout, /skills\/michi\/SKILL\.md/);
+  assert.strictEqual(fs.readFileSync(f, "utf8"), before);
+});
+
+test("owns() reconhece caminhos do vault que entram no sync", () => {
+  const { owns } = require("../bin/sync.js");
+  assert.ok(owns(".claude/skills/michi/SKILL.md"));
+  assert.ok(owns("scripts/sp-move.py"));
+  assert.ok(owns(".claude/commands/sp.md"));
+  assert.ok(!owns("scripts/outro-guard.py"));
+  assert.ok(!owns("knowledge/projects/p/sp/TODO/x.md"));
+});

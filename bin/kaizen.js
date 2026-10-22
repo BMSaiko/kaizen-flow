@@ -9,7 +9,7 @@ const CORE_DIR = path.join(PKG, "core");
 const { loadCore } = require("./core.js");
 const { MARKER } = require("../adapters/util.js");
 const { detectMode } = require("./mode.js");
-const { plan, overlay } = require("./sync.js");
+const { plan, overlay, files, sha } = require("./sync.js");
 const ADAPTERS = { claude: require("../adapters/claude"), codex: require("../adapters/codex"), "agents-md": require("../adapters/agents-md") };
 const VAULT = process.env.KAIZEN_SOURCE || path.join(require("os").homedir(), "Documents", "Second-Brain");
 
@@ -43,18 +43,42 @@ function sanitizeTree(p) {
   if (TEXT_EXT.test(p)) fs.writeFileSync(p, sanitize(fs.readFileSync(p, "utf8")));
 }
 
-function sync() {
+// gera core/ em dest a partir do vault; devolve o que o sync reporta
+function build(dest, tdir, stamp) {
   if (!fs.existsSync(VAULT) || !fs.statSync(VAULT).isDirectory()) throw new Error(`fonte do sync não existe: ${VAULT} (defina KAIZEN_SOURCE; só quem mantém o vault precisa de sync, core/ já vem no pacote)`);
   const { parts, missing, unlisted } = plan(VAULT);
   if (missing.length) throw new Error(`faltam no vault (${VAULT}): ${missing.join(", ")}`);
-  fs.rmSync(CORE_DIR, { recursive: true, force: true });
-  for (const [from, to] of parts) copy(path.join(VAULT, from), path.join(CORE_DIR, coreRel(to)));
-  sanitizeTree(CORE_DIR);
-  const { stale, orphans } = overlay(CORE_DIR, path.join(PKG, "translations"), argv.includes("--stamp"));
+  fs.rmSync(dest, { recursive: true, force: true });
+  for (const [from, to] of parts) copy(path.join(VAULT, from), path.join(dest, coreRel(to)));
+  sanitizeTree(dest);
+  return { parts, unlisted, ...overlay(dest, tdir, stamp) };
+}
+
+function sync() {
+  const { parts, unlisted, stale, orphans } = build(CORE_DIR, path.join(PKG, "translations"), argv.includes("--stamp"));
   for (const u of unlisted) console.warn(`aviso: peça do vault fora do sync: ${u} (acrescente a bin/sync.js ou a SKIP)`);
   for (const t of stale) console.warn(`aviso: a fonte de ${t} mudou desde a tradução; reveja translations/${t}`);
   for (const t of orphans) console.warn(`aviso: translations/${t} não tem peça correspondente em core/`);
   console.log(`sync: ${parts.length} peças de ${VAULT}`);
+}
+
+// compara o que o sync geraria com core/ sem lhe tocar; sai 1 se estiver desatualizado
+function syncCheck() {
+  const tmp = fs.mkdtempSync(path.join(require("os").tmpdir(), "kaizen-check-"));
+  try {
+    const tdir = path.join(tmp, "translations");
+    if (fs.existsSync(path.join(PKG, "translations"))) copy(path.join(PKG, "translations"), tdir);
+    const fresh = path.join(tmp, "core");
+    build(fresh, tdir, false);
+    const a = files(fresh);
+    const b = files(CORE_DIR);
+    const diff = [...new Set([...a, ...b])].filter((f) => !/__pycache__\/|\.pyc$/.test(f)).filter((f) => !a.includes(f) || !b.includes(f) || sha(fs.readFileSync(path.join(fresh, f))) !== sha(fs.readFileSync(path.join(CORE_DIR, f))));
+    for (const f of diff) console.log(`desatualizado: core/${f}`);
+    console.log(`sync --check: ${diff.length} diferenças`);
+    process.exit(diff.length ? 1 : 0);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 // escreve ficheiros sem sobrescrever; devolve quantos criou
@@ -220,7 +244,7 @@ const fix = fi >= 0 && !!argv.splice(fi, 1);
 const [cmd, arg] = argv;
 const cmds = {
   init: () => init(arg, harness),
-  sync,
+  sync: () => (argv.includes("--check") ? syncCheck() : sync()),
   usage: () => process.exit(usage("usage", argv.slice(1))),
   report: () => process.exit(usage("report", argv.slice(1))),
   doctor: () => process.exit(doctor(arg, harness, fix)),
@@ -233,7 +257,7 @@ const cmds = {
   },
 };
 if (!cmds[cmd]) {
-  console.log("kaizen <init [repo] [--harness claude|codex|agents-md] | doctor [repo] [--harness h] [--fix] | status [repo] | usage [flags] | report [--week YYYY-WNN] [flags] | audit [dir] | sync>");
+  console.log("kaizen <init [repo] [--harness claude|codex|agents-md] | doctor [repo] [--harness h] [--fix] | status [repo] | usage [flags] | report [--week YYYY-WNN] [flags] | audit [dir] | sync [--check|--stamp]>");
   process.exit(cmd ? 1 : 0);
 }
 try {
