@@ -9,6 +9,7 @@ function loadCore(dir = CORE) {
   const out = [];
   (function walk(d) {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      if (e.name === "__pycache__" || e.name === ".pytest_cache" || e.name.endsWith(".pyc")) continue;
       const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p);
       else out.push({ rel: path.relative(dir, p).replace(/\\/g, "/"), data: fs.readFileSync(p) });

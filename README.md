@@ -37,9 +37,25 @@ The package ships a neutral core and an adapter per harness. For Codex, `kaizen 
 
 The easiest way is to let Codex do the install. Open Codex in your project and say:
 
-> Install kaizen-flow for Codex: clone it, run `kaizen init --harness codex`, then read the `AGENTS.md` block it added and set up whatever is Codex-specific (prompts, config, approvals) for my setup. Finish with `kaizen doctor --harness codex`.
+> Install kaizen-flow for Codex: clone it, run `kaizen init --harness codex`, then read the `AGENTS.md` block it added and set up whatever is Codex-specific (prompts, config, approvals) for my setup. Finish with `kaizen doctor --harness codex`. The install is only complete when `kaizen doctor --harness codex` exits 0: while it does not, run `kaizen doctor --harness codex --fix` (restores what is missing, never overwrites) and re-run `doctor`, repeating until it exits 0. Then tell me what you set up outside the project.
 
 If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the block.
+
+## Use cases
+
+| I want to... | Run | You get |
+|---|---|---|
+| Start a project with the Kaizen workflow | `kaizen init --harness codex` | skills, prompts, `sp-*` scripts, an `AGENTS.md` block; existing files are kept |
+| Check the install is healthy (CI, new machine) | `kaizen doctor --harness codex` | rc 0 when complete, rc 1 and a list of what is missing |
+| Repair a broken or partial install | `kaizen doctor --harness codex --fix` | missing pieces restored, nothing overwritten |
+| See what my agents cost this month | `kaizen usage --days 30` | totals by day, model, session and 5 h window (API-equivalent USD) |
+| Compare Claude and Codex spend | `kaizen usage --source claude,codex` | one table across both transcript stores |
+| Keep a weekly record | `kaizen report --week 2026-W42` | a metrics-only Markdown note in `reportsDir` |
+| Price a model not in the bundled table | add it to your prices file, set `"prices"` in `kaizen.config.json` | cost instead of `n/a` |
+| List my open stories | `kaizen status` | pending SPs by status and priority |
+| Move to a fresh context mid-story | `sp-handoff` | resume command injected in the pane, or copied to the clipboard |
+
+Bad input (unknown harness, invalid `--since`/`--week`/`--days`, malformed prices or `settings.json`) stops with a one-line message and a non-zero exit; unreadable transcript lines or files are skipped, never fatal.
 
 ## CLI vs desktop app
 

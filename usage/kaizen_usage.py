@@ -22,12 +22,43 @@ CONFIG_NAME = "kaizen.config.json"
 DEFAULTS = {"reportsDir": "reports/usage", "sources": ["claude", "codex"], "prices": None}
 
 
+def num(v):
+    """Non-negative int from a token field; anything else counts as 0."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or v < 0 or v == float("inf"):
+        return 0
+    return int(v)
+
+
+def _lines(path):
+    """Yield parsed JSON objects of a JSONL file; unreadable files and bad lines are skipped."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                try:
+                    d = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(d, dict):
+                    yield d
+    except OSError:
+        return
+
+
 def read_config(repo):
     try:
         data = json.loads((Path(repo) / CONFIG_NAME).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         data = {}
-    return {**DEFAULTS, **(data if isinstance(data, dict) else {})}
+    cfg = {**DEFAULTS, **(data if isinstance(data, dict) else {})}
+    src = cfg["sources"]
+    if isinstance(src, str):
+        src = [x.strip() for x in src.split(",")]
+    cfg["sources"] = [x for x in src if isinstance(x, str)] if isinstance(src, list) else DEFAULTS["sources"]
+    if not isinstance(cfg["reportsDir"], str) or not cfg["reportsDir"]:
+        cfg["reportsDir"] = DEFAULTS["reportsDir"]
+    if not isinstance(cfg["prices"], str):
+        cfg["prices"] = None
+    return cfg
 
 
 class Pricing:
@@ -36,8 +67,21 @@ class Pricing:
 
     @classmethod
     def load(cls, path=None):
-        data = json.loads(Path(path or HERE / "prices.json").read_text(encoding="utf-8"))
-        return cls(data.get("models", {}))
+        f = Path(path or HERE / "prices.json")
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            sys.exit(f"cannot read prices file {f}: {e}")
+        models = data.get("models") if isinstance(data, dict) else None
+        if not isinstance(models, dict):
+            sys.exit(f"prices file {f}: expected an object with a 'models' object")
+        for k, p in models.items():
+            ok = isinstance(p, dict) and all(
+                isinstance(p.get(x), (int, float)) and not isinstance(p.get(x), bool) and p[x] >= 0
+                for x in ("in", "out"))
+            if not ok:
+                sys.exit(f"prices file {f}: model '{k}' needs numeric 'in' and 'out' (USD per million tokens)")
+        return cls(models)
 
     def lookup(self, model):
         hits = [k for k in self.models if model.startswith(k)]
@@ -54,6 +98,8 @@ class Pricing:
 
 
 def _ts(value):
+    if not isinstance(value, str):
+        raise ValueError("timestamp is not a string")
     return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone()
 
 
@@ -71,29 +117,26 @@ class ClaudeTranscripts:
         seen, out = set(), []
         for path in glob.glob(os.path.join(self.root, "*", "*.jsonl")):
             sid = os.path.basename(path)[:8]
-            with open(path, encoding="utf-8", errors="replace") as fh:
-                for line in fh:
-                    try:
-                        d = json.loads(line)
-                    except ValueError:
-                        continue
-                    m = d.get("message")
-                    if d.get("type") != "assistant" or not isinstance(m, dict) or not m.get("usage"):
-                        continue
-                    key = (m.get("id"), d.get("requestId"))
+            for d in _lines(path):
+                m = d.get("message")
+                if d.get("type") != "assistant" or not isinstance(m, dict) or not isinstance(m.get("usage"), dict):
+                    continue
+                key = (m.get("id"), d.get("requestId"))
+                if key != (None, None):
                     if key in seen:
                         continue
                     seen.add(key)
-                    try:
-                        ts = _ts(d["timestamp"])
-                    except (KeyError, ValueError):
-                        continue
-                    if since and ts < since:
-                        continue
-                    u = m["usage"]
-                    out.append(_rec(ts, sid, m.get("model", "?"), u.get("input_tokens") or 0,
-                                    u.get("output_tokens") or 0, u.get("cache_read_input_tokens") or 0,
-                                    u.get("cache_creation_input_tokens") or 0))
+                try:
+                    ts = _ts(d["timestamp"])
+                except (KeyError, ValueError):
+                    continue
+                if since and ts < since:
+                    continue
+                u = m["usage"]
+                model = m.get("model")
+                out.append(_rec(ts, sid, model if isinstance(model, str) else "?", num(u.get("input_tokens")),
+                                num(u.get("output_tokens")), num(u.get("cache_read_input_tokens")),
+                                num(u.get("cache_creation_input_tokens"))))
         return sorted(out, key=lambda r: r["ts"])
 
 
@@ -112,38 +155,34 @@ class CodexSessions:
         out = []
         for path in glob.glob(os.path.join(self.root, "**", "*.jsonl"), recursive=True):
             sid, model, last_total = None, "?", None
-            with open(path, encoding="utf-8", errors="replace") as fh:
-                for line in fh:
+            for d in _lines(path):
+                p = d.get("payload")
+                if not isinstance(p, dict):
+                    continue
+                if d.get("type") == "session_meta":
+                    sid = str(p.get("id") or p.get("session_id") or "")[:8] or None
+                elif d.get("type") == "turn_context":
+                    m = p.get("model")
+                    model = m if isinstance(m, str) and m else model
+                elif d.get("type") == "event_msg" and p.get("type") == "token_count":
+                    info = p.get("info")
+                    if not isinstance(info, dict) or not isinstance(info.get("last_token_usage"), dict):
+                        continue
+                    total = info.get("total_token_usage")
+                    if total is not None and total == last_total:
+                        continue  # repeated event, same cumulative total
+                    last_total = total
                     try:
-                        d = json.loads(line)
-                    except ValueError:
+                        ts = _ts(d["timestamp"])
+                    except (KeyError, ValueError):
                         continue
-                    p = d.get("payload")
-                    if not isinstance(p, dict):
+                    if since and ts < since:
                         continue
-                    if d.get("type") == "session_meta":
-                        sid = str(p.get("id") or p.get("session_id") or "")[:8] or None
-                    elif d.get("type") == "turn_context":
-                        model = p.get("model") or model
-                    elif d.get("type") == "event_msg" and p.get("type") == "token_count":
-                        info = p.get("info")
-                        if not isinstance(info, dict) or not isinstance(info.get("last_token_usage"), dict):
-                            continue
-                        total = info.get("total_token_usage")
-                        if total is not None and total == last_total:
-                            continue  # repeated event, same cumulative total
-                        last_total = total
-                        try:
-                            ts = _ts(d["timestamp"])
-                        except (KeyError, ValueError):
-                            continue
-                        if since and ts < since:
-                            continue
-                        u = info["last_token_usage"]
-                        cached = u.get("cached_input_tokens") or 0
-                        out.append(_rec(ts, sid or os.path.basename(path)[-14:-6], model,
-                                        max((u.get("input_tokens") or 0) - cached, 0),
-                                        u.get("output_tokens") or 0, cached, 0))
+                    u = info["last_token_usage"]
+                    cached = num(u.get("cached_input_tokens"))
+                    out.append(_rec(ts, sid or os.path.basename(path)[-14:-6], model,
+                                    max(num(u.get("input_tokens")) - cached, 0),
+                                    num(u.get("output_tokens")), cached, 0))
         return sorted(out, key=lambda r: r["ts"])
 
 
@@ -216,8 +255,11 @@ def render_text(agg, top=5):
 
 def week_bounds(label):
     if label:
-        y, w = label.split("-W")
-        mon = date.fromisocalendar(int(y), int(w), 1)
+        try:
+            y, w = label.split("-W")
+            mon = date.fromisocalendar(int(y), int(w), 1)
+        except ValueError:
+            sys.exit(f"invalid --week '{label}' (expected YYYY-WNN, e.g. 2026-W42)")
     else:
         today = date.today()
         mon = today - timedelta(days=today.weekday() + 7)
@@ -274,8 +316,13 @@ def main(argv=None):
     if a.cmd == "usage":
         since = None
         if a.since:
-            since = datetime.fromisoformat(a.since).astimezone()
-        elif a.days:
+            try:
+                since = datetime.fromisoformat(a.since).astimezone()
+            except ValueError:
+                sys.exit(f"invalid --since '{a.since}' (expected YYYY-MM-DD)")
+        elif a.days is not None:
+            if a.days <= 0:
+                sys.exit("--days must be a positive number")
             since = datetime.now().astimezone() - timedelta(days=a.days)
         recs = load_records(names, since, roots)
         print(render_text(aggregate(recs, pricing), a.top) if recs else "No data.")
