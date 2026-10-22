@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320" role="img" aria-labelledby="t d">
+  <title id="t">Michi, the kaizen-flow mascot</title>
+  <desc id="d">Michi, a small violet cat whose tail curls into a loop with an upward arrow, standing for a cycle that improves each time.</desc>
+  <!-- body -->
+  <ellipse cx="150" cy="226" rx="70" ry="58" fill="#a78bfa" stroke="#6d28d9" stroke-width="6"/>
+  <ellipse cx="150" cy="238" rx="38" ry="36" fill="#ede9fe"/>
+  <!-- ears -->
+  <path d="M86 112l-6-52 44 30z" fill="#a78bfa" stroke="#6d28d9" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M214 112l6-52-44 30z" fill="#a78bfa" stroke="#6d28d9" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M92 98l-2-26 20 14zM208 98l2-26-20 14z" fill="#f9a8d4"/>
+  <!-- head -->
+  <ellipse cx="150" cy="140" rx="72" ry="62" fill="#a78bfa" stroke="#6d28d9" stroke-width="6"/>
+  <!-- eyes -->
+  <ellipse cx="124" cy="136" rx="9" ry="12" fill="#1e1b4b"/>
+  <ellipse cx="176" cy="136" rx="9" ry="12" fill="#1e1b4b"/>
+  <circle cx="127" cy="131" r="3.5" fill="#fff"/>
+  <circle cx="179" cy="131" r="3.5" fill="#fff"/>
+  <!-- nose and mouth -->
+  <path d="M144 156h12l-6 8z" fill="#f472b6"/>
+  <path d="M150 164v6c-6 6-12 6-16 2M150 170c6 6 12 6 16 2" fill="none" stroke="#1e1b4b" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- whiskers -->
+  <path d="M104 160l-30-6M104 168l-30 6M196 160l30-6M196 168l30 6" stroke="#6d28d9" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- paws -->
+  <ellipse cx="120" cy="280" rx="20" ry="11" fill="#ede9fe" stroke="#6d28d9" stroke-width="5"/>
+  <ellipse cx="180" cy="280" rx="20" ry="11" fill="#ede9fe" stroke="#6d28d9" stroke-width="5"/>
+  <!-- tail loop with arrow: the Kaizen cycle -->
+  <path d="M214 246c52 6 72-34 46-62s-72-6-58 28" fill="none" stroke="#6d28d9" stroke-width="14" stroke-linecap="round"/>
+  <path d="M190 204l14 18 16-20z" fill="#6d28d9"/>
+</svg>

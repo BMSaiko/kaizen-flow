@@ -2,6 +2,10 @@
   <img src="docs/assets/banner.svg" alt="kaizen-flow: a loop of SP, michi and Kaizen" width="100%">
 </p>
 
+<p align="center">
+  <img src="docs/assets/mascot.svg" alt="Michi, the kaizen-flow mascot: a violet cat whose tail loops into an upward cycle" width="160">
+</p>
+
 # kaizen-flow
 
 A small workflow for working with coding agents:
