@@ -41,7 +41,7 @@ The package ships a neutral core and an adapter per harness. For Codex, `kaizen 
 
 The easiest way is to let Codex do the install. Open Codex in your project and say:
 
-> Install kaizen-flow for Codex: clone it, run `kaizen init --harness codex`, then read the `AGENTS.md` block it added and set up whatever is Codex-specific (prompts, config, approvals) for my setup. Finish with `kaizen doctor --harness codex`. The install is only complete when `kaizen doctor --harness codex` exits 0: while it does not, run `kaizen doctor --harness codex --fix` (restores what is missing, never overwrites) and re-run `doctor`, repeating until it exits 0. Then tell me what you set up outside the project.
+> Install kaizen-flow for Codex: clone it, run `kaizen init --harness codex`, then read the `AGENTS.md` block it added and set up whatever is Codex-specific (prompts, config, approvals) for my setup. Finish with `kaizen doctor --harness codex`. The install is only complete when `kaizen doctor --harness codex` exits 0: while it does not, run `kaizen doctor --harness codex --fix` (restores what is missing, never overwrites) and re-run `doctor`, repeating until it exits 0. Then check that the handoff works in Codex (`/new` or equivalent); if it does not, fix it before declaring the install complete. Then tell me what you set up outside the project.
 
 If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the block.
 

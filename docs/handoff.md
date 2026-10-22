@@ -22,6 +22,8 @@ The handoff reuses the terminal where the agent already runs and opens no new wi
 
 Resume command per harness: `/clear` then `/michi <story path>` in Claude Code; the Codex equivalent (`/new`, assumed; verify on your version) then a text instruction to run michi on the story.
 
+**Codex: the handoff must work before the install counts as complete.** If the handoff does not work in Codex (`/new` missing or different, no tmux/WezTerm, resume prompt not pasted), Codex must fix it first: find the new-conversation command of the installed version, adjust the setup (prompts, config, or the clipboard backend) and re-test with `python -I scripts/sp-handoff.py --launch <sp.md> --harness codex --dry-run`. Only then confirm the install as complete (`kaizen doctor --harness codex` exits 0 and the handoff works).
+
 `kaizen doctor` prints the detected mode: `handoff: cli (wezterm|tmux)` or `handoff: app (clipboard)`.
 
 ## CLI vs desktop app
