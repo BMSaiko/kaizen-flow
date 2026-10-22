@@ -134,6 +134,8 @@ class ClaudeTranscripts:
                     continue
                 u = m["usage"]
                 model = m.get("model")
+                if model == "<synthetic>":
+                    continue
                 out.append(_rec(ts, sid, model if isinstance(model, str) else "?", num(u.get("input_tokens")),
                                 num(u.get("output_tokens")), num(u.get("cache_read_input_tokens")),
                                 num(u.get("cache_creation_input_tokens"))))

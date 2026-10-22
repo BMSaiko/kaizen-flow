@@ -27,6 +27,12 @@ class HardeningTest(unittest.TestCase):
         self.tmp = Path(self._tmp.name)
         self.addCleanup(self._tmp.cleanup)
 
+    def test_synthetic_model_is_ignored(self):
+        jl(self.tmp / "p" / "s.jsonl", [claude_row("2026-10-20T10:00:00Z", "m1", model="<synthetic>"),
+                                         claude_row("2026-10-20T10:01:00Z", "m2")])
+        recs = ku.ClaudeTranscripts(str(self.tmp)).read()
+        self.assertEqual([r["model"] for r in recs], ["claude-sonnet-5-5"])
+
     def test_num(self):
         self.assertEqual([ku.num(v) for v in (5, 5.9, "7", -3, None, True, float("nan"), float("inf"), [1])],
                          [5, 5, 0, 0, 0, 0, 0, 0, 0])
