@@ -1,0 +1,90 @@
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="kaizen-flow: a loop of SP, michi and Kaizen" width="100%">
+</p>
+
+# kaizen-flow
+
+A small workflow for working with coding agents:
+
+- **SP** (Super Prompt): a user story in 8 fixed sections (role, context, objective, success criteria, constraints, seams, steps, done-when).
+- **michi**: the cycle that executes an SP: research, plan (TDD-shaped), act, gates, report, reflect, commit proposal.
+- **Kaizen**: every cycle ends with a reflect step, so the workflow gets cheaper and sharper each time.
+- **Usage analysis**: tokens and API-equivalent cost per day, session, model and 5 h window, from your local transcripts (metrics only, never conversation content).
+
+Works with **Claude Code** and **Codex CLI** (plus any harness that reads `AGENTS.md`). Node stdlib and Python stdlib only; no telemetry.
+
+## Install
+
+Requirements: Node >= 18, Python 3.
+
+```sh
+git clone <this repo> && cd kaizen-flow && npm link   # or: npx kaizen-flow ... once published
+cd your-project
+kaizen init --harness codex     # or: claude | agents-md
+kaizen doctor --harness codex   # exits non-zero if something is missing
+```
+
+`init` never overwrites existing files: anything already there is kept and reported.
+
+## Using it with Codex: Codex sets up the Codex-specific parts
+
+The package ships a neutral core and an adapter per harness. For Codex, `kaizen init --harness codex` only drops the neutral material in the project:
+
+- skills in `.agents/skills/`, prompts in `.kaizen/commands/`, helper scripts in `scripts/`;
+- a marked block appended to `AGENTS.md` that tells the agent how the workflow works.
+
+**Everything else that is specific to Codex is done by Codex itself**, in your project, on your machine: wiring the prompts into your Codex setup (`~/.codex/prompts`, `config.toml`, approvals and sandbox settings), and mapping Claude-only ideas (hooks, slash commands) to what your Codex version supports. This is deliberate: Codex knows its own installed version and configuration better than this repo can, and the repo does not edit files outside your project.
+
+The easiest way is to let Codex do the install. Open Codex in your project and say:
+
+> Install kaizen-flow for Codex: clone it, run `kaizen init --harness codex`, then read the `AGENTS.md` block it added and set up whatever is Codex-specific (prompts, config, approvals) for my setup. Finish with `kaizen doctor --harness codex`.
+
+If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the block.
+
+## CLI vs desktop app
+
+| | CLI | Desktop app |
+|---|---|---|
+| Install | `kaizen init` writes project files | same files; the apps read the project (`.claude/`, `AGENTS.md`, Codex config) |
+| Handoff to a fresh context (`sp-handoff`) | injects the clear-context and resume command into the current WezTerm/tmux pane | no pane to inject into: the resume command is copied to the clipboard and printed |
+| `kaizen doctor` | prints `handoff: cli (wezterm\|tmux)` | prints `handoff: app (clipboard)` |
+
+## Commands
+
+```sh
+kaizen init [repo] [--harness claude|codex|agents-md]
+kaizen doctor [repo] [--harness h]
+kaizen status [repo]                  # pending SPs
+kaizen usage [--days N | --since YYYY-MM-DD] [--source claude,codex] [--top N]
+kaizen report [--week YYYY-WNN] [--out DIR] [--print]
+kaizen audit [dir]                    # fails if personal data leaks into the repo
+```
+
+### Usage and cost
+
+`kaizen usage` reads Claude Code transcripts (`~/.claude/projects`) and Codex sessions (`~/.codex/sessions`) and prints totals by day, model, session and 5 h window. `kaizen report` writes the weekly version to `reports/usage/YYYY-WNN.md`.
+
+Cost is the equivalent at API prices, a relative measure and not what a subscription charges. Prices live in `usage/prices.json` (Claude models); **add the OpenAI/GPT models you use** there, or point to your own file. A model with no price shows cost `n/a` and a warning; it never fails.
+
+### `kaizen.config.json` (optional, project root)
+
+```json
+{
+  "spRoot": "knowledge/projects/kaizen",
+  "docsRoot": "knowledge/projects",
+  "reportsDir": "reports/usage",
+  "sources": ["claude", "codex"],
+  "prices": "my-prices.json"
+}
+```
+
+## Known limits
+
+- The Codex transcript parser follows the rollout format (`event_msg` / `token_count`, `last_token_usage`) and is tested with synthetic fixtures; if your Codex version logs usage differently, open an issue with an anonymised sample.
+- Codex has no hook system equivalent to Claude Code's: hook behaviours become instructions in `AGENTS.md`.
+- Cursor, Gemini CLI, opencode and similar are supported only through the `agents-md` fallback.
+- The `new conversation` command used by the Codex handoff (`/new`) is an assumption to verify on your version.
+
+## License
+
+MIT. See [LICENSE](LICENSE) and [CONTRIBUTING](CONTRIBUTING.md).
