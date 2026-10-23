@@ -21,7 +21,7 @@ Stop after any step, resume later.
 | 2 | Deep research (`/dr`) | where the change lands, constraints, risks |
 | 3 | Deep planning (`/dp`) | 3-7 TDD-shaped phases, audit table, risks |
 | 4 | Deep acting (`/da`) | implementation phase by phase, with a proof per phase (screenshot, real call, output) saved in `proofs/` |
-| 5 | Gates | build, tests, lint, e2e; every command and rc recorded; proof of done before the story moves to Done |
+| 5 | Gates | build, tests, lint, e2e, plus the `/harden` gate when that skill is installed (not shipped in `core/`); every command and rc recorded; proof of done before the story moves to Done |
 | 6 | Report | what changed, what was verified, real difficulties, what is open; no commit |
 | 7 | Reflect | friction found and a proposed fix to the workflow itself; you apply it |
 | 8 | Commit proposal | one conventional message; nothing is committed or pushed until you confirm |
@@ -33,9 +33,9 @@ A Super Prompt given as input skips phases 1-2. Say "skip <phase>" or "go to DA"
 | Form | Effect |
 |---|---|
 | `/michi <idea>` | full cycle from the grill |
-| `/michi <path/to/sp.md>` | start from an existing story (moved to Doing with `sp-move.py`) |
-| `/michi --auto <sp>` (or `mode: auto` in the front matter) | no questions: local commit, `sp-move done` on its own, handoff with `--launch --auto`; never pushes |
-| `/michi help` | usage and supplementary skills (five-whys, swot, ooda-loop, eisenhower-matrix) |
-| `skip <phase>`, `go to DA` | jump phases |
+| `/michi <path/to/sp.md>` | start from an existing story (moved to Doing with `sp-move.py`); with no `--auto` and no `mode:` it asks once "with or without auto?" (default: without) |
+| `/michi --auto <sp>` (or `mode: auto` in the front matter) | no questions (no start-up prompt): local commit, `sp-move done` on its own; never pushes |
+| `/michi help` | usage and supplementary skills |
+| `skip <phase>`, `go to DA` | jump phases (`skip harden` skips the optional `/harden` gate) |
 
 Typical flow: `/sp login page` (write the story) → `/michi <path to the story>` (do it) → review the report → confirm the commit. When the context fills up, `/sp-handoff` moves to a fresh one without losing the thread.

@@ -23,7 +23,7 @@ version: 1.0.0
 - O que não cabe é cortado: primeiro P3/polimento, depois P2; nunca P1 nem o que outro P1 exige. Registar o corte na mãe em `## Corte de orçamento` (folha, h, motivo) e deixar a folha em TODO.
 
 ## Fase D - Execução sem perguntas
-- Para cada folha elegível: `sp-move.py <folha> doing`, depois `/michi <folha>` em **modo auto** (`michi/references/michi-modo-auto.md`; decisões em `## Decisões modo auto`). Uma folha por sessão; no fim da folha, `sp-handoff` automático (`--launch --auto`) para a seguinte.
+- Para cada folha elegível: `sp-move.py <folha> doing`, depois `/michi --auto <folha>` (**modo auto**, sem pergunta de arranque) (`michi/references/michi-modo-auto.md`; decisões em `## Decisões modo auto`). Uma folha por sessão; no fim da folha, `sp-handoff` automático (`--launch --auto`) para a seguinte.
 - Sem `AskUserQuestion` na execução: ambiguidade → default mais conservador, registado em `## Decisões modo auto` no SP da folha.
 - Código: repo do projeto novo (`~\Documents\code\<projeto>`), **commit local por fase** (assunto ≤72, autor do user, sem atribuição a agentes), **nunca push**. Vault: fecho do modo auto (`COMMIT_*.md` gerado, executado e apagado).
 - Prova por fase (`references/michi-prova.md`); sem prova possível → prova alternativa e `sem prova` registado na folha.
