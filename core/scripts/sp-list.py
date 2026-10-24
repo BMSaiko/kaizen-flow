@@ -18,6 +18,7 @@ Um programa é um SP-mãe (`kind: program`) com filhos que têm `parent: <slug-m
 `depends_on: [a, b]`. O estado de cada filho vem da pasta; dependências por cumprir só avisam.
 """
 import argparse
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -181,6 +182,27 @@ def fmt_created(sp):
     return f"{sp.created} ({(date.today() - sp.created).days}d)" if sp.created else "?"
 
 
+def _color():
+    return sys.stdout.isatty() and "NO_COLOR" not in os.environ or "FORCE_COLOR" in os.environ
+
+
+def paint(text, *codes):
+    return f"[{';'.join(codes)}m{text}[0m" if codes and _color() else text
+
+
+STATUS_STYLE = {"Doing": ("1", "32"), "TODO": (), "Done": ("2",)}
+PRIO_STYLE = {"P1": ("1", "31"), "P2": ("33",), "P3": ("2",)}
+
+
+def bar(feitos, total, width=10):
+    n = round(width * feitos / total) if total else 0
+    return "▰" * n + "▱" * (width - n)
+
+
+def short_unmet(unmet, keep=2):
+    return ", ".join(unmet[:keep]) + (f" +{len(unmet) - keep}" if len(unmet) > keep else "")
+
+
 def render_tree(groups, loose, visible):
     """Vista agrupada: mãe com progresso e filhos sob `├─`/`└─`; SPs soltos no fim. Colunas alinhadas."""
     rows = []  # (ícone, estado, prio, rótulo, criado, projeto, nota)
@@ -189,15 +211,17 @@ def render_tree(groups, loose, visible):
         if not shown and not visible(mother):
             continue
         feitos = sum(sp.status == "Done" for sp, _ in kids)
-        nota = f"{feitos}/{len(kids)} feitos"
+        nota = f"{bar(feitos, len(kids))} {feitos}/{len(kids)} feitos"
         if kids and feitos == len(kids) and mother.status != "Done":
             nota += " · pronto para fechar"
+        if rows:
+            rows.append(None)
         rows.append((ICONS[mother.status], mother.status, mother.priority, mother.slug, fmt_created(mother), mother.project, nota))
         for i, (sp, unmet) in enumerate(shown):
             ramo = "└─" if i == len(shown) - 1 else "├─"
-            nota = f"aguarda: {', '.join(unmet)}" if unmet and sp.status != "Done" else ""
+            nota = f"aguarda: {short_unmet(unmet)}" if unmet and sp.status != "Done" else ""
             rows.append((ICONS[sp.status], sp.status, sp.priority, f"{ramo} {sp.slug}", fmt_created(sp), "", nota))
-    if loose and rows:
+    if loose and rows and rows[-1] is not None:
         rows.append(None)
     rows += [(ICONS[sp.status], sp.status, sp.priority, sp.slug, fmt_created(sp), sp.project, sp.warning) for sp in loose if visible(sp)]
     if rows and rows[-1] is None:
@@ -214,7 +238,15 @@ def render_tree(groups, loose, visible):
             lines.append("")
             continue
         icon, status, prio, label, created, proj, nota = r
-        lines.append(f"{icon} {status:<5} {prio}  {label:<{w_slug}}  {created:<{w_date}}  {proj:<{w_proj}}  {nota}".rstrip())
+        mae = not label.startswith(("├─", "└─")) and bool(proj) and nota.endswith("feitos") or "pronto para fechar" in nota
+        lines.append("  ".join([
+            paint(f"{icon} {status:<5}", *STATUS_STYLE[status]),
+            paint(prio, *PRIO_STYLE.get(prio, ())),
+            paint(f"{label:<{w_slug}}", *(("1",) if mae else ())),
+            paint(f"{created:<{w_date}}", "2"),
+            paint(f"{proj:<{w_proj}}", "36"),
+            paint(nota, "2") if nota.startswith("aguarda") else nota,
+        ]).rstrip())
     return "\n".join(lines)
 
 

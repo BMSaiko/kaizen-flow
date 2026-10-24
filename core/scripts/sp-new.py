@@ -6,7 +6,7 @@ Recusa slug já existente no projeto (em qualquer pasta) e projeto inexistente.
 Nunca faz commit.
 
 Uso:
-  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--parent <slug>] [--depends-on <slug> ...]
+  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--parent <slug>] [--depends-on <slug> ...]
   python -I scripts/sp-new.py --project <nome> --program <slug> --children a,b:a,c:a+b --priority P1|P2|P3
 
 `--program` cria o SP-mãe (`kind: program`, `children:`) e os filhos (`parent`, `depends_on`) em sp/TODO/.
@@ -36,24 +36,27 @@ class SpNewError(Exception):
     pass
 
 
-def check(root, project, slug, priority):
+def check(root, project, slug, priority, modo="manual"):
     if not SLUG_RE.fullmatch(slug):
         raise SpNewError(f"slug inválido '{slug}' (minúsculas, dígitos e hífens)")
     if priority not in ("P1", "P2", "P3"):
         raise SpNewError(f"prioridade inválida '{priority}' (P1|P2|P3)")
+    if modo not in ("auto", "manual"):
+        raise SpNewError(f"modo inválido '{modo}' (auto|manual)")
     if not (root / project).is_dir():
         raise SpNewError(f"projeto '{project}' não existe em {root}")
     if any(sp.slug == slug and sp.project == project for sp in sp_list.collect(root, include_done=True)):
         raise SpNewError(f"SP '{slug}' já existe no projeto '{project}'")
 
 
-def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=()):
+def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual"):
     root = Path(root)
-    check(root, project, slug, priority)
+    check(root, project, slug, priority, modo)
     stamp = f"{today.isoformat()}T00:00:00Z"
     head = [
         "---", "status: TODO", f"created: {stamp}", f"updated: {stamp}", "phase: SP",
         f"slug: {slug}", f"date: {today.isoformat()}", f"project: {project}", f"priority: {priority}",
+        f"modo: {modo}",
     ]
     head += extra
     if parent:
@@ -88,7 +91,7 @@ def parse_children(text):
     return children
 
 
-def create_program(root, project, slug, priority, today, children):
+def create_program(root, project, slug, priority, today, children, modo="manual"):
     root = Path(root)
     names = [name for name, _ in children]
     if not children:
@@ -102,7 +105,7 @@ def create_program(root, project, slug, priority, today, children):
     if slug in names:
         raise SpNewError(f"o programa '{slug}' não pode ser filho de si próprio")
     for name in [slug, *names]:
-        check(root, project, name, priority)
+        check(root, project, name, priority, modo)
     graph = dict(children)
     for name in names:
         seen, stack = set(), [name]
@@ -116,9 +119,9 @@ def create_program(root, project, slug, priority, today, children):
     extra = ["kind: program", "children:"]
     for name, deps in children:
         extra += [f"  - slug: {name}", f"    depends_on: [{', '.join(deps)}]", "    state: TODO"]
-    paths = [create(root, project, slug, priority, today, extra=extra)]
+    paths = [create(root, project, slug, priority, today, extra=extra, modo=modo)]
     for name, deps in children:
-        paths.append(create(root, project, name, priority, today, parent=slug, depends_on=deps))
+        paths.append(create(root, project, name, priority, today, parent=slug, depends_on=deps, modo=modo))
     return paths
 
 
@@ -129,6 +132,7 @@ def main(argv=None):
     ap.add_argument("--program", metavar="SLUG", help="cria um SP-mãe com os filhos de --children")
     ap.add_argument("--children", help="a,b:a,c:a+b (b depende de a; c de a e b)")
     ap.add_argument("--priority", required=True)
+    ap.add_argument("--modo", default="manual", help="modo do michi: auto|manual (defeito manual)")
     ap.add_argument("--parent")
     ap.add_argument("--depends-on", nargs="*", default=[])
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
@@ -138,11 +142,11 @@ def main(argv=None):
             if not args.children:
                 raise SpNewError("--program exige --children")
             paths = create_program(args.root, args.project, args.program, args.priority, date.today(),
-                                   parse_children(args.children))
+                                   parse_children(args.children), args.modo)
             print("\n".join(str(p) for p in paths))
         elif args.slug:
             check_links(args.root, args.project, args.parent, args.depends_on)
-            print(create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on))
+            print(create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo))
         else:
             raise SpNewError("indicar --slug (ou --program com --children)")
     except SpNewError as exc:

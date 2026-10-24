@@ -50,6 +50,8 @@ def validate(text, folder=None):
         for field in REQUIRED_FIELDS:
             if not fm.get(field):
                 errors.append(f"frontmatter sem '{field}'")
+        if fm.get("modo") and fm["modo"] not in ("auto", "manual"):
+            errors.append(f"modo '{fm['modo']}' inválido (auto|manual)")
         if folder and fm.get("status") and fm["status"] != folder:
             errors.append(f"status '{fm['status']}' ≠ pasta '{folder}'")
     sections = _sections(text)

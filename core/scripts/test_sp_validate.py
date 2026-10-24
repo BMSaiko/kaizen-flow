@@ -22,11 +22,13 @@ SECTIONS = [
 ]
 
 
-def build(status="TODO", drop=None, no_priority=False, empty=None):
+def build(status="TODO", drop=None, no_priority=False, empty=None, modo=None):
     fm = ["---", f"status: {status}", "created: 2026-10-18T00:00:00Z", "updated: 2026-10-18T00:00:00Z",
           "phase: SP", "slug: abc", "date: 2026-10-18", "project: atlas"]
     if not no_priority:
         fm.append("priority: P2")
+    if modo:
+        fm.append(f"modo: {modo}")
     fm.append("---")
     body = ["# Super Prompt - abc", ""]
     for title, text in SECTIONS:
@@ -58,6 +60,16 @@ def test_status_diferente_da_pasta():
 def test_seccao_vazia():
     errors = sp_validate.validate(build(empty=8), folder="TODO")
     assert len(errors) == 1 and "8." in errors[0] and "vazia" in errors[0]
+
+
+def test_modo_ausente_ou_valido_nao_tem_erros():
+    assert sp_validate.validate(build(modo="auto"), folder="TODO") == []
+    assert sp_validate.validate(build(modo="manual"), folder="TODO") == []
+
+
+def test_modo_invalido_nomeia_o_campo():
+    errors = sp_validate.validate(build(modo="semi"), folder="TODO")
+    assert len(errors) == 1 and "modo" in errors[0] and "auto|manual" in errors[0]
 
 
 def test_sem_frontmatter():

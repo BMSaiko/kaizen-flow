@@ -37,7 +37,7 @@ Run with `python scripts/<name>.py`. Roots come from [`kaizen.config.json`](conf
 
 | Script | Usage | Options |
 |---|---|---|
-| `sp-new.py` | create a story in `sp/TODO` | `--project P --priority P1..P3` (required; the project folder must exist, `init` creates `_default`), `--slug S`, `--parent SLUG`, `--depends-on A B`, `--program SLUG --children "a,b:a,c:a+b"` (parent + children; `b:a` = b depends on a) |
+| `sp-new.py` | create a story in `sp/TODO` | `--project P --priority P1..P3` (required; the project folder must exist, `init` creates `_default`), `--slug S`, `--modo auto|manual` (michi mode stored as `modo:` in the front matter; default `manual`), `--parent SLUG`, `--depends-on A B`, `--program SLUG --children "a,b:a,c:a+b"` (parent + children; `b:a` = b depends on a) |
 | `sp-list.py` | list pending stories | `--all` (include Done), `--status todo\|doing`, `--project P`, `--sort priority\|created\|status`, `--reverse`, `--flat`, `--tree`, `--tree-closed SLUG` (close checklist: rc 0 closed, 1 failures, 2 unknown slug) |
 | `sp-move.py` | `<slug> todo\|doing\|done` | `--project P`, `--next` (with `done`: open the next eligible child) |
 | `sp-validate.py` | `<file>...` | checks the 8-section contract (every section non-empty), rc 1 on failure |

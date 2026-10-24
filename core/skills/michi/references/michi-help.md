@@ -11,7 +11,7 @@ here and reply with the Usage block below — do NOT start the workflow.**
 /michi                                # full workflow (dr → grill → dp → da → gates → report → reflect → commit) — DR before grill: informed questions
 /michi <idea>                         # jump in: DR runs first, then grill is informed by repo context
 /michi <idea>                         # jump in with a project idea (grill picks up)
-/michi <SP>                           # sem --auto nem modo: auto, pergunta «com/sem auto» no arranque
+/michi <SP>                           # `modo: auto|manual` no SP decide sem pergunta; sem o campo nem --auto, pergunta «com/sem auto» no arranque
 /michi --auto <SP>                    # modo auto (sem pergunta): sem perguntas, commit local + Done sozinho, nunca push (references/michi-modo-auto.md)
 /michi help | --help | -h | ?         # this help
 /michi skip grill                     # honour "skip phase X" requests

@@ -33,7 +33,7 @@ correu bem · correu mal · corrigido · commits (hash + assunto) · próximo pa
 ## Pergunta de arranque (único sítio da regra)
 Em ciclo novo (`/michi <SP|ideia>`), decidir por esta ordem; a primeira que se aplica ganha:
 1. `--auto` explícito → auto, sem pergunta (inclui relançamentos `sp-handoff --launch --auto` e `[context-guard]`).
-2. `modo: auto` no frontmatter do SP (inclui folhas de `/one-shot`) → auto, sem pergunta.
+2. `modo: auto` no frontmatter do SP (inclui folhas de `/one-shot`) → auto, sem pergunta; `modo: manual` → sem auto, sem pergunta (definido pelo `/super-prompt`/`sp-new --modo`). Sem o campo: segue para 3-5.
 3. `help`, `skip <fase>`, `go to DA` → sem pergunta (não é arranque de ciclo).
 4. SP em Doing com modo já registado (`## Decisões modo auto` ou `## Progresso`) → retomar nesse modo, sem repetir.
 5. Caso contrário: `AskUserQuestion` «Como corre este ciclo?» com «Sem auto (interativo) (Recomendado)» (default) e «Com auto (`--auto`)»; a resposta vale para o ciclo todo.

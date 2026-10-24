@@ -139,6 +139,8 @@ alignment, write the consolidated answers into `## Spec
 P2 / P3 (default)". Save the answer as `priority:` in the frontmatter; if
 the user doesn't answer, write `P3`.
 
+**Modo do michi:** inclui também «Modo do michi? auto / manual (default manual)». Guarda a resposta como `modo:` no frontmatter (`sp-new.py --modo`); sem resposta, `manual`. Com `modo: manual` ou `auto` o michi não repete a pergunta de arranque.
+
 **Rule:** grill-me's blocker rule applies — if the goal is empty /
 placeholder, do NOT interview. Write a blocker note in the draft and
 exit. The user must re-invoke with a real goal.
@@ -215,7 +217,7 @@ incomplete Super Prompt.
 Caminho único, sem resolução livre: criar sempre com
 
 ```
-python -I scripts/sp-new.py --project <projeto> --slug <slug> --priority P1|P2|P3
+python -I scripts/sp-new.py --project <projeto> --slug <slug> --priority P1|P2|P3 --modo auto|manual
 ```
 
 Devolve `knowledge/projects/kaizen/<projeto>/sp/TODO/<slug>-<YYYY-MM-DD>.md` (frontmatter + 8 secções vazias). Preencher as secções nesse ficheiro e validar com `python -I scripts/sp-validate.py <ficheiro>`. `<slug>`: minúsculas ascii, hífens, ≤48 caracteres.
@@ -236,6 +238,7 @@ slug: <slug>
 date: <YYYY-MM-DD>
 project: <project>    # project name (atlas, kaizen, michi, etc.)
 priority: P2          # P1 | P2 | P3 — optional, default P3 (used by /sp-list)
+modo: manual          # auto | manual — modo do michi; default manual (sem pergunta de arranque)
 ---
 ```
 

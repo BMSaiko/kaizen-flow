@@ -29,7 +29,7 @@ def test_cria_em_todo_com_frontmatter_e_oito_seccoes(tmp_path):
     text = path.read_text(encoding="utf-8")
     assert text.startswith(
         "---\nstatus: TODO\ncreated: 2026-10-18T00:00:00Z\nupdated: 2026-10-18T00:00:00Z\n"
-        "phase: SP\nslug: abc\ndate: 2026-10-18\nproject: atlas\npriority: P2\n---\n"
+        "phase: SP\nslug: abc\ndate: 2026-10-18\nproject: atlas\npriority: P2\nmodo: manual\n---\n"
     )
     for n, title in enumerate(("Role", "Context", "Objective", "Success criteria",
                                "Constraints", "Seams", "Steps", "Done-when"), 1):
@@ -104,7 +104,7 @@ def test_program_cria_mae_e_filhos_em_todo(tmp_path):
     assert [p.name for p in paths] == ["prog-2026-10-18.md", "a-2026-10-18.md", "b-2026-10-18.md"]
     mae = paths[0].read_text(encoding="utf-8")
     assert mae.split("---\n")[1].endswith(
-        "priority: P2\nkind: program\nchildren:\n"
+        "priority: P2\nmodo: manual\nkind: program\nchildren:\n"
         "  - slug: a\n    depends_on: []\n    state: TODO\n"
         "  - slug: b\n    depends_on: [a]\n    state: TODO\n"
     )
@@ -134,6 +134,35 @@ def test_program_recusa_filhos_repetidos_ou_vazios(tmp_path):
         sp_new.create_program(root, "atlas", "prog", "P2", TODAY, [("a", []), ("a", [])])
     with pytest.raises(sp_new.SpNewError, match="filhos"):
         sp_new.create_program(root, "atlas", "prog", "P2", TODAY, [])
+
+
+def test_modo_auto_grava_no_frontmatter_e_default_e_manual(tmp_path):
+    root = project(tmp_path)
+    auto = sp_new.create(root, "atlas", "a", "P2", TODAY, modo="auto").read_text(encoding="utf-8")
+    assert "\nmodo: auto\n" in auto
+    assert "\nmodo: manual\n" in sp_new.create(root, "atlas", "b", "P2", TODAY).read_text(encoding="utf-8")
+
+
+def test_modo_invalido_e_recusado_sem_criar_nada(tmp_path):
+    root = project(tmp_path)
+    with pytest.raises(sp_new.SpNewError, match="modo inválido"):
+        sp_new.create(root, "atlas", "abc", "P2", TODAY, modo="semi")
+    assert list((root / "atlas/sp/TODO").glob("*.md")) == []
+
+
+def test_program_aplica_modo_a_mae_e_filhos(tmp_path):
+    root = project(tmp_path)
+    paths = sp_new.create_program(root, "atlas", "prog", "P2", TODAY, [("a", []), ("b", ["a"])], modo="auto")
+    assert all("\nmodo: auto\n" in p.read_text(encoding="utf-8") for p in paths)
+
+
+def test_cli_modo(tmp_path, capsys):
+    root = project(tmp_path)
+    base = ["--project", "atlas", "--priority", "P2", "--root", str(root)]
+    assert sp_new.main([*base, "--slug", "a", "--modo", "auto"]) == 0
+    assert "modo: auto" in (root / "atlas/sp/TODO/a-" f"{date.today().isoformat()}.md").read_text(encoding="utf-8")
+    assert sp_new.main([*base, "--slug", "b", "--modo", "semi"]) == 1
+    assert "modo inválido" in capsys.readouterr().err
 
 
 def test_cli_program(tmp_path, capsys):
