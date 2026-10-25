@@ -25,3 +25,4 @@ Fim de cada fase de entrega (DA que muda código/UI): mostrar ao user uma prova 
 - Captura de UI: esperar por um elemento real da página (`waitFor` no `h1`/conteúdo), nunca um tempo fixo; skeleton na imagem = prova inválida, repetir.
 - Baseline de testes sem as alterações (e2e/jest): usar `git worktree`, nunca `git stash` (ficheiros versionados como `test-results/.last-run.json` fazem o `pop` abortar).
 - A prova da Fase 5 (`## Prova de done`) consolida e referencia estas, não as repete.
+- **SP com `gates:`/`prova:` no frontmatter:** a prova e os gates vêm do SP (`python -I scripts/sp-gates.py <SP>`), não são inferidos; sem esses campos vale a tabela acima.

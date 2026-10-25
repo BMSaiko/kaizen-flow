@@ -22,13 +22,14 @@ SECTIONS = [
 ]
 
 
-def build(status="TODO", drop=None, no_priority=False, empty=None, modo=None):
+def build(status="TODO", drop=None, no_priority=False, empty=None, modo=None, extra=()):
     fm = ["---", f"status: {status}", "created: 2026-10-18T00:00:00Z", "updated: 2026-10-18T00:00:00Z",
           "phase: SP", "slug: abc", "date: 2026-10-18", "project: atlas"]
     if not no_priority:
         fm.append("priority: P2")
     if modo:
         fm.append(f"modo: {modo}")
+    fm += list(extra)
     fm.append("---")
     body = ["# Super Prompt - abc", ""]
     for title, text in SECTIONS:
@@ -91,3 +92,54 @@ def test_cli_rc0_e_rc1_com_lista(tmp_path, capsys):
     assert sp_validate.main([str(bad)]) == 1
     err = capsys.readouterr().err
     assert "5." in err and "priority" in err
+
+
+@pytest.mark.parametrize("extra", [
+    ["commit: auto", "push: nunca", "pr: nunca"],
+    ["commit: pergunta", "push: auto", "pr: auto"],
+    ["restricoes: pasta X intocável"],
+])
+def test_autorizacoes_validas(extra):
+    assert sp_validate.validate(build(extra=extra), folder="TODO") == []
+
+
+@pytest.mark.parametrize("extra,fragment", [
+    (["push: sim"], "push"),
+    (["commit: nunca", "push: auto"], "commit"),
+    (["commit: auto", "push: pergunta", "pr: auto"], "push"),
+])
+def test_autorizacoes_invalidas(extra, fragment):
+    errors = sp_validate.validate(build(extra=extra), folder="TODO")
+    assert len(errors) == 1 and fragment in errors[0]
+
+
+GATES = ["gates:", "  - cmd: python -I scripts/test_sp_list.py", "    timeout: 60", "  - cmd: npm test"]
+
+
+def test_gates_validos_passam():
+    assert sp_validate.validate(build(extra=GATES + ["prova: python -I scripts/x.py"]), "TODO") == []
+
+
+@pytest.mark.parametrize("gates, msg", [
+    (["gates:", "  - cmd:"], "vazio"),
+    (["gates:", "  - cmd: npm test", "  - cmd: npm test"], "duplicado"),
+    (["gates:", "  - cmd: git reset --hard"], "proibido"),
+    (["gates:", "  - cmd: cat .env.local"], "proibido"),
+])
+def test_gates_invalidos_dao_erro(gates, msg):
+    assert any(msg in e for e in sp_validate.validate(build(extra=gates), "TODO"))
+
+
+def test_prova_vazia_da_erro():
+    assert any("prova" in e for e in sp_validate.validate(build(extra=["prova:"]), "TODO"))
+
+
+def test_prova_proibida_da_erro():
+    assert any("prova proibida" in e for e in sp_validate.validate(build(extra=["prova: type .env"]), "TODO"))
+
+
+def test_aviso_modo_auto_sem_gates():
+    assert sp_validate.warnings(build(modo="auto"))
+    assert not sp_validate.warnings(build(modo="auto", extra=GATES))
+    assert not sp_validate.warnings(build(modo="manual"))
+    assert sp_validate.validate(build(modo="auto"), "TODO") == []

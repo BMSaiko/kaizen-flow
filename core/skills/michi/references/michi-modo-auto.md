@@ -3,11 +3,22 @@
 `/michi --auto <SP>` ou `modo: auto` no frontmatter do SP. Executa DR→DP→DA→gates→prova→reflect sem perguntas e fecha o SP sozinho. O modo one-shot (SP de `/one-shot`) é este modo com `horas_disponiveis` e commit por fase; não tem regras próprias.
 
 ## Proibições (único sítio; SKILL.md e AGENTS.md só apontam para aqui)
-- Push de qualquer tipo, `--force`, `reset --hard`, `clean -f`, `git add -A`/`.` (stage sempre explícito).
+- `--force`, `reset --hard`, `clean -f`, `git add -A`/`.` (stage sempre explícito).
+- Push e PR só se o SP os autorizar (`push: auto` / `pr: auto`, ver «Autorizações do SP»); sem o campo, nunca.
 - Apagar ficheiros fora do SP; exceções: o `COMMIT_*.md` que originou o commit e temporários próprios (scratchpad).
 - Ler segredos (`.env*`, `*.key`, `*.pem`, … — regra crítica 8 do AGENTS.md).
 - Commitar ou mover para Done com gate ou prova a falhar.
 - Alterar `user.name`/`user.email`; `Co-Authored-By` ou atribuição a agentes.
+
+## Autorizações do SP (único sítio)
+Frontmatter `commit`, `push`, `pr` (`auto|pergunta|nunca`) e `restricoes` (texto), gravados pelo `/super-prompt` (`sp-new.py --commit/--push/--pr/--restricoes`) e validados por `sp-validate.py` (push `auto` exige commit ≠ `nunca`; pr `auto` exige push `auto`). Valem no fecho em modo auto **e** manual:
+| Valor | Fecho |
+|---|---|
+| `auto` | commit local (skill `commit`) · push (skill `push`, sem force) · PR via `gh` sem atribuição, sem perguntar |
+| `pergunta` | `AskUserQuestion` como no fluxo normal |
+| `nunca` | nem propõe |
+- Sem campo (SP antigo): `pergunta`; em modo auto, commit local sem push nem PR.
+- `restricoes` é lido no arranque e cumprido à letra (pastas intocáveis, repos, ações externas); em dúvida, o mais conservador.
 
 ## Pergunta normal → ação auto
 | Normal | Auto |
@@ -19,8 +30,8 @@
 
 ## Fecho (só com gates e prova verdes)
 1. `sp-move.py <slug> done` (antes do commit).
-2. Gerar `COMMIT_*.md` com stage explícito (skill `commit-msg`), executar-o (skill `commit`: commit local, autor the user) e apagar o `COMMIT_*.md`.
-3. Repo de código: commit local por fase (assunto ≤72). Nunca push.
+2. Se `commit` ≠ `nunca`: gerar `COMMIT_*.md` com stage explícito (skill `commit-msg`), executar-o (skill `commit`: commit local, autor the user) e apagar o `COMMIT_*.md`.
+3. Repo de código: commit local por fase (assunto ≤72). Push/PR só conforme «Autorizações do SP».
 4. Se o SP tem filho seguinte: `sp-handoff --launch --auto`.
 5. `git rev-parse --abbrev-ref HEAD` = `master` (SB-VERIFY).
 

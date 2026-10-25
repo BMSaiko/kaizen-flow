@@ -54,7 +54,7 @@ The agent follows this sequence; the user can stop after any step
    - **Reflect por fase (2026-10-20).** No fim de cada fase (qualquer fase michi, não só DA), antes do handoff: reflect curto de 3 linhas limitado a essa fase (`correu mal · patch · onde`), com o patch aplicado ao ficheiro da fase (SKILL.md, playbook ou reference) e registado no CHANGELOG; sem fricção: «sem patch» numa linha. Só patches com relação à fase; sem commit. Formato e custo: `references/michi-reflect-template.md` (§Reflect por fase).
    - **Modo auto (2026-10-21).** `/michi --auto <SP>` ou `modo: auto` no frontmatter: sem `AskUserQuestion`, commit local e `sp-move done` sozinho, nunca push (`modo: manual` = sem auto, sem pergunta). Sem nenhum dos três, o arranque pergunta «com/sem auto». `/one-shot` é este modo. Regras, pergunta e report: `references/michi-modo-auto.md`.
    - **Handoff por fase:** ver tabela «Quem dispara o handoff» em `## Contexto`.
-5. **Gates.** Correr build/tests/lint/typecheck/e2e aplicáveis; cada comando e RC vão para o report; falha = corrigir a causa e repetir todos, sem `|| true`. Inclui o gate `/harden` (skip: `skip harden`). **Antes de `sp-move.py ... done` e do `COMMIT_*.md`: prova de done** como cliente final, registada em `## Prova de done` no SP (se falhar, o SP não passa a Done); E2E de fecho de árvore só quando este SP fecha mãe+filhos+netos (`sp-list.py --tree-closed <slug>`). Detalhe: `references/michi-fases-detalhe.md` §Fase 5.
+5. **Gates.** Correr build/tests/lint/typecheck/e2e aplicáveis; cada comando e RC vão para o report; falha = corrigir a causa e repetir todos, sem `|| true`. Inclui o gate `/harden` (skip: `skip harden`). SP com `gates:` no frontmatter: `python -I scripts/sp-gates.py <SP>` (rc≠0 = não fecha); sem `gates:`, como antes. **Antes de `sp-move.py ... done` e do `COMMIT_*.md`: prova de done** como cliente final, registada em `## Prova de done` no SP (se falhar, o SP não passa a Done); E2E de fecho de árvore só quando este SP fecha mãe+filhos+netos (`sp-list.py --tree-closed <slug>`). Detalhe: `references/michi-fases-detalhe.md` §Fase 5.
 6. **Report.** Output: what changed (paths + brief diff), what was verified
    (commands + RC/output), difficulties encountered (real, not sanitised),
    what is still open. No commit. No push.
@@ -81,6 +81,7 @@ The agent follows this sequence; the user can stop after any step
    at Phase 1. If they signal "implementation is wrong but the plan
    is right", restart at Phase 4 (DA). Honour the signal — don't
    default to "just patch DA" when the root cause is upstream.
+9. **Autorizações do SP:** `commit`/`push`/`pr`/`restricoes` do frontmatter mandam no fecho (auto ou manual); regras em `references/michi-modo-auto.md` §Autorizações do SP.
 9. **Commit proposal.** *Only after the user explicitly approves the report
    (and has had the chance to act on Reflect).* Suggest a single
    conventional commit message (one line subject ≤72 chars, body explaining

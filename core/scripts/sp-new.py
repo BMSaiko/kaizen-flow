@@ -6,7 +6,7 @@ Recusa slug já existente no projeto (em qualquer pasta) e projeto inexistente.
 Nunca faz commit.
 
 Uso:
-  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--parent <slug>] [--depends-on <slug> ...]
+  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--parent <slug>] [--depends-on <slug> ...]
   python -I scripts/sp-new.py --project <nome> --program <slug> --children a,b:a,c:a+b --priority P1|P2|P3
 
 `--program` cria o SP-mãe (`kind: program`, `children:`) e os filhos (`parent`, `depends_on`) em sp/TODO/.
@@ -24,6 +24,11 @@ sp_list = importlib.util.module_from_spec(_spec)
 sys.modules["sp_list"] = sp_list
 _spec.loader.exec_module(sp_list)
 
+_gspec = importlib.util.spec_from_file_location("sp_gates", Path(__file__).with_name("sp-gates.py"))
+sp_gates = importlib.util.module_from_spec(_gspec)
+sys.modules["sp_gates"] = sp_gates
+_gspec.loader.exec_module(sp_gates)
+
 SECTIONS = (
     "1. Role", "2. Context", "3. Objective (single sentence)", "4. Success criteria (verifiable)",
     "5. Constraints / invariants", "6. Seams (public interfaces to test / change)",
@@ -32,8 +37,40 @@ SECTIONS = (
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
+AUTH_VALUES = ("auto", "pergunta", "nunca")
+
+
 class SpNewError(Exception):
     pass
+
+
+def check_auth(auth):
+    """`auth`: dict opcional commit/push/pr/restricoes; valida valores e dependências."""
+    auth = {k: v for k, v in (auth or {}).items() if v is not None}
+    for key in ("commit", "push", "pr"):
+        if key in auth and auth[key] not in AUTH_VALUES:
+            raise SpNewError(f"{key} inválido '{auth[key]}' ({'|'.join(AUTH_VALUES)})")
+    if "restricoes" in auth and any(c in auth["restricoes"] for c in ("\n", "\r")):
+        raise SpNewError("restricoes tem de ser uma só linha")
+    if auth.get("push") == "auto" and auth.get("commit") == "nunca":
+        raise SpNewError("push auto exige commit ≠ nunca")
+    if auth.get("pr") == "auto" and auth.get("push") != "auto":
+        raise SpNewError("pr auto exige push auto")
+    return auth
+
+
+def check_gates(gates, prova):
+    """`gates`: comandos do frontmatter; `prova`: comando/critério. Uma linha cada, sem proibidos."""
+    for cmd in [*gates, prova or ""]:
+        if "\n" in cmd or "\r" in cmd:
+            raise SpNewError("gates e prova têm de ser uma só linha")
+    found = sp_gates.problems([{"cmd": c} for c in gates])
+    if prova is not None and not prova.strip():
+        found.append("prova vazia")
+    elif prova and sp_gates.forbidden(prova):
+        found.append(f"prova proibida ({sp_gates.forbidden(prova)}): {prova}")
+    if found:
+        raise SpNewError("; ".join(found))
 
 
 def check(root, project, slug, priority, modo="manual"):
@@ -49,15 +86,23 @@ def check(root, project, slug, priority, modo="manual"):
         raise SpNewError(f"SP '{slug}' já existe no projeto '{project}'")
 
 
-def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual"):
+def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None):
     root = Path(root)
     check(root, project, slug, priority, modo)
+    auth = check_auth(auth)
+    check_gates(list(gates), prova)
     stamp = f"{today.isoformat()}T00:00:00Z"
     head = [
         "---", "status: TODO", f"created: {stamp}", f"updated: {stamp}", "phase: SP",
         f"slug: {slug}", f"date: {today.isoformat()}", f"project: {project}", f"priority: {priority}",
         f"modo: {modo}",
     ]
+    head += [f"{k}: {auth[k]}" for k in ("commit", "push", "pr", "restricoes") if k in auth]
+    if gates:
+        head.append("gates:")
+        head += [f"  - cmd: {g.strip()}" for g in gates]
+    if prova is not None:
+        head.append(f"prova: {prova.strip()}")
     head += extra
     if parent:
         head.append(f"parent: {parent}")
@@ -91,8 +136,9 @@ def parse_children(text):
     return children
 
 
-def create_program(root, project, slug, priority, today, children, modo="manual"):
+def create_program(root, project, slug, priority, today, children, modo="manual", auth=None):
     root = Path(root)
+    auth = check_auth(auth)
     names = [name for name, _ in children]
     if not children:
         raise SpNewError("programa sem filhos (--children)")
@@ -119,9 +165,9 @@ def create_program(root, project, slug, priority, today, children, modo="manual"
     extra = ["kind: program", "children:"]
     for name, deps in children:
         extra += [f"  - slug: {name}", f"    depends_on: [{', '.join(deps)}]", "    state: TODO"]
-    paths = [create(root, project, slug, priority, today, extra=extra, modo=modo)]
+    paths = [create(root, project, slug, priority, today, extra=extra, modo=modo, auth=auth)]
     for name, deps in children:
-        paths.append(create(root, project, name, priority, today, parent=slug, depends_on=deps, modo=modo))
+        paths.append(create(root, project, name, priority, today, parent=slug, depends_on=deps, modo=modo, auth=auth))
     return paths
 
 
@@ -133,20 +179,27 @@ def main(argv=None):
     ap.add_argument("--children", help="a,b:a,c:a+b (b depende de a; c de a e b)")
     ap.add_argument("--priority", required=True)
     ap.add_argument("--modo", default="manual", help="modo do michi: auto|manual (defeito manual)")
+    ap.add_argument("--commit", help="commit: auto|pergunta|nunca")
+    ap.add_argument("--push", help="push: auto|pergunta|nunca")
+    ap.add_argument("--pr", help="pr: auto|pergunta|nunca")
+    ap.add_argument("--restricoes", help="restrições extra do SP (uma linha)")
+    ap.add_argument("--gate", action="append", default=[], help="gate executável (repetível), corrido por sp-gates.py")
+    ap.add_argument("--prova", help="comando ou critério verificável da prova")
     ap.add_argument("--parent")
     ap.add_argument("--depends-on", nargs="*", default=[])
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    auth = {"commit": args.commit, "push": args.push, "pr": args.pr, "restricoes": args.restricoes}
     try:
         if args.program:
             if not args.children:
                 raise SpNewError("--program exige --children")
             paths = create_program(args.root, args.project, args.program, args.priority, date.today(),
-                                   parse_children(args.children), args.modo)
+                                   parse_children(args.children), args.modo, auth)
             print("\n".join(str(p) for p in paths))
         elif args.slug:
             check_links(args.root, args.project, args.parent, args.depends_on)
-            print(create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo))
+            print(create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova))
         else:
             raise SpNewError("indicar --slug (ou --program com --children)")
     except SpNewError as exc:

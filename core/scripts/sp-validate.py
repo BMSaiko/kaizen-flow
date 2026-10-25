@@ -17,6 +17,11 @@ sp_list = importlib.util.module_from_spec(_spec)
 sys.modules["sp_list"] = sp_list
 _spec.loader.exec_module(sp_list)
 
+_gspec = importlib.util.spec_from_file_location("sp_gates", Path(__file__).with_name("sp-gates.py"))
+sp_gates = importlib.util.module_from_spec(_gspec)
+sys.modules["sp_gates"] = sp_gates
+_gspec.loader.exec_module(sp_gates)
+
 REQUIRED_FIELDS = ("status", "created", "updated", "phase", "slug", "date", "project", "priority")
 SECTION_NAMES = {
     1: "Role", 2: "Context", 3: "Objective", 4: "Success criteria",
@@ -52,6 +57,19 @@ def validate(text, folder=None):
                 errors.append(f"frontmatter sem '{field}'")
         if fm.get("modo") and fm["modo"] not in ("auto", "manual"):
             errors.append(f"modo '{fm['modo']}' inválido (auto|manual)")
+        for key in ("commit", "push", "pr"):
+            if fm.get(key) and fm[key] not in ("auto", "pergunta", "nunca"):
+                errors.append(f"{key} '{fm[key]}' inválido (auto|pergunta|nunca)")
+        if fm.get("push") == "auto" and fm.get("commit") == "nunca":
+            errors.append("push auto exige commit ≠ nunca")
+        if fm.get("pr") == "auto" and fm.get("push") != "auto":
+            errors.append("pr auto exige push auto")
+        errors += sp_gates.problems(sp_gates.parse_gates(text))
+        if "prova" in fm:
+            if not fm["prova"]:
+                errors.append("prova vazia")
+            elif sp_gates.forbidden(fm["prova"]):
+                errors.append(f"prova proibida ({sp_gates.forbidden(fm['prova'])}): {fm['prova']}")
         if folder and fm.get("status") and fm["status"] != folder:
             errors.append(f"status '{fm['status']}' ≠ pasta '{folder}'")
     sections = _sections(text)
@@ -61,6 +79,14 @@ def validate(text, folder=None):
         elif not sections[n]:
             errors.append(f"secção vazia: {n}. {name}")
     return errors
+
+
+def warnings(text):
+    """Avisos (não bloqueiam): SP `modo: auto` sem gates executáveis."""
+    fm = sp_list.parse_frontmatter(text)
+    if fm.get("modo") == "auto" and not sp_gates.parse_gates(text):
+        return ["modo auto sem 'gates:' (a verificação fica inferida)"]
+    return []
 
 
 def main(argv=None):
@@ -78,6 +104,8 @@ def main(argv=None):
             continue
         folder = path.parent.name if path.parent.name in sp_list.FOLDERS else None
         errors = validate(text, folder)
+        for w in warnings(text):
+            print(f"{path.name}: aviso: {w}", file=sys.stderr)
         if errors:
             rc = 1
             for e in errors:

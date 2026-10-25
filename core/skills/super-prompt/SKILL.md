@@ -141,6 +141,10 @@ the user doesn't answer, write `P3`.
 
 **Modo do michi:** inclui também «Modo do michi? auto / manual (default manual)». Guarda a resposta como `modo:` no frontmatter (`sp-new.py --modo`); sem resposta, `manual`. Com `modo: manual` ou `auto` o michi não repete a pergunta de arranque.
 
+**Autorizações:** no mesmo lote, UMA pergunta agrupada: commit, push, PR (`auto|pergunta|nunca`; defaults conservadores: `pergunta`, e `nunca` para push/PR se `modo: auto`) e restrições extra (pastas intocáveis, repos, ações externas). Grava em `commit:`/`push:`/`pr:`/`restricoes:` (`sp-new.py --commit/--push/--pr/--restricoes`); o michi cumpre-as (`michi-modo-auto.md` §Autorizações do SP).
+
+**Gates:** no mesmo lote, pergunta «Como se verifica que está certo?». Propõe gates a partir do projeto (`package.json` → `npm test`/`vitest`/lint/build; `scripts/test_*.py` → `python -I scripts/test_sp_list.py`) e confirma com o user. Grava em `gates:` (um `- cmd:` por gate, `cwd`/`timeout` opcionais) e `prova:` (`sp-new.py --gate` repetível, `--prova`). Comandos proibidos (`--force`, `reset --hard`, `git add -A`, `.env*`) são recusados por `sp-validate.py`.
+
 **Rule:** grill-me's blocker rule applies — if the goal is empty /
 placeholder, do NOT interview. Write a blocker note in the draft and
 exit. The user must re-invoke with a real goal.
@@ -217,7 +221,7 @@ incomplete Super Prompt.
 Caminho único, sem resolução livre: criar sempre com
 
 ```
-python -I scripts/sp-new.py --project <projeto> --slug <slug> --priority P1|P2|P3 --modo auto|manual
+python -I scripts/sp-new.py --project <projeto> --slug <slug> --priority P1|P2|P3 --modo auto|manual [--commit C] [--push P] [--pr R] [--restricoes "..."]
 ```
 
 Devolve `knowledge/projects/kaizen/<projeto>/sp/TODO/<slug>-<YYYY-MM-DD>.md` (frontmatter + 8 secções vazias). Preencher as secções nesse ficheiro e validar com `python -I scripts/sp-validate.py <ficheiro>`. `<slug>`: minúsculas ascii, hífens, ≤48 caracteres.
@@ -239,6 +243,7 @@ date: <YYYY-MM-DD>
 project: <project>    # project name (atlas, kaizen, michi, etc.)
 priority: P2          # P1 | P2 | P3 — optional, default P3 (used by /sp-list)
 modo: manual          # auto | manual — modo do michi; default manual (sem pergunta de arranque)
+commit: pergunta      # auto | pergunta | nunca (idem push, pr); restricoes: texto opcional
 ---
 ```
 

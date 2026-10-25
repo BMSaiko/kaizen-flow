@@ -172,3 +172,61 @@ def test_cli_program(tmp_path, capsys):
     assert len(capsys.readouterr().out.splitlines()) == 3
     assert sp_new.main(["--project", "atlas", "--priority", "P2", "--root", str(root)]) == 1
     assert "--slug" in capsys.readouterr().err
+
+
+def test_autorizacoes_vao_para_o_frontmatter_e_validam(tmp_path):
+    auth = {"commit": "auto", "push": "nunca", "pr": "nunca", "restricoes": "não tocar em AGENTS.md"}
+    path = sp_new.create(project(tmp_path), "atlas", "abc", "P2", TODAY, auth=auth)
+    text = path.read_text(encoding="utf-8")
+    assert "modo: manual\ncommit: auto\npush: nunca\npr: nunca\nrestricoes: não tocar em AGENTS.md\n---" in text
+    assert not any(e.startswith(("commit", "push", "pr")) for e in sp_validate.validate(text, "TODO"))
+
+
+@pytest.mark.parametrize("auth", [
+    {"push": "talvez"}, {"commit": "nunca", "push": "auto"}, {"push": "pergunta", "pr": "auto"},
+    {"restricoes": "a\nb"},
+])
+def test_autorizacoes_invalidas_recusadas_sem_criar(tmp_path, auth):
+    root = project(tmp_path)
+    with pytest.raises(sp_new.SpNewError):
+        sp_new.create(root, "atlas", "abc", "P2", TODAY, auth=auth)
+    assert not list((root / "atlas/sp/TODO").iterdir())
+
+
+def test_program_herda_autorizacoes_nos_filhos(tmp_path):
+    paths = sp_new.create_program(project(tmp_path), "atlas", "prog", "P2", TODAY, [("a", [])],
+                                  auth={"push": "nunca"})
+    assert all("push: nunca" in p.read_text(encoding="utf-8") for p in paths)
+
+
+def test_sem_autorizacoes_frontmatter_inalterado(tmp_path):
+    text = sp_new.create(project(tmp_path), "atlas", "abc", "P2", TODAY).read_text(encoding="utf-8")
+    assert "commit:" not in text and "push:" not in text
+
+
+def test_gates_e_prova_vao_para_o_frontmatter_e_validam(tmp_path):
+    path = sp_new.create(project(tmp_path), "atlas", "abc", "P2", TODAY,
+                         gates=["python -I scripts/test_sp_list.py", "npm test"], prova="python -I scripts/x.py")
+    text = path.read_text(encoding="utf-8")
+    assert "gates:\n  - cmd: python -I scripts/test_sp_list.py\n  - cmd: npm test\nprova: python -I scripts/x.py\n---" in text
+    assert not any("gate" in e or "prova" in e for e in sp_validate.validate(text, "TODO"))
+
+
+@pytest.mark.parametrize("kw", [
+    {"gates": ["npm test", "npm test"]}, {"gates": [""]}, {"gates": ["git add -A"]},
+    {"gates": ["a\nb"]}, {"prova": "a\nb"}, {"prova": "cat .env"},
+])
+def test_gates_prova_invalidos_recusados_sem_criar(tmp_path, kw):
+    root = project(tmp_path)
+    with pytest.raises(sp_new.SpNewError):
+        sp_new.create(root, "atlas", "abc", "P2", TODAY, **kw)
+    assert not list((root / "atlas/sp/TODO").iterdir())
+
+
+def test_cli_gate_repetivel_e_prova(tmp_path, capsys):
+    root = project(tmp_path)
+    rc = sp_new.main(["--root", str(root), "--project", "atlas", "--slug", "abc", "--priority", "P2",
+                      "--gate", "npm test", "--gate", "npm run lint", "--prova", "npm run e2e"])
+    assert rc == 0
+    text = Path(capsys.readouterr().out.strip()).read_text(encoding="utf-8")
+    assert "  - cmd: npm test\n  - cmd: npm run lint\nprova: npm run e2e" in text

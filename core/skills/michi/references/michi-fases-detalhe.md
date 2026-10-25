@@ -68,5 +68,7 @@ Texto integral movido de `SKILL.md` (otimização de custo, SP michi-otimizacao-
    testes/lint de `da`. Registar comando + output/caminho numa secção
    extra `## Prova de done` no SP (fora das 8; `sp-validate.py` tolera).
    Se a prova falhar, o SP não passa a Done: reportar a falha como é.
+
+   **SP com `gates:` no frontmatter:** correr `python -I scripts/sp-gates.py <SP>` em vez de inferir os comandos; rc 0 = verde, 1 = gate vermelho (corrigir a causa e repetir), 2 = gate inválido/proibido (nada corre). O resumo (comando, rc, duração, últimas linhas) vai para o Report. Vermelho impede `sp-move.py ... done`. `prova:` (comando ou critério) é a prova de done. Sem `gates:`, mantém-se o comportamento acima.
    Consolida e referencia as provas por fase (`## Prova`, `references/michi-prova.md`).
    **E2E de fecho de árvore** (só quando este SP fecha uma árvore mãe+filhos+netos; não a cada filho): (a) mecânica, `python -I scripts/sp-list.py --tree-closed <slug>` (rc≠0 = filho/neto por fechar, status≠pasta, dependência por cumprir ou sem `COMMIT_*.md`); (b) código entregue em `code\<projeto>`: build/typecheck/testes e um cenário e2e dos casos de uso do SP-mãe. Resultado com output no Report; falha impede propor o commit e abre correção. Detalhe: `workflow-sp-michi.md`.
