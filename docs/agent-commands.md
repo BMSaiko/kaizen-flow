@@ -8,6 +8,7 @@ Typed inside Claude Code / Codex, not in the shell. These are skills and prompt 
 | `/michi [--auto] <idea or SP file>` | an idea, or the path of an SP | Runs the whole improvement cycle on one story. |
 | `/sp-list [flags]` | same flags as `sp-list.py` | Lists open stories, then offers a picker to start one. |
 | `/sp-handoff [slug]` | optional slug | Logs progress in the story in Doing, prints the `/michi <path>` to resume, and (if you say yes) clears the context and resumes in the same pane. |
+| `/sp-fila [--dry-run] [--max N] [--ate HH:MM] [--projeto P]` | optional limits | Runs the eligible stories in sequence (`modo: auto`, `gates:` set, dependencies met), each in a clean session; stops on the first failure and writes a report. |
 | `/one-shot <idea>` | the project idea | One long interview (25+ questions, hours available), then a tree of stories (parent, children, grandchildren) executed by michi without questions. |
 | `/grill-me`, `/dr`, `/dp`, `/da`, `/brainstorm`, `/swot` | topic | The building blocks michi chains; usable alone. |
 
