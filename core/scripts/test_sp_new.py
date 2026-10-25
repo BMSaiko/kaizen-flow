@@ -230,3 +230,35 @@ def test_cli_gate_repetivel_e_prova(tmp_path, capsys):
     assert rc == 0
     text = Path(capsys.readouterr().out.strip()).read_text(encoding="utf-8")
     assert "  - cmd: npm test\n  - cmd: npm run lint\nprova: npm run e2e" in text
+
+
+def test_perfil_vai_para_o_frontmatter_e_valida(tmp_path):
+    perfil = {"perfil": "autonomo", "max_tentativas": 2, "parar_se": ["gate-falha", "custo"]}
+    path = sp_new.create(project(tmp_path), "atlas", "abc", "P2", TODAY, perfil=perfil, gates=["npm test"])
+    text = path.read_text(encoding="utf-8")
+    assert "perfil: autonomo\nmax_tentativas: 2\nparar_se: [gate-falha, custo]\n" in text
+    assert not any("perfil" in e or "max_" in e or "parar" in e for e in sp_validate.validate(text, "TODO"))
+
+
+def test_sem_perfil_nao_escreve_campos(tmp_path):
+    text = sp_new.create(project(tmp_path), "atlas", "abc", "P2", TODAY).read_text(encoding="utf-8")
+    assert "perfil" not in text and "parar_se" not in text
+
+
+@pytest.mark.parametrize("perfil", [
+    {"perfil": "ousado"}, {"max_tentativas": 0}, {"max_requests": -1}, {"parar_se": ["sempre"]}, {"perfil": "autonomo"},
+])
+def test_perfil_invalido_recusado_sem_criar(tmp_path, perfil):
+    root = project(tmp_path)
+    with pytest.raises(sp_new.SpNewError):
+        sp_new.create(root, "atlas", "abc", "P2", TODAY, perfil=perfil)
+    assert not list((root / "atlas/sp/TODO").iterdir())
+
+
+def test_cli_perfil(tmp_path, capsys):
+    root = project(tmp_path)
+    rc = sp_new.main(["--project", "atlas", "--slug", "abc", "--priority", "P2", "--root", str(root),
+                      "--perfil", "cauteloso", "--max-tentativas", "1", "--parar-se", "ambiguidade,custo"])
+    assert rc == 0
+    text = next((root / "atlas/sp/TODO").glob("abc-*.md")).read_text(encoding="utf-8")
+    assert "perfil: cauteloso" in text and "parar_se: [ambiguidade, custo]" in text

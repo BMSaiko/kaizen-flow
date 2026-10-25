@@ -64,6 +64,16 @@ def validate(text, folder=None):
             errors.append("push auto exige commit ≠ nunca")
         if fm.get("pr") == "auto" and fm.get("push") != "auto":
             errors.append("pr auto exige push auto")
+        if fm.get("perfil") and fm["perfil"] not in ("cauteloso", "normal", "autonomo"):
+            errors.append(f"perfil '{fm['perfil']}' inválido (cauteloso|normal|autonomo)")
+        for key in ("max_tentativas", "max_requests"):
+            if key in fm and not (fm[key].isdigit() and int(fm[key]) >= 1):
+                errors.append(f"{key} '{fm[key]}' tem de ser um inteiro ≥ 1")
+        bad = [x for x in sp_list.parse_list(fm.get("parar_se")) if x not in ("gate-falha", "ambiguidade", "ficheiro-fora-de-escopo", "custo")]
+        if bad:
+            errors.append(f"parar_se inválido {bad}")
+        if fm.get("perfil") == "autonomo" and not sp_gates.parse_gates(text):
+            errors.append("perfil autonomo exige gates")
         errors += sp_gates.problems(sp_gates.parse_gates(text))
         if "prova" in fm:
             if not fm["prova"]:

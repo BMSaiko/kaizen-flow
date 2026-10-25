@@ -38,6 +38,8 @@ SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
 AUTH_VALUES = ("auto", "pergunta", "nunca")
+PERFIS = ("cauteloso", "normal", "autonomo")
+PARAR_SE = ("gate-falha", "ambiguidade", "ficheiro-fora-de-escopo", "custo")
 
 
 class SpNewError(Exception):
@@ -57,6 +59,22 @@ def check_auth(auth):
     if auth.get("pr") == "auto" and auth.get("push") != "auto":
         raise SpNewError("pr auto exige push auto")
     return auth
+
+
+def check_perfil(perfil, gates=()):
+    """`perfil`: dict opcional perfil/max_tentativas/max_requests/parar_se (lista); valida valores."""
+    perfil = {k: v for k, v in (perfil or {}).items() if v is not None}
+    if "perfil" in perfil and perfil["perfil"] not in PERFIS:
+        raise SpNewError(f"perfil inválido '{perfil['perfil']}' ({'|'.join(PERFIS)})")
+    for key in ("max_tentativas", "max_requests"):
+        if key in perfil and (not isinstance(perfil[key], int) or perfil[key] < 1):
+            raise SpNewError(f"{key} tem de ser um inteiro ≥ 1")
+    bad = [x for x in perfil.get("parar_se", []) if x not in PARAR_SE]
+    if bad:
+        raise SpNewError(f"parar_se inválido {bad} ({'|'.join(PARAR_SE)})")
+    if perfil.get("perfil") == "autonomo" and not gates:
+        raise SpNewError("perfil autonomo exige gates")
+    return perfil
 
 
 def check_gates(gates, prova):
@@ -86,11 +104,12 @@ def check(root, project, slug, priority, modo="manual"):
         raise SpNewError(f"SP '{slug}' já existe no projeto '{project}'")
 
 
-def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None):
+def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None, perfil=None):
     root = Path(root)
     check(root, project, slug, priority, modo)
     auth = check_auth(auth)
     check_gates(list(gates), prova)
+    perfil = check_perfil(perfil, gates)
     stamp = f"{today.isoformat()}T00:00:00Z"
     head = [
         "---", "status: TODO", f"created: {stamp}", f"updated: {stamp}", "phase: SP",
@@ -98,6 +117,9 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
         f"modo: {modo}",
     ]
     head += [f"{k}: {auth[k]}" for k in ("commit", "push", "pr", "restricoes") if k in auth]
+    head += [f"{k}: {perfil[k]}" for k in ("perfil", "max_tentativas", "max_requests") if k in perfil]
+    if "parar_se" in perfil:
+        head.append(f"parar_se: [{', '.join(perfil['parar_se'])}]")
     if gates:
         head.append("gates:")
         head += [f"  - cmd: {g.strip()}" for g in gates]
@@ -185,11 +207,17 @@ def main(argv=None):
     ap.add_argument("--restricoes", help="restrições extra do SP (uma linha)")
     ap.add_argument("--gate", action="append", default=[], help="gate executável (repetível), corrido por sp-gates.py")
     ap.add_argument("--prova", help="comando ou critério verificável da prova")
+    ap.add_argument("--perfil", help="perfil de execução: cauteloso|normal|autonomo")
+    ap.add_argument("--max-tentativas", type=int, help="tentativas por gate (override do perfil)")
+    ap.add_argument("--max-requests", type=int, help="máximo de pedidos (override do perfil)")
+    ap.add_argument("--parar-se", help="lista separada por vírgulas: gate-falha,ambiguidade,ficheiro-fora-de-escopo,custo")
     ap.add_argument("--parent")
     ap.add_argument("--depends-on", nargs="*", default=[])
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     auth = {"commit": args.commit, "push": args.push, "pr": args.pr, "restricoes": args.restricoes}
+    perfil = {"perfil": args.perfil, "max_tentativas": args.max_tentativas, "max_requests": args.max_requests,
+              "parar_se": [x.strip() for x in args.parar_se.split(",") if x.strip()] if args.parar_se else None}
     try:
         if args.program:
             if not args.children:
@@ -199,7 +227,7 @@ def main(argv=None):
             print("\n".join(str(p) for p in paths))
         elif args.slug:
             check_links(args.root, args.project, args.parent, args.depends_on)
-            print(create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova))
+            print(create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil))
         else:
             raise SpNewError("indicar --slug (ou --program com --children)")
     except SpNewError as exc:

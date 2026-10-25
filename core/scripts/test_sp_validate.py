@@ -143,3 +143,24 @@ def test_aviso_modo_auto_sem_gates():
     assert not sp_validate.warnings(build(modo="auto", extra=GATES))
     assert not sp_validate.warnings(build(modo="manual"))
     assert sp_validate.validate(build(modo="auto"), "TODO") == []
+
+
+@pytest.mark.parametrize("extra", [
+    ["perfil: cauteloso"],
+    ["perfil: normal", "max_tentativas: 3", "max_requests: 40", "parar_se: [gate-falha, custo]"],
+    ["perfil: autonomo"] + GATES,
+])
+def test_perfil_valido(extra):
+    assert sp_validate.validate(build(extra=extra), "TODO") == []
+
+
+@pytest.mark.parametrize("extra,fragment", [
+    (["perfil: ousado"], "perfil"),
+    (["max_tentativas: 0"], "max_tentativas"),
+    (["max_requests: muitos"], "max_requests"),
+    (["parar_se: [gate-falha, sempre]"], "parar_se"),
+    (["perfil: autonomo"], "gates"),
+])
+def test_perfil_invalido(extra, fragment):
+    errors = sp_validate.validate(build(extra=extra), "TODO")
+    assert len(errors) == 1 and fragment in errors[0]
