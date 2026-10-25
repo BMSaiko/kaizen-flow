@@ -212,3 +212,97 @@ def test_tree_marca_mae_pronta_para_fechar(tmp_path):
     done_kids = [(dataclasses.replace(sp, status="Done"), []) for sp, _ in kids]
     assert "pronto para fechar" in sp_list.render_tree([(mother, done_kids)], [], lambda sp: True)
     assert "pronto para fechar" not in sp_list.render_tree(groups, [], lambda sp: True)
+
+
+def test_parse_list_variantes():
+    assert sp_list.parse_list("[a, b ,c]") == ["a", "b", "c"]
+    assert sp_list.parse_list("a") == ["a"]
+    assert sp_list.parse_list("[]") == [] and sp_list.parse_list(None) == [] and sp_list.parse_list("") == []
+
+
+def test_parse_date_invalida_ou_ausente():
+    assert sp_list.parse_date("2026-13-45") is None
+    assert sp_list.parse_date("") is None and sp_list.parse_date(None) is None
+    assert str(sp_list.parse_date("2026-10-25T00:00:00Z")) == "2026-10-25"
+
+
+def test_parse_frontmatter_ignora_comentario_e_linhas_sem_chave():
+    fm = sp_list.parse_frontmatter("---\npriority: P1  # urgente\nsem-dois-pontos\n: vazio\n---\nx: y\n")
+    assert fm == {"priority": "P1"}
+
+
+def test_bar_e_short_unmet():
+    assert sp_list.bar(0, 0) == "▱" * 10
+    assert sp_list.bar(5, 10) == "▰" * 5 + "▱" * 5
+    assert sp_list.bar(3, 3) == "▰" * 10
+    assert sp_list.short_unmet(["a", "b"]) == "a, b"
+    assert sp_list.short_unmet(["a", "b", "c", "d"]) == "a, b +2"
+
+
+def test_collect_ignora_moc_e_pastas_fora_de_sp(tmp_path):
+    make_sp(tmp_path, "atlas/sp/TODO", "MOC")
+    make_sp(tmp_path, "atlas/dr/TODO", "pesquisa")
+    make_sp(tmp_path, "atlas/sp/TODO", "real", project="atlas")
+    assert [s.slug for s in sp_list.collect(tmp_path)] == ["real"]
+
+
+def test_build_tree_ciclo_de_dependencias_nao_rebenta(tmp_path):
+    make_sp(tmp_path, "atlas/sp/TODO", "mae", project="atlas", kind="program")
+    make_sp(tmp_path, "atlas/sp/TODO", "x", project="atlas", parent="mae", depends_on=["y"])
+    make_sp(tmp_path, "atlas/sp/TODO", "y", project="atlas", parent="mae", depends_on=["x"])
+    groups, _ = sp_list.build_tree(sp_list.collect(tmp_path, include_done=True))
+    assert sorted(sp.slug for sp, _ in groups[0][1]) == ["x", "y"]
+
+
+def test_build_tree_deps_de_outro_projeto_nao_contam(tmp_path):
+    make_sp(tmp_path, "atlas/sp/Done", "a", status="Done", project="atlas")
+    make_sp(tmp_path, "outro/sp/TODO", "mae", project="outro", kind="program")
+    make_sp(tmp_path, "outro/sp/TODO", "f", project="outro", parent="mae", depends_on=["a"])
+    groups, _ = sp_list.build_tree(sp_list.collect(tmp_path, include_done=True))
+    assert groups[0][1][0][1] == ["a"]
+
+
+def test_main_project_filtra_na_vista_em_arvore(tmp_path, capsys):
+    program(tmp_path)
+    make_sp(tmp_path, "outro/sp/TODO", "estranho", project="outro")
+    sp_list.main(["--root", str(tmp_path), "--project", "outro"])
+    out = capsys.readouterr().out
+    assert "estranho" in out and "mae" not in out
+    assert out.splitlines()[-1] == "1 TODO, 0 Doing, 0 avisos"
+
+
+def test_main_status_filtra_na_vista_em_arvore(tmp_path, capsys):
+    program(tmp_path)
+    sp_list.main(["--root", str(tmp_path), "--status", "doing"])
+    out = capsys.readouterr().out
+    assert "─ b" in out and "─ c" not in out and "solto" not in out
+    assert out.splitlines()[-1] == "0 TODO, 1 Doing, 0 avisos"
+
+
+def test_main_sem_sps_imprime_so_resumo(tmp_path, capsys):
+    assert sp_list.main(["--root", str(tmp_path)]) == 0
+    assert capsys.readouterr().out == "\n0 TODO, 0 Doing, 0 avisos\n"
+
+
+def test_main_flat_resumo_singular_do_aviso(tmp_path, capsys):
+    make_sp(tmp_path, "atlas/sp/TODO", "torto", status="Doing", project="atlas")
+    sp_list.main(["--root", str(tmp_path), "--flat"])
+    out = capsys.readouterr().out
+    assert "⚠ status≠pasta" in out and out.splitlines()[-1] == "1 TODO, 0 Doing, 1 aviso"
+
+
+def test_paint_sem_tty_nao_poe_codigos(monkeypatch):
+    monkeypatch.delenv("FORCE_COLOR", raising=False)
+    monkeypatch.setattr(sp_list.sys.stdout, "isatty", lambda: False, raising=False)
+    assert sp_list.paint("x", "1") == "x"
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    assert sp_list.paint("x", "1").startswith("\x1b[1m") and sp_list.paint("x") == "x"
+
+
+def test_tree_closed_via_main_codigos_de_saida(tmp_path, capsys):
+    program(tmp_path)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    assert sp_list.main(["--root", str(tmp_path), "--repo", str(repo), "--tree-closed", "nada"]) == 2
+    assert sp_list.main(["--root", str(tmp_path), "--repo", str(repo), "--tree-closed", "mae"]) == 1
+    assert "sem COMMIT_*.md gerado" in capsys.readouterr().out

@@ -32,7 +32,7 @@ Frontmatter `commit`, `push`, `pr` (`auto|pergunta|nunca`) e `restricoes` (texto
 1. `sp-move.py <slug> done` (antes do commit).
 2. Se `commit` ≠ `nunca`: gerar `COMMIT_*.md` com stage explícito (skill `commit-msg`), executar-o (skill `commit`: commit local, autor the user) e apagar o `COMMIT_*.md`.
 3. Repo de código: commit local por fase (assunto ≤72). Push/PR só conforme «Autorizações do SP».
-4. Se o SP tem filho seguinte: `sp-handoff --launch --auto`. Se corre numa fila (`~/.claude/sp-fila-estado.json` existe): `sp-fila.py --seguinte` (`.claude/commands/sp-fila.md`); também na paragem, para registar o falhado.
+4. **Continuar sozinho, nunca parar para perguntar «sigo?»** (2026-10-25): fechado um SP em auto, `sp-list.py --status todo` e executar já o próximo elegível (dependências em Done), até não haver nenhum; a mãe com todos os filhos Done fecha também. Parar só por paragem/gate falhado. Se o SP tem filho seguinte: `sp-handoff --launch --auto`. Se corre numa fila (`~/.claude/sp-fila-estado.json` existe): `sp-fila.py --seguinte` (`.claude/commands/sp-fila.md`); também na paragem, para registar o falhado.
 5. `git rev-parse --abbrev-ref HEAD` = `master` (SB-VERIFY).
 
 ## Paragem
