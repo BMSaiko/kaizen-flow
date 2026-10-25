@@ -16,6 +16,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_hooks  # noqa: E402
+
 _spec = importlib.util.spec_from_file_location("sp_list", Path(__file__).with_name("sp-list.py"))
 sp_list = importlib.util.module_from_spec(_spec)
 sys.modules["sp_list"] = sp_list
@@ -124,13 +127,20 @@ def move(root, slug, dest, project=None):
     new_raw = _rewrite_frontmatter(sp.path.read_bytes(), target, updated)
     if dst.exists():
         raise SpMoveError(f"destino já ocupado por outro ficheiro: {dst}")
+    ctx = {"slug": slug, "project": sp.project, "de": sp.status, "para": target, "path": str(sp.path)}
+    try:
+        kaizen_hooks.fire("sp.moved", ctx, phase="pre")
+    except kaizen_hooks.HookBlocked as exc:
+        raise SpMoveError(str(exc))
     _relocate(sp.path, dst)
     dst.write_bytes(new_raw)
     n = _move_proofs(sp, dst)
     if target == "Done":
         _agent_claim(slug, target)
     extra = f" (+{n} provas)" if n else ""
-    return f"{slug}: {sp.status} → {target} ({dst}){extra}"
+    ctx["path"] = str(dst)
+    avisos = "".join(f"\naviso: {w}" for w in kaizen_hooks.fire("sp.moved", ctx, phase="post"))
+    return f"{slug}: {sp.status} → {target} ({dst}){extra}{avisos}"
 
 
 def _find(root, slug, project):

@@ -24,3 +24,34 @@ def sp_root(repo):
 
 def docs_root(repo):
     return Path(repo) / _read(repo).get("docsRoot", DEFAULT_DOCS_ROOT)
+
+
+HOOKS_NAME = "kaizen-hooks.json"
+EVENTS = ("sp.created", "sp.moved", "michi.phase.start", "michi.phase.end",
+          "michi.gate.failed", "michi.commit", "michi.closed")
+
+
+def hooks(repo):
+    """Hooks válidos de `kaizen-hooks.json` (lista `hooks`); entradas inválidas são descartadas."""
+    try:
+        data = json.loads((Path(repo) / HOOKS_NAME).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    raw = data.get("hooks") if isinstance(data, dict) else None
+    out = []
+    for h in raw if isinstance(raw, list) else []:
+        if not isinstance(h, dict) or h.get("event") not in EVENTS:
+            continue
+        cmd = h.get("cmd")
+        if not isinstance(cmd, str) or not cmd.strip():
+            continue
+        modo = h.get("modo", "informativo")
+        timeout = h.get("timeout", 10)
+        cond = h.get("if", {})
+        if modo not in ("bloqueante", "informativo") or isinstance(timeout, bool) \
+                or not isinstance(timeout, (int, float)) or timeout <= 0 or not isinstance(cond, dict):
+            continue
+        if h.get("enabled", True) is not True:
+            continue
+        out.append({"event": h["event"], "cmd": cmd, "modo": modo, "timeout": timeout, "if": cond})
+    return out

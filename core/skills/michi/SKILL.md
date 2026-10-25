@@ -46,6 +46,8 @@ The agent follows this sequence; the user can stop after any step
 
 ## Phases
 
+Hooks (`kaizen-hooks.json`, ref. `knowledge/infra/reference/kaizen-hooks.md`): em cada início/fim de fase, gate falhado, commit e fecho correr `python -I scripts/kaizen_hooks.py fire michi.<phase.start|phase.end|gate.failed|commit|closed> --slug <SP> --project <p>` (rc≠0 de bloqueante = parar e reportar). Sem config é no-op.
+
 1. **Grill me.** `/grill-me <projeto + ideia>` até alinhar o quê, porquê e forma. Por defeito DR corre antes do grill; **Super Prompt de 8 secções como input: saltar fases 1-2 e começar no DP (ou DA se pedido), sem repetir factos das secções 2/3/4/5.** Detalhe (ordem DR/grill, min-DR gate): `references/michi-fases-detalhe.md` §Fase 1.
 2. **Deep Research.** Run `/dr <project> <area touched>`. Goal: surface the
    real code paths, constraints, prior art, and integration points. Cite
