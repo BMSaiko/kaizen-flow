@@ -72,6 +72,13 @@ def validate(text, folder=None):
         bad = [x for x in sp_list.parse_list(fm.get("parar_se")) if x not in ("gate-falha", "ambiguidade", "ficheiro-fora-de-escopo", "custo")]
         if bad:
             errors.append(f"parar_se inválido {bad}")
+        globs = {k: sp_list.parse_list(fm.get(k)) for k in ("escopo", "fora_de_escopo")}
+        for key, vals in globs.items():
+            if key in fm and not vals:
+                errors.append(f"{key} vazio")
+            errors += [f"{key}: glob inválido '{g}'" for g in vals if ".." in g.replace("\\", "/").split("/")]
+        if globs["fora_de_escopo"] and not globs["escopo"]:
+            errors.append("fora_de_escopo exige escopo")
         if fm.get("perfil") == "autonomo" and not sp_gates.parse_gates(text):
             errors.append("perfil autonomo exige gates")
         errors += sp_gates.problems(sp_gates.parse_gates(text))

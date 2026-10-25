@@ -77,6 +77,16 @@ def check_perfil(perfil, gates=()):
     return perfil
 
 
+def check_escopo(escopo, fora):
+    """Globs do escopo: não vazios, sem `..`, sem vírgulas/colchetes (vão em lista inline)."""
+    for g in list(escopo) + list(fora):
+        if not g.strip() or ".." in g.replace("\\", "/").split("/") or any(c in g for c in ",[]"):
+            raise SpNewError(f"glob de escopo inválido '{g}'")
+    if fora and not escopo:
+        raise SpNewError("fora_de_escopo exige escopo")
+    return [g.strip() for g in escopo], [g.strip() for g in fora]
+
+
 def check_gates(gates, prova):
     """`gates`: comandos do frontmatter; `prova`: comando/critério. Uma linha cada, sem proibidos."""
     for cmd in [*gates, prova or ""]:
@@ -104,12 +114,13 @@ def check(root, project, slug, priority, modo="manual"):
         raise SpNewError(f"SP '{slug}' já existe no projeto '{project}'")
 
 
-def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None, perfil=None):
+def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None, perfil=None, escopo=(), fora_de_escopo=()):
     root = Path(root)
     check(root, project, slug, priority, modo)
     auth = check_auth(auth)
     check_gates(list(gates), prova)
     perfil = check_perfil(perfil, gates)
+    escopo, fora_de_escopo = check_escopo(escopo, fora_de_escopo)
     stamp = f"{today.isoformat()}T00:00:00Z"
     head = [
         "---", "status: TODO", f"created: {stamp}", f"updated: {stamp}", "phase: SP",
@@ -120,6 +131,10 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
     head += [f"{k}: {perfil[k]}" for k in ("perfil", "max_tentativas", "max_requests") if k in perfil]
     if "parar_se" in perfil:
         head.append(f"parar_se: [{', '.join(perfil['parar_se'])}]")
+    if escopo:
+        head.append(f"escopo: [{', '.join(escopo)}]")
+    if fora_de_escopo:
+        head.append(f"fora_de_escopo: [{', '.join(fora_de_escopo)}]")
     if gates:
         head.append("gates:")
         head += [f"  - cmd: {g.strip()}" for g in gates]
@@ -193,6 +208,10 @@ def create_program(root, project, slug, priority, today, children, modo="manual"
     return paths
 
 
+def split(value):
+    return [x.strip() for x in value.split(",") if x.strip()] if value else []
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Cria um SP vazio em sp/TODO")
     ap.add_argument("--project", required=True)
@@ -211,6 +230,8 @@ def main(argv=None):
     ap.add_argument("--max-tentativas", type=int, help="tentativas por gate (override do perfil)")
     ap.add_argument("--max-requests", type=int, help="máximo de pedidos (override do perfil)")
     ap.add_argument("--parar-se", help="lista separada por vírgulas: gate-falha,ambiguidade,ficheiro-fora-de-escopo,custo")
+    ap.add_argument("--escopo", help="globs permitidos, separados por vírgulas (guard-escopo.js)")
+    ap.add_argument("--fora-de-escopo", help="globs negados, separados por vírgulas")
     ap.add_argument("--parent")
     ap.add_argument("--depends-on", nargs="*", default=[])
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
@@ -227,7 +248,7 @@ def main(argv=None):
             print("\n".join(str(p) for p in paths))
         elif args.slug:
             check_links(args.root, args.project, args.parent, args.depends_on)
-            print(create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil))
+            print(create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo)))
         else:
             raise SpNewError("indicar --slug (ou --program com --children)")
     except SpNewError as exc:

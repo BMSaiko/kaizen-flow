@@ -262,3 +262,22 @@ def test_cli_perfil(tmp_path, capsys):
     assert rc == 0
     text = next((root / "atlas/sp/TODO").glob("abc-*.md")).read_text(encoding="utf-8")
     assert "perfil: cauteloso" in text and "parar_se: [ambiguidade, custo]" in text
+
+
+def test_escopo_vai_para_o_frontmatter_e_valida(tmp_path):
+    path = sp_new.create(project(tmp_path), "atlas", "abc", "P2", TODAY, escopo=["code/**", "scripts/x.py"], fora_de_escopo=["code/old/**"])
+    text = path.read_text(encoding="utf-8")
+    assert "escopo: [code/**, scripts/x.py]\nfora_de_escopo: [code/old/**]\n" in text
+    assert not any("escopo" in e for e in sp_validate.validate(text, "TODO"))
+
+
+@pytest.mark.parametrize("escopo,fora", [(["../x"], []), ([""], []), (["a,b"], []), ([], ["x/**"])])
+def test_escopo_invalido_recusado(tmp_path, escopo, fora):
+    with pytest.raises(sp_new.SpNewError):
+        sp_new.create(project(tmp_path), "atlas", "abc", "P2", TODAY, escopo=escopo, fora_de_escopo=fora)
+
+
+def test_validate_apanha_escopo_mau():
+    text = "---\nescopo: [../x]\n---\n"
+    errs = sp_validate.validate(text, "TODO")
+    assert any("glob inválido" in e for e in errs)
