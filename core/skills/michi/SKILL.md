@@ -32,6 +32,8 @@ metadata:
 
 `/michi help|--help|-h|?`: responder só com a Usage e parar. Uso: `/michi [--auto] [<idea>|<SP>]`, `skip <fase>`, `go to DA`. Skills suplementares: `references/michi-help.md`.
 
+**Checkpoint/rollback:** `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate (`references/michi-modo-auto.md` §Paragem).
+
 A single skill that drives an end-to-end project change:
 grill → dr → dp → da → gates → report → reflect → commit-suggest.
 

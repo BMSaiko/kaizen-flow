@@ -36,7 +36,8 @@ Frontmatter `commit`, `push`, `pr` (`auto|pergunta|nunca`) e `restricoes` (texto
 5. `git rev-parse --abbrev-ref HEAD` = `master` (SB-VERIFY).
 
 ## Paragem
-Gate/prova falhada após 2 tentativas, ou proibição em causa: não commita, não move para Done, regista em `## Report modo auto` e para. Em one-shot passa à folha independente seguinte.
+Gate/prova falhada após 2 tentativas, ou proibição em causa: não commita, não move para Done, regista em `## Report modo auto` reverte ao checkpoint e para. Em one-shot passa à folha independente seguinte.
+Checkpoint: antes da DA (ou de fase com escrita) `python -I scripts/michi-checkpoint.py save --slug <SP>`. Na paragem: `restore --slug <SP>` mostra o plano; em auto, `--apply` e regista a reversão no Report; em manual, `AskUserQuestion` antes de `--apply` (recusa se o HEAD mudou).
 
 ## Report (`## Report modo auto` no SP + resumo curto no chat)
 correu bem · correu mal · corrigido · commits (hash + assunto) · próximo passo.
