@@ -39,6 +39,8 @@ SEND_DELAY = 5.0
 SEND_GAP = 2.0
 ENTER_GAP = 0.5
 UPDATED_RE = re.compile(r"^updated:.*$")
+MAX_BODY_LINES = 25
+SP_SECTION_RE = re.compile(r"^#{1,6}\s*(?:\d+\.\s*)?(role|context|objective|success criteria|constraints|seams|steps|done-when)", re.I)
 
 
 class HandoffError(Exception):
@@ -89,7 +91,20 @@ def resolve(root, slug=None, mine=None):
     return doing[0].path.resolve()
 
 
+def check_delta(body):
+    """O handoff só leva o delta: ≤MAX_BODY_LINES linhas e sem repetir secções 1-8 do SP."""
+    lines = body.splitlines()
+    while lines and not lines[-1].strip():
+        lines.pop()
+    if len(lines) > MAX_BODY_LINES:
+        raise HandoffError(f"handoff com {len(lines)} linhas (máx {MAX_BODY_LINES}): só o delta (próximo passo, ficheiros, decisões novas)")
+    dup = next((l for l in lines if SP_SECTION_RE.match(l)), None)
+    if dup:
+        raise HandoffError(f"handoff repete uma secção do SP ({dup.strip()!r}): apontar para o SP em vez de copiar")
+
+
 def write(path, progress, today=None):
+    check_delta(progress)
     path = Path(path)
     raw = path.read_bytes().decode("utf-8")
     eol = "\r\n" if "\r\n" in raw else "\n"

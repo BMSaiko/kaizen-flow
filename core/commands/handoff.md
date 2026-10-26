@@ -4,7 +4,7 @@ description: Passar uma conversa livre (sem SP) para uma sessão nova: escreve u
 Para conversas sem SP (para um SP, usar `/sp-handoff`). Passos, por esta ordem (português europeu):
 
 1. Escrever o estado desta conversa num ficheiro temporário (scratchpad), só o corpo, sem título, com: **Feito**, **Por fazer**, **Decisões**, **Ficheiros tocados**, **Próximo passo**. Curto e factual, a partir da conversa. `$ARGUMENTS` = nome curto opcional da conversa (slug).
-2. `python -I scripts/handoff.py --write --slug <slug> --file <corpo.md>`. Imprime o caminho `knowledge/projects/kaizen/handoffs/<data>-<HHMM>-<slug>.md` (limpa também `handoffs/*.md` com mais de 7 dias).
+2. Corpo só com o delta, ≤25 linhas (o script recusa mais). `python -I scripts/handoff.py --write --slug <slug> --file <corpo.md>`. Imprime o caminho `knowledge/projects/kaizen/handoffs/<data>-<HHMM>-<slug>.md` (limpa também `handoffs/*.md` com mais de 7 dias).
 3. Imprimir sempre este bloco, com o caminho absoluto do passo 2:
 
    ```

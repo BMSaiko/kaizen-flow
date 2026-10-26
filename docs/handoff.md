@@ -8,6 +8,8 @@ python scripts/sp-handoff.py --write PATH [--file BODY]  # log progress in the s
 python scripts/sp-handoff.py --launch PATH               # clear context and resume
 ```
 
+`--write` only accepts the delta: at most 25 lines and no copied story sections (Role, Context, Objective…); longer bodies are rejected. The same limit applies to `handoff.py --write`.
+
 Extra options: `--harness claude|codex`, `--backend wezterm|tmux|clipboard`, `--pane ID`, `--dry-run` (print the commands, execute nothing), `--auto` (no questions; needs a story in Doing).
 
 ## Backends

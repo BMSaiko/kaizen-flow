@@ -56,6 +56,7 @@ def cleanup(folder, keep=None, max_age_days=MAX_AGE_DAYS, now=None):
 
 
 def write(folder, body, slug, now=None):
+    sp_handoff.check_delta(body)
     now = now or datetime.now()
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)

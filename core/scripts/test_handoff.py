@@ -116,3 +116,14 @@ def test_send_manda_clear_e_depois_o_prompt(tmp_path):
                  sleep=lambda s: None)
     texts = [c[-1] for c in calls]
     assert texts == ["/clear", "\r", "continua", "\r"]
+
+
+def test_write_recusa_handoff_com_mais_de_25_linhas(tmp_path):
+    with pytest.raises(handoff.HandoffError, match="máx 25"):
+        handoff.write(tmp_path / "handoffs", "x\n" * 26, "z", now=datetime(2026, 10, 18, 9, 5))
+
+
+def test_write_aceita_25_linhas_e_recusa_secao_copiada_do_sp(tmp_path):
+    handoff.write(tmp_path / "handoffs", "x\n" * 25, "z", now=datetime(2026, 10, 18, 9, 5))
+    with pytest.raises(handoff.HandoffError, match="secção do SP"):
+        handoff.write(tmp_path / "handoffs", "## Objective\nc\n", "z", now=datetime(2026, 10, 18, 9, 6))
