@@ -43,7 +43,7 @@ Run with `python scripts/<name>.py`. Roots come from [`kaizen.config.json`](conf
 | `sp-validate.py` | `<file>...` | checks the 8-section contract (every section non-empty), rc 1 on failure |
 | `sp-organize.py` | tidy stories into program folders | `--project P`, `--apply` (default is a dry run) |
 | `sp-handoff.py` | move the story to a fresh context | see [handoff](handoff.md) |
-| `sp-fila.py` | run eligible stories in sequence | `--dry-run` (order + exclusions), `--max N`, `--ate HH:MM`, `--projeto P`, `--seguinte` (next step of a running queue) |
+| `sp-fila.py` | run eligible stories in sequence | `--dry-run` (order + exclusions), `--max N`, `--ate HH:MM`, `--projeto P`, `--programa SLUG` (tree + budget from the parent story), `--seguinte` (next step of a running queue) |
 | `doc-list.py` | `dr\|dp` | `--all` |
 | `doc-move.py` | `dr\|dp <slug> todo\|doing\|done` | |
 
