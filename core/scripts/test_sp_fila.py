@@ -229,3 +229,47 @@ def test_cli_dry_run_mostra_ordem_e_exclusoes(tmp_path, capsys):
     rc = sp_fila.main(["--dry-run", "--root", str(tmp_path)])
     out = capsys.readouterr().out
     assert rc == 0 and "um" in out and "man" in out and "modo" in out
+
+
+def _arvore(root, mae_extra):
+    make_sp(root, "mae", kind="program", modo="manual", extra=mae_extra)
+    for s in ("f1", "f2", "f3"):
+        make_sp(root, s, extra={"parent": "mae"})
+    make_sp(root, "fora")
+
+
+def test_programa_restringe_a_arvore(tmp_path):
+    _arvore(tmp_path, {})
+    items = sp_fila.load(tmp_path)
+    assert slugs(sp_fila.plan(items, so=sp_fila.descendentes(items, "mae"))) == ["f1", "f2", "f3"]
+
+
+def test_orcamento_tempo_e_custo_em_limite():
+    base = {"max": 9, "ate": None, "orcamento": 999, "usados": 0, "feitos": [], "falhados": [],
+            "inicio": "2026-10-25T10:00:00", "horas": 2.0, "usd": 5.0}
+    assert "tempo" in sp_fila.limite(base, datetime(2026, 10, 25, 12, 0))
+    assert sp_fila.limite(base, datetime(2026, 10, 25, 11, 0)) is None
+    assert "custo" in sp_fila.limite(base, datetime(2026, 10, 25, 11, 0), custo=5.0)
+
+
+def test_e2e_para_no_limite_grava_progresso_e_retoma(tmp_path):
+    root = tmp_path / "sps"
+    _arvore(root, {"orcamento_requests": 100})
+    st = _estado(tmp_path, max=9, orcamento=100, programa="mae", horas=None, usd=None)
+    agora, calls = datetime(2026, 10, 25, 12, 0), []
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), agora)
+    assert out["slug"] == "f1"
+    make_sp(root, "f1", folder="Done", extra={"parent": "mae"})  # sessão f1 fechou
+    (root / "p" / "sp" / "TODO" / "f1.md").unlink()
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), agora)
+    assert out["slug"] == "f2"
+    make_sp(root, "f2", folder="Done", extra={"parent": "mae"})
+    (root / "p" / "sp" / "TODO" / "f2.md").unlink()
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), agora)  # 100 usados: sem espaço para f3
+    assert out["acao"] == "fim" and "orçamento" in out["motivo"] and not st.exists()
+    mae = (root / "p" / "sp" / "TODO" / "mae.md").read_text(encoding="utf-8")
+    assert "## Progresso" in mae and "- f1" in mae and "- f2" in mae and "- f3" in mae
+    assert "fora" not in mae
+    # retoma: nova corrida, f1/f2 ficam Done, só f3 por correr
+    st2 = _estado(tmp_path, max=9, orcamento=100, programa="mae", horas=None, usd=None)
+    assert sp_fila.seguinte(root, st2, tmp_path / "rel", _runner(calls), agora)["slug"] == "f3"

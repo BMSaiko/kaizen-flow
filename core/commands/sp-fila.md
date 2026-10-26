@@ -1,7 +1,7 @@
 ---
 description: Executar em sequência os SPs elegíveis (modo auto, gates, dependências cumpridas), com limites e relatório final
 ---
-Passos (português europeu). `$ARGUMENTS` = flags de `scripts/sp-fila.py` (`--dry-run`, `--max N`, `--ate HH:MM`, `--projeto P`, `--orcamento N`).
+Passos (português europeu). `$ARGUMENTS` = flags de `scripts/sp-fila.py` (`--dry-run`, `--max N`, `--ate HH:MM`, `--projeto P`, `--orcamento N`, `--programa SLUG-MÃE`: só a árvore da mãe, com `orcamento_horas`/`orcamento_usd`/`orcamento_requests` do frontmatter dela; ao parar grava `## Progresso` na mãe).
 
 1. Correr sempre primeiro `python -I scripts/sp-fila.py --dry-run $ARGUMENTS` e mostrar a ordem e os excluídos (modo ≠ auto, sem gates, dependência em falta, ciclo, autorização insuficiente).
 2. Se `$ARGUMENTS` tem `--dry-run`, parar aqui.

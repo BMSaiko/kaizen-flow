@@ -7,12 +7,18 @@ prioridade, depois idade, com `depends_on` a mandar. Nunca faz push/PR: isso é 
 Uso:
   python -I scripts/sp-fila.py --dry-run [--max N] [--ate HH:MM] [--projeto P]   # ordem e exclusões
   python -I scripts/sp-fila.py [--max N] [--ate HH:MM] [--projeto P] [--orcamento N]   # arranca a fila
+  python -I scripts/sp-fila.py --programa <slug-mãe> [--max N]   # só a árvore da mãe; orçamento lido dela
   python -I scripts/sp-fila.py --seguinte    # no fecho de cada SP da fila: regista e lança o seguinte
   python -I scripts/sp-fila.py --parar       # abandona a fila (apaga o estado)
 
 O estado vive em `~/.claude/sp-fila-estado.json`; no fim (fila vazia, limite ou erro) escreve o
 relatório em `knowledge/infra/reports/sp-fila/` e apaga o estado. Um SP lançado que não chegou a Done
 conta como falhado: os dependentes ficam de fora e só continuam os independentes.
+
+Orçamento por programa: o SP-mãe pode ter `orcamento_horas`, `orcamento_usd`, `orcamento_requests` no
+frontmatter. Contam por corrida (retomar = nova corrida): tempo desde o arranque, custo USD das sessões
+`/michi` da árvore (sp-metricas.custo_por_slug) e requests. Ao parar acrescenta `## Progresso (sessão <data>)`
+à mãe (feitos, falhados, por correr) além do relatório.
 """
 import argparse
 import importlib.util
@@ -71,12 +77,26 @@ def estatico(sp, fm):
     return autorizacao(fm)
 
 
-def plan(items, maximo=None):
-    """(fila ordenada, [(slug, motivo)]). Função pura, sem FS."""
+def descendentes(items, mae):
+    """Slugs dos SPs na árvore de `mae` (netos incluídos, sem a própria mãe)."""
+    arvore, novos = set(), {mae}
+    while novos:
+        novos = {sp.slug for sp, _ in items if sp.parent in novos and sp.slug not in arvore and sp.slug != mae}
+        arvore |= novos
+    return arvore
+
+
+def orcamento_mae(items, mae):
+    """(frontmatter da mãe, ou None se não existir)."""
+    return next((fm for sp, fm in items if sp.slug == mae), None)
+
+
+def plan(items, maximo=None, so=None):
+    """(fila ordenada, [(slug, motivo)]). Função pura, sem FS. `so`: só estes slugs são candidatos."""
     done = {sp.slug for sp, _ in items if sp.status == "Done"}
     excluidos, cand = [], {}
     for sp, fm in items:
-        if sp.status == "Done":
+        if sp.status == "Done" or (so is not None and sp.slug not in so):
             continue
         why = estatico(sp, fm)
         if why:
@@ -113,14 +133,20 @@ def plan(items, maximo=None):
     return (fila[:maximo] if maximo else fila), sorted(excluidos)
 
 
-def limite(estado, agora):
-    """Motivo para parar a fila, ou None."""
+def limite(estado, agora, custo=0.0):
+    """Motivo para parar a fila, ou None. `custo`: USD gasto nesta corrida (só conta com orcamento_usd)."""
     if len(estado["feitos"]) + len(estado["falhados"]) >= estado["max"]:
         return f"atingido o máximo de {estado['max']} SPs"
     if estado.get("ate"):
         h, m = (int(x) for x in estado["ate"].split(":"))
         if (agora.hour, agora.minute) >= (h, m):
             return f"atingida a hora limite {estado['ate']}"
+    if estado.get("horas") is not None:
+        gastas = (agora - datetime.fromisoformat(estado["inicio"])).total_seconds() / 3600
+        if gastas >= estado["horas"]:
+            return f"orçamento de tempo esgotado ({gastas:.1f}/{estado['horas']} h)"
+    if estado.get("usd") is not None and custo >= estado["usd"]:
+        return f"orçamento de custo esgotado ({custo:.2f}/{estado['usd']} USD)"
     if estado["usados"] + REQ_POR_SP > estado["orcamento"]:
         return f"orçamento de requests esgotado ({estado['usados']}/{estado['orcamento']})"
     return None
@@ -158,17 +184,33 @@ def relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora):
     return path
 
 
-def seguinte(root, estado_path, rel_dir, run=subprocess.run, agora=None):
+def progresso(mae_path, estado, fila, motivo, agora):
+    """Acrescenta `## Progresso (sessão <data>)` à mãe: feitos, falhados, por correr."""
+    listar = lambda xs: [f"- {x}" for x in xs] or ["- nenhum"]
+    porcorrer = [sp.slug for sp in fila if sp.slug not in estado["falhados"]]
+    linhas = ["", f"## Progresso (sessão {agora:%Y-%m-%d %H:%M})", "", f"Paragem: {motivo}.", "", "Feitos:",
+              *listar(estado["feitos"]), "", "Falhados:", *listar(estado["falhados"]), "", "Por correr:",
+              *listar(porcorrer), ""]
+    with Path(mae_path).open("a", encoding="utf-8") as f:
+        f.write("\n".join(linhas))
+
+
+def seguinte(root, estado_path, rel_dir, run=subprocess.run, agora=None, custo_fn=None):
     """Regista o SP lançado, respeita os limites e lança o seguinte. Devolve {acao, ...}."""
     agora = agora or datetime.now()
     estado = json.loads(Path(estado_path).read_text(encoding="utf-8"))
     items = load(root, estado.get("projeto"))
+    so = descendentes(items, estado["programa"]) if estado.get("programa") else None
     if estado["lancado"]:
         sp = next((s for s, _ in items if s.slug == estado["lancado"]), None)
         (estado["feitos"] if sp is not None and sp.status == "Done" else estado["falhados"]).append(estado["lancado"])
         estado["lancado"] = None
-    fila, excluidos = plan(items)
-    motivo = limite(estado, agora) or ("fila vazia" if not fila else None)
+    fila, excluidos = plan(items, so=so)
+    custo = 0.0
+    if estado.get("usd") is not None:
+        custos = (custo_fn or _custos)()
+        custo = sum(custos.get(s, 0.0) for s in so) - estado.get("custo_inicio", 0.0)
+    motivo = limite(estado, agora, custo) or ("fila vazia" if not fila else None)
     alvo = fila[0] if motivo is None else None
     if alvo is not None:
         doing = alvo.path.parent.parent / "Doing" / alvo.path.name
@@ -182,12 +224,23 @@ def seguinte(root, estado_path, rel_dir, run=subprocess.run, agora=None):
                 break
     if alvo is None:
         path = relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora)
+        if estado.get("programa"):
+            mae = next((sp for sp, _ in items if sp.slug == estado["programa"]), None)
+            if mae is not None:
+                progresso(mae.path, estado, fila, motivo, agora)
         Path(estado_path).unlink()
         return {"acao": "fim", "motivo": motivo, "relatorio": str(path)}
     estado["lancado"] = alvo.slug
     estado["usados"] += REQ_POR_SP
     Path(estado_path).write_text(json.dumps(estado, ensure_ascii=False, indent=1), encoding="utf-8")
     return {"acao": "lancou", "slug": alvo.slug, "caminho": str(doing)}
+
+
+def _custos():
+    spec = importlib.util.spec_from_file_location("sp_metricas", SCRIPTS / "sp-metricas.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.custo_por_slug()
 
 
 def main(argv=None):
@@ -199,6 +252,7 @@ def main(argv=None):
     ap.add_argument("--ate", metavar="HH:MM", help="hora limite")
     ap.add_argument("--orcamento", type=int, default=ORCAMENTO, help=f"requests totais; cada SP gasta {REQ_POR_SP}")
     ap.add_argument("--projeto")
+    ap.add_argument("--programa", metavar="SLUG", help="só a árvore deste SP-mãe; orçamento lido do frontmatter dela")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     ap.add_argument("--estado", default=str(ESTADO), help=argparse.SUPPRESS)
     ap.add_argument("--relatorios", default=str(RELATORIOS), help=argparse.SUPPRESS)
@@ -209,8 +263,18 @@ def main(argv=None):
         estado.unlink(missing_ok=True)
         print("fila abandonada")
         return 0
+    items = load(args.root, args.projeto)
+    mae = None
+    if args.programa:
+        mae = next(((sp, fm) for sp, fm in items if sp.slug == args.programa), None)
+        if mae is None:
+            print(f"erro: SP-mãe desconhecido: {args.programa}", file=sys.stderr)
+            return 1
+        args.projeto = mae[0].project
+        items = load(args.root, args.projeto)
+    so = descendentes(items, args.programa) if args.programa else None
     if args.dry_run:
-        fila, excluidos = plan(load(args.root, args.projeto), args.max)
+        fila, excluidos = plan(items, args.max, so)
         print(render_plan(fila, excluidos))
         return 0
     if args.seguinte:
@@ -222,9 +286,16 @@ def main(argv=None):
             print(f"erro: fila já em curso ({estado}); `--seguinte` continua, `--parar` abandona", file=sys.stderr)
             return 1
         estado.parent.mkdir(parents=True, exist_ok=True)
-        estado.write_text(json.dumps({"max": args.max, "ate": args.ate, "orcamento": args.orcamento, "usados": 0,
-                                      "feitos": [], "falhados": [], "lancado": None, "projeto": args.projeto,
-                                      "inicio": datetime.now().isoformat(timespec="seconds")}), encoding="utf-8")
+        fm = mae[1] if mae else {}
+        num = lambda k: float(fm[k]) if fm.get(k) not in (None, "") else None
+        usd = num("orcamento_usd")
+        novo = {"max": args.max, "ate": args.ate, "orcamento": int(num("orcamento_requests") or args.orcamento),
+                "usados": 0, "feitos": [], "falhados": [], "lancado": None, "projeto": args.projeto,
+                "programa": args.programa, "horas": num("orcamento_horas"), "usd": usd,
+                "inicio": datetime.now().isoformat(timespec="seconds")}
+        if usd is not None:
+            novo["custo_inicio"] = sum(_custos().get(s, 0.0) for s in so)
+        estado.write_text(json.dumps(novo), encoding="utf-8")
     out = seguinte(args.root, estado, Path(args.relatorios))
     if out["acao"] == "lancou":
         print(f"lançado: {out['slug']} ({out['caminho']}); terminar o turno, a sessão nova arranca em segundo plano")
