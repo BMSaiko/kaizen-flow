@@ -10,6 +10,18 @@ python scripts/sp-handoff.py --launch PATH               # clear context and res
 
 `--write` only accepts the delta: at most 25 lines and no copied story sections (Role, Context, Objective…); longer bodies are rejected. The same limit applies to `handoff.py --write`.
 
+## Free conversation (`/handoff`)
+
+`handoff.py` does the same for a conversation with no story. The handoff is an ephemeral file in `knowledge/projects/kaizen/handoffs/<date>-<HHMM>-<slug>.md`, never committed.
+
+```sh
+python scripts/handoff.py --write [--slug NAME] --file BODY  # prints the handoff path
+python scripts/handoff.py --launch PATH [--auto]             # clear context and resume
+python scripts/handoff.py --consume PATH                     # print the handoff, then delete it
+```
+
+`--write` also deletes `handoffs/*.md` older than 7 days. Options: `--pane ID`, `--dry-run`, `--auto` (context-guard mode, no questions).
+
 Extra options: `--harness claude|codex`, `--backend wezterm|tmux|clipboard`, `--pane ID`, `--dry-run` (print the commands, execute nothing), `--auto` (no questions; needs a story in Doing).
 
 ## Backends
