@@ -30,10 +30,10 @@ import time
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-_spec = importlib.util.spec_from_file_location("sp_list", Path(__file__).with_name("sp-list.py"))
-sp_list = importlib.util.module_from_spec(_spec)
-sys.modules["sp_list"] = sp_list
-_spec.loader.exec_module(sp_list)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_engine  # noqa: E402
+
+sp_list = kaizen_engine.load("sp-list")
 
 SEND_DELAY = 5.0
 SEND_GAP = 2.0

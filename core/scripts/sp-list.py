@@ -25,11 +25,10 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
-import importlib.util as _ilu
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_engine  # noqa: E402
 
-_cspec = _ilu.spec_from_file_location("kaizen_config", Path(__file__).with_name("kaizen_config.py"))
-_kc = _ilu.module_from_spec(_cspec)
-_cspec.loader.exec_module(_kc)
+_kc = kaizen_engine.load("kaizen_config")
 REPO = Path(__file__).resolve().parent.parent
 
 
@@ -57,24 +56,8 @@ class Sp:
     kind: str = ""
 
 
-def parse_frontmatter(text):
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return {}
-    fm = {}
-    for line in lines[1:]:
-        if line.strip() == "---":
-            break
-        key, sep, value = line.partition(":")
-        if not sep or not key.strip():
-            continue
-        value = re.sub(r"\s+#.*$", "", value.strip()).strip("'\"")
-        fm[key.strip()] = value
-    return fm
-
-
-def parse_list(value):
-    return [item.strip() for item in (value or "").strip("[]").split(",") if item.strip()]
+parse_frontmatter = kaizen_engine.parse_frontmatter
+parse_list = kaizen_engine.parse_list
 
 
 def parse_date(value):

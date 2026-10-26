@@ -7,20 +7,15 @@ Uso:
   python -I scripts/sp-validate.py <caminho.md> [<caminho.md> ...]
 """
 import argparse
-import importlib.util
 import re
 import sys
 from pathlib import Path
 
-_spec = importlib.util.spec_from_file_location("sp_list", Path(__file__).with_name("sp-list.py"))
-sp_list = importlib.util.module_from_spec(_spec)
-sys.modules["sp_list"] = sp_list
-_spec.loader.exec_module(sp_list)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_engine  # noqa: E402
 
-_gspec = importlib.util.spec_from_file_location("sp_gates", Path(__file__).with_name("sp-gates.py"))
-sp_gates = importlib.util.module_from_spec(_gspec)
-sys.modules["sp_gates"] = sp_gates
-_gspec.loader.exec_module(sp_gates)
+sp_list = kaizen_engine.load("sp-list")
+sp_gates = kaizen_engine.load("sp-gates")
 
 REQUIRED_FIELDS = ("status", "created", "updated", "phase", "slug", "date", "project", "priority")
 SECTION_NAMES = {

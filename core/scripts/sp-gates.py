@@ -18,6 +18,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_engine  # noqa: E402
+
 DEFAULT_TIMEOUT = 300
 FORBIDDEN = (
     (re.compile(r"(?<![\w-])--force(?![\w-])|\bgit\s+push\b.*\s-f\b"), "--force"),
@@ -36,21 +39,9 @@ def forbidden(cmd):
     return None
 
 
-def _frontmatter_lines(text):
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return []
-    out = []
-    for line in lines[1:]:
-        if line.strip() == "---":
-            break
-        out.append(line)
-    return out
-
-
 def parse_gates(text):
     gates, in_gates, current = [], False, None
-    for line in _frontmatter_lines(text):
+    for line in kaizen_engine.frontmatter_lines(text):
         if re.match(r"^gates:\s*$", line):
             in_gates = True
             continue

@@ -9,7 +9,6 @@ Uso:
   python -I scripts/sp-move.py <filho> done --next   # programa: abre o próximo filho elegível; a mãe nunca é movida
 """
 import argparse
-import importlib.util
 import re
 import subprocess
 import sys
@@ -17,28 +16,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_engine  # noqa: E402
 import kaizen_hooks  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_list", Path(__file__).with_name("sp-list.py"))
-sp_list = importlib.util.module_from_spec(_spec)
-sys.modules["sp_list"] = sp_list
-_spec.loader.exec_module(sp_list)
-
-_spec = importlib.util.spec_from_file_location("sp_handoff", Path(__file__).with_name("sp-handoff.py"))
-sp_handoff = importlib.util.module_from_spec(_spec)
-sys.modules["sp_handoff"] = sp_handoff
-_spec.loader.exec_module(sp_handoff)
+sp_list = kaizen_engine.load("sp-list")
+sp_handoff = kaizen_engine.load("sp-handoff")
 
 # opcional: o pacote kaizen-flow instala este script noutros repos sem sb-agent.py
 sb_agent = None
 if Path(__file__).with_name("sb-agent.py").is_file():
-    _spec = importlib.util.spec_from_file_location("sb_agent", Path(__file__).with_name("sb-agent.py"))
-    sb_agent = importlib.util.module_from_spec(_spec)
-    sys.modules["sb_agent"] = sb_agent
-    _spec.loader.exec_module(sb_agent)
+    sb_agent = kaizen_engine.load("sb-agent")
 
 DESTS = {"todo": "TODO", "doing": "Doing", "done": "Done"}
-FM_FIELD = re.compile(r"^(status|updated):")
 
 
 class SpMoveError(Exception):
@@ -46,24 +35,7 @@ class SpMoveError(Exception):
 
 
 def _rewrite_frontmatter(raw, status, updated):
-    lines = raw.decode("utf-8").splitlines(keepends=True)
-    if not lines or lines[0].strip() != "---":
-        raise SpMoveError("SP sem frontmatter")
-    seen = set()
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            break
-        m = FM_FIELD.match(lines[i])
-        if m:
-            eol = lines[i][len(lines[i].rstrip("\r\n")):]
-            value = status if m.group(1) == "status" else updated
-            lines[i] = f"{m.group(1)}: {value}{eol}"
-            seen.add(m.group(1))
-    else:
-        raise SpMoveError("frontmatter sem fecho")
-    if seen != {"status", "updated"}:
-        raise SpMoveError("frontmatter sem status/updated")
-    return "".join(lines).encode("utf-8")
+    return kaizen_engine.rewrite_fields(raw, {"status": status, "updated": updated}, SpMoveError)
 
 
 def _relocate(src, dst):

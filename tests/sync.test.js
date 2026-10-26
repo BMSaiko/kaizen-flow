@@ -15,7 +15,7 @@ function fakeVault() {
   const v = tmp();
   for (const s of SKILLS) put(v, `.claude/skills/${s}/SKILL.md`);
   for (const c of ["sp", "sp-list", "sp-handoff", "one-shot", "handoff"]) put(v, `.claude/commands/${c}.md`);
-  for (const s of ["context-guard", "handoff", "skill-cut", "kaizen_config", "kaizen_hooks", "test_kaizen_hooks", "test_michi_tree_close", "sp-list", "sp-move"]) put(v, `scripts/${s}.py`);
+  for (const s of ["context-guard", "handoff", "skill-cut", "kaizen_config", "kaizen_engine", "kaizen_hooks", "test_kaizen_engine", "test_kaizen_hooks", "test_michi_tree_close", "sp-list", "sp-move"]) put(v, `scripts/${s}.py`);
   return v;
 }
 
