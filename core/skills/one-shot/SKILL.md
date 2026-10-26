@@ -14,6 +14,7 @@ version: 1.0.0
 4. Resumo em ≤15 linhas e um único «avanço com a árvore e a execução sem perguntas?» (nomear: criar SPs, executar, commits locais, sem push). Só depois de «sim».
 
 ## Fase B - Árvore de SPs
+- Escalão primeiro: `python -I scripts/sp-escalao.py ...` propõe pequena|média|grande (override `--escalao`; playbook `kaizen-flow` §Escalões); pequena = 1 SP, sem árvore.
 - Projeto michi/vault: `python -I scripts/sp-new.py --project <P> --program <slug> --children a,b:a,c:a+b --priority P1|P2|P3` (mãe + filhos); netos com `--slug <neto> --parent <filho> --depends-on ...`.
 - Mãe: §2 com as decisões do grill (Q&A condensado) e `horas_disponiveis`; §4 com critérios verificáveis; filhos/netos preenchidos nas 8 secções (um folha = uma sessão, ≤1 fase de entrega com prova).
 - Cada folha leva estimativa `h:` em §2 e prioridade P1 (núcleo) / P2 / P3 (polimento). `python -I scripts/sp-validate.py <todos>` tem de dar rc=0.
