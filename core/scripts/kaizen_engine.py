@@ -76,3 +76,22 @@ def rewrite_fields(raw, fields, error):
     if seen != set(fields):
         raise error("frontmatter sem " + "/".join(fields))
     return "".join(lines).encode("utf-8")
+
+
+def parse_permitir(value):
+    """Allowlist `permitir:` (uma linha, comandos separados por `;`)."""
+    return [c.strip() for c in (value or "").split(";") if c.strip()]
+
+
+def precisa_perguntar(fm, acao):
+    """True se `acao` ainda exige pergunta ao user.
+
+    `acao` = commit|push|pr (só `auto` dispensa) ou um comando (só dispensa se estiver em
+    `permitir` e não for irreversível: o que `sp-gates.forbidden` apanha pergunta sempre).
+    """
+    if acao in ("commit", "push", "pr"):
+        return fm.get(acao) != "auto"
+    cmd = acao.strip()
+    if load("sp-gates").forbidden(cmd):
+        return True
+    return cmd not in parse_permitir(fm.get("permitir"))

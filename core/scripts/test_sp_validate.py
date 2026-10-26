@@ -164,3 +164,12 @@ def test_perfil_valido(extra):
 def test_perfil_invalido(extra, fragment):
     errors = sp_validate.validate(build(extra=extra), "TODO")
     assert len(errors) == 1 and fragment in errors[0]
+
+
+def test_permitir_proibido_ou_vazio_e_rejeitado():
+    base = "---\nstatus: TODO\ncreated: c\nupdated: u\nphase: SP\nslug: s\ndate: d\nproject: p\npriority: P2\n{}---\n"
+    body = "".join(f"## {t}\n{c}\n" for t, c in SECTIONS)
+    errs = sp_validate.validate(base.format("permitir: git reset --hard\n") + body)
+    assert any("permitir" in e and "git reset --hard" in e for e in errs)
+    assert any("permitir vazio" in e for e in sp_validate.validate(base.format("permitir:\n") + body))
+    assert not any("permitir" in e for e in sp_validate.validate(base.format("permitir: npm test\n") + body))

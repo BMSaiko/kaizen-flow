@@ -45,3 +45,29 @@ def test_rewrite_fields_errors(raw, msg):
 def test_load_sibling_script_is_cached():
     mod = ke.load("sp-list")
     assert mod is ke.load("sp-list") and hasattr(mod, "collect")
+
+
+def test_precisa_perguntar_acoes_seguem_o_frontmatter():
+    assert ke.precisa_perguntar({"commit": "auto"}, "commit") is False
+    assert ke.precisa_perguntar({"commit": "pergunta"}, "commit") is True
+    assert ke.precisa_perguntar({}, "push") is True
+    assert ke.precisa_perguntar({"pr": "nunca"}, "pr") is True
+
+
+def test_precisa_perguntar_comando_so_se_na_allowlist():
+    fm = {"permitir": "npm test; python -I scripts/x.py"}
+    assert ke.precisa_perguntar(fm, "npm test") is False
+    assert ke.precisa_perguntar(fm, "  python -I scripts/x.py ") is False
+    assert ke.precisa_perguntar(fm, "npm publish") is True
+    assert ke.precisa_perguntar({}, "npm test") is True
+
+
+def test_precisa_perguntar_irreversivel_pergunta_sempre():
+    fm = {"permitir": "git push --force", "push": "auto"}
+    assert ke.precisa_perguntar(fm, "git push --force") is True
+    assert ke.precisa_perguntar(fm, "git reset --hard") is True
+
+
+def test_parse_permitir_separa_por_ponto_e_virgula():
+    assert ke.parse_permitir("a b; c ;;d") == ["a b", "c", "d"]
+    assert ke.parse_permitir(None) == []

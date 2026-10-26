@@ -18,6 +18,7 @@ Frontmatter `commit`, `push`, `pr` (`auto|pergunta|nunca`) e `restricoes` (texto
 | `pergunta` | `AskUserQuestion` como no fluxo normal |
 | `nunca` | nem propõe |
 - Sem campo (SP antigo): `pergunta`; em modo auto, commit local sem push nem PR.
+- `permitir` (allowlist, `;`-separada, `sp-new.py --permitir` repetível) e `## Decisões` (`--decisao`, decisões do grill): **consultar antes de perguntar**. Comando em `permitir` corre sem pedir; o resto pergunta. `kaizen_engine.precisa_perguntar(fm, acao)` decide (acao = `commit|push|pr` ou o comando). Irreversíveis (`--force`, `reset --hard`, `git add -A`, segredos) perguntam sempre e `sp-validate.py`/`sp-new.py` recusam-nos em `permitir`. Decisão já em `## Decisões`: não repetir a pergunta.
 - `restricoes` é lido no arranque e cumprido à letra (pastas intocáveis, repos, ações externas); em dúvida, o mais conservador.
 
 ## Pergunta normal → ação auto

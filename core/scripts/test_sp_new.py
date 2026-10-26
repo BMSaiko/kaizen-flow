@@ -281,3 +281,21 @@ def test_validate_apanha_escopo_mau():
     text = "---\nescopo: [../x]\n---\n"
     errs = sp_validate.validate(text, "TODO")
     assert any("glob inválido" in e for e in errs)
+
+
+def test_permitir_e_decisoes_gravados_e_validos(tmp_path):
+    root = project(tmp_path)
+    path = sp_new.create(root, "atlas", "p", "P2", TODAY, permitir=["npm test", "python -I scripts/x.py"], decisoes=["usar A", "sem B"])
+    text = path.read_text(encoding="utf-8")
+    assert "\npermitir: npm test; python -I scripts/x.py\n" in text
+    assert "## Decisões\n\n- usar A\n- sem B" in text
+    assert not any("permitir" in e for e in sp_validate.validate(text))
+
+
+def test_permitir_proibido_ou_com_quebra_de_linha_e_recusado(tmp_path):
+    root = project(tmp_path)
+    with pytest.raises(sp_new.SpNewError, match="permitir"):
+        sp_new.create(root, "atlas", "p", "P2", TODAY, permitir=["git push --force"])
+    with pytest.raises(sp_new.SpNewError, match="permitir"):
+        sp_new.create(root, "atlas", "p", "P2", TODAY, permitir=["a\nb"])
+    assert list((root / "atlas/sp/TODO").glob("*.md")) == []

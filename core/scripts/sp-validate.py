@@ -77,6 +77,11 @@ def validate(text, folder=None):
         if fm.get("perfil") == "autonomo" and not sp_gates.parse_gates(text):
             errors.append("perfil autonomo exige gates")
         errors += sp_gates.problems(sp_gates.parse_gates(text))
+        if "permitir" in fm:
+            cmds = kaizen_engine.parse_permitir(fm["permitir"])
+            if not cmds:
+                errors.append("permitir vazio")
+            errors += [f"permitir proibido ({sp_gates.forbidden(c)}): {c}" for c in cmds if sp_gates.forbidden(c)]
         if "prova" in fm:
             if not fm["prova"]:
                 errors.append("prova vazia")

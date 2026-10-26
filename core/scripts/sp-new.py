@@ -6,7 +6,7 @@ Recusa slug já existente no projeto (em qualquer pasta) e projeto inexistente.
 Nunca faz commit.
 
 Uso:
-  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--parent <slug>] [--depends-on <slug> ...]
+  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--parent <slug>] [--depends-on <slug> ...]
   python -I scripts/sp-new.py --project <nome> --program <slug> --children a,b:a,c:a+b --priority P1|P2|P3
 
 `--program` cria o SP-mãe (`kind: program`, `children:`) e os filhos (`parent`, `depends_on`) em sp/TODO/.
@@ -117,11 +117,21 @@ def check(root, project, slug, priority, modo="manual"):
         raise SpNewError(f"SP '{slug}' já existe no projeto '{project}'")
 
 
-def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None, perfil=None, escopo=(), fora_de_escopo=()):
+def check_permitir(permitir):
+    """Cada comando da allowlist: uma só linha, sem `;` e não proibido (irreversíveis perguntam sempre)."""
+    for cmd in permitir:
+        if not cmd.strip() or any(c in cmd for c in ("\n", "\r", ";")):
+            raise SpNewError(f"permitir inválido (uma linha, sem ';'): {cmd!r}")
+        if sp_gates.forbidden(cmd):
+            raise SpNewError(f"permitir proibido ({sp_gates.forbidden(cmd)}): {cmd}")
+
+
+def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None, perfil=None, escopo=(), fora_de_escopo=(), permitir=(), decisoes=()):
     root = Path(root)
     check(root, project, slug, priority, modo)
     auth = check_auth(auth)
     check_gates(list(gates), prova)
+    check_permitir(list(permitir))
     perfil = check_perfil(perfil, gates)
     escopo, fora_de_escopo = check_escopo(escopo, fora_de_escopo)
     stamp = f"{today.isoformat()}T00:00:00Z"
@@ -141,6 +151,8 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
     if gates:
         head.append("gates:")
         head += [f"  - cmd: {g.strip()}" for g in gates]
+    if permitir:
+        head.append("permitir: " + "; ".join(c.strip() for c in permitir))
     if prova is not None:
         head.append(f"prova: {prova.strip()}")
     head += extra
@@ -152,6 +164,8 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
     body = [f"# Super Prompt - {slug} ({today.isoformat()})", ""]
     for title in SECTIONS:
         body += [f"## {title}", "", ""]
+    if decisoes:
+        body += ["## Decisões", ""] + [f"- {d.strip()}" for d in decisoes] + [""]
     path = root / project / "sp" / "TODO" / f"{slug}-{today.isoformat()}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(head + body), encoding="utf-8")
@@ -229,6 +243,8 @@ def main(argv=None):
     ap.add_argument("--restricoes", help="restrições extra do SP (uma linha)")
     ap.add_argument("--gate", action="append", default=[], help="gate executável (repetível), corrido por sp-gates.py")
     ap.add_argument("--prova", help="comando ou critério verificável da prova")
+    ap.add_argument("--permitir", action="append", default=[], help="comando pré-aprovado (repetível; irreversíveis são recusados)")
+    ap.add_argument("--decisao", action="append", default=[], help="decisão do grill (repetível), vai para ## Decisões")
     ap.add_argument("--perfil", help="perfil de execução: cauteloso|normal|autonomo")
     ap.add_argument("--max-tentativas", type=int, help="tentativas por gate (override do perfil)")
     ap.add_argument("--max-requests", type=int, help="máximo de pedidos (override do perfil)")
@@ -251,7 +267,7 @@ def main(argv=None):
             print("\n".join(str(p) for p in paths))
         elif args.slug:
             check_links(args.root, args.project, args.parent, args.depends_on)
-            print(create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo)))
+            print(create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao))
         else:
             raise SpNewError("indicar --slug (ou --program com --children)")
     except SpNewError as exc:
