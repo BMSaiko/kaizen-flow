@@ -27,6 +27,10 @@ sb_agent = None
 if Path(__file__).with_name("sb-agent.py").is_file():
     sb_agent = kaizen_engine.load("sb-agent")
 
+sp_metricas = None
+if Path(__file__).with_name("sp-metricas.py").is_file():
+    sp_metricas = kaizen_engine.load("sp-metricas")
+
 DESTS = {"todo": "TODO", "doing": "Doing", "done": "Done"}
 
 
@@ -110,6 +114,12 @@ def move(root, slug, dest, project=None):
     if target == "Done":
         _agent_claim(slug, target)
     extra = f" (+{n} provas)" if n else ""
+    if target == "Done" and sp_metricas:
+        try:
+            if sp_metricas.registar(root, dst, sp.project):
+                extra += " (+métricas)"
+        except Exception as exc:  # métricas nunca bloqueiam o fecho
+            extra += f" (métricas falharam: {exc})"
     ctx["path"] = str(dst)
     avisos = "".join(f"\naviso: {w}" for w in kaizen_hooks.fire("sp.moved", ctx, phase="post"))
     return f"{slug}: {sp.status} → {target} ({dst}){extra}{avisos}"
