@@ -23,8 +23,8 @@ def sp_text(*gates):
 def test_parse_gates_le_so_o_frontmatter():
     gates = sp_gates.parse_gates(sp_text(("echo a", {"cwd": ".", "timeout": 5}), ("echo b", {})))
     assert gates == [
-        {"cmd": "echo a", "cwd": ".", "timeout": 5},
-        {"cmd": "echo b", "cwd": ".", "timeout": 300},
+        {"cmd": "echo a", "cwd": ".", "timeout": 5, "inputs": []},
+        {"cmd": "echo b", "cwd": ".", "timeout": 300, "inputs": []},
     ]
 
 
@@ -92,3 +92,50 @@ def test_main_sem_gates_rc_0_com_aviso(tmp_path, capsys):
     f.write_text("---\nslug: x\n---\ncorpo", encoding="utf-8")
     assert sp_gates.main([str(f)]) == 0
     assert "sem gates" in capsys.readouterr().out
+
+
+# --- incremental (kf-gates-incrementais) ---
+def _gate(tmp_path, cmd, inputs):
+    return {"cmd": cmd, "cwd": str(tmp_path), "timeout": 30, "inputs": inputs}
+
+
+def test_parse_gates_le_inputs():
+    text = "---\ngates:\n  - cmd: echo x\n    inputs: a/*.py, b.md\n---\n"
+    g = sp_gates.parse_gates(text)[0]
+    assert g["inputs"] == ["a/*.py", "b.md"]
+    assert sp_gates.parse_gates("---\ngates:\n  - cmd: echo x\n---\n")[0]["inputs"] == []
+
+
+def test_cache_hit_miss_e_invalidacao(tmp_path):
+    (tmp_path / "f.txt").write_text("1", encoding="utf-8")
+    cache = tmp_path / "c.json"
+    g = [_gate(tmp_path, f'python -c "print(1)"', ["f.txt"])]
+    r1 = sp_gates.run(g, cache_path=cache)          # miss: corre
+    assert r1[0]["rc"] == 0 and not r1[0].get("cached")
+    r2 = sp_gates.run(g, cache_path=cache)          # hit: não corre
+    assert r2[0]["rc"] == 0 and r2[0]["cached"]
+    (tmp_path / "f.txt").write_text("2", encoding="utf-8")
+    r3 = sp_gates.run(g, cache_path=cache)          # input mudou: corre
+    assert not r3[0].get("cached")
+
+
+def test_sem_inputs_corre_sempre(tmp_path):
+    cache = tmp_path / "c.json"
+    g = [_gate(tmp_path, 'python -c "print(1)"', [])]
+    sp_gates.run(g, cache_path=cache)
+    assert not sp_gates.run(g, cache_path=cache)[0].get("cached")
+
+
+def test_vermelho_nao_entra_na_cache(tmp_path):
+    (tmp_path / "f.txt").write_text("1", encoding="utf-8")
+    cache = tmp_path / "c.json"
+    g = [_gate(tmp_path, 'python -c "import sys; sys.exit(1)"', ["f.txt"])]
+    sp_gates.run(g, cache_path=cache)
+    assert sp_gates.run(g, cache_path=cache)[0]["rc"] == 1
+
+
+def test_sem_cache_path_corre_tudo(tmp_path):
+    """Fecho (sp-fechar chama run(gates) sem cache): nunca salta."""
+    (tmp_path / "f.txt").write_text("1", encoding="utf-8")
+    g = [_gate(tmp_path, 'python -c "print(1)"', ["f.txt"])]
+    assert not sp_gates.run(g)[0].get("cached") and not sp_gates.run(g)[0].get("cached")

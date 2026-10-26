@@ -6,12 +6,16 @@ Só lê o campo `gates:` do frontmatter (nunca o corpo do SP). Formato:
     - cmd: python -I scripts/test_sp_list.py
       cwd: .          # opcional, defeito = diretório de trabalho atual
       timeout: 300    # opcional, segundos, defeito 300
+      inputs: a/*.py, b.md   # opcional, globs (relativos a cwd): sem mudança desde a última corrida verde, o gate é saltado
 RC 0 = todos verdes (ou SP sem gates); 1 = gate vermelho/timeout; 2 = gate inválido ou proibido (nada corre).
 
 Uso:
-  python -I scripts/sp-gates.py <caminho.md>
+  python -I scripts/sp-gates.py <caminho.md>          # incremental: salta gates verdes com inputs iguais
+  python -I scripts/sp-gates.py <caminho.md> --full   # corre todos (o fecho, sp-fechar.py, usa sempre isto)
 """
 import argparse
+import hashlib
+import json
 import re
 import subprocess
 import sys
@@ -22,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 
 DEFAULT_TIMEOUT = 300
+CACHE_PATH = Path(__file__).resolve().parent.parent / ".sp-gates-cache.json"
 FORBIDDEN = (
     (re.compile(r"(?<![\w-])--force(?![\w-])|\bgit\s+push\b.*\s-f\b"), "--force"),
     (re.compile(r"\bgit\s+reset\s+--hard\b"), "git reset --hard"),
@@ -51,12 +56,17 @@ def parse_gates(text):
             break
         m = re.match(r"^\s*-\s*cmd:\s*(.*?)\s*$", line)
         if m:
-            current = {"cmd": m.group(1), "cwd": ".", "timeout": DEFAULT_TIMEOUT}
+            current = {"cmd": m.group(1), "cwd": ".", "timeout": DEFAULT_TIMEOUT, "inputs": []}
             gates.append(current)
             continue
-        m = re.match(r"^\s+(cwd|timeout):\s*(.*?)\s*$", line)
+        m = re.match(r"^\s+(cwd|timeout|inputs):\s*(.*?)\s*$", line)
         if m and current is not None:
-            current[m.group(1)] = int(m.group(2)) if m.group(1) == "timeout" else m.group(2).strip("'\"")
+            if m.group(1) == "timeout":
+                current["timeout"] = int(m.group(2))
+            elif m.group(1) == "inputs":
+                current["inputs"] = [x.strip().strip("'\"") for x in m.group(2).split(",") if x.strip()]
+            else:
+                current["cwd"] = m.group(2).strip("'\"")
     return gates
 
 
@@ -76,10 +86,40 @@ def problems(gates):
     return found
 
 
-def run(gates):
-    """Corre por ordem; pára no primeiro rc≠0 ou timeout. Devolve os resultados corridos."""
+def input_hash(g):
+    """Hash do comando + conteúdo dos ficheiros que casam com `inputs`; None se não há inputs."""
+    if not g.get("inputs"):
+        return None
+    base = Path(g["cwd"])
+    h = hashlib.sha256(g["cmd"].encode("utf-8"))
+    files = sorted({p for pat in g["inputs"] for p in base.glob(pat) if p.is_file()})
+    for p in files:
+        h.update(str(p.relative_to(base)).encode("utf-8"))
+        h.update(p.read_bytes())
+    return h.hexdigest()
+
+
+def _load_cache(path):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def run(gates, cache_path=None):
+    """Corre por ordem; pára no primeiro rc≠0 ou timeout. Devolve os resultados corridos.
+
+    Com `cache_path`, um gate com `inputs` cujo hash coincide com a última corrida verde é saltado
+    (resultado com `cached`). Sem `cache_path` corre sempre tudo.
+    """
+    cache = _load_cache(cache_path) if cache_path else {}
     results = []
     for g in gates:
+        digest = input_hash(g) if cache_path else None
+        key = f"{Path(g['cwd']).resolve()}::{g['cmd']}"
+        if digest and cache.get(key) == digest:
+            results.append({"cmd": g["cmd"], "rc": 0, "timeout": False, "secs": 0, "tail": "", "cached": True})
+            continue
         start = time.monotonic()
         timed_out = False
         try:
@@ -92,8 +132,18 @@ def run(gates):
         results.append({"cmd": g["cmd"], "rc": rc, "timeout": timed_out,
                         "secs": round(time.monotonic() - start, 1),
                         "tail": "\n".join(out.strip().splitlines()[-10:])})
+        if digest:
+            if rc == 0:
+                cache[key] = digest
+            else:
+                cache.pop(key, None)
         if rc != 0:
             break
+    if cache_path:
+        try:
+            Path(cache_path).write_text(json.dumps(cache, indent=1), encoding="utf-8")
+        except OSError:
+            pass
     return results
 
 
@@ -101,7 +151,8 @@ def summary(results):
     lines = []
     for r in results:
         flag = " TIMEOUT" if r["timeout"] else ""
-        lines.append(f"- `{r['cmd']}` rc={r['rc']}{flag} ({r['secs']} s)")
+        when = "cache" if r.get("cached") else f"{r['secs']} s"
+        lines.append(f"- `{r['cmd']}` rc={r['rc']}{flag} ({when})")
         if r["tail"]:
             lines += [f"    {t}" for t in r["tail"].splitlines()]
     return "\n".join(lines)
@@ -110,6 +161,7 @@ def summary(results):
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Corre os gates do frontmatter de um SP")
     ap.add_argument("path")
+    ap.add_argument("--full", action="store_true", help="ignora a cache: corre todos os gates")
     args = ap.parse_args(argv)
     try:
         text = Path(args.path).read_text(encoding="utf-8")
@@ -124,7 +176,7 @@ def main(argv=None):
     if bad:
         print("\n".join(bad), file=sys.stderr)
         return 2
-    results = run(gates)
+    results = run(gates, cache_path=None if args.full else CACHE_PATH)
     print(summary(results))
     return 0 if all(r["rc"] == 0 for r in results) and len(results) == len(gates) else 1
 
