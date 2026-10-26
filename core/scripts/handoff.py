@@ -89,7 +89,7 @@ def continuation_prompt(path):
             "(lê o handoff e só depois o apaga) e segue o Próximo passo.")
 
 
-def send(text, pane, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=subprocess.run, sleep=time.sleep,
+def send(text, pane, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=sp_handoff.run_hidden, sleep=time.sleep,
          inspect=None):
     def line(chunk):
         run(sp_handoff.send_argv(pane, chunk), check=True)
@@ -109,7 +109,7 @@ def launch(path, pane=None):
     sp_handoff.send_argv(pane, continuation_prompt(path))
     sp_handoff.pane_exists(pane)
     argv = [sys.executable, "-I", str(Path(__file__).resolve()), "--send", str(path), "--pane", str(pane)]
-    flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    flags = sp_handoff.NO_WINDOW | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      creationflags=flags, close_fds=True)
     return argv

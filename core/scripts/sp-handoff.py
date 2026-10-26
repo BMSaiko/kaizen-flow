@@ -194,6 +194,15 @@ def pane_id(env=None):
     return pane
 
 
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def run_hidden(*args, **kwargs):
+    """subprocess.run sem abrir janela de consola no Windows (wezterm/clip são apps de consola)."""
+    kwargs.setdefault("creationflags", NO_WINDOW)
+    return subprocess.run(*args, **kwargs)
+
+
 def send_argv(pane, text):
     if any(ch in text for ch in "\r\n\x1b"):
         raise HandoffError("texto com caracteres de controlo")
@@ -205,7 +214,7 @@ def enter_argv(pane):
     return ["wezterm", "cli", "send-text", "--pane-id", str(pane), "--no-paste", "\r"]
 
 
-def pane_exists(pane, run=subprocess.run):
+def pane_exists(pane, run=run_hidden):
     out = run(["wezterm", "cli", "list", "--format", "json"], check=True, capture_output=True, text=True, encoding="utf-8").stdout
     if not any(str(p.get("pane_id")) == str(pane) for p in json.loads(out)):
         raise HandoffError(f"painel {pane} não existe")
@@ -217,7 +226,7 @@ def prompt_has_text(screen):
     return bool(lines) and bool(lines[-1].lstrip()[1:].strip())
 
 
-def check_prompt(pane, run=subprocess.run):
+def check_prompt(pane, run=run_hidden):
     screen = run(["wezterm", "cli", "get-text", "--pane-id", str(pane)], check=True,
                  capture_output=True, text=True, encoding="utf-8").stdout
     if prompt_has_text(screen):
@@ -270,7 +279,7 @@ def _copy(text):
     """Copia para a área de transferência com a ferramenta do sistema; OSError se não há nenhuma."""
     for argv in (["clip"], ["pbcopy"], ["wl-copy"], ["xclip", "-selection", "clipboard"]):
         try:
-            subprocess.run(argv, input=text.encode("utf-16-le" if argv[0] == "clip" else "utf-8"), check=True)
+            run_hidden(argv, input=text.encode("utf-16-le" if argv[0] == "clip" else "utf-8"), check=True)
             return
         except (OSError, subprocess.CalledProcessError):
             continue
@@ -289,7 +298,7 @@ def deliver_clipboard(harness, sp_path, copy=None):
     return copied
 
 
-def send(sp_path, pane, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=subprocess.run, sleep=time.sleep,
+def send(sp_path, pane, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=run_hidden, sleep=time.sleep,
          inspect=None, backend="wezterm", harness="claude"):
     text_argv, key_argv = _argvs(backend, pane)
     clear, resume = resume_commands(harness, sp_path)
@@ -322,7 +331,7 @@ def launch(sp_path, pane=None, backend=None, harness="claude"):
         pane_exists(pane)
     argv = [sys.executable, "-I", str(Path(__file__).resolve()), "--send", str(sp_path), "--pane", str(pane),
             "--backend", backend, "--harness", harness]
-    flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    flags = NO_WINDOW | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)  # DETACHED_PROCESS faria cada filho abrir consola
     subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      creationflags=flags, close_fds=True)
     return argv
