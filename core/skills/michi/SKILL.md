@@ -32,6 +32,7 @@ metadata:
 
 `/michi help|--help|-h|?`: responder só com a Usage e parar. Uso: `/michi [--auto] [<idea>|<SP>]`, `skip <fase>`, `go to DA`. Skills suplementares: `references/michi-help.md`.
 
+**Estado do SP:** no arranque `python -I scripts/sp-estado.py <SP>` (≤30 linhas: fase, passos, gates, deps, ramo, ficheiros) em vez de ler SP, lista e git à parte.
 **Perfil do SP:** ler `perfil`/`max_tentativas`/`parar_se` no arranque e na paragem (`references/michi-perfis.md`).
 **Escopo do SP:** no arranque `python -I scripts/michi-escopo.py start <SP>`, no fecho ou paragem `... stop`; o hook `guard-escopo.js` bloqueia escrita fora de `escopo:`.
 
