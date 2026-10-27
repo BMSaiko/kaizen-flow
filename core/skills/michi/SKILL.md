@@ -35,6 +35,7 @@ metadata:
 **Estado do SP:** no arranque `python -I scripts/sp-estado.py <SP>` (≤30 linhas: fase, passos, gates, deps, ramo, ficheiros) em vez de ler SP, lista e git à parte.
 **Perfil do SP:** ler `perfil`/`max_tentativas`/`parar_se` no arranque e na paragem (`references/michi-perfis.md`).
 **Escopo do SP:** no arranque `python -I scripts/michi-escopo.py start <SP>`, no fecho ou paragem `... stop`; o hook `guard-escopo.js` bloqueia escrita fora de `escopo:`.
+**Tab:** no arranque `python -I scripts/tab-title.py <slug-do-SP>` (best-effort, rc 0; renomeia a tab do WezTerm e imprime `/rename <slug>` para a sessão). Vale também para a sessão nova do `/sp-handoff`, que arranca com `/michi`.
 
 **Checkpoint/rollback:** `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate (`references/michi-modo-auto.md` §Paragem).
 
