@@ -59,6 +59,7 @@ Texto integral movido de `SKILL.md` (otimização de custo, SP michi-otimizacao-
    typecheck, e2e — whatever applies). *Every command and its RC must
    appear in the report.* If any gate fails, fix root cause, re-run all
    gates. Do not paper over with `|| true`.
+   **Vault/scripts:** `python -I scripts/test-fast.py` (fast, só o que o diff tocou, ~2 s) em cada fase; `... full` (~3,5 min) no fecho.
    **Gate `harden`** (após DA, antes do Report): `/harden vault` (ou o repo do SP) sobre o que a DA alterou; FAIL bloqueia o Report até corrigir a causa; o resultado vai para o Report. `skip harden` salta-o (modo auto: corre sempre, sem perguntar).
    **Prove it's done (antes de `sp-move.py ... done` e do `COMMIT_*.md`).**
    Agir como o cliente final da feature: executar o caminho real do

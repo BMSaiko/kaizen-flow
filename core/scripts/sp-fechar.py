@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Fecha um SP numa só chamada: gates -> context-budget -> sp-move done -> COMMIT_*.md.
 
-Pára sem mover o SP se um gate (ou o orçamento de contexto) falhar. Nunca faz commit nem push.
+Pára sem mover o SP se um gate (ou o orçamento de contexto) falhar. Sem gates declarados corre
+`test-fast.py fast`; avisa (sem bloquear) se faltar `## Prova de done` ou `## Reflect`. Nunca faz commit nem push.
 O COMMIT_*.md lista o stage explícito (um `git add` por caminho, sem o próprio COMMIT_*.md).
 
 Uso:
   python -I scripts/sp-fechar.py <slug> [--project P] [--next] [--msg "assunto"]
-                                 [--sem-budget] [--sem-commit] [--commit-dir DIR]
+                                 [--sem-budget] [--sem-testes] [--sem-commit] [--commit-dir DIR]
 RC 0 = fechado; 1 = gate/orçamento vermelho (SP fica em Doing); 2 = erro de uso.
 """
 import argparse
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -17,6 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import wt_redirect  # noqa: E402
 
 sp_list = kaizen_engine.load("sp-list")
 sp_gates = kaizen_engine.load("sp-gates")
@@ -66,6 +69,30 @@ def run_budget():
     return r.returncode, f"context-budget rc={r.returncode}\n{tail}"
 
 
+def run_fast():
+    """test-fast.py fast quando o SP não declara gates. Opcional: o pacote kaizen-flow pode não o levar."""
+    script = HERE / "test-fast.py"
+    if not script.exists():
+        return 0, "test-fast: ausente (ignorado)"
+    r = subprocess.run([sys.executable, "-I", str(script), "fast"], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    tail = "\n".join((r.stdout + r.stderr).strip().splitlines()[-8:])
+    return r.returncode, f"test-fast rc={r.returncode}\n{tail}"
+
+
+def avisos(sp_text):
+    """Avisos (não bloqueiam) se faltar a prova de done ou o Reflect de fase/final."""
+    def body(title):
+        m = re.search(rf"^## {title}[^\n]*\n(.*?)(?=^## |\Z)", sp_text, re.S | re.M)
+        return m.group(1) if m else ""
+    out = []
+    if not body("Prova de done").strip():
+        out.append("AVISO: sem '## Prova de done' no SP (registar a prova como cliente final)")
+    if not re.search(r"^Reflect \S", body("Reflect"), re.M):
+        out.append("AVISO: sem linhas 'Reflect <fase>:' no SP (correr /reflect fase|final)")
+    return out
+
+
 def changed_paths(cwd):
     """Caminhos alterados/novos segundo o git, sem COMMIT_*.md nem segredos. Vazio fora de repo git."""
     r = subprocess.run(["git", "-C", str(cwd), "status", "--porcelain", "-uall"],
@@ -106,7 +133,7 @@ def worktree_hint(cwd, slug):
             f"python -I scripts/sb-worktree.py clean {slug}")
 
 
-def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir="."):
+def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True):
     """Corre o fecho. Devolve (rc, linhas)."""
     sp = find_doing(root, slug, project)
     lines = []
@@ -114,6 +141,12 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
     lines.append(text)
     if rc:
         return rc, lines + [f"{slug}: gate vermelho, SP continua em Doing"]
+    if testes and not sp_gates.parse_gates(sp.path.read_text(encoding="utf-8")):
+        rc, text = run_fast()
+        lines.append(text)
+        if rc:
+            return 1, lines + [f"{slug}: test-fast vermelho, SP continua em Doing"]
+    lines += avisos(sp.path.read_text(encoding="utf-8"))
     if budget:
         rc, text = run_budget()
         lines.append(text)
@@ -142,13 +175,19 @@ def main(argv=None):
     ap.add_argument("--next", action="store_true", help="abre o próximo filho elegível do programa")
     ap.add_argument("--msg", help="assunto do commit (defeito: vault: fecha <slug>)")
     ap.add_argument("--sem-budget", action="store_true")
+    ap.add_argument("--sem-testes", action="store_true", help="não correr test-fast quando o SP não tem gates")
     ap.add_argument("--sem-commit", action="store_true")
     ap.add_argument("--commit-dir", default=".", help="repo onde gerar o COMMIT_*.md (defeito: cwd)")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    if argv is None and args.root == str(sp_list.DEFAULT_ROOT):
+        rc = wt_redirect.redirect(__file__, args.slug, sys.argv[1:])
+        if rc is not None:
+            return rc
     try:
         rc, lines = fechar(args.root, args.slug, args.project, args.next, args.msg,
-                           not args.sem_budget, not args.sem_commit, args.commit_dir)
+                           not args.sem_budget, not args.sem_commit, args.commit_dir,
+                           not args.sem_testes)
     except (FecharError, sp_move.SpMoveError) as exc:
         print(f"erro: {exc}", file=sys.stderr)
         return 2

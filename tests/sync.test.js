@@ -85,6 +85,21 @@ test("sync --check sai 0 com core/ em dia e 1 quando o vault mudou, sem tocar em
   assert.strictEqual(fs.readFileSync(f, "utf8"), before);
 });
 
+test("sync --check falha com ficheiro órfão em core/ que o vault já não gera, sem lhe tocar", () => {
+  const pkg = tmp();
+  const root = path.join(__dirname, "..");
+  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true });
+  const kz = path.join(pkg, "bin", "kaizen.js");
+  const v = fakeVault();
+  const env = { ...process.env, KAIZEN_SOURCE: v };
+  assert.strictEqual(spawnSync("node", [kz, "sync"], { encoding: "utf8", env }).status, 0);
+  put(pkg, "core/commands/one-shot.md", "órfão");
+  const r = spawnSync("node", [kz, "sync", "--check"], { encoding: "utf8", env });
+  assert.strictEqual(r.status, 1);
+  assert.match(r.stdout, /desatualizado: core\/commands\/one-shot\.md/);
+  assert.ok(fs.existsSync(path.join(pkg, "core", "commands", "one-shot.md")));
+});
+
 test("owns() reconhece caminhos do vault que entram no sync", () => {
   const { owns } = require("../bin/sync.js");
   assert.ok(owns(".claude/skills/michi/SKILL.md"));

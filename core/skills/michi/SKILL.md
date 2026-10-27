@@ -35,7 +35,7 @@ metadata:
 **Estado do SP:** no arranque `python -I scripts/sp-estado.py <SP>` (≤30 linhas: fase, passos, gates, deps, ramo, ficheiros) em vez de ler SP, lista e git à parte.
 **Perfil do SP:** ler `perfil`/`max_tentativas`/`parar_se` no arranque e na paragem (`references/michi-perfis.md`).
 **Escopo do SP:** no arranque `python -I scripts/michi-escopo.py start <SP>`, no fecho ou paragem `... stop`; o hook `guard-escopo.js` bloqueia escrita fora de `escopo:`.
-**Worktree:** no arranque `python -I scripts/sb-worktree.py ensure <slug-do-SP>` e editar pelo caminho absoluto da worktree (o guard bloqueia escrita no checkout principal); fecho: `merge` + `clean` (`sp-fechar.py`).
+**Worktree:** no arranque `python -I scripts/sb-worktree.py ensure <slug-do-SP>` e editar pelo caminho absoluto da worktree (o guard bloqueia escrita no checkout principal); `sp-move`/`sp-fechar` saltam sozinhos para a worktree; commits por fase lá; `merge` (recusa SP fora de Done, `--force` explícito) + `clean` só no fecho.
 **Tab:** no arranque `python -I scripts/tab-title.py <slug-do-SP>` (best-effort, rc 0; renomeia a tab do WezTerm e imprime `/rename <slug>` para a sessão). Vale também para a sessão nova do `/sp-handoff`, que arranca com `/michi`.
 
 **Checkpoint/rollback:** `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate (`references/michi-modo-auto.md` §Paragem).
@@ -153,7 +153,7 @@ Se aparecer `[context-guard] Contexto … >= limite`: acabar o passo em curso (n
 
 ## Pitfalls
 
-23 entradas numeradas em `references/michi-pitfalls.md` (índice: `references/michi-pitfalls-index.md`). Ler só a relevante.
+30 entradas numeradas em `references/michi-pitfalls.md` (índice: `references/michi-pitfalls-index.md`). Ler só a relevante.
 
 ## See also
 

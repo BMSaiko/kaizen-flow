@@ -1,7 +1,7 @@
 ---
 description: Listar os Super Prompts pendentes (TODO e Doing) agrupados por programa, com estado, prioridade e idade
 ---
-Corre `python -I scripts/sp-list.py $ARGUMENTS` (sem argumentos = Doing antes de TODO, P1→P3, mais antigo primeiro; aceita `--sort priority|created|status`, `--reverse`, `--project <nome>`, `--status todo|doing`, `--all`, `--flat`) e mostra a saída tal como vem, em português europeu, destacando as linhas com `⚠ status≠pasta`.
+Corre `python -I scripts/sb.py sp list $ARGUMENTS` (sem argumentos = Doing antes de TODO, P1→P3, mais antigo primeiro; aceita `--sort priority|created|status`, `--reverse`, `--project <nome>`, `--status todo|doing`, `--all`, `--flat`) e mostra a saída tal como vem, em português europeu, destacando as linhas com `⚠ status≠pasta`.
 
 Por omissão a vista é agrupada: cada SP-mãe (`kind: program`) com o progresso (`2/3 feitos`, `pronto para fechar`) e os filhos (`parent:`) por baixo, com `├─`/`└─`, estado (`▶ Doing`, `○ TODO`, `✔ Done`), prioridade, data de criação com idade (`2026-10-16 (2d)`) e `aguarda: <dependências por cumprir>` (só aviso, nunca bloqueia); os SPs sem mãe vêm a seguir. `--flat` dá a tabela plana antiga (com `#`); `--tree` é sinónimo do predefinido.
 

@@ -17,6 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import wt_redirect  # noqa: E402
 import kaizen_hooks  # noqa: E402
 
 sp_list = kaizen_engine.load("sp-list")
@@ -162,6 +163,10 @@ def main(argv=None):
     ap.add_argument("--next", action="store_true", help="com done: abre o próximo filho elegível do programa")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    if argv is None and args.root == str(sp_list.DEFAULT_ROOT):
+        rc = wt_redirect.redirect(__file__, args.slug, sys.argv[1:])
+        if rc is not None:
+            return rc
     try:
         if args.next:
             if args.dest.lower() != "done":

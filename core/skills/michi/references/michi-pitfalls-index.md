@@ -2,7 +2,7 @@
 
 ## Pitfalls
 
-Texto integral em `references/michi-pitfalls.md` (28 entradas, numeradas como abaixo). Ler só a entrada relevante.
+Texto integral em `references/michi-pitfalls.md` (30 entradas, numeradas como abaixo). Ler só a entrada relevante.
 
 1. Treating `/michi` as a single-shot: the user may want to pause at any
 2. Re-asking the user a fact they already gave you
@@ -27,3 +27,5 @@ Texto integral em `references/michi-pitfalls.md` (28 entradas, numeradas como ab
 26. Fecho com push + merge: fast-forward quando `origin/<ramo>` == base (portfolio-docs-audit, 2026-10-17)
 27. Python em modo texto no Windows: CRLF e `\n` escapado (dev-workflow-escalar-programas, 2026-10-18)
 28. "Duplicada" num SP de inventário: ler o corpo antes de remover (dev-workflow-refactorizar-inventario, 2026-10-18)
+29. MCP numa worktree nova: verificar com `claude -p --mcp-config` (vault-mcp-uso-maximo, 2026-10-27)
+30. Gates sobre repo externo: `cd` no comando (kaizen-sync-igual-ao-vault, 2026-10-27)

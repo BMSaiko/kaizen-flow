@@ -22,6 +22,7 @@ function audit(root) {
   (function walk(dir) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, e.name);
+      if (e.name === ".git") continue; // diretoria, ou ficheiro "gitdir:" numa worktree
       if (e.isDirectory()) {
         if (!SKIP_DIRS.has(e.name)) walk(p);
         continue;

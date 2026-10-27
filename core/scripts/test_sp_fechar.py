@@ -83,3 +83,22 @@ def test_worktree_hint_so_em_worktree(tmp_path):
     assert mod.worktree_hint(repo, "x") is None
     assert "sb-worktree.py merge x" in mod.worktree_hint(wt, "x")
     assert mod.worktree_hint(tmp_path, "x") is None
+
+
+def _mod():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("sp_fechar", SCRIPTS / "sp-fechar.py")
+    m = importlib.util.module_from_spec(spec)
+    sys.modules["sp_fechar"] = m
+    spec.loader.exec_module(m)
+    return m
+
+
+def test_avisos_sem_prova_nem_reflect():
+    out = _mod().avisos("## Prova de done\n\n## Reflect\n\nmodelo sem linhas\n")
+    assert len(out) == 2
+
+
+def test_avisos_com_prova_e_reflect():
+    txt = "## Prova de done\nfast 2 s\n\n## Reflect\nReflect final: sem patch\n"
+    assert _mod().avisos(txt) == []

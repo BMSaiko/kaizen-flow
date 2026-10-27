@@ -259,3 +259,11 @@ Reincidência (sp-programa-avancar-fechar, 2026-10-18): um patch Python com `\n`
 ## 28. "Duplicada" num SP de inventário: ler o corpo antes de remover (dev-workflow-refactorizar-inventario, 2026-10-18)
 
 - **"Duplicada" num SP de inventário: ler o corpo antes de remover (dev-workflow-refactorizar-inventario, 2026-10-18).** O SP dizia que `grilling` duplicava `grill-me` (ambas v1.2.0), mas `grill-me` era só um ponto de entrada que carregava `grilling`; remover à letra deixava `grill-me` sem protocolo. Antes de mover/apagar uma skill marcada como duplicada, ler o corpo das duas e fazer `Grep` pelo nome (`related_skills`, "load X"). Se uma depende da outra, não são duplicadas: perguntar uma vez (fundir / manter / literal) com a recomendação. `skill-version demote` recusa se a cópia primária difere da de referência; usar `archive` e copiar a versão primária para `inactive/`.
+
+## 29. MCP numa worktree nova: verificar com `claude -p --mcp-config` (vault-mcp-uso-maximo, 2026-10-27)
+
+- `claude mcp list` numa worktree nova fica em "Pending approval" (o `.mcp.json` do projeto novo não está aprovado) e não prova nada. Para confirmar que um servidor liga, repetir `echo ok | claude -p --mcp-config .mcp.json --strict-mcp-config --output-format stream-json --verbose --max-turns 1` e ler `mcp_servers[].status` (esperado `connected`). Um servidor que indexa antes de `server.connect` falha o handshake aos 30 s (`CONNECT_TIMEOUT`): ligar primeiro, aquecer depois.
+
+## 30. Gates sobre repo externo: `cd` no comando (kaizen-sync-igual-ao-vault, 2026-10-27)
+
+- `sp-gates.py` corre cada `gates[].cmd` com o `cwd` do vault. Um `node K/bin/kaizen.js audit` sem `cd` analisou o vault (14214 hits falsos em `_templates/`) e travou o fecho. Todo o `cmd` que opera num repo externo ou numa worktree de código começa com `cd <repo> &&`, apontando para a worktree K do SP e não para o checkout principal.
