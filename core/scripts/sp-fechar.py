@@ -94,6 +94,18 @@ def write_commit(cwd, slug, subject, paths):
     return out
 
 
+def worktree_hint(cwd, slug):
+    """Se `cwd` é uma worktree (não o checkout principal), o passo que falta depois do commit."""
+    def git(*a):
+        r = subprocess.run(["git", "-C", str(cwd), *a], capture_output=True, text=True, encoding="utf-8")
+        return r.stdout.strip() if r.returncode == 0 else None
+    gd, common = git("rev-parse", "--path-format=absolute", "--git-dir"), git("rev-parse", "--path-format=absolute", "--git-common-dir")
+    if not gd or not common or gd == common:
+        return None
+    return (f"WORKTREE: depois do commit: python -I scripts/sb-worktree.py merge {slug} && "
+            f"python -I scripts/sb-worktree.py clean {slug}")
+
+
 def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir="."):
     """Corre o fecho. Devolve (rc, linhas)."""
     sp = find_doing(root, slug, project)
@@ -117,6 +129,9 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
             lines.append(f"COMMIT: {write_commit(commit_dir, slug, msg or f'vault: fecha {slug}', paths)}")
         else:
             lines.append("COMMIT: nada para stage (sem alterações ou fora de repo git)")
+    hint = worktree_hint(commit_dir, slug)
+    if hint:
+        lines.append(hint)
     return 0, lines
 
 

@@ -67,3 +67,19 @@ def test_sp_fora_de_doing_erro(root):
     assert novo(root, "todo")[0] == 0
     rc, _, err = fechar(root, "todo")
     assert rc == 2 and "não em Doing" in err
+
+
+def test_worktree_hint_so_em_worktree(tmp_path):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("sp_fechar", SCRIPTS / "sp-fechar.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    repo = tmp_path / "r"
+    g = lambda *a, c=repo: subprocess.run(["git", "-C", str(c), *a], check=True, capture_output=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+    g("-c", "user.email=t@t", "-c", "user.name=t", "commit", "--allow-empty", "-m", "i")
+    wt = tmp_path / "wt"
+    g("worktree", "add", "-q", "-b", "agent/x", str(wt))
+    assert mod.worktree_hint(repo, "x") is None
+    assert "sb-worktree.py merge x" in mod.worktree_hint(wt, "x")
+    assert mod.worktree_hint(tmp_path, "x") is None

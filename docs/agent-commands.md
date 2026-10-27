@@ -10,7 +10,6 @@ Typed inside Claude Code / Codex, not in the shell. These are skills and prompt 
 | `/sp-handoff [slug]` | optional slug | Logs progress in the story in Doing, prints the `/michi <path>` to resume, and (if you say yes) clears the context and resumes in the same pane. |
 | `/handoff [slug]` | optional short name | Like `/sp-handoff`, for a free conversation with no story: writes an ephemeral handoff (`handoff.py --write`), and (if you say yes) clears the context; the new session runs `handoff.py --consume`, which prints and deletes it. |
 | `/sp-fila [--dry-run] [--max N] [--ate HH:MM] [--projeto P] [--programa SLUG]` | optional limits | Runs the eligible stories in sequence (`modo: auto`, `gates:` set, dependencies met), each in a clean session; stops on the first failure and writes a report. `--programa` runs only a parent story's tree, bounded by its `orcamento_horas`/`orcamento_usd`/`orcamento_requests`; on a stop it appends `## Progresso` to the parent so the next run resumes. |
-| `/one-shot <idea>` | the project idea | One long interview (25+ questions, hours available), then a tree of stories (parent, children, grandchildren) executed by michi without questions. |
 | `/grill-me`, `/dr`, `/dp`, `/da`, `/brainstorm`, `/swot` | topic | The building blocks michi chains; usable alone. |
 
 ## The michi cycle

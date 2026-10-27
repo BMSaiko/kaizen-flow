@@ -35,6 +35,7 @@ metadata:
 **Estado do SP:** no arranque `python -I scripts/sp-estado.py <SP>` (≤30 linhas: fase, passos, gates, deps, ramo, ficheiros) em vez de ler SP, lista e git à parte.
 **Perfil do SP:** ler `perfil`/`max_tentativas`/`parar_se` no arranque e na paragem (`references/michi-perfis.md`).
 **Escopo do SP:** no arranque `python -I scripts/michi-escopo.py start <SP>`, no fecho ou paragem `... stop`; o hook `guard-escopo.js` bloqueia escrita fora de `escopo:`.
+**Worktree:** no arranque `python -I scripts/sb-worktree.py ensure <slug-do-SP>` e editar pelo caminho absoluto da worktree (o guard bloqueia escrita no checkout principal); fecho: `merge` + `clean` (`sp-fechar.py`).
 **Tab:** no arranque `python -I scripts/tab-title.py <slug-do-SP>` (best-effort, rc 0; renomeia a tab do WezTerm e imprime `/rename <slug>` para a sessão). Vale também para a sessão nova do `/sp-handoff`, que arranca com `/michi`.
 
 **Checkpoint/rollback:** `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate (`references/michi-modo-auto.md` §Paragem).
@@ -60,24 +61,14 @@ Hooks (`kaizen-hooks.json`, ref. `knowledge/infra/reference/kaizen-hooks.md`): e
    phase following the TDD plan agreed in step 3, surfacing blockers early.
    Track with `todo`. No "done" without evidence (RC, test output, lint).
    - **Prova por fase (2026-10-20).** Gate de saída de cada fase de entrega (código/UI): antes de a dar por fechada (e do handoff), apresentar uma prova observável como o cliente final (UI = print/`run`; backend = chamada real/output/benchmark), guardada em `proofs/` junto do SP e referenciada em `## Prova`. Dizer sempre o caminho absoluto das provas na resposta. Sem prova: bloquear e perguntar ao user; one-shot: prova alternativa e registar «sem prova». Tabela e regras: `references/michi-prova.md`.
-   - **Reflect por fase (2026-10-20).** No fim de cada fase (qualquer fase michi, não só DA), antes do handoff: reflect curto de 3 linhas limitado a essa fase (`correu mal · patch · onde`), com o patch aplicado ao ficheiro da fase (SKILL.md, playbook ou reference) e registado no CHANGELOG; sem fricção: «sem patch» numa linha. Só patches com relação à fase; sem commit. Formato e custo: `references/michi-reflect-template.md` (§Reflect por fase).
-   - **Modo auto (2026-10-21).** `/michi --auto <SP>` ou `modo: auto` no frontmatter: sem `AskUserQuestion`, commit local e `sp-move done` sozinho, nunca push (`modo: manual` = sem auto, sem pergunta). Sem nenhum dos três, o arranque pergunta «com/sem auto». `/one-shot` é este modo. Regras, pergunta e report: `references/michi-modo-auto.md`.
+   - **Reflect por fase (2026-10-20).** No fim de cada fase (qualquer fase michi, não só DA), antes do handoff: correr `/reflect fase <SP>` (skill `reflect`; a linha fica em `## Reflect` do SP e sobrevive ao handoff).
+   - **Modo auto (2026-10-21).** `/michi --auto <SP>` ou `modo: auto` no frontmatter: sem `AskUserQuestion`, commit local e `sp-move done` sozinho, nunca push (`modo: manual` = sem auto, sem pergunta). Sem nenhum dos três, o arranque pergunta «com/sem auto». Regras, pergunta e report: `references/michi-modo-auto.md`.
    - **Handoff por fase:** ver tabela «Quem dispara o handoff» em `## Contexto`.
 5. **Gates.** Correr build/tests/lint/typecheck/e2e aplicáveis; cada comando e RC vão para o report; falha = corrigir a causa e repetir todos, sem `|| true`. Inclui o gate `/harden` (skip: `skip harden`). SP com `gates:` no frontmatter: `python -I scripts/sp-gates.py <SP>` (rc≠0 = não fecha); sem `gates:`, como antes. **Fecho num só passo:** `python -I scripts/sp-fechar.py <slug> [--next]` = gates + context-budget + `done` + `COMMIT_*.md` (pára sem mover se falhar). **Antes de `sp-move.py ... done` e do `COMMIT_*.md`: prova de done** como cliente final, registada em `## Prova de done` no SP (se falhar, o SP não passa a Done); E2E de fecho de árvore só quando este SP fecha mãe+filhos+netos (`sp-list.py --tree-closed <slug>`). Detalhe: `references/michi-fases-detalhe.md` §Fase 5.
 6. **Report.** Output: what changed (paths + brief diff), what was verified
    (commands + RC/output), difficulties encountered (real, not sanitised),
    what is still open. No commit. No push.
-7. **Reflect (final = consolidação).** Os patches de fase já foram aplicados
-   (ver «Reflect por fase»); aqui só se tratam os gaps transversais ao ciclo
-   e as linhas «sem patch» repetidas. Self-evolution step. Before proposing the commit, surface
-   the friction the cycle just produced and propose how michi (or the
-   surrounding skills) should change so the next cycle is cheaper. Michi
-   **proposes**, the user **applies** — never auto-edit. See
-   `references/michi-reflect-template.md` for the template and the three
-   exit paths (patch michi / new helper skill / log gap to
-   `knowledge/infra/improvement-backlog.md`). Gate: ≥3 cycles with the
-   same gap before a new skill is created; patches on michi itself can go
-   through immediately if they are direct corrections.
+7. **Reflect (final = consolidação).** Correr `/reflect final <SP>` antes de propor o commit (skill `reflect`: lê `## Reflect`, propõe A/B/C, o user aplica).
 8. **Review restart on user pushback.** When the user says there's
    something wrong, broken, missing, or erroneous in the work
    (trigger phrases: "está errado", "está partido", "tem erros",
@@ -155,7 +146,7 @@ Se aparecer `[context-guard] Contexto … >= limite`: acabar o passo em curso (n
 |---|---|---|
 | Fim de fase com verificação verde, SP em Doing (`/michi <SP>`) | `/sp-handoff` manual: regista `## Progresso`, pergunta sim/não | um por fase, não por passo; nunca a meio de edição/teste; não repetir se o guard já o fez nessa fase |
 | `[context-guard]` ≥ limite | `--launch --auto`, sem perguntar | acabar o passo em curso primeiro |
-| Modo auto (`--auto`, `/one-shot`) | `--launch --auto` por fase | sem `AskUserQuestion` |
+| Modo auto (`--auto`) | `--launch --auto` por fase | sem `AskUserQuestion` |
 | Sem SP em Doing | nada (`/handoff` só em conversa livre) | |
 
 **Arranque `/michi <SP>` com sessão suja:** se o contexto já tem conversa anterior (não veio de `/clear` nem de handoff), um só AskUserQuestion: "Limpar e iniciar o SP em sessão nova?" + modo (§Pergunta de arranque); com «sim», `python -I scripts/sp-handoff.py --launch <caminho>` (`--auto` se escolhido) e terminar o turno.
@@ -166,7 +157,7 @@ Se aparecer `[context-guard] Contexto … >= limite`: acabar o passo em curso (n
 
 ## See also
 
-- `references/michi-reflect-template.md` — Reflect template
+- `.claude/skills/reflect/` — Reflect (`/reflect fase|final`)
 - `references/michi-skip-grill-play.md` — skip-grill recipe
 - `knowledge/infra/skills/self-improvement-loop/SKILL.md` — daily SIL
 - `knowledge/infra/skills/learn-from-session/SKILL.md` — LFS at session close

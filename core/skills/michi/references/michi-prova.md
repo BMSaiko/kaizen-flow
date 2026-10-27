@@ -21,7 +21,7 @@ Fim de cada fase de entrega (DA que muda código/UI): mostrar ao user uma prova 
 - **Mostrar sempre o caminho absoluto de cada prova na resposta** (um por linha, copiável) ao apresentá-la e no relatório final; o user não deve ter de a procurar.
 - Prova fabricada é proibida: o output é o real, mesmo que falhe (reportar a falha).
 - Sem prova possível: parar e perguntar ao user (`AskUserQuestion`: dar outra prova / dispensar). Dispensa explícita fica registada «sem prova (dispensada pelo user)».
-- One-shot / sem interação: tentar prova alternativa; se nenhuma, registar «sem prova» e dizê-lo no relatório.
+- Modo auto / sem interação: tentar prova alternativa; se nenhuma, registar «sem prova» e dizê-lo no relatório.
 - Captura de UI: esperar por um elemento real da página (`waitFor` no `h1`/conteúdo), nunca um tempo fixo; skeleton na imagem = prova inválida, repetir.
 - Baseline de testes sem as alterações (e2e/jest): usar `git worktree`, nunca `git stash` (ficheiros versionados como `test-results/.last-run.json` fazem o `pop` abortar).
 - A prova da Fase 5 (`## Prova de done`) consolida e referencia estas, não as repete.

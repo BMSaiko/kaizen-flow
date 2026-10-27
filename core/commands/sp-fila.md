@@ -9,4 +9,6 @@ Passos (português europeu). `$ARGUMENTS` = flags de `scripts/sp-fila.py` (`--dr
 4. No fecho de cada SP lançado pela fila, a sessão michi corre `python -I scripts/sp-fila.py --seguinte` (regista feito/falhado, respeita os limites, lança o seguinte) e termina o turno. No fim escreve o relatório em `knowledge/infra/reports/sp-fila/` e apaga o estado.
 5. `python -I scripts/sp-fila.py --parar` abandona a fila.
 
+Reflect: cada sessão michi lançada pela fila corre `/reflect fase <SP>` por fase e `/reflect final <SP>` antes de fechar, sem perguntas (modo auto); as linhas ficam em `## Reflect` do SP e o relatório da fila resume os gaps repetidos.
+
 Regras: um SP por sessão limpa, sem paralelismo, sem sub-agentes; push/PR só como cada SP autoriza (a fila nunca os faz); SP em Doing que não chega a Done conta como falhado e os dependentes ficam de fora (só continuam os independentes).

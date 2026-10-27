@@ -1,6 +1,6 @@
 # michi — modo auto (2026-10-21)
 
-`/michi --auto <SP>` ou `modo: auto` no frontmatter do SP. Executa DR→DP→DA→gates→prova→reflect sem perguntas e fecha o SP sozinho. O modo one-shot (SP de `/one-shot`) é este modo com `horas_disponiveis` e commit por fase; não tem regras próprias.
+`/michi --auto <SP>` ou `modo: auto` no frontmatter do SP. Executa DR→DP→DA→gates→prova→reflect sem perguntas e fecha o SP sozinho.
 
 ## Proibições (único sítio; SKILL.md e AGENTS.md só apontam para aqui)
 - `--force`, `reset --hard`, `clean -f`, `git add -A`/`.` (stage sempre explícito).
@@ -37,7 +37,7 @@ Frontmatter `commit`, `push`, `pr` (`auto|pergunta|nunca`) e `restricoes` (texto
 5. `git rev-parse --abbrev-ref HEAD` = `master` (SB-VERIFY).
 
 ## Paragem
-Gate/prova falhada após 2 tentativas, ou proibição em causa: não commita, não move para Done, regista em `## Report modo auto` reverte ao checkpoint e para. Em one-shot passa à folha independente seguinte.
+Gate/prova falhada após 2 tentativas, ou proibição em causa: não commita, não move para Done, regista em `## Report modo auto` reverte ao checkpoint e para.
 Checkpoint: antes da DA (ou de fase com escrita) `python -I scripts/michi-checkpoint.py save --slug <SP>`. Na paragem: `restore --slug <SP>` mostra o plano; em auto, `--apply` e regista a reversão no Report; em manual, `AskUserQuestion` antes de `--apply` (recusa se o HEAD mudou).
 
 ## Report (`## Report modo auto` no SP + resumo curto no chat)
@@ -46,7 +46,7 @@ correu bem · correu mal · corrigido · commits (hash + assunto) · próximo pa
 ## Pergunta de arranque (único sítio da regra)
 Em ciclo novo (`/michi <SP|ideia>`), decidir por esta ordem; a primeira que se aplica ganha:
 1. `--auto` explícito → auto, sem pergunta (inclui relançamentos `sp-handoff --launch --auto` e `[context-guard]`).
-2. `modo: auto` no frontmatter do SP (inclui folhas de `/one-shot`) → auto, sem pergunta; `modo: manual` → sem auto, sem pergunta (definido pelo `/super-prompt`/`sp-new --modo`). Sem o campo: segue para 3-5.
+2. `modo: auto` no frontmatter do SP → auto, sem pergunta; `modo: manual` → sem auto, sem pergunta (definido pelo `/super-prompt`/`sp-new --modo`). Sem o campo: segue para 3-5.
 3. `help`, `skip <fase>`, `go to DA` → sem pergunta (não é arranque de ciclo).
 4. SP em Doing com modo já registado (`## Decisões modo auto` ou `## Progresso`) → retomar nesse modo, sem repetir.
 5. Caso contrário: `AskUserQuestion` «Como corre este ciclo?» com «Sem auto (interativo) (Recomendado)» (default) e «Com auto (`--auto`)»; a resposta vale para o ciclo todo.

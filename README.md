@@ -92,7 +92,7 @@ If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the blo
 |---|---|
 | [Use cases](docs/use-cases.md) | "I want to..." recipes for install, usage, stories and handoff |
 | [Commands](docs/commands.md) | every `kaizen` command, option and workflow script |
-| [Agent commands](docs/agent-commands.md) | `/sp`, `/michi`, `/one-shot`, `/sp-handoff` and the michi cycle |
+| [Agent commands](docs/agent-commands.md) | `/sp`, `/michi`, `/sp-handoff` and the michi cycle |
 | [Usage and cost](docs/usage-and-cost.md) | transcripts read, prices file, reports |
 | [Config](docs/config.md) | `kaizen.config.json` and project folders |
 | [Handoff](docs/handoff.md) | fresh-context handoff, backends, CLI vs desktop app |

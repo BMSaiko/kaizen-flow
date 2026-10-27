@@ -3,8 +3,8 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-const SKILLS = ["michi", "super-prompt", "one-shot", "grill-me", "dr", "dp", "da", "brainstorm", "swot"];
-const COMMAND_RE = /^(sp(-[a-z]+)*|one-shot|handoff)\.md$/;
+const SKILLS = ["michi", "super-prompt", "grill-me", "dr", "dp", "da", "brainstorm", "swot"];
+const COMMAND_RE = /^(sp(-[a-z]+)*|handoff)\.md$/;
 const SCRIPT_RE = /^(sp|doc)-[a-z-]+\.py$/;
 const SCRIPT_NAMES = ["context-guard.py", "handoff.py", "skill-cut.py", "kaizen_config.py", "kaizen_engine.py", "kaizen_hooks.py", "test_kaizen_engine.py", "test_kaizen_hooks.py", "test_michi_tree_close.py"];
 // testes que ficam no vault: afirmam textos em português ou dependem do vault inteiro
