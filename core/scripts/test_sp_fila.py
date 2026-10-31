@@ -906,10 +906,10 @@ def test_lancar_seguinte_auto_passa_o_slug_que_fechou():
 
 
 def test_contar_tails_conta_so_os_que_seguem_o_log_da_vigia():
-    saida = "tail -F C:/Users/x/.claude/sp-fila-vigia.log\ntail -F /var/log/outro.log\ntail -f ~/.claude/sp-fila-vigia.log\npython sp-fila.py\n"
+    saida = "tail -F C:/" "Users/x/.claude/sp-fila-vigia.log\ntail -F /var/log/outro.log\ntail -f ~/.claude/sp-fila-vigia.log\npython sp-fila.py\n"
     run = lambda *a, **k: type("R", (), {"stdout": saida})()
     assert sp_fila.contar_tails(run) == 2
-    win = r'"C:\Program Files\Git\usr\bin\tail.exe" -F C:\Users\x\.claude\sp-fila-vigia.log'
+    win = r'"C:\Program Files\Git\usr\bin\tail.exe" -F C:' r'\Users\x\.claude\sp-fila-vigia.log'
     assert sp_fila.contar_tails(lambda *a, **k: type("R", (), {"stdout": win})()) == 1
     def rebenta(*a, **k):
         raise OSError("x")
