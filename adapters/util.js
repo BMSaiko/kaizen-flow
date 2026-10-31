@@ -29,4 +29,4 @@ function agentsBlock(core, skillsDir, commandsDir) {
   return lines.join("\n");
 }
 
-module.exports = { MARKER, remap, skillNames, agentsBlock };
+module.exports = { MARKER, remap, agentsBlock };

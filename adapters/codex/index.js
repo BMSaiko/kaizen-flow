@@ -9,4 +9,4 @@ function render(core) {
   };
 }
 
-module.exports = { render, name: "codex" };
+module.exports = { render };
