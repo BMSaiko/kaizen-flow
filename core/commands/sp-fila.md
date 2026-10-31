@@ -1,7 +1,7 @@
 ---
 description: Executar em sequência os SPs elegíveis (modo auto, gates, dependências cumpridas), com limites e relatório final
 ---
-Passos (português europeu). `$ARGUMENTS` = flags de `scripts/sp-fila.py` (`--dry-run`, `--max N`, `--ate HH:MM`, `--projeto P`, `--orcamento N` (teto opcional de requests; sem ele não há limite), `--programa SLUG-MÃE`: só a árvore da mãe, com `orcamento_horas`/`orcamento_usd`/`orcamento_requests` do frontmatter dela; ao parar grava `## Progresso` na mãe).
+Passos (português europeu). `$ARGUMENTS` = flags de `scripts/sp-fila.py` (`--dry-run`, `--max N`, `--ate HH:MM`, `--projeto P`, `--concorrencia N` (modo paralelo), `--orcamento N` (teto opcional de requests; sem ele não há limite), `--programa SLUG-MÃE`: só a árvore da mãe, com `orcamento_horas`/`orcamento_usd`/`orcamento_requests` do frontmatter dela; ao parar grava `## Progresso` na mãe).
 
 1. Correr sempre primeiro `python -I scripts/sp-fila.py --dry-run $ARGUMENTS` e mostrar a ordem e os excluídos (modo ≠ auto, sem gates, dependência em falta, ciclo, autorização insuficiente).
 2. Se `$ARGUMENTS` tem `--dry-run`, parar aqui.
@@ -11,4 +11,4 @@ Passos (português europeu). `$ARGUMENTS` = flags de `scripts/sp-fila.py` (`--dr
 
 Reflect: cada sessão michi lançada pela fila corre `/reflect fase <SP>` por fase e `/reflect final <SP>` antes de fechar, sem perguntas (modo auto); as linhas ficam em `## Reflect` do SP e o relatório da fila resume os gaps repetidos.
 
-Regras: um SP por sessão limpa, sem paralelismo, sem sub-agentes; push/PR só como cada SP autoriza (a fila nunca os faz); SP em Doing que não chega a Done conta como falhado e os dependentes ficam de fora (só continuam os independentes).
+Regras: um SP por sessão limpa, sem sub-agentes; paralelo só com `--concorrencia N` (N painéis, uma worktree por SP, só SPs sem dependência entre si, merge serializado pelo lock); push/PR só como cada SP autoriza (a fila nunca os faz); SP em Doing que não chega a Done conta como falhado e os dependentes ficam de fora (só continuam os independentes).
