@@ -107,7 +107,7 @@ save("sp-workflow.svg", s)
 s = head(1200, 640, "Architecture",
          "kaizen-flow architecture: the core (skills, commands, scripts) is rendered by the claude, codex and agents-md adapters into the target project.",
          "Architecture", "One core, rendered per harness into your project")
-s += panel(200, 130, 800, 110, "violet", "core", ["skills (michi, dp, da, dr, pentest, pr-fase…) · commands (/sp, /sp-fila, /handoff…)", "scripts (sp-*.py, context-guard, kaizen_hooks, pentest, review_ciclo)"])
+s += panel(200, 130, 800, 110, "violet", "core", ["skills (michi, dp, da, dr, pentest, pr-fase…) · commands (/sp, /sp-fila, /handoff…)", "scripts (sp-*.py on kaizen_engine) · CLI: bin/kaizen.js routes to bin/commands/*"])
 for x, (t, sub) in zip(ax, [("adapter claude", ".claude/skills, commands + hooks"), ("adapter codex", "Codex CLI layout"), ("adapter agents-md", "AGENTS.md for any harness")]):
     s += box(x, 320, aw, 90, "blue", t, sub)
     s += varrow(600, 242, 320) if x == 455 else elbow(600, 242, 282, x + aw // 2, 320)

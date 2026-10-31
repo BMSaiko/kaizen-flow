@@ -9,7 +9,6 @@ Uso:
   python -I scripts/sp-estado.py <slug|caminho.md> [--project P]
 """
 import argparse
-import importlib.util
 import re
 import subprocess
 import sys
@@ -22,14 +21,6 @@ import kaizen_engine  # noqa: E402
 MAX_LINES = 30
 MAX_FILES = 8
 MAX_PROGRESSO = 3
-
-
-def _load(name, filename):
-    spec = importlib.util.spec_from_file_location(name, HERE / filename)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
 
 
 def section(text, prefix):
@@ -46,8 +37,8 @@ def git_state():
 
 
 def estado(ref, root=None, project=None, git_lines=None):
-    sp_list = _load("sp_list_estado", "sp-list.py")
-    sp_gates = _load("sp_gates_estado", "sp-gates.py")
+    sp_list = kaizen_engine.load("sp-list")
+    sp_gates = kaizen_engine.load("sp-gates")
     root = Path(root) if root else sp_list.default_root()
     sps = sp_list.collect(root, include_done=True)
     alvo = None

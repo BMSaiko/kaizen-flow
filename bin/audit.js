@@ -15,7 +15,7 @@ const PATTERNS = [
 ];
 const SKIP_DIRS = new Set([".git", "node_modules"]);
 // o próprio auditor e o seu teste contêm os padrões por definição
-const SKIP_FILES = new Set(["LICENSE", "bin/audit.js", "bin/kaizen.js", "docs/privacy-audit.md", "tests/audit.test.js"]);
+const SKIP_FILES = new Set(["LICENSE", "bin/audit.js", "bin/commands/sync.js", "docs/privacy-audit.md", "tests/audit.test.js"]);
 
 function audit(root) {
   const hits = [];

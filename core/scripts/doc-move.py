@@ -8,16 +8,14 @@ Uso:
   python -I scripts/doc-move.py <dr|dp> <slug> <todo|doing|done>
 """
 import argparse
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-import importlib.util as _ilu
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_engine  # noqa: E402
 
-_cspec = _ilu.spec_from_file_location("kaizen_config", Path(__file__).with_name("kaizen_config.py"))
-_kc = _ilu.module_from_spec(_cspec)
-_cspec.loader.exec_module(_kc)
+_kc = kaizen_engine.load("kaizen_config")
 REPO = Path(__file__).resolve().parent.parent
 
 
@@ -63,17 +61,6 @@ def rewrite(raw, status, updated):
     return "".join(lines).encode("utf-8")
 
 
-def relocate(src, dst):
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    tracked = subprocess.run(
-        ["git", "-C", str(src.parent), "ls-files", "--error-unmatch", src.name], capture_output=True
-    ).returncode == 0
-    if tracked:
-        subprocess.run(["git", "-C", str(src.parent), "mv", str(src), str(dst)], check=True, capture_output=True)
-    else:
-        src.rename(dst)
-
-
 def move(root, kind, slug, dest):
     if kind not in TYPES:
         raise DocMoveError(f"tipo inválido '{kind}' (dr|dp)")
@@ -91,7 +78,7 @@ def move(root, kind, slug, dest):
     dst = src.parent.parent / target / src.name
     updated = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     new_raw = rewrite(src.read_bytes(), target, updated)
-    relocate(src, dst)
+    kaizen_engine.relocate(src, dst)
     dst.write_bytes(new_raw)
     return f"{slug}: {src.parent.name} → {target} ({dst})"
 
