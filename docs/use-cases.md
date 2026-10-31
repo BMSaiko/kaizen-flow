@@ -21,4 +21,11 @@
 | Check stories are well-formed | `python scripts/sp-validate.py path/to/story.md` | rc 1 if a section is missing or empty |
 | Keep CI honest about leaks | `kaizen audit .` | rc 1 if personal data is found |
 | See what a handoff would do | `python scripts/sp-handoff.py --launch path/to/story.md --dry-run` | the commands, nothing executed |
+| Run several ready stories in a row | `/sp-fila --dry-run`, then `/sp-fila` | order and exclusions first; then each `modo: auto` story with `gates:` runs in a clean session |
+| Run independent stories in parallel | `/sp-fila --concorrencia 3` | up to 3 panes, one worktree each; watch with `python scripts/sp-painel.py` |
+| Scan a diff for security slips | `python scripts/pentest.py --repo . --base main` | rc 1 and the findings; add `--criar-sps --project _default` for one story each |
+| Loop fix and review until approved | `python scripts/review_ciclo.py review.json --achados achados.txt` | `APROVADO`, `CORRIGIR` or `ESCALAR` |
+| Draft the PR body | `python scripts/pr_corpo.py path/to/story.md --review review.json` | body from the story, pen test and review; add `--criar` to open it |
+| Hand off a conversation with no story | `/handoff` | ephemeral file; the fresh context reads and deletes it |
+| Run a command on workflow events | add [`kaizen-hooks.json`](config.md#kaizen-hooksjson) | `kaizen_hooks.py fire` runs it |
 | Move to a fresh context mid-story | `/sp-handoff` | resume command injected in the pane, or copied to the clipboard |
