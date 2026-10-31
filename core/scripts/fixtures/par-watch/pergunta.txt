@@ -1,0 +1,6 @@
+ Which approach do you prefer?
+
+ ❯ 1. Opção A
+   2. Opção B
+
+ Enter to confirm · Esc to cancel

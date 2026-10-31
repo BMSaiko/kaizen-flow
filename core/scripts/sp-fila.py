@@ -55,6 +55,15 @@ MAX_DEFEITO = 5
 LOCK_VELHO_S = 60  # um bloqueio mais antigo é de uma sessão morta
 
 
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def run_hidden(*args, **kwargs):
+    """subprocess.run sem janela de consola no Windows: o vigia chama wezterm/git a cada ciclo e as janelas piscavam."""
+    kwargs.setdefault("creationflags", NO_WINDOW)
+    return subprocess.run(*args, **kwargs)
+
+
 @contextmanager
 def bloqueio(path, espera=15.0):
     """Exclusão mútua entre sessões sobre `path`: ficheiro `<path>.lock` criado com O_CREAT|O_EXCL."""
@@ -249,7 +258,7 @@ def render_plan(fila, excluidos):
     return "\n".join(linhas)
 
 
-def sem_commit(items, run=subprocess.run):
+def sem_commit(items, run=run_hidden):
     """Slugs dos SPs cujo ficheiro não está no HEAD do repo (só leitura). Sem git ou fora de um repo: nenhum."""
     fora = set()
     for sp, _ in items:
@@ -309,7 +318,7 @@ def progresso(mae_path, estado, fila, motivo, agora):
         f.write("\n".join(linhas))
 
 
-def seguinte(root, estado_path, rel_dir, run=subprocess.run, agora=None, custo_fn=None, slug=None):
+def seguinte(root, estado_path, rel_dir, run=run_hidden, agora=None, custo_fn=None, slug=None):
     """Regista o SP que fechou, respeita os limites e lança o seguinte. Devolve {acao, ...}.
 
     `slug`: só essa sessão fecha (as outras continuam); sem ele fecham todas as registadas (formato antigo).
@@ -329,7 +338,7 @@ def _ler_sp(sp):
 
 def _cwd_neutro(root):
     """Checkout principal (master): `sp-move doing` aí não reclama o SP para o agente do worktree que orquestra; quem reclama é o `sb-worktree ensure` do spawn."""
-    r = subprocess.run(["git", "-C", str(root), "rev-parse", "--path-format=absolute", "--git-common-dir"], capture_output=True, text=True)
+    r = run_hidden(["git", "-C", str(root), "rev-parse", "--path-format=absolute", "--git-common-dir"], capture_output=True, text=True)
     return Path(r.stdout.strip()).parent if r.returncode == 0 and r.stdout.strip() else None
 
 
@@ -546,16 +555,19 @@ def _chave(est, motivo):
     return (est, re.sub(r"\d+", "N", motivo) if motivo.startswith("inativa há") else motivo)
 
 
-def vigiar(ler_estado, intervalo_s, espera, saida, passou_o_fim=lambda: False, batida=lambda: None, fechar_painel=lambda slug: None, relogio=time.monotonic):
+def vigiar(ler_estado, intervalo_s, espera, saida, passou_o_fim=lambda: False, batida=lambda: None, fechar_painel=lambda slug: None, relogio=time.monotonic, lancar_seguinte=lambda slug: (False, "")):
     """Repete `ler_estado()` ([(slug, estado, motivo)] ou None se a fila acabou) e emite só as mudanças por sessão.
 
     «bloqueado» por inatividade (ou outro igual) só se repete a cada `REAVISO_S`; qualquer outra transição emite logo.
 
     `fechar_painel(slug)` corre uma vez quando a sessão passa a «fechado» (SP em Done): o painel já não faz falta.
+    `lancar_seguinte(slug)` corre logo a seguir e devolve `(lançou, razão)`: a razão vai numa linha `slug · fila · razão`;
+    se lançou, a vigia continua (o estado já tem a sessão nova) em vez de sair por «todas fechadas».
 
     Sai (0) quando todas as sessões estão fechadas, mortas ou paradas sem fechar, quando a fila desaparece ou quando `passou_o_fim()` (--ate)."""
     ultimo, quando = {}, {}
     while True:
+        relancou = False
         batida()  # heartbeat: prova no estado que o vigia está vivo
         linhas = ler_estado()
         if not linhas:
@@ -566,11 +578,16 @@ def vigiar(ler_estado, intervalo_s, espera, saida, passou_o_fim=lambda: False, b
                 continue
             repetido = ultimo.get(slug) == chave
             ultimo[slug], quando[slug] = chave, agora
+            razao = ""
             if est == "fechado":
                 fechar_painel(slug)
+                lancou, razao = lancar_seguinte(slug)
+                relancou = relancou or lancou
             nome = (f"PRECISA DE APROVAÇÃO DO {USER.upper()}" if motivo.startswith("precisa de aprovação") else "À ESPERA DE RESPOSTA")                 if est == "bloqueado" and motivo.startswith(("à espera", "precisa de aprovação")) else _AVISO.get(est, est)
             saida(linha(slug, ("AINDA " if repetido else "") + nome, motivo))
-        if all(est in ("fechado", "morto", "parada sem fechar") for _, est, _ in linhas):  # parada: já reportada, precisa do utilizador
+            if est == "fechado" and razao:
+                saida(linha(slug, "fila", razao))
+        if not relancou and all(est in ("fechado", "morto", "parada sem fechar") for _, est, _ in linhas):  # parada: já reportada, precisa do utilizador
             return 0
         if passou_o_fim():
             saida("vigilância terminada: hora limite (--ate)")
@@ -595,6 +612,30 @@ def fechar_painel_sessao(estado, slug, run):
     return True
 
 
+def lancar_seguinte_auto(root, estado, rel_dir, slug, seguinte_fn=seguinte):
+    """`--seguinte --slug <slug>` por dentro: (lançou, razão numa linha). Nunca levanta: a vigia não pode morrer por isto."""
+    try:
+        out = seguinte_fn(root, estado, rel_dir, slug=slug)
+    except Exception as e:
+        return False, f"erro a lançar o seguinte: {e}"
+    if out["acao"] == "lancou":
+        return True, "lançou " + ", ".join(out["slugs"])
+    if out["acao"] == "espera":
+        return False, "a aguardar · " + ", ".join(out["sessoes"])
+    return False, f"fila terminada: {out['motivo']}"
+
+
+def contar_tails(run=subprocess.run):
+    """Nº de `tail` a seguir o log da vigia (mais de 1 = Monitores duplicados, linhas repetidas); 0 se não der para ver."""
+    cmd = (["powershell", "-NoProfile", "-Command", "(Get-CimInstance Win32_Process -Filter \"Name like 'tail%'\").CommandLine"]
+           if os.name == "nt" else ["ps", "-eo", "args"])
+    try:
+        saida = run(cmd, capture_output=True, text=True, encoding="utf-8").stdout or ""
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return 0
+    return sum(1 for l in saida.splitlines() if "sp-fila-vigia" in l and re.match(r'^\W*(?:.*[\\/])?tail(?:\.exe)?"?\s', l))
+
+
 def _custos_seguros(custo_fn=None):
     try:
         return (custo_fn or _custos)()
@@ -610,11 +651,12 @@ def _custos():
 
 
 AJUDA = """Orquestrador do sp-fila (regras):
-- Vigia: `sp-fila.py --vigiar --destacado` (processo próprio) e UM só Monitor `tail -F ~/.claude/sp-fila-vigia.log`, re-armado aos 30 min.
+- Vigia: `sp-fila.py --vigiar --destacado` (processo próprio; se já houver uma ativa não arma outra) e UM só Monitor `tail -F ~/.claude/sp-fila-vigia.log`; aos 30 min o novo substitui o anterior (parar o antigo primeiro).
+- Ao ver um SP «fechado» a vigia fecha o painel e lança o seguinte sozinha (como `--seguinte --slug`), respeitando max, concorrência, ate, orçamento e dependências; se não lança, a razão fica no log (`slug · fila · razão`).
 - Cada linha do log = `slug · estado · ação`; só mudanças (bloqueado repete-se a cada 15 min como «AINDA»).
 - Relato por linha: ≤3 linhas + TLDR; não narrar avisos repetidos nem reler ecrãs.
 - Pergunta/aprovação de painel: `wezterm cli get-text --pane-id N`, um AskUserQuestion («Painel N»), só depois `send-text --no-paste`; nunca aprovar sozinho.
-- `--estado-vivo` avisa «SEM VIGIA»/«VIGIA PAROU»: rearmar."""
+- `--estado-vivo` avisa «SEM VIGIA»/«VIGIA PAROU» (rearmar) e «N Monitores» (deixar só um)."""
 
 
 def main(argv=None):
@@ -664,22 +706,25 @@ def main(argv=None):
         return 0
     if args.vigiar:
         def lido():
-            return estado_vivo(ler(estado), load(args.root, args.projeto), subprocess.run, datetime.now(), args.inatividade * 60) if estado.exists() else None
+            return estado_vivo(ler(estado), load(args.root, args.projeto), run_hidden, datetime.now(), args.inatividade * 60) if estado.exists() else None
         fim = None
         if args.ate:
             h, m = map(int, args.ate.split(":"))
             fim = datetime.now().replace(hour=h, minute=m, second=0, microsecond=0)
         return vigiar(lido, args.intervalo, time.sleep, lambda m: print(m, flush=True), lambda: fim is not None and datetime.now() >= fim,
-                      lambda: batida_vigia(estado), lambda slug: fechar_painel_sessao(estado, slug, subprocess.run))
+                      lambda: batida_vigia(estado), lambda slug: fechar_painel_sessao(estado, slug, run_hidden),
+                      lancar_seguinte=lambda slug: lancar_seguinte_auto(args.root, estado, Path(args.relatorios), slug))
     if args.estado_vivo:
         if not estado.exists():
             print("erro: sem fila em curso", file=sys.stderr)
             return 1
         atual = ler(estado)
-        for slug, est, motivo in estado_vivo(atual, load(args.root, args.projeto), subprocess.run, datetime.now(), args.inatividade * 60):
+        for slug, est, motivo in estado_vivo(atual, load(args.root, args.projeto), run_hidden, datetime.now(), args.inatividade * 60):
             print(linha(slug, est, motivo))
         if aviso := aviso_vigia(atual, datetime.now()):
             print(aviso)
+        if (n := contar_tails()) > 1:
+            print(f"AVISO: {n} Monitores `tail` sobre o log da vigia (linhas duplicadas); parar os antigos e deixar só um")
         return 0
     if args.gastos:
         if not estado.exists():

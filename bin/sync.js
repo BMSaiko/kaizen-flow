@@ -12,6 +12,9 @@ const SKIP = new Set(["test_context_guard.py", "test_e2e_kaizen_pacote.py", "tes
 // ficheiros do vault com nomes de kaizen que ainda assim não entram no pacote vão para SKIP; o resto avisa
 const RELATED_RE = /^(test_)?(sp|doc|handoff|kaizen|michi)[-_.]/;
 
+// fixtures dos testes do sp-fila (test_sp_fila.py)
+const FIXTURES = "scripts/fixtures/par-watch";
+
 const ls = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir) : []);
 
 // devolve { parts: [[origem, destino]], missing: [...], unlisted: [...] } sem tocar em disco
@@ -37,6 +40,7 @@ function plan(vault) {
     if (!n.startsWith("test_") && scripts.includes(t) && !SKIP.has(t)) chosen.add(t);
   }
   for (const n of [...chosen].sort()) parts.push([`scripts/${n}`, `scripts/${n}`]);
+  if (fs.existsSync(path.join(vault, FIXTURES))) parts.push([FIXTURES, FIXTURES]);
 
   const unlisted = scripts.filter((n) => n.endsWith(".py") && !chosen.has(n) && !SKIP.has(n) && RELATED_RE.test(n)).map((n) => `scripts/${n}`);
   return { parts, missing, unlisted };
@@ -48,6 +52,7 @@ function owns(rel) {
   if (m) return SKILLS.includes(m[1]);
   const c = rel.match(/^\.claude\/commands\/([^/]+)$/);
   if (c) return COMMAND_RE.test(c[1]);
+  if (rel.startsWith(`${FIXTURES}/`)) return true;
   const sc = rel.match(/^scripts\/([^/]+\.py)$/);
   if (!sc) return false;
   const n = sc[1];

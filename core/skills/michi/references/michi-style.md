@@ -21,7 +21,7 @@ Movido de `SKILL.md` (## Style); condensado em 2026-10-31 (regras todas mantidas
 
 ## 5. Git é do user; um «go» responde ao que a pergunta nomeou
 
-- Nunca auto-commit nem auto-push (a skill opina sobre o *fluxo*; o git é do user).
+- Commit/push: regras em `michi-modo-auto.md` §Proibições e §Autorizações do SP (a skill opina sobre o *fluxo*; o git é do user).
   - **Um «go» responde ao que a pergunta nomeou** (atlas-inbox-e-painel-sps, 2026-10-18). Se o ok já lista as ações (commit, push, PR), um «go» aprova todas. Lista vaga («avanço?»): nomear cada ação. Merge e ações destrutivas pedem ok próprio.
   - **O ok de cada fase nomeia as ações** (atlas-calendario-e-pomodoro, 2026-10-18). «Segues com a 7?» não autoriza escrever nem commitar: «escrevo, commito e passo à seguinte?». Commit sobre um «go» não associado a commit é deslize, mesmo com plano aprovado. Antes do commit, assunto ≤72 caracteres (o hook recusa).
   - **Factos herdados do SP verificam-se à hora do DP** (idem). Número da próxima decisão e «validado em X» resolvem-se com `Grep` em `DECISIONS.md` e no código (o SP dizia «decisão 24», era 26, e «validado em `write_board`», quem rejeitava era o serde). Alinha com «SP vs repo state may still fork».

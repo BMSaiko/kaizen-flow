@@ -848,3 +848,94 @@ def test_fechar_painel_sessao_acha_o_painel_pela_worktree(tmp_path):
     assert sp_fila.fechar_painel_sessao(estado, "a", run) is True
     assert chamadas[-1] == ["wezterm", "cli", "kill-pane", "--pane-id", "4"]
     assert sp_fila.fechar_painel_sessao(estado, "b", run) is False
+
+
+def test_run_hidden_esconde_a_janela_de_consola(monkeypatch):
+    visto = {}
+    monkeypatch.setattr(sp_fila.subprocess, "run", lambda *a, **kw: visto.update(kw))
+    sp_fila.run_hidden(["wezterm", "cli", "list"])
+    assert visto["creationflags"] == sp_fila.NO_WINDOW
+    assert sp_fila.seguinte.__defaults__[0] is sp_fila.run_hidden
+
+
+# --- arranque automático do seguinte (kf-fila-arranque-automatico) ---
+
+def test_vigiar_lanca_o_seguinte_ao_fechar_e_continua_a_vigiar():
+    passos = iter([[("a", "fechado", "SP em Done")], [("b", "a correr", "")], [("b", "fechado", "SP em Done")]])
+    lancados, saida = [], []
+
+    def lancar(slug):
+        lancados.append(slug)
+        return (slug == "a", f"lançou b depois de {slug}" if slug == "a" else "fila vazia")
+
+    rc = sp_fila.vigiar(lambda: next(passos), 1, lambda s: None, saida.append, lancar_seguinte=lancar)
+    assert rc == 0 and lancados == ["a", "b"]
+    assert "a · fila · lançou b depois de a" in saida and "b · fila · fila vazia" in saida
+
+
+def test_vigiar_regista_a_razao_quando_nao_lanca():
+    saida = []
+    sp_fila.vigiar(lambda: [("a", "fechado", "SP em Done")], 1, lambda s: None, saida.append,
+                   lancar_seguinte=lambda slug: (False, "limite de SPs atingido"))
+    assert saida[-1] == "a · fila · limite de SPs atingido"
+
+
+def test_lancar_seguinte_auto_traduz_a_resposta_do_seguinte(tmp_path):
+    def fn(acao):
+        return lambda *a, **k: acao
+    lancou = sp_fila.lancar_seguinte_auto("r", "e", "rel", "a", seguinte_fn=fn({"acao": "lancou", "slugs": ["b", "c"]}))
+    assert lancou == (True, "lançou b, c")
+    assert sp_fila.lancar_seguinte_auto("r", "e", "rel", "a", seguinte_fn=fn({"acao": "espera", "sessoes": ["x"]})) == (False, "a aguardar · x")
+    fim = sp_fila.lancar_seguinte_auto("r", "e", "rel", "a", seguinte_fn=fn({"acao": "fim", "motivo": "fila vazia", "relatorio": "p"}))
+    assert fim == (False, "fila terminada: fila vazia")
+
+    def rebenta(*a, **k):
+        raise OSError("sem acesso")
+    ok, motivo = sp_fila.lancar_seguinte_auto("r", "e", "rel", "a", seguinte_fn=rebenta)
+    assert ok is False and "sem acesso" in motivo
+
+
+def test_lancar_seguinte_auto_passa_o_slug_que_fechou():
+    vistos = {}
+
+    def fn(root, estado, rel, slug=None):
+        vistos["slug"] = slug
+        return {"acao": "espera", "sessoes": []}
+    sp_fila.lancar_seguinte_auto("r", "e", "rel", "kf-x", seguinte_fn=fn)
+    assert vistos["slug"] == "kf-x"
+
+
+def test_contar_tails_conta_so_os_que_seguem_o_log_da_vigia():
+    saida = "tail -F C:/Users/x/.claude/sp-fila-vigia.log\ntail -F /var/log/outro.log\ntail -f ~/.claude/sp-fila-vigia.log\npython sp-fila.py\n"
+    run = lambda *a, **k: type("R", (), {"stdout": saida})()
+    assert sp_fila.contar_tails(run) == 2
+    win = r'"C:\Program Files\Git\usr\bin\tail.exe" -F C:\Users\x\.claude\sp-fila-vigia.log'
+    assert sp_fila.contar_tails(lambda *a, **k: type("R", (), {"stdout": win})()) == 1
+    def rebenta(*a, **k):
+        raise OSError("x")
+    assert sp_fila.contar_tails(rebenta) == 0
+
+
+def test_estado_vivo_cli_avisa_de_monitores_duplicados(tmp_path, capsys, monkeypatch):
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Doing")
+    est = tmp_path / "e.json"
+    sp_fila.guardar(est, {"sessoes": {"a": {"inicio": "2026-10-29T11:59:00"}}})
+    monkeypatch.setattr(sp_fila, "contar_tails", lambda run=None: 2)
+    sp_fila.main(["--estado-vivo", "--estado", str(est), "--root", str(root)])
+    assert "2 Monitores" in capsys.readouterr().out
+
+
+def test_vigia_destacado_nao_arma_segunda_vigia(tmp_path, capsys, monkeypatch):
+    est = tmp_path / "e.json"
+    sp_fila.guardar(est, {"sessoes": {"a": {}}, "vigia": {"pid": 77, "ts": datetime.now().isoformat(timespec="seconds")}})
+    chamadas = []
+    monkeypatch.setattr(sp_fila, "destacar", lambda *a, **k: chamadas.append(a))
+    assert sp_fila.main(["--vigiar", "--destacado", "--estado", str(est)]) == 0
+    assert chamadas == [] and "vigia já ativo (pid 77)" in capsys.readouterr().out
+
+
+def test_ajuda_descreve_arranque_automatico_e_monitor_unico(capsys):
+    sp_fila.main(["--ajuda"])
+    out = capsys.readouterr().out
+    assert "lança o seguinte" in out and "substitui" in out

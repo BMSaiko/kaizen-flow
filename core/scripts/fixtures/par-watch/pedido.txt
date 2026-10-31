@@ -1,0 +1,9 @@
+ Bash command
+
+   git commit -m "feat: vigia limpo"
+   Commit as the user on the worktree branch
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, and don't ask again for git commit commands
+   3. No, and tell Claude what to do differently (esc)

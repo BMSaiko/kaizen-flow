@@ -1,0 +1,8 @@
+● A correr os testes do SP
+
+● Bash(python -I scripts/test.py)
+  ⎿  Running…
+
+✻ Working… (12s · esc to interrupt)
+
+❯ 

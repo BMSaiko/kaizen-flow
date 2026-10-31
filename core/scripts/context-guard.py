@@ -18,13 +18,12 @@ Chamadas de subagentes (payload com `agent_id`) são ignoradas: partilham o `ses
 Os marcadores vivem em `%TEMP%/claude-context-guard/<session_id>.<nível>`. Qualquer erro no hook é
 silencioso (exit 0): o guard nunca pode estragar um prompt.
 """
-import argparse
 import json
 import os
-import re
 import sys
-import tempfile
 from pathlib import Path
+
+# argparse, re e tempfile custam ~190 ms de import: carregados só quando precisos (hook a cada tool call).
 
 DEFAULT_LIMIT = 100_000
 WARN_RATIO = 0.85
@@ -90,6 +89,8 @@ def limit_from_env(env=None):
 
 
 def marker_path(marker_dir, session_id, level):
+    import re
+
     safe = re.sub(r"[^A-Za-z0-9_-]", "_", str(session_id))
     return Path(marker_dir) / f"{safe}.{level}"
 
@@ -105,12 +106,16 @@ def _claim(marker_dir, session_id, level):
         return False
 
 
-MICHI_RE = re.compile(r"^\s*/michi\s+(\S.*\.md)\s*$", re.IGNORECASE)
+MICHI_PATTERN = r"^\s*/michi\s+(\S.*\.md)\s*$"
 
 
 def bind_sp(marker_dir, session_id, prompt):
     """Liga a sessão ao SP quando o prompt é `/michi <caminho>.md` (marcador `<session_id>.sp`)."""
-    match = MICHI_RE.match(prompt.strip().strip('"')) if isinstance(prompt, str) else None
+    if not isinstance(prompt, str) or "/michi" not in prompt.lower():
+        return
+    import re
+
+    match = re.match(MICHI_PATTERN, prompt.strip().strip('"'), re.IGNORECASE)
     if not match:
         return
     path = marker_path(marker_dir, session_id, "sp")
@@ -143,7 +148,10 @@ def hook(payload, env=None, marker_dir=None):
     transcript = payload.get("transcript_path")
     if not session_id or not transcript or payload.get("agent_id"):
         return None  # subagente: o aviso gastaria o marcador da sessão e não chegaria ao modelo principal
-    marker_dir = marker_dir or Path(tempfile.gettempdir()) / "claude-context-guard"
+    if marker_dir is None:
+        import tempfile
+
+        marker_dir = Path(tempfile.gettempdir()) / "claude-context-guard"
     if payload.get("hook_event_name") == "UserPromptSubmit":
         bind_sp(marker_dir, session_id, payload.get("prompt"))
     tokens = context_tokens(transcript)
@@ -172,11 +180,17 @@ def hook(payload, env=None, marker_dir=None):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Guarda de contexto do Claude Code")
-    ap.add_argument("--transcript", help="transcript (.jsonl) a medir")
-    ap.add_argument("--limit", type=int, help="limiar em tokens (omissão: CLAUDE_CONTEXT_LIMIT ou 100000)")
-    args = ap.parse_args(argv)
-    if args.transcript:
+    if argv is None:
+        argv = sys.argv[1:]
+    args = None
+    if argv:  # caminho quente (hook) não tem argumentos: sem argparse
+        import argparse
+
+        ap = argparse.ArgumentParser(description="Guarda de contexto do Claude Code")
+        ap.add_argument("--transcript", help="transcript (.jsonl) a medir")
+        ap.add_argument("--limit", type=int, help="limiar em tokens (omissão: CLAUDE_CONTEXT_LIMIT ou 100000)")
+        args = ap.parse_args(argv)
+    if args and args.transcript:
         tokens = context_tokens(args.transcript)
         if tokens is None:
             print("sem usage no transcript", file=sys.stderr)
