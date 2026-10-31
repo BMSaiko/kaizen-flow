@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-labelledby="t d">
+  <title id="t">Architecture</title>
+  <desc id="d">kaizen-flow architecture: the core (skills, commands, scripts) is rendered by the claude, codex and agents-md adapters into the target project.</desc>
+  <rect width="1200" height="640" rx="24" fill="#0f172a"/>
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<text x="600.0" y="62" text-anchor="middle" font-size="40" font-weight="700" fill="#f8fafc">Architecture</text>
+<text x="600.0" y="96" text-anchor="middle" font-size="20" fill="#cbd5e1">One core, rendered per harness into your project</text>
+<rect x="200" y="130" width="800" height="110" rx="18" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/><text x="600.0" y="164" text-anchor="middle" font-size="22" font-weight="700" fill="#a78bfa">core</text><text x="600.0" y="192" text-anchor="middle" font-size="16" fill="#cbd5e1">skills (michi, dp, da, dr, pentest, pr-fase…) · commands (/sp, /sp-fila, /handoff…)</text>
+<text x="600.0" y="216" text-anchor="middle" font-size="16" fill="#cbd5e1">scripts (sp-*.py, context-guard, kaizen_hooks, pentest, review_ciclo)</text>
+<rect x="85" y="320" width="290" height="90" rx="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="230.0" y="363.0" text-anchor="middle" font-size="22" font-weight="600" fill="#38bdf8">adapter claude</text><text x="230.0" y="387.0" text-anchor="middle" font-size="15" fill="#cbd5e1">.claude/skills, commands + hooks</text>
+<path d="M600 242V282H230V312" stroke="#94a3b8" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M230 320l-6-10h12z" fill="#94a3b8"/>
+<rect x="455" y="320" width="290" height="90" rx="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="600.0" y="363.0" text-anchor="middle" font-size="22" font-weight="600" fill="#38bdf8">adapter codex</text><text x="600.0" y="387.0" text-anchor="middle" font-size="15" fill="#cbd5e1">Codex CLI layout</text>
+<path d="M600 242V312" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M600 320l-6-10h12z" fill="#94a3b8"/>
+<rect x="825" y="320" width="290" height="90" rx="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="970.0" y="363.0" text-anchor="middle" font-size="22" font-weight="600" fill="#38bdf8">adapter agents-md</text><text x="970.0" y="387.0" text-anchor="middle" font-size="15" fill="#cbd5e1">AGENTS.md for any harness</text>
+<path d="M600 242V282H970V312" stroke="#94a3b8" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M970 320l-6-10h12z" fill="#94a3b8"/>
+<rect x="85" y="500" width="1030" height="100" rx="18" fill="#1e293b" stroke="#34d399" stroke-width="2"/><text x="600.0" y="534" text-anchor="middle" font-size="22" font-weight="700" fill="#34d399">your project</text><text x="600.0" y="562" text-anchor="middle" font-size="16" fill="#cbd5e1">SPs (TODO/Doing/Done) · scripts/ · kaizen-hooks.json · config; no telemetry, stdlib only</text>
+<path d="M230 412V492" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M230 500l-6-10h12z" fill="#94a3b8"/>
+<path d="M600 412V492" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M600 500l-6-10h12z" fill="#94a3b8"/>
+<path d="M970 412V492" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M970 500l-6-10h12z" fill="#94a3b8"/>
+  </g>
+</svg>

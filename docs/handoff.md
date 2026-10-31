@@ -11,6 +11,8 @@ python scripts/sp-handoff.py --spawn SLUG [SLUG...]      # new pane + worktree p
 
 `--spawn` is what `sp-fila.py --concorrencia N` uses: one pane per story (at most `--max` at once), with `--dry-run` to preview and `--sem-registo` to skip writing the queue state.
 
+![sp-fila parallel: up to N panes, one worktree each, a watcher that brings blocked panes to you](assets/sp-fila-parallel.svg)
+
 `--write` only accepts the delta: at most 25 lines and no copied story sections (Role, Context, Objective…); longer bodies are rejected. The same limit applies to `handoff.py --write`.
 
 ## Free conversation (`/handoff`)
