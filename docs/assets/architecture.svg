@@ -6,7 +6,7 @@
 <text x="600.0" y="62" text-anchor="middle" font-size="40" font-weight="700" fill="#f8fafc">Architecture</text>
 <text x="600.0" y="96" text-anchor="middle" font-size="20" fill="#cbd5e1">One core, rendered per harness into your project</text>
 <rect x="200" y="130" width="800" height="110" rx="18" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/><text x="600.0" y="164" text-anchor="middle" font-size="22" font-weight="700" fill="#a78bfa">core</text><text x="600.0" y="192" text-anchor="middle" font-size="16" fill="#cbd5e1">skills (michi, dp, da, dr, pentest, pr-fase…) · commands (/sp, /sp-fila, /handoff…)</text>
-<text x="600.0" y="216" text-anchor="middle" font-size="16" fill="#cbd5e1">scripts (sp-*.py, context-guard, kaizen_hooks, pentest, review_ciclo)</text>
+<text x="600.0" y="216" text-anchor="middle" font-size="16" fill="#cbd5e1">scripts (sp-*.py on kaizen_engine) · CLI: bin/kaizen.js routes to bin/commands/*</text>
 <rect x="85" y="320" width="290" height="90" rx="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="230.0" y="363.0" text-anchor="middle" font-size="22" font-weight="600" fill="#38bdf8">adapter claude</text><text x="230.0" y="387.0" text-anchor="middle" font-size="15" fill="#cbd5e1">.claude/skills, commands + hooks</text>
 <path d="M600 242V282H230V312" stroke="#94a3b8" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M230 320l-6-10h12z" fill="#94a3b8"/>
 <rect x="455" y="320" width="290" height="90" rx="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="600.0" y="363.0" text-anchor="middle" font-size="22" font-weight="600" fill="#38bdf8">adapter codex</text><text x="600.0" y="387.0" text-anchor="middle" font-size="15" fill="#cbd5e1">Codex CLI layout</text>
