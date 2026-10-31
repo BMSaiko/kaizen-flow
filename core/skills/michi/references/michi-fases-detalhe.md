@@ -62,6 +62,7 @@ Texto integral movido de `SKILL.md` (otimização de custo, SP michi-otimizacao-
    **Vault/scripts:** `python -I scripts/test-fast.py` (fast, só o que o diff tocou, ~2 s) em cada fase; `... full` (~3,5 min) no fecho.
    **Gate `harden`** (após DA, antes do Report): `/harden vault` (ou o repo do SP) sobre o que a DA alterou; FAIL bloqueia o Report até corrigir a causa; o resultado vai para o Report. `skip harden` salta-o (modo auto: corre sempre, sem perguntar).
    **Gate `pentest`** (após `harden`, antes do Report e do review): `/pentest <repo do SP>` sobre o diff; achados viram SPs (`--criar-sps`) executados com prova; só passa sem achados abertos ou com decisão do user. `skip pentest` salta-o.
+   **Gate `review-ciclo`** (após `pentest`, antes do PR): review só leitura com ciclo corrigir → rever (`/review-ciclo`); APROVADO segue para PR, ESCALAR (3 iterações) pede decisão ao user. `skip review` salta-o.
    **Prove it's done (antes de `sp-move.py ... done` e do `COMMIT_*.md`).**
    Agir como o cliente final da feature: executar o caminho real do
    utilizador (app/CLI/comando, skill `run` se aplicável; em docs/vault,
