@@ -4,7 +4,7 @@
 Uso: review_ciclo.py <estado.json> --achados <ficheiro> [--max 3] [--criar-sps --project P [--prefixo S]]
 O ficheiro de achados tem uma linha por achado: `[bloqueante|menor] ficheiro:linha descrição`.
 Veredicto (stdout, primeira linha): APROVADO | CORRIGIR | ESCALAR.
-rc 0 aprovado, 1 corrigir (SPs gerados com --criar-sps; repetir o review depois), 2 escalar ao user.
+rc 0 aprovado, 1 corrigir (SPs gerados com --criar-sps; repetir o review depois), 2 escalar ao utilizador.
 Só lê o ficheiro de achados e escreve o estado; o review em si é só leitura.
 """
 import argparse

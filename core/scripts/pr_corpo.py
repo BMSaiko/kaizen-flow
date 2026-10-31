@@ -77,7 +77,7 @@ def main(argv=None):
         return 5
     pol = frontmatter(sp, "pr")
     if pol == "pergunta":
-        print("PR: política `pergunta`, pedir confirmação ao user", file=sys.stderr)
+        print("PR: política `pergunta`, pedir confirmação ao utilizador", file=sys.stderr)
         return 3
     if pol != "auto":
         print(f"PR não criado: política `{pol or 'em falta'}`", file=sys.stderr)

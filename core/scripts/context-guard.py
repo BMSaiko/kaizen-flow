@@ -9,7 +9,7 @@ Uso:
 
 Modo hook (eventos UserPromptSubmit e PostToolUse): recebe `session_id`, `transcript_path` e
 `hook_event_name`. Limiar em `CLAUDE_CONTEXT_LIMIT` (omissão 100000); aviso a 85%.
-- `aviso`: uma `systemMessage` ao user, uma vez por sessão.
+- `aviso`: uma `systemMessage` ao utilizador, uma vez por sessão.
 - `limite`: `additionalContext` curto a mandar correr, em modo automático e uma vez por sessão,
   `/sp-handoff` se a sessão trabalha num SP (correu `/michi <SP>` nela e o SP está em Doing) ou
   `/handoff` (ficheiro efémero em `handoffs/`) se é conversa livre. Um SP em Doing noutra sessão não conta.

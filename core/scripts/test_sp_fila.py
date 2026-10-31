@@ -611,7 +611,7 @@ def test_vigiar_para_na_hora_limite_mesmo_com_sessoes_vivas():
 
 def test_classificar_inclui_a_pergunta_no_motivo():
     est, motivo = sp_fila.classificar({"painel": "7"}, "Doing", {"7"}, "Do you want to proceed?\n❯ 1. Yes", RECENTE, AGORA)
-    assert est == "bloqueado" and motivo == "precisa de aprovação do user: Do you want to proceed?"
+    assert est == "bloqueado" and motivo == f"precisa de aprovação do {sp_fila.USER}: Do you want to proceed?"
 
 # --- sessão parada sem fechar e SP por commitar (par-vigilancia-parada) ---
 
@@ -740,14 +740,14 @@ def test_cli_estado_vivo_imprime_aviso_sem_vigia(tmp_path, capsys):
 def test_permissao_e_reportada_como_precisa_de_aprovacao():
     ecra = "Bash command\n  git commit -m x\nDo you want to proceed?\n❯ 1. Yes\n  2. No\nEsc to cancel"
     est, motivo = sp_fila.classificar({"painel": "7"}, "Doing", {"7"}, ecra, RECENTE, AGORA, 600)
-    assert est == "bloqueado" and "precisa de aprovação do user" in motivo
+    assert est == "bloqueado" and f"precisa de aprovação do {sp_fila.USER}" in motivo
 
 
 def test_vigiar_anuncia_aprovacao_do_bms():
-    passos = iter([[("a", "bloqueado", "precisa de aprovação do user: Do you want to proceed?")], [("a", "fechado", "")]])
+    passos = iter([[("a", "bloqueado", f"precisa de aprovação do {sp_fila.USER}: Do you want to proceed?")], [("a", "fechado", "")]])
     saida = []
     sp_fila.vigiar(lambda: next(passos), 1, lambda s: None, saida.append)
-    assert saida[0].startswith("a: PRECISA DE APROVAÇÃO DO user")
+    assert saida[0].startswith(f"a: PRECISA DE APROVAÇÃO DO {sp_fila.USER.upper()}")
 
 
 def test_vigia_destacado_arranca_processo_proprio_com_log(tmp_path):
@@ -778,8 +778,8 @@ def test_fixture_a_correr():
 
 def test_fixture_pedido_inclui_comando_e_motivo_numa_linha():
     est, motivo = _cls("pedido")
-    assert est == "bloqueado" and motivo.startswith("precisa de aprovação do user: ")
-    assert 'git commit -m "feat: vigia limpo"' in motivo and "Commit as the user" in motivo and "\n" not in motivo
+    assert est == "bloqueado" and motivo.startswith(f"precisa de aprovação do {sp_fila.USER}: ")
+    assert 'git commit -m "feat: vigia limpo"' in motivo and "Commit as the " in motivo and "\n" not in motivo
 
 
 def test_fixture_pergunta():
@@ -798,7 +798,7 @@ def test_vigiar_com_fixtures_emite_so_uma_linha_por_mudanca():
     saida = []
     sp_fila.vigiar(lambda: next(passos), 1, lambda s: None, saida.append)
     assert len(saida) == 4 and all("\n" not in ln for ln in saida)  # a-correr e pedido repetidos suprimidos
-    assert saida[1].startswith("a: PRECISA DE APROVAÇÃO DO user (") and saida[2].startswith("a: À ESPERA DE RESPOSTA") and saida[3].startswith("a: PARADA SEM FECHAR")
+    assert saida[1].startswith(f"a: PRECISA DE APROVAÇÃO DO {sp_fila.USER.upper()} (") and saida[2].startswith("a: À ESPERA DE RESPOSTA") and saida[3].startswith("a: PARADA SEM FECHAR")
 
 
 

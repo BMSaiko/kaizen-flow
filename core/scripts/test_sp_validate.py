@@ -11,7 +11,7 @@ sys.modules["sp_validate"] = sp_validate
 _spec.loader.exec_module(sp_validate)
 
 SECTIONS = [
-    ("1. Role", "És o the agent."),
+    ("1. Role", "És o agente."),
     ("2. Context", "- Repo: Second Brain."),
     ("3. Objective (single sentence)", "Fazer uma coisa."),
     ("4. Success criteria (verifiable)", "- [ ] RC 0."),

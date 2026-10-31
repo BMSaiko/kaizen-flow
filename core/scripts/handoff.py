@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Apoio ao /handoff: passa uma conversa livre (sem SP) para uma sessão nova através de um ficheiro efémero.
 
-O ficheiro vive em `knowledge/projects/kaizen/handoffs/<data>-<HHMM>-<slug>.md`. Só a sessão nova o
+O ficheiro vive em `<spRoot>/handoffs/<data>-<HHMM>-<slug>.md`. Só a sessão nova o
 apaga, depois de o ler (`--consume`). Este script, ao escrever, só limpa `handoffs/*.md` com mais de 7 dias.
 Nunca faz commit.
 
@@ -28,8 +28,12 @@ sp_handoff = importlib.util.module_from_spec(_spec)
 sys.modules["sp_handoff"] = sp_handoff
 _spec.loader.exec_module(sp_handoff)
 
+_cspec = importlib.util.spec_from_file_location("kaizen_config", Path(__file__).with_name("kaizen_config.py"))
+_cfg = importlib.util.module_from_spec(_cspec)
+_cspec.loader.exec_module(_cfg)
+
 HandoffError = sp_handoff.HandoffError
-HANDOFFS_DIR = Path(__file__).resolve().parent.parent / "knowledge" / "projects" / "kaizen" / "handoffs"
+HANDOFFS_DIR = _cfg.sp_root(Path(__file__).resolve().parent.parent) / "handoffs"
 MAX_AGE_DAYS = 7
 DEFAULT_SLUG = "conversa"
 SEND_DELAY = sp_handoff.SEND_DELAY

@@ -42,6 +42,10 @@ sys.modules.setdefault("sp_list", sp_list)
 _spec.loader.exec_module(sp_list)
 
 REPO = Path(__file__).resolve().parent.parent
+_cspec = importlib.util.spec_from_file_location("kaizen_config", Path(__file__).with_name("kaizen_config.py"))
+_cfg = importlib.util.module_from_spec(_cspec)
+_cspec.loader.exec_module(_cfg)
+USER = _cfg.user_name(REPO)
 SCRIPTS = Path(__file__).resolve().parent
 ESTADO = Path.home() / ".claude" / "sp-fila-estado.json"
 RELATORIOS = REPO / "knowledge" / "infra" / "reports" / "sp-fila"
@@ -134,7 +138,7 @@ def autorizacao(fm):
     """Motivo de exclusão por autorizações insuficientes, ou ''."""
     commit, push, pr = (fm.get(k, "") for k in ("commit", "push", "pr"))
     if push == "pergunta" or pr == "pergunta":
-        return "autorização insuficiente (push/pr «pergunta» precisa do user)"
+        return f"autorização insuficiente (push/pr «pergunta» precisa do {USER})"
     if push == "auto" and commit == "nunca":
         return "autorização insuficiente (push auto com commit nunca)"
     if pr == "auto" and push != "auto":
@@ -405,7 +409,7 @@ def _painel_lancado(slug, saida):
 INATIVIDADE_S = 600  # sem ecrã novo nem commit há mais disto = sessão bloqueada
 ARRANQUE_S = 120  # até aqui, sem prompt do Claude Code (ou sem painel registado) = sessão ainda a arrancar
 TURNO_ACABADO = re.compile(r"\bdone \d{1,2}:\d{2}\b")  # linha «done HH:MM» que o Claude Code deixa quando o turno acaba
-PERGUNTAS = ("Do you want to", "(y/n)", "Esc to cancel", "Enter to confirm")  # prompts que esperam resposta do user
+PERGUNTAS = ("Do you want to", "(y/n)", "Esc to cancel", "Enter to confirm")  # prompts que esperam resposta do utilizador
 
 
 def _resumo_pedido(ecra):
@@ -441,7 +445,7 @@ def classificar(sessao, sp_status, paineis, ecra, atividade, agora, inatividade_
     if any(p in ecra for p in PERGUNTAS):
         pergunta = next((ln.strip() for ln in ecra.splitlines() if any(p in ln for p in PERGUNTAS)), "")
         if "Do you want to" in ecra and re.search(r"^\s*(?:❯\s*)?1\.\s*Yes", ecra, re.MULTILINE):  # pedido de permissão de uma ferramenta
-            return "bloqueado", f"precisa de aprovação do user: {(_resumo_pedido(ecra) or pergunta)[:120]}"
+            return "bloqueado", f"precisa de aprovação do {USER}: {(_resumo_pedido(ecra) or pergunta)[:120]}"
         return "bloqueado", f"à espera de resposta: {pergunta[:80]}"
     if TURNO_ACABADO.search("\n".join([ln for ln in ecra.splitlines() if ln.strip()][-14:])):
         return "parada sem fechar", "turno acabado e SP ainda em Doing"
@@ -550,10 +554,10 @@ def vigiar(ler_estado, intervalo_s, espera, saida, passou_o_fim=lambda: False, b
             ultimo[slug] = (est, motivo)
             if est == "fechado":
                 fechar_painel(slug)
-            nome = ("PRECISA DE APROVAÇÃO DO user" if motivo.startswith("precisa de aprovação") else "À ESPERA DE RESPOSTA")                 if est == "bloqueado" and motivo.startswith(("à espera", "precisa de aprovação")) else _AVISO.get(est, est)
+            nome = (f"PRECISA DE APROVAÇÃO DO {USER.upper()}" if motivo.startswith("precisa de aprovação") else "À ESPERA DE RESPOSTA")                 if est == "bloqueado" and motivo.startswith(("à espera", "precisa de aprovação")) else _AVISO.get(est, est)
             motivo_1l = " ".join(motivo.split())  # nunca mais de uma linha por evento
             saida(f"{slug}: {nome}" + (f" ({motivo_1l})" if motivo_1l else ""))
-        if all(est in ("fechado", "morto", "parada sem fechar") for _, est, _ in linhas):  # parada: já reportada, precisa do user
+        if all(est in ("fechado", "morto", "parada sem fechar") for _, est, _ in linhas):  # parada: já reportada, precisa do utilizador
             return 0
         if passou_o_fim():
             saida("vigilância terminada: hora limite (--ate)")
@@ -697,9 +701,9 @@ def main(argv=None):
     elif out["acao"] == "lancou":
         print(f"lançado: {', '.join(out['slugs'])} ({out['caminho']}); terminar o turno, a sessão nova arranca em segundo plano")
         if ler(estado).get("concorrencia"):
-            print("VIGIAR (obrigatório): arrancar já, sem pedir ao user, `python -I scripts/sp-fila.py --vigiar --destacado` "
+            print("VIGIAR (obrigatório): arrancar já, sem pedir ao utilizador, `python -I scripts/sp-fila.py --vigiar --destacado` "
                   "(processo próprio, não expira) e um Monitor `tail -F` ao log que ele indica, re-armado aos 30 min; "
-                  "avisar o user a cada linha; perguntas/aprovações de painéis: ler o painel (`wezterm cli get-text`), um `AskUserQuestion` por painel («Painel N») e só depois `wezterm cli send-text --no-paste` (arrancou, À ESPERA DE RESPOSTA, PRECISA DE APROVAÇÃO, terminou). "
+                  "avisar o utilizador a cada linha; perguntas/aprovações de painéis: ler o painel (`wezterm cli get-text`), um `AskUserQuestion` por painel («Painel N») e só depois `wezterm cli send-text --no-paste` (arrancou, À ESPERA DE RESPOSTA, PRECISA DE APROVAÇÃO, terminou). "
                   "`--estado-vivo` avisa se o vigia parar")
     else:
         print(f"fila terminada: {out['motivo']}\nrelatório: {out['relatorio']}")

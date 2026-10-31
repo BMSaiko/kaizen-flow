@@ -8,10 +8,15 @@ este script; assim não há `$` nem crases numa linha de comando que peça aprov
 Copia bytes (preserva CRLF); recusa nomes com separadores e não sobrescreve sem --forcar.
 """
 import argparse
+import importlib.util
 import re
 import shutil
 import sys
 from pathlib import Path
+
+_cspec = importlib.util.spec_from_file_location("kaizen_config", Path(__file__).with_name("kaizen_config.py"))
+_cfg = importlib.util.module_from_spec(_cspec)
+_cspec.loader.exec_module(_cfg)
 
 NOME_OK = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
@@ -21,7 +26,7 @@ def destino(root, nome, project):
         raise ValueError(f"nome inválido: {nome!r}")
     if not nome.endswith(".md"):
         nome += ".md"
-    return Path(root) / "knowledge" / "projects" / "kaizen" / project / "sp" / "proofs" / nome
+    return _cfg.sp_root(root) / project / "sp" / "proofs" / nome
 
 
 def gravar(root, nome, origem, project="kaizenflow", forcar=False):

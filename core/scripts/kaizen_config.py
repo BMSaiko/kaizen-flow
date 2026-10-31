@@ -8,6 +8,7 @@ from pathlib import Path
 DEFAULT_SP_ROOT = "knowledge/projects/kaizen"
 DEFAULT_DOCS_ROOT = "knowledge/projects"
 CONFIG_NAME = "kaizen.config.json"
+DEFAULT_USER = "user"
 
 
 def _read(repo):
@@ -20,6 +21,12 @@ def _read(repo):
 
 def sp_root(repo):
     return Path(repo) / _read(repo).get("spRoot", DEFAULT_SP_ROOT)
+
+
+def user_name(repo):
+    """Nome com que os avisos tratam o utilizador (`userName`; defeito «user»)."""
+    v = _read(repo).get("userName")
+    return v if isinstance(v, str) and v.strip() else DEFAULT_USER
 
 
 def docs_root(repo):
