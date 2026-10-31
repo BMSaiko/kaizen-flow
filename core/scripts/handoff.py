@@ -15,7 +15,6 @@ continuação no painel do WezTerm onde o Claude Code já corre ($WEZTERM_PANE).
 aviso do context-guard) recusa lançar se o ficheiro não existir em `handoffs/`.
 """
 import argparse
-import importlib.util
 import re
 import subprocess
 import sys
@@ -25,21 +24,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
-
-_spec = importlib.util.spec_from_file_location("sp_handoff", Path(__file__).with_name("sp-handoff.py"))
-sp_handoff = importlib.util.module_from_spec(_spec)
-sys.modules["sp_handoff"] = sp_handoff
-_spec.loader.exec_module(sp_handoff)
+import handoff_pane as pane_lib  # noqa: E402
+from handoff_pane import ENTER_GAP, SEND_DELAY, SEND_GAP, HandoffError  # noqa: E402
+from sp_progresso import check_delta  # noqa: E402
 
 _cfg = kaizen_engine.load("kaizen_config")
 
-HandoffError = sp_handoff.HandoffError
 HANDOFFS_DIR = _cfg.sp_root(Path(__file__).resolve().parent.parent) / "handoffs"
 MAX_AGE_DAYS = 7
 DEFAULT_SLUG = "conversa"
-SEND_DELAY = sp_handoff.SEND_DELAY
-SEND_GAP = sp_handoff.SEND_GAP
-ENTER_GAP = sp_handoff.ENTER_GAP
 
 
 def _slugify(text):
@@ -61,7 +54,7 @@ def cleanup(folder, keep=None, max_age_days=MAX_AGE_DAYS, now=None):
 
 
 def write(folder, body, slug, now=None):
-    sp_handoff.check_delta(body)
+    check_delta(body)
     now = now or datetime.now()
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
@@ -94,30 +87,16 @@ def continuation_prompt(path):
             "(lê o handoff e só depois o apaga) e segue o Próximo passo.")
 
 
-def send(text, pane, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=sp_handoff.run_hidden, sleep=time.sleep,
+def send(text, pane, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=pane_lib.run_hidden, sleep=time.sleep,
          inspect=None):
-    def line(chunk):
-        run(sp_handoff.send_argv(pane, chunk), check=True)
-        sleep(enter_gap)
-        run(sp_handoff.enter_argv(pane), check=True)
-
-    sleep(delay)
-    if inspect:
-        inspect(pane)
-    line("/clear")
-    sleep(gap)
-    line(text)
+    pane_lib.send_lines(["/clear", text], pane, pane_lib.send_argv, pane_lib.enter_argv, delay, gap, enter_gap, run, sleep, inspect)
 
 
 def launch(path, pane=None):
-    pane = pane or sp_handoff.pane_id()
-    sp_handoff.send_argv(pane, continuation_prompt(path))
-    sp_handoff.pane_exists(pane)
-    argv = [sys.executable, "-I", str(Path(__file__).resolve()), "--send", str(path), "--pane", str(pane)]
-    flags = sp_handoff.NO_WINDOW | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-    subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     creationflags=flags, close_fds=True)
-    return argv
+    pane = pane or pane_lib.pane_id()
+    pane_lib.send_argv(pane, continuation_prompt(path))
+    pane_lib.pane_exists(pane)
+    return pane_lib.launch_detached(__file__, ["--send", str(path), "--pane", str(pane)])
 
 
 def main(argv=None):
@@ -144,15 +123,15 @@ def main(argv=None):
         elif args.consume:
             consume(args.consume)
         elif args.send:
-            send(continuation_prompt(args.send), args.pane or sp_handoff.pane_id(), inspect=sp_handoff.check_prompt)
+            send(continuation_prompt(args.send), args.pane or pane_lib.pane_id(), inspect=pane_lib.check_prompt)
         else:
             if args.auto:
                 _check(args.launch)
             if args.dry_run:
-                pane = args.pane or sp_handoff.pane_id()
+                pane = args.pane or pane_lib.pane_id()
                 for text in ("/clear", continuation_prompt(args.launch)):
-                    print(subprocess.list2cmdline(sp_handoff.send_argv(pane, text)))
-                    print(subprocess.list2cmdline(sp_handoff.enter_argv(pane)))
+                    print(subprocess.list2cmdline(pane_lib.send_argv(pane, text)))
+                    print(subprocess.list2cmdline(pane_lib.enter_argv(pane)))
             else:
                 launch(args.launch, args.pane)
                 print(f"a continuar neste painel em {SEND_DELAY:.0f}s: /clear e a leitura de {args.launch}")
