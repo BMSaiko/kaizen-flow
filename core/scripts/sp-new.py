@@ -20,7 +20,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
-import kaizen_hooks  # noqa: E402
 
 sp_list = kaizen_engine.load("sp-list")
 

@@ -9,7 +9,6 @@ Uso:
   python -I scripts/sp-move.py <filho> done --next   # programa: abre o próximo filho elegível; a mãe nunca é movida
 """
 import argparse
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
