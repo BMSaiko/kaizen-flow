@@ -2,7 +2,7 @@
 import importlib.util
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 _spec = importlib.util.spec_from_file_location("sp_fila", Path(__file__).with_name("sp-fila.py"))
@@ -581,15 +581,15 @@ def test_vigiar_imprime_so_as_mudancas_e_sai_quando_todas_terminam():
     saida, esperas = [], []
     rc = sp_fila.vigiar(lambda: next(passos), 30, esperas.append, saida.append)
     assert rc == 0 and len(esperas) == 5 and set(esperas) == {30}
-    assert saida == ["a: arrancou (painel ainda não aberto)", "a: a correr",
-                     "a: À ESPERA DE RESPOSTA (à espera de resposta: Do you want to proceed?)", "a: terminou (SP em Done)"]
+    assert saida == ["a · arrancou · painel ainda não aberto", "a · a correr",
+                     "a · À ESPERA DE RESPOSTA · à espera de resposta: Do you want to proceed?", "a · terminou · SP em Done"]
 
 
 def test_vigiar_sai_quando_a_fila_desaparece_e_com_varias_sessoes():
     passos = iter([[("a", "a correr", ""), ("b", "a arrancar", "")], [("a", "fechado", "x"), ("b", "morto", "painel inexistente")]])
     saida = []
     assert sp_fila.vigiar(lambda: next(passos), 1, lambda s: None, saida.append) == 0
-    assert saida[-2:] == ["a: terminou (x)", "b: morreu (painel inexistente)"]
+    assert saida[-2:] == ["a · terminou · x", "b · morreu · painel inexistente"]
     assert sp_fila.vigiar(lambda: None, 1, lambda s: None, saida.append) == 0
 
 
@@ -598,7 +598,7 @@ def test_vigiar_sai_quando_todas_as_sessoes_estao_paradas_sem_fechar():
                    [("a", "parada sem fechar", "turno acabado"), ("b", "fechado", "SP em Done")]])
     saida = []
     assert sp_fila.vigiar(lambda: next(passos), 1, lambda s: None, saida.append) == 0
-    assert saida[-2:] == ["a: PARADA SEM FECHAR (turno acabado)", "b: terminou (SP em Done)"]
+    assert saida[-2:] == ["a · PARADA SEM FECHAR · turno acabado", "b · terminou · SP em Done"]
 
 
 def test_vigiar_para_na_hora_limite_mesmo_com_sessoes_vivas():
@@ -606,7 +606,7 @@ def test_vigiar_para_na_hora_limite_mesmo_com_sessoes_vivas():
     limite = iter([False, False, True])
     rc = sp_fila.vigiar(lambda: [("a", "a correr", "")], 5, esperas.append, saida.append, lambda: next(limite))
     assert rc == 0 and len(esperas) == 2
-    assert saida == ["a: a correr", "vigilância terminada: hora limite (--ate)"]
+    assert saida == ["a · a correr", "vigilância terminada: hora limite (--ate)"]
 
 
 def test_classificar_inclui_a_pergunta_no_motivo():
@@ -637,7 +637,7 @@ def test_vigiar_avisa_quando_a_sessao_fica_parada_sem_fechar():
     passos = iter([[("a", "a correr", "")], [("a", "parada sem fechar", "turno acabado e SP ainda em Doing")], [("a", "fechado", "SP em Done")]])
     saida = []
     assert sp_fila.vigiar(lambda: next(passos), 1, lambda s: None, saida.append) == 0
-    assert saida[1] == "a: PARADA SEM FECHAR (turno acabado e SP ainda em Doing)"
+    assert saida[1] == "a · PARADA SEM FECHAR · turno acabado e SP ainda em Doing"
 
 
 def test_plan_exclui_sp_por_commitar(tmp_path):
@@ -747,7 +747,7 @@ def test_vigiar_anuncia_aprovacao_do_bms():
     passos = iter([[("a", "bloqueado", f"precisa de aprovação do {sp_fila.USER}: Do you want to proceed?")], [("a", "fechado", "")]])
     saida = []
     sp_fila.vigiar(lambda: next(passos), 1, lambda s: None, saida.append)
-    assert saida[0].startswith(f"a: PRECISA DE APROVAÇÃO DO {sp_fila.USER.upper()}")
+    assert saida[0].startswith(f"a · PRECISA DE APROVAÇÃO DO {sp_fila.USER.upper()}")
 
 
 def test_vigia_destacado_arranca_processo_proprio_com_log(tmp_path):
@@ -798,9 +798,34 @@ def test_vigiar_com_fixtures_emite_so_uma_linha_por_mudanca():
     saida = []
     sp_fila.vigiar(lambda: next(passos), 1, lambda s: None, saida.append)
     assert len(saida) == 4 and all("\n" not in ln for ln in saida)  # a-correr e pedido repetidos suprimidos
-    assert saida[1].startswith(f"a: PRECISA DE APROVAÇÃO DO {sp_fila.USER.upper()} (") and saida[2].startswith("a: À ESPERA DE RESPOSTA") and saida[3].startswith("a: PARADA SEM FECHAR")
+    assert saida[1].startswith(f"a · PRECISA DE APROVAÇÃO DO {sp_fila.USER.upper()} · ") and saida[2].startswith("a · À ESPERA DE RESPOSTA") and saida[3].startswith("a · PARADA SEM FECHAR")
 
 
+
+
+def test_vigiar_inativa_nao_repete_a_cada_minuto_e_reavisa_espacado():
+    passos = iter([[("a", "bloqueado", f"inativa há {n} min")] for n in (10, 11, 12, 13)] + [[("a", "fechado", "")]])
+    tempo = iter([0, 60, 120, 1000, 1001])
+    saida = []
+    sp_fila.vigiar(lambda: next(passos), 1, lambda s: None, saida.append, relogio=lambda: next(tempo))
+    assert saida == ["a · bloqueado · inativa há 10 min", "a · AINDA bloqueado · inativa há 13 min", "a · terminou"]
+
+
+def test_classificar_spinner_visivel_nao_e_bloqueado():
+    ecra = "\n✻ Pensando… (12s · esc to interrupt)\n❯ "
+    velho = AGORA - timedelta(minutes=30)
+    assert sp_fila.classificar({"painel": "7"}, "Doing", {"7"}, ecra, velho, AGORA, 600) == ("a correr", "")
+    assert sp_fila.classificar({"painel": "7"}, "Doing", {"7"}, "❯ ", velho, AGORA, 600)[0] == "bloqueado"
+
+
+def test_linha_formato_compacto_numa_so_linha():
+    assert sp_fila.linha("a", "a correr") == "a · a correr"
+    assert sp_fila.linha("a", "bloqueado", "x\n  y ") == "a · bloqueado · x y"
+
+
+def test_cli_ajuda_imprime_regras_curtas(capsys):
+    assert sp_fila.main(["--ajuda"]) == 0
+    assert len(capsys.readouterr().out.splitlines()) <= 8
 
 
 def test_vigiar_fecha_o_painel_uma_vez_quando_fechado():

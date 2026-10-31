@@ -167,11 +167,6 @@ def descendentes(items, mae):
     return arvore
 
 
-def orcamento_mae(items, mae):
-    """(frontmatter da mãe, ou None se não existir)."""
-    return next((fm for sp, fm in items if sp.slug == mae), None)
-
-
 def plan(items, maximo=None, so=None, por_commitar=()):
     """(fila ordenada, [(slug, motivo)]). Função pura, sem FS. `so`: só estes slugs são candidatos; `por_commitar`: slugs fora do HEAD."""
     done = {sp.slug for sp, _ in items if sp.status == "Done"}
@@ -410,6 +405,8 @@ INATIVIDADE_S = 600  # sem ecrã novo nem commit há mais disto = sessão bloque
 ARRANQUE_S = 120  # até aqui, sem prompt do Claude Code (ou sem painel registado) = sessão ainda a arrancar
 TURNO_ACABADO = re.compile(r"\bdone \d{1,2}:\d{2}\b")  # linha «done HH:MM» que o Claude Code deixa quando o turno acaba
 PERGUNTAS = ("Do you want to", "(y/n)", "Esc to cancel", "Enter to confirm")  # prompts que esperam resposta do utilizador
+VIVO = re.compile(r"esc to interrupt|^\s*[✻✶✳✢✽·*]\s+\S+…", re.MULTILINE | re.IGNORECASE)  # spinner do Claude Code: o painel está a trabalhar
+REAVISO_S = 900  # «bloqueado» repetido só a cada 15 min enquanto nada mudar
 
 
 def _resumo_pedido(ecra):
@@ -447,7 +444,10 @@ def classificar(sessao, sp_status, paineis, ecra, atividade, agora, inatividade_
         if "Do you want to" in ecra and re.search(r"^\s*(?:❯\s*)?1\.\s*Yes", ecra, re.MULTILINE):  # pedido de permissão de uma ferramenta
             return "bloqueado", f"precisa de aprovação do {USER}: {(_resumo_pedido(ecra) or pergunta)[:120]}"
         return "bloqueado", f"à espera de resposta: {pergunta[:80]}"
-    if TURNO_ACABADO.search("\n".join([ln for ln in ecra.splitlines() if ln.strip()][-14:])):
+    ultimas = "\n".join([ln for ln in ecra.splitlines() if ln.strip()][-14:])
+    if VIVO.search(ultimas):  # spinner visível: a trabalhar, por muito que o SP e a worktree estejam quietos
+        return "a correr", ""
+    if TURNO_ACABADO.search(ultimas):
         return "parada sem fechar", "turno acabado e SP ainda em Doing"
     parado = (agora - atividade).total_seconds()
     if parado > inatividade_s:
@@ -536,27 +536,40 @@ def destacar(args, log, popen=subprocess.Popen):
 _AVISO = {"a arrancar": "arrancou", "a correr": "a correr", "fechado": "terminou", "morto": "morreu", "parada sem fechar": "PARADA SEM FECHAR"}
 
 
-def vigiar(ler_estado, intervalo_s, espera, saida, passou_o_fim=lambda: False, batida=lambda: None, fechar_painel=lambda slug: None):
+def linha(slug, estado, acao=""):
+    """Formato único e curto de uma linha do orquestrador: `slug · estado · ação` (ação numa só linha, sem excesso)."""
+    return " · ".join([slug, estado] + ([" ".join(acao.split())] if acao and acao.split() else []))
+
+
+def _chave(est, motivo):
+    """Identidade de um estado para deduplicar: «inativa há N min» é o mesmo estado ao longo dos minutos."""
+    return (est, re.sub(r"\d+", "N", motivo) if motivo.startswith("inativa há") else motivo)
+
+
+def vigiar(ler_estado, intervalo_s, espera, saida, passou_o_fim=lambda: False, batida=lambda: None, fechar_painel=lambda slug: None, relogio=time.monotonic):
     """Repete `ler_estado()` ([(slug, estado, motivo)] ou None se a fila acabou) e emite só as mudanças por sessão.
+
+    «bloqueado» por inatividade (ou outro igual) só se repete a cada `REAVISO_S`; qualquer outra transição emite logo.
 
     `fechar_painel(slug)` corre uma vez quando a sessão passa a «fechado» (SP em Done): o painel já não faz falta.
 
     Sai (0) quando todas as sessões estão fechadas, mortas ou paradas sem fechar, quando a fila desaparece ou quando `passou_o_fim()` (--ate)."""
-    ultimo = {}
+    ultimo, quando = {}, {}
     while True:
         batida()  # heartbeat: prova no estado que o vigia está vivo
         linhas = ler_estado()
         if not linhas:
             return 0
         for slug, est, motivo in linhas:
-            if ultimo.get(slug) == (est, motivo):
+            chave, agora = _chave(est, motivo), relogio()
+            if ultimo.get(slug) == chave and (est != "bloqueado" or agora - quando[slug] < REAVISO_S):
                 continue
-            ultimo[slug] = (est, motivo)
+            repetido = ultimo.get(slug) == chave
+            ultimo[slug], quando[slug] = chave, agora
             if est == "fechado":
                 fechar_painel(slug)
             nome = (f"PRECISA DE APROVAÇÃO DO {USER.upper()}" if motivo.startswith("precisa de aprovação") else "À ESPERA DE RESPOSTA")                 if est == "bloqueado" and motivo.startswith(("à espera", "precisa de aprovação")) else _AVISO.get(est, est)
-            motivo_1l = " ".join(motivo.split())  # nunca mais de uma linha por evento
-            saida(f"{slug}: {nome}" + (f" ({motivo_1l})" if motivo_1l else ""))
+            saida(linha(slug, ("AINDA " if repetido else "") + nome, motivo))
         if all(est in ("fechado", "morto", "parada sem fechar") for _, est, _ in linhas):  # parada: já reportada, precisa do utilizador
             return 0
         if passou_o_fim():
@@ -596,6 +609,14 @@ def _custos():
     return mod.custo_por_slug()
 
 
+AJUDA = """Orquestrador do sp-fila (regras):
+- Vigia: `sp-fila.py --vigiar --destacado` (processo próprio) e UM só Monitor `tail -F ~/.claude/sp-fila-vigia.log`, re-armado aos 30 min.
+- Cada linha do log = `slug · estado · ação`; só mudanças (bloqueado repete-se a cada 15 min como «AINDA»).
+- Relato por linha: ≤3 linhas + TLDR; não narrar avisos repetidos nem reler ecrãs.
+- Pergunta/aprovação de painel: `wezterm cli get-text --pane-id N`, um AskUserQuestion («Painel N»), só depois `send-text --no-paste`; nunca aprovar sozinho.
+- `--estado-vivo` avisa «SEM VIGIA»/«VIGIA PAROU»: rearmar."""
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Fila autónoma de SPs")
     ap.add_argument("--dry-run", action="store_true", help="mostra a ordem e as exclusões, sem lançar")
@@ -607,6 +628,7 @@ def main(argv=None):
     ap.add_argument("--destacado", action="store_true", help="com --vigiar: corre o vigia num processo próprio (sobrevive ao Monitor) e escreve em ~/.claude/sp-fila-vigia.log")
     ap.add_argument("--intervalo", type=int, default=20, metavar="S", help="com --vigiar: segundos entre leituras")
     ap.add_argument("--inatividade", type=int, default=INATIVIDADE_S // 60, metavar="MIN", help="com --estado-vivo: minutos sem atividade até «bloqueado»")
+    ap.add_argument("--ajuda", action="store_true", help="regras do orquestrador (vigia, Monitor, perguntas dos painéis, relato)")
     ap.add_argument("--parar", action="store_true", help="abandona a fila")
     ap.add_argument("--max", type=int, default=MAX_DEFEITO, help=f"nº máximo de SPs (defeito {MAX_DEFEITO})")
     ap.add_argument("--ate", metavar="HH:MM", help="hora limite")
@@ -620,6 +642,9 @@ def main(argv=None):
     args = ap.parse_args(argv)
     estado = Path(args.estado)
 
+    if args.ajuda:
+        print(AJUDA)
+        return 0
     if args.parar:
         estado.unlink(missing_ok=True)
         print("fila abandonada")
@@ -652,7 +677,7 @@ def main(argv=None):
             return 1
         atual = ler(estado)
         for slug, est, motivo in estado_vivo(atual, load(args.root, args.projeto), subprocess.run, datetime.now(), args.inatividade * 60):
-            print(f"{slug}: {est}" + (f" ({motivo})" if motivo else ""))
+            print(linha(slug, est, motivo))
         if aviso := aviso_vigia(atual, datetime.now()):
             print(aviso)
         return 0
@@ -697,14 +722,11 @@ def main(argv=None):
         guardar(estado, novo)
     out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug)
     if out["acao"] == "espera":
-        print(f"a aguardar sessões em curso: {', '.join(out['sessoes'])}")
+        print(f"a aguardar · {', '.join(out['sessoes'])}")
     elif out["acao"] == "lancou":
-        print(f"lançado: {', '.join(out['slugs'])} ({out['caminho']}); terminar o turno, a sessão nova arranca em segundo plano")
+        print(f"lançado · {', '.join(out['slugs'])} · terminar o turno")
         if ler(estado).get("concorrencia"):
-            print("VIGIAR (obrigatório): arrancar já, sem pedir ao utilizador, `python -I scripts/sp-fila.py --vigiar --destacado` "
-                  "(processo próprio, não expira) e um Monitor `tail -F` ao log que ele indica, re-armado aos 30 min; "
-                  "avisar o utilizador a cada linha; perguntas/aprovações de painéis: ler o painel (`wezterm cli get-text`), um `AskUserQuestion` por painel («Painel N») e só depois `wezterm cli send-text --no-paste` (arrancou, À ESPERA DE RESPOSTA, PRECISA DE APROVAÇÃO, terminou). "
-                  "`--estado-vivo` avisa se o vigia parar")
+            print("VIGIAR · `sp-fila.py --vigiar --destacado` + um só Monitor `tail -F` ao log · regras: `sp-fila.py --ajuda`")
     else:
         print(f"fila terminada: {out['motivo']}\nrelatório: {out['relatorio']}")
     return 0
