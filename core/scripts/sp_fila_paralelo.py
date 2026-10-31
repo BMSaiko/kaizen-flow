@@ -84,6 +84,7 @@ def _norm_caminho(caminho):
     c = unquote(str(caminho)).replace("\\", "/")
     c = re.sub(r"^file://[^/]*/(?=[A-Za-z]:)", "", c)
     c = re.sub(r"^file://[^/]*(?=/)", "", c)
+    c = re.sub(r"^/{2,}", "/", c)
     return c.rstrip("/").lower()
 
 
