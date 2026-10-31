@@ -4,26 +4,6 @@ description: Project workflow with self-evolution. Reflect, then commit.
 version: 2.4
 author: user
 license: MIT
-metadata:
-  hermes:
-    tags:
-    - workflow
-    - project
-    - orchestration
-    - michi
-    - self-evolution
-    category: workflow
-    related_skills:
-    - self-improvement-loop
-    - learn-from-session
-    - verification
-    - five-whys
-    - swot
-    - eisenhower-matrix
-    - ooda-loop
-    - grill-me
-    - dp
-    - da
 ---
 ## michi — full project workflow
 
@@ -34,18 +14,12 @@ metadata:
 
 **Estado do SP:** no arranque `python -I scripts/sp-estado.py <SP>` (≤30 linhas: fase, passos, gates, deps, ramo, ficheiros) em vez de ler SP, lista e git à parte.
 **Perfil do SP:** ler `perfil`/`max_tentativas`/`parar_se` no arranque e na paragem (`references/michi-perfis.md`).
-**Escopo do SP:** no arranque `python -I scripts/michi-escopo.py start <SP>`, no fecho ou paragem `... stop`; o hook `guard-escopo.js` bloqueia escrita fora de `escopo:`.
 **Worktree:** no arranque `python -I scripts/sb-worktree.py ensure <slug-do-SP>` e editar pelo caminho absoluto da worktree (o guard bloqueia escrita no checkout principal); `sp-move`/`sp-fechar` saltam sozinhos para a worktree; commits por fase lá; `merge` (recusa SP fora de Done, `--force` explícito) + `clean` só no fecho.
 **Tab:** no arranque `python -I scripts/tab-title.py <slug-do-SP>` (best-effort, rc 0; renomeia a tab do WezTerm e imprime `/rename <slug>` para a sessão). Vale também para a sessão nova do `/sp-handoff`, que arranca com `/michi`.
 
 **Checkpoint/rollback:** `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate (`references/michi-modo-auto.md` §Paragem).
 
-A single skill that drives an end-to-end project change:
-grill → dr → dp → da → gates → report → reflect → commit-suggest.
-
-The agent follows this sequence; the user can stop after any step
-(`/stop` interrupts the agent loop) and resume from where they left off
-(`/resume` or simply the next `/michi` re-pickup of the same context).
+O user pode parar após qualquer passo (`/stop`) e retomar (`/resume` ou novo `/michi` no mesmo contexto).
 
 ## Phases
 
@@ -82,7 +56,7 @@ Hooks (`kaizen-hooks.json`, ref. `knowledge/infra/reference/kaizen-hooks.md`): e
    is right", restart at Phase 4 (DA). Honour the signal — don't
    default to "just patch DA" when the root cause is upstream.
 9. **Autorizações do SP:** `commit`/`push`/`pr`/`restricoes` do frontmatter mandam no fecho (auto ou manual); regras em `references/michi-modo-auto.md` §Autorizações do SP.
-9. **Commit proposal.** *Only after the user explicitly approves the report
+10. **Commit proposal.** *Only after the user explicitly approves the report
    (and has had the chance to act on Reflect).* Suggest a single
    conventional commit message (one line subject ≤72 chars, body explaining
    *why*). Show the message; the user types "commit" / "ok" before any
@@ -94,47 +68,13 @@ Hooks (`kaizen-hooks.json`, ref. `knowledge/infra/reference/kaizen-hooks.md`): e
 
    **Worktree → dev:** `fetch`, merge de `origin/dev` NO worktree, resolver e correr os gates lá, só depois merge no pai (`references/michi-worktree-merge.md`).
 
-## Document Lifecycle Management
+## Document Lifecycle
 
-DR/DP/SP vivem em `knowledge/projects/kaizen/<project>/{dr,dp,sp}/{TODO,Doing,Done}/` e movem-se TODO → Doing → Done. O campo `status`/`updated` do frontmatter acompanha a pasta.
-
-SP (scripts em `scripts/`, correr com `python -I`):
-- `sp-list.py [--project P] [--status todo|doing] [--all]` — listar SPs pendentes.
-- `sp-move.py [--project P] <slug> doing` — ao iniciar a execução; `done` ao concluir.
-- `sp-validate.py <ficheiro...>` — validar o contrato das 8 secções.
-- `sp-new.py --project P --slug S --priority P2` — criar SP vazio em `sp/TODO`.
-
-DR/DP: `doc-move.py <dr|dp> <slug> todo|doing|done` e `doc-list.py <dr|dp> [--all]` (acrescentam `status`/`updated` se faltarem).
-
-| Evento | Ação |
-|--------|------|
-| DR/DP start | `doc-move.py <tipo> <slug> doing` |
-| DR/DP complete | `doc-move.py <tipo> <slug> done` |
-| SP execution start | `sp-move.py <slug> doing` |
-| SP complete | `sp-move.py <slug> done` |
-
-`/michi status` = `sp-list.py --all` + `doc-list.py dr` + `doc-list.py dp`; mostrar as pastas `Doing` com a hora da última modificação para destacar trabalho parado.
+DR/DP/SP movem-se TODO → Doing → Done com `sp-move.py`/`doc-move.py`; `/michi status` lista o estado. Scripts, tabela de eventos e `status`: `references/michi-lifecycle.md`.
 
 ## Style
 
-Texto integral em `references/michi-style.md` (16 entradas, numeradas como abaixo). Ler só a entrada relevante.
-
-1. DEFAULT to a free-text question, not multi-choice `clarify`
-2. One user-visible turn per phase transition: short summary of what was
-3. Do not re-ask facts the user already stated
-4. `clarify` answers change the running code/skills in the same turn, not later
-5. Um «go» responde ao que a pergunta nomeou (atlas-inbox-e-painel-sps, 2026-10-18)
-6. Never auto-patch skills, never auto-create skills. Reflect proposes; the
-7. "fix it" + destructive fix = clarify, never guess (hermes-agent 2026-09-04, michi cycle)
-8. If the user says "skip phase X" or "go to DA", honour it. The phases are
-9. Skill-fit check before loading (atlas main-chat michi, 2026-09-04)
-10. Scope
-11. **Test tautology skip is a valid TDD decision, document it (atlas main-chat
-12. **Default to "run the gate" over "probe the dependency" (atlas polish-A
-13. If the workflow reveals the plan is wrong mid-DA, restart at the relevant
-14. Keep responses short. Code and outputs first, prose only where asked
-15. DP supersession by rename, not overwrite (michi 2026-09-04, atlas polish-A recovery cycle)
-16. User did not answer the free-text ask within the window → ponytail defaults applied (michi 2026-09-04)
+16 entradas numeradas em `references/michi-style.md` (ex.: pergunta em texto livre por defeito, não repetir factos do user, honrar «skip fase X», respostas curtas). Ler só a entrada relevante.
 
 ## Contexto (context-guard)
 

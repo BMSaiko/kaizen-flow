@@ -7,11 +7,15 @@ Uso:
   python -I scripts/sp-handoff.py --resolve [slug]        # slug de um programa (SP-mãe): devolve o filho em Doing
   python -I scripts/sp-handoff.py --write <caminho> --file <progresso.md>
   python -I scripts/sp-handoff.py --launch <caminho> [--dry-run] [--auto]
+  python -I scripts/sp-handoff.py --spawn <slug>... [--max N] [--backend wezterm|tmux|clipboard]
 
 `--launch` não abre janelas: em segundo plano, passados ~5 s (para o turno atual acabar), escreve
 `/clear` e depois `/michi <caminho>` no painel do WezTerm onde o Claude Code já corre ($WEZTERM_PANE),
 via `wezterm cli send-text`. Não faz nada fora desse painel. `--auto` (usado após o aviso do
 context-guard) recusa lançar se o SP não estiver em Doing.
+
+`--spawn` abre um painel novo por SP (worktree própria via `sb-worktree ensure`, `claude`, `/michi --auto <slug>`)
+e regista-o em `sessoes` do estado do `sp-fila`; a falha de um SP não afeta os outros (rc 1 se algum falhou).
 
 Se o SP tem `parent:`, `--write` atualiza o `state` desse filho no SP-mãe (cache; a pasta manda) e
 imprime o próximo filho elegível (TODO com todas as dependências em Done). Dependências por cumprir só avisam.
@@ -337,6 +341,141 @@ def launch(sp_path, pane=None, backend=None, harness="claude"):
     return argv
 
 
+MAX_SPAWN = 3
+SPAWN_READY_S = 40  # espera máxima pelo prompt do Claude Code num painel novo
+SPAWN_ENTER_TRIES = 3
+SPAWN_SETTLE = 6.0  # o Claude Code demora a limpar o prompt (hooks UserPromptSubmit)
+
+
+def _sp_fila():
+    spec = importlib.util.spec_from_file_location("sp_fila_spawn", Path(__file__).with_name("sp-fila.py"))
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["sp_fila_spawn"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _spawn_pane(backend, wt, run):
+    """Abre um painel novo em `wt` a correr o Claude Code; devolve o id do painel."""
+    if backend == "wezterm":
+        argv = ["wezterm", "cli", "spawn", "--cwd", wt, "--", "claude"]
+        pane = run(argv, check=True, capture_output=True, text=True, encoding="utf-8").stdout.strip()
+        origem = os.environ.get("WEZTERM_PANE")
+        if origem:  # o spawn foca o painel novo; devolver o foco ao painel que lançou a fila
+            run(["wezterm", "cli", "activate-pane", "--pane-id", origem], capture_output=True, text=True, encoding="utf-8")
+        return pane
+    else:
+        argv = ["tmux", "split-window", "-P", "-F", "#{pane_id}", "-c", wt, "claude"]
+    return run(argv, check=True, capture_output=True, text=True, encoding="utf-8").stdout.strip()
+
+
+def _screen(backend, pane, run):
+    argv = (["wezterm", "cli", "get-text", "--pane-id", str(pane)] if backend == "wezterm"
+            else ["tmux", "capture-pane", "-p", "-t", str(pane)])
+    return run(argv, check=True, capture_output=True, text=True, encoding="utf-8").stdout
+
+
+_KEYS = {"wezterm": {"Down": chr(27) + "[B", "Space": " ", "Enter": chr(13)}}
+
+
+def _press(backend, pane, key, run):
+    if backend == "wezterm":
+        run(["wezterm", "cli", "send-text", "--pane-id", str(pane), "--no-paste", _KEYS["wezterm"][key]], check=True)
+    else:
+        run(["tmux", "send-keys", "-t", str(pane), key], check=True)
+
+
+def _aviso_mcp(screen):
+    """True no aviso «new MCP servers found» (o `❯` dele não é o prompt)."""
+    return "new MCP server" in screen
+
+
+def _aprovar_mcp(backend, pane, run, sleep):
+    """Aprova só o `vault`: desmarca o `roblox` (2.ª linha) e confirma «Enable selected»."""
+    for key in ("Down", "Space", "Down", "Enter"):
+        _press(backend, pane, key, run)
+        sleep(0.5)
+
+
+def _wait_prompt(backend, pane, run, sleep):
+    """Espera que o prompt `❯` apareça (o Claude Code descarta teclas enviadas durante o arranque)."""
+    for _ in range(SPAWN_READY_S):
+        screen = _screen(backend, pane, run)
+        if _aviso_mcp(screen):
+            _aprovar_mcp(backend, pane, run, sleep)
+            sleep(2)
+            continue
+        if any(ln.lstrip().startswith("❯") for ln in screen.splitlines()):
+            sleep(1)
+            return
+        sleep(1)
+    raise HandoffError(f"painel {pane}: o Claude Code não ficou pronto em {SPAWN_READY_S}s")
+
+
+def _send_line(backend, pane, text, run, sleep):
+    """Envia `text` e Enter; se o texto continuar no prompt (Enter perdido), repete o Enter."""
+    text_argv, key_argv = _argvs(backend, pane)
+    run(text_argv(pane, text), check=True)
+    for _ in range(SPAWN_ENTER_TRIES):
+        sleep(ENTER_GAP)
+        run(key_argv(pane), check=True)
+        sleep(SPAWN_SETTLE)
+        if not prompt_has_text(_screen(backend, pane, run)):
+            return
+    raise HandoffError(f"painel {pane}: o Enter não submeteu {text!r}")
+
+
+def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.sleep, estado_path=None, copy=None, registar=True, dry_run=False):
+    """Um painel e uma worktree por SP: `sb-worktree ensure`, painel novo, `/michi --auto <slug>`, registo no estado.
+
+    Cada SP é independente: a falha de um fica em `erro` e não pára os outros. Acima de `maximo` os SPs ficam adiados.
+    Sem multiplexer (clipboard) imprime, por SP, o `cd` e o comando de retoma.
+    """
+    backend = backend or detect_backend()[0]
+    if dry_run:  # sem efeitos: nem worktree, nem painel, nem estado
+        return [{"slug": s, "ok": True, "painel": None, "worktree": None, "dry_run": True} for s in slugs[:maximo]] +                [{"slug": s, "ok": False, "painel": None, "worktree": None, "erro": f"adiado: máximo de {maximo} painéis em simultâneo"} for s in slugs[maximo:]]
+    fila = _sp_fila()
+    estado_path = Path(estado_path or fila.ESTADO)
+    estado_path.parent.mkdir(parents=True, exist_ok=True)
+    if registar and not estado_path.exists():
+        fila.guardar(estado_path, {"sessoes": {}})
+    results = []
+    for n, slug in enumerate(slugs):
+        res = {"slug": slug, "ok": False, "painel": None, "worktree": None}
+        results.append(res)
+        if n >= maximo:
+            res["erro"] = f"adiado: máximo de {maximo} painéis em simultâneo"
+            continue
+        try:
+            wt = run([sys.executable, "-I", str(Path(__file__).with_name("sb-worktree.py")), "ensure", slug],
+                     check=True, capture_output=True, text=True, encoding="utf-8").stdout.strip().splitlines()[-1]
+            res["worktree"] = wt
+            cmd = f"/michi --auto {slug}"
+            if backend == "clipboard":
+                print(f"{slug}: cd {wt} && claude  →  {cmd}")
+            else:
+                res["painel"] = _spawn_pane(backend, wt, run)
+                _wait_prompt(backend, res["painel"], run, sleep)
+                _send_line(backend, res["painel"], cmd, run, sleep)
+            res["ok"] = True
+        except (subprocess.CalledProcessError, OSError, HandoffError, IndexError) as exc:
+            res["erro"] = (getattr(exc, "stderr", None) or str(exc)).strip() or type(exc).__name__
+            continue
+        if not registar:
+            continue
+        entrada = {"worktree": wt, "painel": res["painel"], "estado": "lancado",
+                   "inicio": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        fila.atualizar(estado_path, lambda e, s=slug, v=entrada: e["sessoes"].__setitem__(s, v))
+    if backend == "clipboard":
+        ok = [r["slug"] for r in results if r["ok"]]
+        if ok:
+            try:
+                (copy or _copy)(f"/michi --auto {ok[-1]}")
+            except OSError:
+                pass
+    return results
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Apoio ao /sp-handoff")
     group = ap.add_mutually_exclusive_group(required=True)
@@ -344,11 +483,14 @@ def main(argv=None):
     group.add_argument("--write", metavar="CAMINHO")
     group.add_argument("--launch", metavar="CAMINHO")
     group.add_argument("--send", metavar="CAMINHO", help=argparse.SUPPRESS)
+    group.add_argument("--spawn", nargs="+", metavar="SLUG", help="painel novo + worktree por SP, a correr /michi --auto")
+    ap.add_argument("--sem-registo", action="store_true", help="com --spawn: não escreve no estado (quem chama, o sp-fila, já o faz)")
+    ap.add_argument("--max", type=int, default=MAX_SPAWN, help=f"com --spawn: painéis em simultâneo (default {MAX_SPAWN})")
     ap.add_argument("--file", help="ficheiro com o corpo do progresso (com --write)")
     ap.add_argument("--pane", help="painel do multiplexer (default: $WEZTERM_PANE ou $TMUX_PANE)")
     ap.add_argument("--backend", choices=BACKENDS, help="default: deteção automática; sem painel, clipboard")
     ap.add_argument("--harness", choices=tuple(HARNESSES), default="claude", help="comando de retoma (default: claude)")
-    ap.add_argument("--dry-run", action="store_true", help="com --launch: só mostra os comandos")
+    ap.add_argument("--dry-run", action="store_true", help="com --launch ou --spawn: só mostra, sem efeitos")
     ap.add_argument("--auto", action="store_true", help="com --launch: modo do context-guard, exige SP em Doing")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
@@ -367,6 +509,15 @@ def main(argv=None):
             nxt = sync_program(args.root, args.write)
             if nxt:
                 print(nxt)
+        elif args.spawn:
+            falhou = False
+            for r in spawn(args.spawn, args.backend, args.max, registar=not args.sem_registo, dry_run=args.dry_run):
+                if r.get("dry_run"):
+                    print(f"{r['slug']}: dry-run (sem worktree nem painel)")
+                    continue
+                print(f"{r['slug']}: " + (f"painel {r['painel'] or '-'} em {r['worktree']}" if r["ok"] else f"FALHOU ({r['erro']})"))
+                falhou = falhou or not r["ok"]
+            return 1 if falhou else 0
         elif args.send:
             backend = args.backend or "wezterm"
             send(args.send, args.pane or pane_id(), backend=backend, harness=args.harness,

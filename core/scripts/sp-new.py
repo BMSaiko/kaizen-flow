@@ -249,7 +249,7 @@ def main(argv=None):
     ap.add_argument("--max-tentativas", type=int, help="tentativas por gate (override do perfil)")
     ap.add_argument("--max-requests", type=int, help="máximo de pedidos (override do perfil)")
     ap.add_argument("--parar-se", help="lista separada por vírgulas: gate-falha,ambiguidade,ficheiro-fora-de-escopo,custo")
-    ap.add_argument("--escopo", help="globs permitidos, separados por vírgulas (guard-escopo.js)")
+    ap.add_argument("--escopo", help="globs permitidos, separados por vírgulas (documentação do SP)")
     ap.add_argument("--fora-de-escopo", help="globs negados, separados por vírgulas")
     ap.add_argument("--parent")
     ap.add_argument("--depends-on", nargs="*", default=[])

@@ -1,5 +1,6 @@
 """Testes de scripts/sp-handoff.py (fixtures em ficheiros temporários)."""
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -357,3 +358,127 @@ def test_main_dry_run_tmux_mostra_comandos(tmp_path, capsys):
     doing = make_sp(tmp_path, "atlas/sp/Doing", "a")
     assert sp_handoff.main(["--launch", str(doing), "--dry-run", "--backend", "tmux", "--pane", "%2"]) == 0
     assert "send-keys" in capsys.readouterr().out
+
+
+# --- --spawn: um painel e uma worktree por SP ---
+
+WT = "C:" + chr(92) + "wt" + chr(92)
+
+
+class FakeRun:
+    """Regista os comandos; `spawn` devolve ids de painel 11, 12, ... e falha para os slugs em `falha`."""
+
+    def __init__(self, falha=()):
+        self.calls, self.falha, self.next_pane = [], set(falha), 11
+
+    screens = None  # ecrãs sucessivos de get-text/capture-pane; omissão: prompt vazio
+
+    def __call__(self, argv, **kw):
+        self.calls.append(argv)
+        if "get-text" in argv or "capture-pane" in argv:
+            out = self.screens.pop(0) if self.screens else "❯ \n"
+            return sp_handoff.subprocess.CompletedProcess(argv, 0, stdout=out, stderr="")
+        if "sb-worktree.py" in " ".join(map(str, argv)):
+            slug = argv[-1]
+            if slug in self.falha:
+                raise sp_handoff.subprocess.CalledProcessError(1, argv, stderr="sem worktree")
+            return sp_handoff.subprocess.CompletedProcess(argv, 0, stdout=WT + slug + chr(10), stderr="")
+        if argv[:3] == ["wezterm", "cli", "spawn"]:
+            self.next_pane += 1
+            return sp_handoff.subprocess.CompletedProcess(argv, 0, stdout=f"{self.next_pane - 1}\n", stderr="")
+        return sp_handoff.subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+
+def spawn(slugs, tmp_path, run, **kw):
+    return sp_handoff.spawn(slugs, backend=kw.pop("backend", "wezterm"), run=run, sleep=lambda s: None,
+                            estado_path=tmp_path / "estado.json", **kw)
+
+
+def test_spawn_abre_um_painel_por_sp_com_worktree_e_michi_auto(tmp_path):
+    run = FakeRun()
+    res = spawn(["a", "b"], tmp_path, run)
+    assert [r["slug"] for r in res] == ["a", "b"] and [r["painel"] for r in res] == ["11", "12"]
+    spawns = [c for c in run.calls if c[:3] == ["wezterm", "cli", "spawn"]]
+    assert [c[c.index("--cwd") + 1] for c in spawns] == [WT + "a", WT + "b"]
+    sent = [c[-1] for c in run.calls if "send-text" in c]
+    assert "/michi --auto a" in sent and "/michi --auto b" in sent
+
+
+def test_spawn_regista_cada_painel_no_estado(tmp_path):
+    spawn(["a", "b"], tmp_path, FakeRun())
+    sessoes = json.loads((tmp_path / "estado.json").read_text(encoding="utf-8"))["sessoes"]
+    assert sessoes["a"]["painel"] == "11" and sessoes["b"]["worktree"] == WT + "b"
+    assert sessoes["a"]["estado"] == "lancado" and "inicio" in sessoes["a"]
+
+
+def test_spawn_falha_num_sp_nao_afeta_os_outros(tmp_path):
+    res = spawn(["a", "b", "c"], tmp_path, FakeRun(falha={"b"}))
+    assert [(r["slug"], r["ok"]) for r in res] == [("a", True), ("b", False), ("c", True)]
+    assert "sem worktree" in res[1]["erro"]
+    assert set(json.loads((tmp_path / "estado.json").read_text(encoding="utf-8"))["sessoes"]) == {"a", "c"}
+
+
+def test_spawn_respeita_concorrencia_maxima(tmp_path):
+    res = spawn(["a", "b", "c", "d"], tmp_path, FakeRun(), maximo=2)
+    assert [r["slug"] for r in res if r["ok"]] == ["a", "b"]
+    assert all("adiado" in r["erro"] for r in res[2:])
+
+
+def test_spawn_tmux_usa_split_window(tmp_path):
+    run = FakeRun()
+    res = spawn(["a"], tmp_path, run, backend="tmux")
+    assert res[0]["ok"] and any(c[:2] == ["tmux", "split-window"] for c in run.calls)
+
+
+def test_spawn_clipboard_imprime_comandos_sem_painel(tmp_path, capsys):
+    run = FakeRun()
+    res = spawn(["a"], tmp_path, run, backend="clipboard", copy=lambda t: None)
+    out = capsys.readouterr().out
+    assert res[0]["ok"] and res[0]["painel"] is None
+    assert WT + "a" in out and "/michi --auto a" in out
+    assert not any(c[0] in ("wezterm", "tmux") for c in run.calls)
+
+
+def test_spawn_espera_pelo_prompt_e_repete_enter_perdido(tmp_path):
+    run = FakeRun()
+    # 1.º ecrã: a arrancar (sem prompt); 2.º: prompt pronto; 3.º: texto ficou por submeter; 4.º: submetido
+    run.screens = ["a iniciar\n", "❯ \n", "❯ /michi --auto a\n", "❯ \n"]
+    res = spawn(["a"], tmp_path, run)
+    assert res[0]["ok"]
+    assert sum(1 for c in run.calls if c[-1] == "\r") == 2
+    assert sum(1 for c in run.calls if "send-text" in c and c[-1] == "/michi --auto a") == 1
+
+
+def test_spawn_aprova_so_o_vault_no_aviso_mcp(tmp_path):
+    run = FakeRun()
+    nl = chr(10)
+    aviso = "2 new MCP servers found in this project" + nl + "❯ [✓] vault" + nl + "  [✓] roblox" + nl
+    run.screens = [aviso, "❯ " + nl, "❯ " + nl]
+    res = spawn(["a"], tmp_path, run)
+    assert res[0]["ok"]
+    teclas = [c[-1] for c in run.calls if "send-text" in c][:4]
+    assert teclas == [chr(27) + "[B", " ", chr(27) + "[B", chr(13)]
+    assert sum(1 for c in run.calls if "send-text" in c and c[-1] == "/michi --auto a") == 1
+
+
+def test_spawn_enter_que_nunca_submete_falha_so_esse_sp(tmp_path):
+    run = FakeRun()
+    run.screens = ["❯ \n"] + ["❯ /michi --auto a\n"] * 3
+    res = spawn(["a"], tmp_path, run)
+    assert not res[0]["ok"] and "Enter" in res[0]["erro"]
+
+
+def test_spawn_dry_run_nao_tem_efeitos(tmp_path):
+    run = FakeRun()
+    res = spawn(["a", "b"], tmp_path, run, dry_run=True)
+    assert run.calls == []
+    assert not (tmp_path / "estado.json").exists()
+    assert [r["slug"] for r in res] == ["a", "b"] and all(r["ok"] and r["painel"] is None for r in res)
+
+
+def test_cli_spawn_dry_run_nao_lanca_nada(tmp_path, capsys, monkeypatch):
+    run = FakeRun()
+    monkeypatch.setattr(sp_handoff, "run_hidden", run)
+    monkeypatch.setattr(sp_handoff, "detect_backend", lambda env=None: ("wezterm", None))
+    assert sp_handoff.main(["--spawn", "a", "--dry-run"]) == 0
+    assert run.calls == [] and "a: dry-run" in capsys.readouterr().out

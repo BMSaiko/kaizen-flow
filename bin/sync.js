@@ -6,9 +6,9 @@ const crypto = require("crypto");
 const SKILLS = ["michi", "super-prompt", "grill-me", "dr", "dp", "da", "brainstorm", "swot"];
 const COMMAND_RE = /^(sp(-[a-z]+)*|handoff)\.md$/;
 const SCRIPT_RE = /^(sp|doc)-[a-z-]+\.py$/;
-const SCRIPT_NAMES = ["context-guard.py", "handoff.py", "skill-cut.py", "kaizen_config.py", "kaizen_engine.py", "kaizen_hooks.py", "test_kaizen_engine.py", "test_kaizen_hooks.py", "test_michi_tree_close.py"];
+const SCRIPT_NAMES = ["context-guard.py", "handoff.py", "skill-cut.py", "kaizen_config.py", "kaizen_engine.py", "kaizen_hooks.py", "wt_redirect.py", "test_kaizen_engine.py", "test_kaizen_hooks.py", "test_michi_tree_close.py"];
 // testes que ficam no vault: afirmam textos em português ou dependem do vault inteiro
-const SKIP = new Set(["test_context_guard.py", "test_e2e_kaizen_pacote.py", "test_e2e_kaizen_sp.py", "michi-checkpoint.py", "test_michi_checkpoint.py", "michi-escopo.py", "test_michi_escopo.py", "test_guard_escopo.py"]);
+const SKIP = new Set(["test_context_guard.py", "test_e2e_kaizen_pacote.py", "test_e2e_kaizen_sp.py", "michi-checkpoint.py", "test_michi_checkpoint.py", "michi-escopo.py", "test_michi_escopo.py", "test_guard_escopo.py", "test_wt_redirect.py"]);
 // ficheiros do vault com nomes de kaizen que ainda assim não entram no pacote vão para SKIP; o resto avisa
 const RELATED_RE = /^(test_)?(sp|doc|handoff|kaizen|michi)[-_.]/;
 

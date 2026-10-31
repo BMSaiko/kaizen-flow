@@ -2,6 +2,7 @@
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,8 @@ FILL = "conteúdo de teste"
 
 def run(script, *args, cwd=None):
     r = subprocess.run([sys.executable, "-I", str(SCRIPTS / script), *args],
-                       capture_output=True, text=True, encoding="utf-8", cwd=cwd)
+                       capture_output=True, text=True, encoding="utf-8",
+                       cwd=cwd or tempfile.gettempdir())
     return r.returncode, r.stdout, r.stderr
 
 
