@@ -13,6 +13,12 @@ _spec.loader.exec_module(sp_gates)
 PY = f'"{sys.executable}"'
 
 
+@pytest.fixture(autouse=True)
+def _cache_isolada(tmp_path, monkeypatch):
+    """`main()` sem --full grava CACHE_PATH: desviar para tmp para não sujar o repo."""
+    monkeypatch.setattr(sp_gates, "CACHE_PATH", tmp_path / "gates-cache.json")
+
+
 def sp_text(*gates):
     lines = ["---", "status: Doing", "slug: x", "gates:"]
     for cmd, extra in gates:
