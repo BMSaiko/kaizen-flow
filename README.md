@@ -92,10 +92,11 @@ If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the blo
 |---|---|
 | [Use cases](docs/use-cases.md) | "I want to..." recipes for install, usage, stories and handoff |
 | [Commands](docs/commands.md) | every `kaizen` command, option and workflow script |
-| [Agent commands](docs/agent-commands.md) | `/sp`, `/michi`, `/sp-handoff` and the michi cycle |
+| [Agent commands](docs/agent-commands.md) | `/sp`, `/michi`, `/sp-handoff`, `/sp-fila`, `/pentest`, `/review-ciclo`, `/pr-fase` and the michi cycle |
 | [Usage and cost](docs/usage-and-cost.md) | transcripts read, prices file, reports |
-| [Config](docs/config.md) | `kaizen.config.json` and project folders |
-| [Handoff](docs/handoff.md) | fresh-context handoff, backends, CLI vs desktop app |
+| [Config](docs/config.md) | `kaizen.config.json`, `kaizen-hooks.json` and project folders |
+| [Handoff](docs/handoff.md) | fresh-context handoff, parallel panes, backends, CLI vs desktop app |
+| [Privacy audit](docs/privacy-audit.md) | what `kaizen audit` scans for |
 
 Quickstart:
 

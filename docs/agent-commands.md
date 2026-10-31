@@ -9,7 +9,10 @@ Typed inside Claude Code / Codex, not in the shell. These are skills and prompt 
 | `/sp-list [flags]` | same flags as `sp-list.py` | Lists open stories, then offers a picker to start one. |
 | `/sp-handoff [slug]` | optional slug | Logs progress in the story in Doing, prints the `/michi <path>` to resume, and (if you say yes) clears the context and resumes in the same pane. |
 | `/handoff [slug]` | optional short name | Like `/sp-handoff`, for a free conversation with no story: writes an ephemeral handoff (`handoff.py --write`), and (if you say yes) clears the context; the new session runs `handoff.py --consume`, which prints and deletes it. |
-| `/sp-fila [--dry-run] [--max N] [--ate HH:MM] [--projeto P] [--programa SLUG]` | optional limits | Runs the eligible stories in sequence (`modo: auto`, `gates:` set, dependencies met), each in a clean session; stops on the first failure and writes a report. `--programa` runs only a parent story's tree, bounded by its `orcamento_horas`/`orcamento_usd`/`orcamento_requests`; on a stop it appends `## Progresso` to the parent so the next run resumes. |
+| `/sp-fila [--dry-run] [--max N] [--ate HH:MM] [--projeto P] [--programa SLUG] [--concorrencia N] [--orcamento N]` | optional limits | Runs the eligible stories in sequence (`modo: auto`, `gates:` set, dependencies met), each in a clean session; stops on the first failure and writes a report. `--programa` runs only a parent story's tree, bounded by its `orcamento_horas`/`orcamento_usd`/`orcamento_requests`; on a stop it appends `## Progresso` to the parent so the next run resumes. `--concorrencia N` runs up to N stories at once in their own panes and worktrees; `--orcamento N` is an optional request cap (none by default). After starting, a watcher (`--vigiar --destacado`) reports each state change; a pane that waits for an answer or approval is brought to you, never approved on its own. Nothing is pushed. |
+| `/pentest [repo]` | optional repo | Defensive, local pen test of the lines added in the diff (`pentest.py`); each finding becomes a fix story. |
+| `/review-ciclo` | | Review phase that loops fix and review until approved, with an iteration limit and escalation to you (`review_ciclo.py`). |
+| `/pr-fase` | | Final phase: opens the PR from the story, the pen test and the review (`pr_corpo.py`), following the story's `pr:` authorization. |
 | `/grill-me`, `/dr`, `/dp`, `/da`, `/brainstorm`, `/swot` | topic | The building blocks michi chains; usable alone. |
 
 ## The michi cycle
@@ -26,6 +29,8 @@ Stop after any step, resume later.
 | 6 | Report | what changed, what was verified, real difficulties, what is open; no commit |
 | 7 | Reflect | friction found and a proposed fix to the workflow itself; you apply it |
 | 8 | Commit proposal | one conventional message; nothing is committed or pushed until you confirm |
+
+After the gates, the delivery flow can continue with three optional phases: `/pentest` (security scan of the diff), `/review-ciclo` (fix and review until approved) and `/pr-fase` (open the PR). `skip review` skips the review loop.
 
 A Super Prompt given as input skips phases 1-2. Say "skip <phase>" or "go to DA" to jump. If you say the work is wrong or broken, michi asks which phase failed and restarts there (default: grill).
 
