@@ -20,7 +20,6 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import kaizen_hooks  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location("sp_list", Path(__file__).with_name("sp-list.py"))
 sp_list = importlib.util.module_from_spec(_spec)
