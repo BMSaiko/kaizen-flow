@@ -1,354 +1,105 @@
-# michi — Skip-grill play (the `skip grill + vague scope` gate)
+# michi — Skip-grill play (`skip grill` + âmbito vago)
 
-> The pitfall in `SKILL.md` "skip grill + vague large-scope instruction"
-> links here. When the user says `skip grill` and the instruction is
-> large and fuzzy ("refactor X", "clean up Y", "fix all the bugs in Z"),
-> do NOT jump straight to DR/DP/DA and do NOT ask 5 clarifying questions.
-> Do this instead.
+> O pitfall «skip grill + instrução vaga e grande» (`michi-pitfalls.md` §3) liga aqui. Com `skip grill` e uma instrução grande e difusa («refactor X», «limpa Y», «corrige os bugs de Z»): não saltar para DR/DP/DA nem fazer 5 perguntas. Fazer isto.
 
-## The 5-minute scan (run before asking)
+## O scan de 5 minutos (antes de perguntar)
 
-A scan is not research; it is a census. The goal is to know what exists
-and what would break, not to understand the system.
+Um scan é um censo, não pesquisa: saber o que existe e o que partiria.
 
-| Probe | Tool | Why |
-|-------|------|-----|
-| Top-level layout | `search_files(target='files', pattern='*', path=<repo>)` | Know what kind of repo this is (TS/Node, Python, Go, …) |
-| File sizes of the suspect area | `execute_code` + `pathlib` over the dir, count `b'\n'` per file | Identify the **single** monolith that needs refactor (vs 30 already-small files) |
-| Exported surface | grep `^export ` / `^export default function` / `^export class` | Public contract — every refactor must preserve it |
-| Public entry points | routes (`router.X` / `app.X` / `s.middlewares.use`) OR function names | What the tests + client depend on |
-| Tests that touch the area | `search_files(target='files', pattern='*test*')` + content grep for the public entry points | The minimum gate you must not break |
-| Git state | `git -C <repo> status --short`, `branch --show-current`, `worktree list` | Worktree trap, clean tree vs dirty, which branch you are on |
+| Sonda | Ferramenta | Porquê |
+|---|---|---|
+| Layout de topo | `Glob` `*` no repo | Tipo de repo (TS/Node, Python, Go…) |
+| Tamanhos da zona suspeita | contar `b'\n'` por ficheiro (`pathlib`) | Achar o **único** monólito (vs 30 ficheiros pequenos) |
+| Superfície exportada | `Grep` `^export ` / `^export default function` / `^export class` | Contrato público a preservar |
+| Entradas públicas | rotas (`router.X`/`app.X`/`s.middlewares.use`) ou nomes de funções | De que dependem testes e cliente |
+| Testes na zona | `Glob` `*test*` + grep das entradas | Gate mínimo a não partir |
+| Estado git | `git status --short`, `branch --show-current`, `worktree list` | Worktree trap, árvore suja, ramo |
 
-If the scan takes >5 minutes, you are doing research, not scanning. Stop,
-write what you have, ask the question.
+Mais de 5 min = pesquisa: parar, escrever o que há, perguntar.
 
-## The courage table (the alignment artifact)
+## A tabela de coragem (o artefacto de alinhamento)
 
-The user skipped grill. They are not going to answer 6 questions. They
-are willing to answer 1. Make that 1 question a multi-option choice
-where each option is a **meaningfully different shape** (different
-amount of code touched, different risk, different dependencies added).
-
-Template:
+O user saltou o grill: responde a 1 pergunta, não a 6. Essa pergunta é uma escolha em que cada opção é uma **forma diferente** (código tocado, risco, dependências):
 
 ```
 == Onde aterrar — preciso de 1 decisão tua ==
 
-A — <safe>: <what + diff size hint>. <risk one-liner>.
-B — <+1 axis>: <what + diff size hint + which axis>. <risk one-liner>.
-C — <rewrite>: <what + diff size hint + which framework/pattern>. <risk one-liner>.
+A — <seguro>: <o quê + tamanho do diff>. <risco numa linha>.
+B — <+1 eixo>: <o quê + tamanho + eixo>. <risco>.
+C — <reescrita>: <o quê + tamanho + framework/padrão>. <risco>.
 
-Honestamente, <recommendation> é o que "<user's words>" quer dizer sem
-transbordar. <mention what would change your recommendation>.
+Honestamente, <recomendação> é o que "<palavras do user>" quer dizer sem transbordar. <o que mudaria a recomendação>.
 
-Diz:
-- <which level> (A/B/C)
-- <escopo yes/no>
-- <one other axis if unavoidable>
+Diz: <nível A/B/C> · <âmbito sim/não> · <um eixo inevitável>
 ```
 
-The recommendation is not optional — the user skipped grill *to avoid
-deciding everything*. They want a senior to pick. The table is the
-option set; the recommendation is your best read.
+A recomendação é obrigatória: o user saltou o grill para não decidir tudo; quer um sénior a escolher.
 
-## The one-decision ask
+## O pedido de uma decisão
 
-End with **one** question that bundles:
-- which level (A/B/C) — almost always the recommendation
-- which scope (the area or the whole backend) — to bound the diff
-- one **unavoidable** axis (e.g. "can I add zod as a dep?") — if the
-  level you are pitching requires it
+Uma só pergunta com: nível (quase sempre a recomendação), âmbito (a zona ou o backend todo) e **um** eixo inevitável (ex.: «posso adicionar zod?») se o nível o exigir. Nunca incluir: ramo (está no scan), caminhos (derivam da estrutura), testes a correr (derivam da lista), «mais alguma coisa?» (scan incompleto: voltar atrás). «Faz A e B mas salta C»: honrar; o user manda na escada, tu escolhes o degrau.
 
-NEVER bundle:
-- branch choice (look it up; it is in your scan)
-- path choices (derive from project structure)
-- tests-to-run (derive from the test list)
-- "anything else I should know" — if you need this, your scan is
-  incomplete; go back
+## O que NÃO fazer
 
-If the user comes back with "do A and B but skip C", honour it. They
-own the ladder; you pick the rung.
+- `dp` sobre a instrução vaga: DP precisa de um objetivo de um ecrã; «refactor do backend» é direção.
+- Lista de 30 itens: se precisas, a tabela de coragem não está acabada.
+- Editar antes da resposta: o play expõe a forma; 2 min de scan + 1 decisão são mais rápidos que 3 patches revertidos.
+- Parafrasear o user: a tabela tem de *nomear* o que é o backend; o scan ganha esse direito.
 
-## What NOT to do
+## Sem resposta ao free-text (atlas polish-A, 2026-09-04)
 
-- Do not run `dp` on the vague instruction. DP needs a one-screen
-  goal; "refactor todo o backend" is not a goal, it is a direction.
-- Do not produce a 30-item todo list. If you need 30 items to express
-  the work, you have not finished the courage table.
-- Do not start editing before the user answers. The skip-grill play is
-  about *exposing the shape*, not about being fast. A 2-minute scan +
-  1 decision ask is faster than 3 patches the user has to revert.
-- Do not rephrase the user. "refactor the backend" → your table must
-  *name* what the backend is, not echo "backend". The scan earns the
-  right to name things.
+O `clarify` tem janela. Sem resposta, não parar: regra ponytail, versão preguiçosa, defaults mais conservadores que preservam o contrato do SP, e listar cada default aplicado no DP em «What you should know before signing off» para override na review. Defaults que aguentaram:
 
-## User did not answer the free-text ask (2026-09-04, atlas polish-A cycle)
+1. **Worktree** com dir+ramo e trabalho por commitar de sessão anterior: recuperar+terminar (`git worktree prune` + add sem `-b`), nunca apagar e recomeçar (receita completa: pitfalls §6).
+2. **`stash@{0}` de sessão anterior**: deixar, não tocar neste épico (o pop mistura âmbitos e pode partir invariantes do SP, ex.: `server/**` idêntico byte a byte).
+3. **Gate anterior que falhou a barra** (Lighthouse 91 vs ≥95): repetir uma vez no estado atual e confiar no novo número (pode ser artefacto do preview); se falha, sub-fase condicional no DP, sem baixar a barra.
 
-The `clarify` call has a time window. If the user does not respond
-within it, do **not** stall on a missing decision. Ponytail rule
-applies: ship the lazy version, apply the most conservative defaults
-that preserve the SP contract, and surface every applied default in
-the DP's "What you should know before signing off" section so the
-user can override on review.
+Regra: não assumir em silêncio; mostrar o default, nomear a escolha conservadora e a regra de recurso (Style do SKILL.md).
 
-Three concrete defaults that have held up:
+## Exemplo (atlas backend refactor, 2026-09-02)
 
-1. **Worktree state** when an existing dir+branch on disk have
-   uncommitted work from a prior session → recover+finish
-   (`git worktree prune` + re-add without `-b`). Never wipe + restart:
-   the on-disk work is the answer to most of the phases already.
-2. **A leftover `stash@{0}` from a prior session** → leave stashed,
-   never touch in this epic. Popping it conflates two sessions'
-   scopes and likely breaks SP hard-invariants (e.g. `server/**`
-   byte-identical).
-3. **A previous gate run that failed a bar** (e.g. Lighthouse perf
-   91 vs SP ≥95) → re-run once on the current state and trust the
-   new number. Cheap, may have been a preview-server artifact.
-   If still failing, file a conditional sub-phase in the DP, do not
-   lower the bar.
+«faz refactor ao backend todo do projeto atlas, da skip ao grillme». Scan: `server/api.ts` 1500 linhas, um `export default function atlasApi(): Plugin` (Vite), ~35 handlers inline e 35 helpers; `config.ts` 75, `roadmap.ts` 81, `snapshots.ts` 155 (módulos limpos), `prompts/` já dividido; cliente usa 6 endpoints de `src/api.ts`; `test/_atlas-harness.mjs` + `test/ci-gate.test.mjs` batem no servidor real; `live-data/.wt/atlas/` tem 14 worktrees históricas.
 
-The rule is "do not silently assume" — surface the default, name
-the conservative choice, link the rule it falls back to. See the
-parent SKILL.md Style section for the matching inline rule.
+| Nível | O quê | Risco |
+|---|---|---|
+| A — extrair só handlers | ~200 LoC, 35 handlers → `server/routes/*.ts`, tabela de dispatch | baixo |
+| B — + erros/validação | A + `readBody<T>(schema)` + `sendError` | médio (zod = **nova dep**) |
+| C — + Router real | B + `express.Router`/Hono/find-my-way | alto (middlewares do `configureServer` + router escorregadio) |
 
-## Worked example (2026-09-02, atlas backend refactor)
+Recomendação A: «refactor do backend» é estrutural e A é o mínimo que merece o nome. O user não respondeu (interrompido): michi parou na fase 1; o Reflect continua devido (pitfalls §8).
 
-User: "faz refactor ao backend todo do projeto atlas, da skip ao grillme".
+## Depois da escolha: juntar o «wire-only» ao primeiro movimento
 
-Scan output that fed the table:
-- `server/api.ts`: 1500 lines, single `export default function atlasApi():
-  Plugin` (Vite plugin), ~35 inline handlers, 35 helper functions
-- `server/config.ts`: 75 lines (clean)
-- `server/roadmap.ts`: 81 lines (clean)
-- `server/snapshots.ts`: 155 lines (already a module)
-- `server/prompts/`: already split
-- Client uses only 6 endpoints from `src/api.ts`
-- `test/_atlas-harness.mjs` + `test/ci-gate.test.mjs` hit the real
-  server; rest of tests are frontend
-- `live-data/.wt/atlas/` has 14 historical feature worktrees
+Tipicamente a seguir vem «extrair o esqueleto de dispatch → gates → mover handlers». **Esqueleto vazio (sem rotas, sem mudança de comportamento, testes idênticos) é meia fase, não fase**: juntar ao 1º movimento real («ligar o dispatcher E mover o domínio mais simples, 3 handlers, depois gates»). O user aprovou a tabela, não um gate entre «esqueleto compila» e «primeira feature move». Padrão: (1) `done-when` da fase seguinte em termos visíveis («X rotas fora de `api.ts`, gates RC=0, `api.ts` −N linhas»); (2) dentro dela, wire + 1º movimento (wire = pré-requisito, movimento = entrega); (3) wire no report como sub-secção, não como «fase concluída».
 
-Courage table (final form sent to user):
+Exceção: quando o wire É o risco (novo modelo de auth, passo de build, dependência de runtime): a fase wire-only guarda o risco. Refactors estruturais puros não entram. Contra-exemplo (atlas, 2026-09-02): «2A wire dispatch, 0 handlers» + «2B mover `terms/*`»; 2A deu report vazio e parei a pedir confirmação do plano por domínio, um gate de aprovação que a tabela não pedia; devia ser uma fase («wire + 3 handlers `terms`, gates verdes»).
 
-| A — extrair só handlers | ~200 LoC, 35 handlers → `server/routes/*.ts`, dispatch table | baixo |
-| B — extrair + normalizar erros/validação | A + `readBody<T>(schema)` + `sendError` | médio (se zod, **add dep**) |
-| C — extrair + Router real | B + `express.Router`/Hono/find-my-way | alto — `configureServer` middlewares + router é terreno escorregadio |
+## Higiene de gates
 
-Recommendation: A. "Refactor todo o backend" is structural; A is the
-minimum that earns that label.
+Estas regras estão em `michi-pitfalls.md`: não matar processos em bloco (`taskkill /PID` ou filtro por `CommandLine`, ex. `killWtLockers` em `server/api.ts:206-211`; confirmar com `tasklist /FI "IMAGENAME eq <interpreter>"` antes de dizer «limpei») e EOL começa por `git config --show-origin --get-all core.autocrlf`/`core.eol` + `git check-attr -a -- <file>` (§3; atlas EOL 2026-09-04: 3 `git checkout` falhados até ver o autocrlf de sistema; um `Path.write_bytes` + `git add` + commit resolveu). Gate de estado pré-DA: §20.
 
-User never answered (interrupted) → michi paused at phase 1. Reflect
-still owed (per the "hijacked mid-stream" pitfall), and the lesson
-("vague scope + skip grill needs a 5-min scan + courage table, not
-zero questions") is now encoded as a michi pitfall.
+### Perfil Windows do hermes-agent: `patch`/`read_file`/`search_files` falham com erros genéricos
 
-## After the courage-table answer: bundle wire-only with first move
-
-When the user picks A/B/C, the next thing the plan does is usually
-"extract the dispatch skeleton → run gates → then move handlers".
-**If the dispatch skeleton ships empty (no real routes, no real
-behavior change, tests pass identically), the wire-only phase is
-not a phase — it is half a phase.** Bundle it with the first real
-move (e.g. "wire the dispatcher AND move the simplest domain (3
-handlers) into it, then gates"). The user signed off on the courage
-table; they did not sign off on a separate approval gate between
-"skeleton compiles" and "first feature moves".
-
-Pattern after a courage-table pick:
-
-1. Define `done-when` for the next concrete phase in user-visible
-   terms ("X routes moved out of `api.ts`, all gates RC=0,
-   `api.ts` down N lines").
-2. Inside that phase, do the wire work AND the first real move.
-   The wire work is justified as the prerequisite; the real move
-   is the deliverable.
-3. Surface the wire work in the report as a sub-section, not as
-   a separate "phase done" item.
-
-The exception is when the wire work IS the risk (new auth model,
-new build step, new runtime dependency). Then the wire-only
-phase gates the risk and the bundling rule does not apply. Pure
-structural refactors are not in that exception list.
-
-Worked counter-example (atlas backend refactor, 2026-09-02): the
-plan split into "Phase 2A: wire dispatch table, move 0 handlers"
-and "Phase 2B: move first domain (terms/*) into the table". After
-2A, the report section was empty (zero behavior change, identical
-tests, all gates green) and I stopped to ask the user to confirm
-the per-domain plan shape — which was an approval gate the
-courage table had not asked for. 2A and 2B should have been one
-phase. Bundled, the same work would have been one report section
-"wire dispatcher + moved 3 terms handlers, gates green" instead
-of two turns of confirmation for zero behavior change.
-
-
-## Gate hygiene — two rules that pay for themselves in skip-grill
-
-These are reflexes the cycle pays for when you skip them,
-regardless of which courage level you picked.
-
-### Rule 1 — never broad-kill during gates
-
-When a Phase 5 gate hangs (build/test/lint that does not return),
-the reflex is `taskkill /F /IM <interpreter>` (e.g. `node.exe`,
-`python.exe`, `java.exe`). On Windows this kills **every** process
-matching the name — including the user's live dev server, the
-IDE's child process, the LLM harness the user is reading this
-session from. The user feels it as "the kanban went down" or "VS
-Code reloaded".
-
-Recipe: scope the kill to the PID you actually have, or to a
-narrow filter.
-
-```bash
-# BAD — kills every node process on the box
-taskkill /F /IM node.exe /T
-
-# GOOD — kill only the PID you spawned for the gate
-taskkill /F /PID <pid> /T
-
-# GOOD — narrow by commandline (atlas pattern: killWtLockers
-# in server/api.ts:206-211)
-powershell -NoProfile -NonInteractive -Command \
-  "Get-CimInstance Win32_Process | \
-   Where-Object { $_.CommandLine -match '<unique-substring>' } | \
-   ForEach-Object { taskkill /PID $_.ProcessId /T /F }"
-```
-
-Detection that you already broad-killed: `tasklist` shows the
-expected process is gone AND other unrelated processes are also
-gone. Re-check with `tasklist /FI "IMAGENAME eq <interpreter>"`
-before claiming "I cleaned up".
-
-### Rule 2 — for EOL symptoms, `git config --show-origin` first
-
-When a user says "EOL is mixed / lines are wrong / gitattributes
-doesn't take effect", the temptation is to immediately rewrite
-files or set `core.autocrlf` and watch what happens. Wastes
-2-5 minutes when the answer is one command away.
-
-```bash
-# 1. Show every value of core.autocrlf and where it comes from
-git config --show-origin --get-all core.autocrlf
-
-# 2. Same for core.eol
-git config --show-origin --get-all core.eol
-
-# 3. Show what the index actually thinks the file is
-git check-attr -a -- <file>
-```
-
-If `core.autocrlf` is `true` at the `--system` scope (Git for
-Windows default) and `--local` says `false`, **system wins for
-checkout** on Windows — the file is rewritten on every `git
-checkout` regardless of local config. The `.gitattributes`
-`eol=lf` is a no-op. `git checkout HEAD -- <file>` STILL writes
-CRLF. **Fix:** rewrite files via Python
-(`.read_bytes().replace(b'\r\n', b'\n')` + `git add` + commit)
-with `core.autocrlf=false` local. Cannot `--system --unset`
-without admin.
-
-Reference: atlas EOL cycle, 2026-09-04 — three failed `git
-checkout` attempts at normalize before realising system
-autocrlf was active. One `Path.write_bytes` + `git add` + commit
-succeeded in one shot. Pattern is reusable whenever the file is
-text and the system autocrlf is hostile.
-
-### Rule 3 — Windows profile: `patch` / `read_file` / `search_files` fail with generic errors; default to `execute_code`+`pathlib`
-
-On the user Windows profile, `terminal()` runs in an MSYS sandbox
-where `git`, `uv`, `python` are not on the PATH, and the
-`read_file` / `search_files` / `patch` tools are workspace-bound
-with broken path resolution. Symptom: every one returns a generic
-"Failed to read file" or "search requires rg" for paths inside
-the workspace. `write_file` for content with embedded single-quote
-characters also fails with `unexpected EOF` (bash escape inside
-the sandbox).
-
-Cost without this rule: 3-5 min per file trying the broken tools
-before switching to `execute_code` with `pathlib`.
-
-**Recipe (default for any FS work on this profile):**
+No perfil Windows do user (hermes), `terminal()` corre numa sandbox MSYS sem `git`/`uv`/`python` no PATH e as ferramentas `read_file`/`search_files`/`patch` têm resolução de caminhos partida («Failed to read file», «search requires rg»); `write_file` com aspas simples falha com `unexpected EOF`. Sem esta regra: 3-5 min por ficheiro. **Default para qualquer FS:** `execute_code` + `pathlib`.
 
 ```python
-# Read
 from pathlib import Path
 content = Path(r"~\Documents\hermes-agent\file.py").read_text(encoding="utf-8", errors="replace")
-
-# Write (overwrite; create parents)
-Path(r"C:\...").write_text(content, encoding="utf-8")
-
-# Delete
+Path(r"C:\...").write_text(content, encoding="utf-8")   # cria pais se preciso
 Path(r"C:\...").unlink(missing_ok=True)
-
-# Iterate / search
 for p in Path(r"C:\...").rglob("*.py"):
-    if "needle" in p.read_text(encoding="utf-8", errors="replace"):
-        ...
+    if "needle" in p.read_text(encoding="utf-8", errors="replace"): ...
 ```
 
-For shell work (git, uv, python, etc.):
+Shell: sempre exe absoluto (PATH vazio) e decodificar `tasklist` em cp1252.
 
 ```python
 import subprocess
-# Always absolute exe path on this profile — PATH inside the sandbox is empty
 GIT = r"C:\Program Files\Git\bin\git.exe"
 UV = r"~\.local\bin\uv.exe"
 PY = r"~\Documents\hermes-agent\.venv\Scripts\python.exe"
-r = subprocess.run([GIT, "status", "--short"], cwd=str(repo),
-                   capture_output=True, text=True, timeout=15)
-# tasklist output is cp1252; decode with errors="replace"
-r2 = subprocess.run([r"C:\Windows\System32\tasklist.exe"],
-                    capture_output=True, timeout=10)
-text = r2.stdout.decode("cp1252", errors="replace")
+r = subprocess.run([GIT, "status", "--short"], cwd=str(repo), capture_output=True, text=True, timeout=15)
+t = subprocess.run([r"C:\Windows\System32\tasklist.exe"], capture_output=True, timeout=10).stdout.decode("cp1252", errors="replace")
 ```
 
-**Detection that you're on the broken profile:** `read_file`
-returns `Failed to read file: <path>` for a path that `ls` (or
-`Path.exists()`) can see. Don't retry the same broken tool —
-switch to `execute_code`.
-
-**Why this belongs in michi:** every michi cycle on this profile
-hits this friction. Not having the recipe in the skill means
-re-discovering it every session. The first DA call to
-`execute_code` should be the pivot, not the third.
-
-Reference: hermes-agent michi cycle 2026-09-04 (windows-notify
-feature) — DA lost 3-5 min on the broken tools before pivoting.
-
-## Pre-DA state gate — snapshot before edit, ask once if drift
-
-Even with a Super Prompt that names branch + last commit + worktree
-state, **those facts drift** between SP write and michi exec. One
-cycle's SP said "clean working tree, branch main, last commit
-5bca0e345" — reality was `wip/main-features` with 7 files dirty
-from a parallel session (gateway wizard work, not the SP's scope).
-The michi flow's "user decides" handle saved the cycle, but only
-after a wasted 5-min scan.
-
-**Recipe (3 lines, run before the first edit):**
-
-```bash
-git -C <repo> status --short | head -20
-git -C <repo> branch --show-current
-git -C <repo> log -1 --oneline
-```
-
-Compare each to the SP's claims. If ANY fact disagrees, surface
-the divergence in **one** free-text ask before touching the tree:
-
-> SP says clean + main + 5bca0e345. Reality is dirty
-> (7 modified, 20 untracked) + wip/main-features + <other-sha>.
-> Branch mismatch + parallel work in tree. OK to write into
-> the dirty tree, or feature branch from HEAD?
-
-**Cost of skipping the gate:** 2-5 min of confusion mid-DA when
-`git diff` shows the whole file as removed+added because the
-working tree's HEAD ≠ the SP's expected base, or you accidentally
-branch off the wrong commit. The state gate is 5 seconds.
-
-**Why free-text, not multi-choice:** the user already knows what
-they have on disk. The ask is "still on wip/main-features? / still
-want feature branch from HEAD?" — one-word answer, not a 4-option
-list. (This is the michi "default to free-text" Style rule applied
-to the pre-DA gate.)
+Deteção: `read_file` dá `Failed to read file` para um caminho que `ls`/`Path.exists()` vê; não repetir, mudar para `execute_code` (a 1ª chamada da DA, não a 3ª). Origem: hermes-agent windows-notify, 2026-09-04 (3-5 min perdidos).

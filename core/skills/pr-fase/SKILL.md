@@ -17,6 +17,8 @@ Sem `--criar` imprime o corpo (template `PR_TEMPLATE.md`: O que foi feito, Decis
 | pergunta | rc 3: pedir confirmação ao user com AskUserQuestion |
 | nunca / em falta | rc 4, não cria |
 
+`--repo` é o caminho local do repo (cwd do `gh`), não `owner/nome`; o SP precisa de `pr:` no frontmatter. Provado com PR real (#1, repo de teste, fechado).
+
 Outros rc: 2 review não aprovado; 5 corpo sem «feito» ou sem «prova». Nunca `Co-Authored-By` nem atribuição a agentes.
 
 Testes: `python scripts/test_pr_corpo.py`.

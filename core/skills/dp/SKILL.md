@@ -1,93 +1,45 @@
 ---
 name: dp
 description: "Use when starting any Deep-Planning (DP) session or COMPLEX task requiring structured planning before execution. Produces _PLAN_*.md with phases, risks, verification criteria, and time-boxed deliverables."
-version: 2.1.0
+version: 2.2.0
 ---
-# Deep Planning (DP) — Skill
+# Deep Planning (DP)
 
-> Adapted from obra/superpowers for pi coding agent + the agent.
+> Adaptado de obra/superpowers para pi coding agent + the agent.
 
-## Overview
+Fase de planeamento entre Deep-Research (DR) e Deep-Acting (DA). Aqui não se escreve código, só decisões, fases, riscos e critérios de verificação: o plano é o contrato entre pesquisa e execução. **Um plano sem critérios de verificação é um desejo, não um plano.**
 
-DP is the **structured planning phase** that sits between Deep-Research (DR) and Deep-Acting (DA). No code is written here — only decisions, phases, risks, and verification criteria. The plan is a contract between research and execution.
+| Cenário | Aplicar? |
+|---|---|
+| COMPLEX (multi-passo, código, debugging, arquitetura) | **OBRIGATÓRIO** |
+| «plan this first» | **OBRIGATÓRIO** |
+| «just do it» | Saltar; registar o bypass na nota de sessão |
+| STANDARD com solução conhecida | Recomendado (plano leve) |
+| TRIVIAL one-liner | Nunca; executar |
 
-**Core principle:** A plan without verification criteria is a wish, not a plan.
+## Pré-condição: gate de conclusão do DR
 
-## When to Use
+Antes do DP: (1) o Research Brief existe em `knowledge/projects/<projeto>/research/YYYY-MM-DD-<tópico>-brief.md`; (2) não está vazio (secções preenchidas ou lacunas documentadas); (3) a Confidence Assessment foi revista e as secções de baixa confiança viram riscos; (4) a decisão do Scope Gate (Full/Delta/Skipped) está registada. Sem DR: correr a skill `deep-research` primeiro. Exceção: contexto totalmente conhecido (mesma tarefa há minutos, trivial): documentar a razão e seguir.
 
-| Scenario | Apply? |
-|----------|--------|
-| COMPLEX task (multi-step, code, debugging, architecture) | **MANDATORY** |
-| User says "plan this first" | **MANDATORY** |
-| User says "just do it" | Skip — document bypass in session note |
-| STANDARD task with known solution | Recommended — use lightweight plan |
-| TRIVIAL one-liner | Never — execute directly |
+Fluxo: TRIVIAL → executar (registar bypass). COMPLEX → gate do DR → Analyze → Plan → Quality Gate → Present & Iterate (máx. 2 rondas) → aprovado: DA; rejeitado: voltar ao Analyze ou abortar.
 
-## Pre-Condition: DR Completion Gate
+## Fase 0 — Scope Gate
 
-Before DP can begin, verify the DR (Deep-Research) handoff:
+| Decisão | Condição | Ação |
+|---|---|---|
+| **Saltar** | TRIVIAL, contexto conhecido, one-liner | Executar, registar bypass |
+| **Delta-only** | Mesma tarefa <24 h, contexto conhecido | Plano leve (2-3 fases) |
+| **DP completo** | COMPLEX, contexto novo, multi-sistema | Plano de 7 fases |
 
-1. **Research Brief exists** at `knowledge/projects/<project>/research/YYYY-MM-DD-<topic>-brief.md`
-2. **Brief is not empty** — all sections populated (or gaps documented)
-3. **Confidence Assessment** reviewed — low-confidence sections flagged as risks
-4. **Scope Gate decision** recorded (Full/Delta/Skipped)
+Registar em `## Executive Summary` do plano.
 
-**If DR is missing:** Run `deep-research` skill first. Do not skip.
-**Exception:** Context fully known (same task continued within minutes, trivial task) → document skip reason, proceed.
+## Fase 1 — Analyze (máx. 10 min)
 
-## Workflow
+Ler o Brief; **não repetir a pesquisa**. (1) Reformular o problema numa frase; (2) constrangimentos (técnicos, temporais, recursos); (3) atores afetados; (4) dependências prévias; (5) secções de baixa confiança do Brief → riscos; (6) completar o Brief só se houver lacunas; (7) MISTAKE_LOG do domínio. Sem tempo: seguir com o que há e sinalizar a pressão como risco.
 
-```
-Task received
-  → TRIVIAL? → Execute directly (document bypass)
-  → COMPLEX?
-      → Pre-Condition: DR Research Brief validated (gate above)
-      → Phase 1: Analyze (read Brief, restate, identify constraints)
-      → Phase 2: Plan (write plan with phases, risks, verification)
-      → Quality Gate: self-review before presenting
-      → Phase 3: Present & Iterate (max 2 rounds)
-      → User approves → Execute via DA
-      → User rejects → Return to Phase 1 or Abort
-```
+## Fase 2 — Escrever o plano (máx. 15 min)
 
----
-
-## Phase 0 — Scope Gate (Pre-DP)
-
-Before investing in planning, confirm the task warrants it:
-
-| Decision | Condition | Action |
-|----------|-----------|--------|
-| **Skip entirely** | TRIVIAL, context known, one-liner | Execute directly, log bypass |
-| **Delta-only** | Same task <24h, known context | Lightweight plan (2-3 phases) |
-| **Full DP** | COMPLEX, new context, multi-system | Full 7-phase plan |
-
-Record Scope Gate decision in plan's `## Executive Summary` section.
-
----
-
-## Phase 1 — Analyze (10 min max)
-
-Read the Research Brief. Do NOT re-research.
-
-1. **Restate problem** in one sentence.
-2. **Identify constraints** — technical, temporal, resource.
-3. **Identify actors** — what/who is affected.
-4. **Identify dependencies** — what must exist before this.
-5. **Cross-reference Brief's low-confidence sections** → convert to risks.
-6. **Supplement Brief** only if gaps found — do not start from scratch.
-7. **Check MISTAKE_LOG** for patterns matching this domain.
-
-**Time-box:** 10 minutes. If not done, proceed with what you have and flag time pressure as a risk.
-
----
-
-## Phase 2 — Write Plan (15 min max)
-
-Write to `knowledge/projects/<project>/plans/_draft/_PLAN_YYYYMMDD_HHMMSS.md`.
-Include `status: DRAFT` in YAML frontmatter.
-
-### Required Sections
+Em `knowledge/projects/<projeto>/plans/_draft/_PLAN_YYYYMMDD_HHMMSS.md` com `status: DRAFT`:
 
 ```markdown
 ---
@@ -101,173 +53,75 @@ created: YYYY-MM-DDTHH:MM:SS
 # Plan: <goal>
 
 ## Executive Summary
-{Scope Gate decision, 2-3 sentences on approach}
+{Scope Gate, 2-3 frases sobre a abordagem}
 
 ## Problem Statement
-{Restated from Phase 1}
+{reformulado na Fase 1}
 
 ## Context & Analysis
-<Reference Research Brief. Key constraints, actors, dependencies>
+{Brief referenciado; constrangimentos, atores, dependências}
 
 ## Assumptions
-- {Explicit assumptions, load-bearing ones flagged ⚠️}
+- {explícitas; as de que o plano depende marcadas ⚠️}
 
 ## Phases
-### 1. <phase name>
-- **What:** 1-2 lines
-- **Scope:** paths or systems touched
-- **Done when:** observable/testable criterion
-- **Time-box:** X min max
-- **Parallel:** [list independent phases that can run concurrently]
+### 1. <nome>
+- **What:** 1-2 linhas
+- **Scope:** caminhos ou sistemas tocados
+- **Done when:** critério observável/testável
+- **Time-box:** X min máx.
+- **Parallel:** [fases independentes que correm em simultâneo]
 
 ## Risks
-- {Top 3 risks, each with mitigation and trigger condition}
+- {top 3, cada um com mitigação e condição-gatilho}
 
 ## Out of Scope
-- {Explicit exclusion list — lazy scope kills plans}
+- {exclusões explícitas; âmbito preguiçoso mata planos}
 
 ## Verification Criteria
-- {Per-phase acceptance tests}
+- {testes de aceitação por fase}
 
 ## Rollback Plan
-- {How to undo each phase if needed}
+- {como desfazer cada fase}
 
 ## Open Questions
-- {Anything unresolved — must be addressed or accepted as risk}
+- {o que ficou por resolver: endereçar ou aceitar como risco}
 ```
 
-### Plan Quality Rules
-- **3-7 phases** (minimum 2, maximum 7 — if more, split or simplify)
-- **Every phase** has a "Done when" test/observable
-- **No code** in the plan body — implementation lives in `/da`
-- **Every risk** has a mitigation AND a trigger condition
-- **Time-box** on every phase
-- **Parallel flags** on phases that can run concurrently
+Regras: **3-7 fases** (mínimo 2; mais = dividir ou simplificar); toda a fase com «Done when» e time-box; **sem código** no corpo (a implementação vive no `/da`); todo o risco com mitigação E gatilho; flags de paralelismo só em fases realmente independentes.
 
----
+## Fase 3 — Quality Gate (autorevisão, 3 min)
 
-## Phase 3 — Quality Gate (Self-Review, 3 min)
+Antes de apresentar: Brief referenciado (caminho certo, ficheiro existe); todas as fases com «Done when» e time-box; riscos com mitigação + gatilho; Out of Scope explícito; assunções declaradas (as críticas marcadas); critérios de verificação por fase; rollback; sem código; Scope Gate registado; Open Questions listadas (ou «None — all resolved»); fases paralelas assinaladas. **Qualquer falha: corrigir antes de apresentar, sem exceções.**
 
-Before presenting, validate the plan against this checklist:
+## Fase 4 — Apresentar e iterar (máx. 2 rondas)
 
-- [ ] Research Brief referenced (path correct, file exists)
-- [ ] All phases have "Done when" criterion
-- [ ] All phases have time-box
-- [ ] Risks have mitigation + trigger
-- [ ] Out of Scope is explicit (not implied)
-- [ ] Assumptions are stated, load-bearing ones flagged
-- [ ] Verification Criteria exist per phase
-- [ ] Rollback Plan exists
-- [ ] No code in plan body
-- [ ] Scope Gate decision recorded
-- [ ] Open Questions listed (or "None — all resolved")
-- [ ] Parallel phases flagged
+Resumo conciso (≤5 bullets: objetivo, fases, riscos-chave, fora de âmbito, estimativa). Ronda 1: o user ajusta âmbito/fases/riscos → atualizar e reapresentar. Ronda 2: só ajustes finais. **Ronda 3: abortar** (o plano não converge; escalar ao user) e registar na nota de sessão «Plan rejected after 2 iterations».
+- **Aprovado:** `status: APPROVED`, mover para `plans/_approved/`, registar `approved: YYYY-MM-DDTHH:MM:SS`, executar via **DA**.
+- **Rejeitado:** `status: REJECTED`, registar a razão na nota de sessão, **não executar**, reportar ao user; opcionalmente sugerir novo `deep-research` se as assunções de base estavam erradas.
 
-**If any checkbox fails → fix before presenting. No exceptions.**
+## Orçamento de tempo
 
----
+Analyze 10 min · Plan 15 · Quality Gate 3 · Present 5 por ronda (máx. 2) · **~45 min**; `--deep` soma +15 min por fase.
 
-## Phase 4 — Present & Iterate (Max 2 rounds)
+## Critérios de abortar
 
-1. **Present** concise summary (5 bullets max): goal, phases, key risks, out-of-scope, time estimate.
-2. **User adjusts** → iterate. **Max 2 rounds.**
-3. **Round 3 rejection** → Abort. Log in session note: "Plan rejected after 2 iterations."
+Parar e escalar quando: âmbito fundamentalmente pouco claro após 2 rondas de clarificação; lacunas críticas no Brief que bloqueiam; 2 rejeições; esforço estimado excede o tempo disponível em >50%; dependências desconhecidas e irresolúveis.
 
-### Iteration Rules
-- Round 1: User adjusts scope, phases, or risks → update plan → re-present
-- Round 2: Final adjustments only → present for approval
-- Round 3: **Abort** — plan is not converging. Escalate to user.
+## Anti-padrões
 
-### Approval → DA Handoff
-When user approves:
-1. Update plan frontmatter: `status: APPROVED`
-2. Move to `knowledge/projects/<project>/plans/_approved/`
-3. Record `approved: YYYY-MM-DDTHH:MM:SS`
-4. Execute via **Deep Acting (DA)** skill
+Planear sem Brief do DR (correr `deep-research`); fase sem «Done when» (acrescentar critério); >7 fases (consolidar ou dividir em sub-planos); código no corpo (vai para o DA); iteração infinita (máx. 2 rondas, depois abortar); ignorar secções de baixa confiança (riscos); saltar o Quality Gate; caminhos hardcoded (`sb_resolve`); fases sem time-box; assumir paralelismo sem verificar.
 
-### Rejection → Abort
-When user rejects after 2 rounds:
-1. Update plan: `status: REJECTED`
-2. Log in session note with reason
-3. **Do not execute.** Report findings to user.
-4. Optional: suggest `deep-research` revisit if fundamental assumptions were wrong
+## Observabilidade
 
----
+- [ ] Brief validado (pré-condição) e Scope Gate registado
+- [ ] Plano em `plans/_draft/` referencia o caminho do Brief; Quality Gate passou em todos os itens
+- [ ] `status: APPROVED` antes de executar; iterações ≤2
+- [ ] MISTAKE_LOG verificado via DR; time-box em todas as fases; fases paralelas assinaladas
 
-## Time Budget Summary
+## Referência rápida
 
-| Phase | Max Time | Override |
-|-------|----------|----------|
-| Phase 1 — Analyze | 10 min | `--deep` flag |
-| Phase 2 — Write Plan | 15 min | `--deep` flag |
-| Phase 3 — Quality Gate | 3 min | Fixed |
-| Phase 4 — Present & Iterate | 5 min per round | Max 2 rounds |
-| **Total** | **~45 min** | `--deep` adds +15 min per phase |
-
----
-
-## Abort Criteria
-
-Stop planning and escalate to user when:
-- Task scope is fundamentally unclear after 2 rounds of clarification
-- Research Brief has critical gaps that block planning
-- User rejects plan 2 times
-- Estimated effort exceeds available time by >50%
-- Dependencies are unknown and cannot be resolved
-
----
-
-## Failure Modes & Anti-Patterns
-
-| Anti-Pattern | Fix |
-|-------------|-----|
-| Planning without DR Brief | Run `deep-research` first |
-| No "Done when" per phase | Add verification criterion |
-| Too many phases (>7) | Consolidate or split into sub-plans |
-| Code in plan body | Move to DA; plan is decisions only |
-| Infinite iteration | Max 2 rounds, then abort |
-| Ignoring low-confidence Brief sections | Flag as risks |
-| Skipping Quality Gate | Mandatory self-review before presenting |
-| Hardcoding paths | Resolve dynamically via `sb_resolve` |
-| No time-boxes | Add per-phase time limit |
-| Assuming parallelism without checking | Only flag truly independent phases |
-
----
-
-## Observability
-
-- [ ] Research Brief exists and is validated (Pre-Condition)
-- [ ] Scope Gate decision recorded
-- [ ] Plan document exists in `knowledge/projects/<proj>/plans/_draft/`
-- [ ] Plan references Research Brief file path
-- [ ] Quality Gate checklist passed (all items)
-- [ ] Status is APPROVED before execution
-- [ ] Iteration count ≤2
-- [ ] MISTAKE_LOG checked via DR
-- [ ] Time-budgets present on every phase
-- [ ] Parallel phases flagged
-
----
-
-## Quick Reference
-
-| Aspect | Rule |
-|--------|------|
-| **Pre-Condition** | DR Research Brief validated (or documented skip) |
-| **When** | COMPLEX or user requests |
-| **Phases** | Scope Gate → Analyze → Write → Quality Gate → Present (max 2 rounds) |
-| **Plan location** | `knowledge/projects/<project>/plans/_draft/_PLAN_*.md` |
-| **Approved location** | `knowledge/projects/<project>/plans/_approved/` |
-| **Code location** | `~\Documents\projetcs\<project>\` |
-| **Approval** | Required (max 2 iteration rounds) |
-| **Execution** | Deep Acting (DA) skill |
-| **Time-box** | ~45 min total (per phase: Analyze 10min, Plan 15min, Quality 3min, Present 5min) |
-| **Commit plans** | Never |
-| **Abort** | After 2 rejections, critical gaps, or scope unclear |
-
----
-
-#dp #deep-planning #architecture #planning #quality-gate #time-boxed
+Planos em `plans/_draft/_PLAN_*.md`, aprovados em `plans/_approved/`; código em `~\Documents\projetcs\<projeto>\`; execução: skill DA; ~45 min no total; **planos nunca se commitam**.
 
 ## Adaptação Claude Code (the agent)
 

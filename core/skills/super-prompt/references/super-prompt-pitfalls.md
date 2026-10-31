@@ -1,170 +1,28 @@
-# Super-prompt — common pitfalls
+# Super-prompt — pitfalls
 
-Movido de `SKILL.md` (## Common pitfalls); texto integral, 10 entradas.
+Movido de `SKILL.md`; condensado em 2026-10-31 (regras todas mantidas), 13 entradas.
 
-## 1. Empty goal
-
-1. **Empty goal.** User typed only `/super-prompt`. Write a blocker note,
-   ask once, exit. Do not invent a goal.
-
-## 2. Skipping phases "to save time"
-
-2. **Skipping phases "to save time".** Each phase tightens the next. A
-   90-second brainstorm saves a 30-min rework in DP.
-
-## 3. Multi-choice `clarify` for already-stated facts
-
-3. **Multi-choice `clarify` for already-stated facts.** If the user said
-   "scope is the auth flow" in turn 1, do not ask "auth flow or
-   payments?" in turn 4.
-
-## 4. Incomplete sections 4 / 5 / 8
-
-4. **Incomplete sections 4 / 5 / 8.** "Success criteria" without
-   observable signals = not a success criterion. "Done-when" without a
-   concrete check = not a done condition. Restart grill-me for the
-   under-specified section.
-
-## 5. Saving to the wrong path
-
-5. **Saving to the wrong path.** The 3-tier resolution exists for a
-   reason - always check current working dir first.
-
-## 6. Auto-executing the Super Prompt in the same session
-
-6. **Auto-executing the Super Prompt in the same session.** The point
-   of the Super Prompt is to survive a session boundary. Stay out of
-   DA in this skill. If the user insists, say so explicitly: "this
-   skill builds prompts, not implementations - `/michi` is the
-   executor."
-
-## 7. User pivots mid-pipeline to an unrelated task
-
-7. **User pivots mid-pipeline to an unrelated task.** Mid-pipeline
-   (typically between Phase 1-3) the user may send a meta-instruction
-   or switch topic entirely — e.g. "review this conversation and
-   update skills", "forget the polish, do X", "actually never mind".
-   The wrong move is to keep marching to Phase 4/5 to "finish" the
-   Super Prompt. The right move is to abort the pipeline cleanly,
-   note in one sentence that the Super Prompt was not saved (and
-   why), and hand off to whatever the user actually asked for. Do NOT
-   save a half-baked Super Prompt just to close the loop — the
-   receiving session would be built on unvalidated scope. The user
-   can re-invoke `/super-prompt` when they have a stable goal.
-
-## 8. Multi-round grill-me when one round + defaults suffices
-
-8. **Multi-round grill-me when one round + defaults suffices.** (2026-09-04
-   lesson.) The first grill-me round should batch ALL open questions
-   (scope, success, constraints, non-goals, tecto, browser, evidence) into
-   one free-text ask offering "default" for any item the user wants to
-   skip. After the first round, **if the user's response covers 3+ items
-   with "default" / explicit picks, close grill-me** — do NOT open a
-   second round to "clarify the remaining 1-2 things". Interpret
-   unknowns (e.g. user says "I don't know what Lighthouse is") inline in the
-   Spec appendix: pick a sensible default + one-line note "user
-   unaware, executor treats as gate". One round of grill-me is the
-   ceiling for well-scoped goals. A second round is only justified when
-   the first response materially contradicts a section (e.g. says A then
-   picks B in same turn).
-
-   **The bake-defaults-into-question-text pattern** that makes one round
-   work in practice: list every open decision in the question text with
-   its recommended default prefixed ("Por defeito aplico: (1) confirms-danger
-   FICAM modal; (2) 4 tabs pinadas; (3) ..."). The user replies with
-   "confirmo todas" or names only the deviations. This collapses what
-   would otherwise be a multi-round `clarify` into one turn because the
-   cost of saying yes is zero — no per-option re-reading. Use this when
-   the user is fluent, the defaults are defensible, and the question set
-   is ≥4 items. Don't use it when the user is learning the domain — bake
-   defaults and surface them as facts in the Spec, not as a checklist.
-
-## 9. Saving the Super Prompt with shell-hostile content
-
-9. **Saving the Super Prompt with shell-hostile content.** (2026-09-04/05 lesson.)
-   The body of a Super Prompt routinely contains backticks (`npx lighthouse <url>`),
-   `$`, `!`, unescaped quotes, or Windows paths with spaces. Three failure modes
-   on Windows/MSYS, in order — all fix to the SAME recipe:
-
-   - **`write_file` fails with `unexpected EOF while looking for matching "'`**
-     even when the JSON string is valid — Hermes routes `write_file` through bash.
-   - **`execute_code` + `body = """..."""` also fails** with
-     `SyntaxError: unterminated triple-quoted string literal` (or f-string
-     backslash trap) before the write ever runs.
-   - **`A = body.append; A("...frag with `)` inside...")` ALSO fails** with
-     `SyntaxError: unmatched ')'` — the kernel still parses the whole execute_code
-     cell before running it, and an unbalanced `)` inside one fragment ends the
-     statement early. The fragment is a string literal, but Python doesn't know
-     that until it has matched the parens. Common trigger: Markdown like
-     `"see step 6), \`dashboard.tsx\`.\n"` — the `, )` looks like end of args.
-
-   **Recipe that works for ANY Super Prompt body** — build a LIST of plain string
-   literals directly, then `join`. Do NOT alias `body.append` to `A(...)`; the
-   `A("...")` form is the same trap, just one level deeper:
+1. **Objetivo vazio.** Só `/super-prompt`: nota de bloqueio, perguntar uma vez, sair. Não inventar objetivo.
+2. **Saltar fases «para poupar tempo».** Cada fase aperta a seguinte; 90 s de brainstorm poupam 30 min de retrabalho no DP.
+3. **`clarify` multi-escolha sobre factos já ditos.** «Âmbito é o fluxo de auth» no turno 1 não vira «auth ou pagamentos?» no turno 4.
+4. **Secções 4/5/8 incompletas.** Sucesso sem sinais observáveis, ou done-when sem verificação concreta, não são critérios: voltar ao grill-me nessa secção.
+5. **Guardar no caminho errado.** Usar sempre `sp-new.py` (ver SKILL.md §Onde guardar).
+6. **Auto-executar o SP na mesma sessão.** O ponto do SP é sobreviver à fronteira de sessão; fora da DA. Se o user insiste: «esta skill constrói prompts, não implementações; `/michi` é o executor».
+7. **Pivot a meio para tarefa não relacionada** (tipicamente Fases 1-3: «revê a conversa e atualiza skills», «esquece o polish, faz X», «deixa estar»). Errado: continuar às Fases 4/5 para «fechar». Certo: abortar limpo, dizer numa frase que o SP não foi guardado (e porquê) e passar ao pedido real. Nunca guardar um SP meio cozinhado (a sessão que o recebe assentaria em âmbito não validado).
+8. **Grill-me em várias rondas quando uma + defaults chega** (2026-09-04). A 1ª ronda junta TODAS as perguntas abertas (âmbito, sucesso, constrangimentos, não-objetivos, tecto, browser, evidência) num free-text com «default» para o que o user quiser saltar. Se a resposta cobre 3+ itens com «default»/escolhas explícitas, **fechar o grill-me**: sem 2ª ronda para «os últimos 1-2 pontos». Resolver desconhecidos inline no apêndice do Spec (default sensato + nota «user unaware, executor treats as gate»). Uma ronda é o teto para objetivos bem delimitados; a 2ª só se a resposta contradiz uma secção (diz A e escolhe B no mesmo turno).
+   **Padrão bake-defaults-into-question-text:** listar cada decisão aberta no texto da pergunta com o default recomendado à frente («Por defeito aplico: (1) confirms-danger FICAM modal; (2) 4 tabs pinadas; (3) …»). O user responde «confirmo todas» ou só os desvios; dizer sim custa zero. Usar com user fluente, defaults defensáveis e ≥4 itens; com user a aprender o domínio, os defaults vão como factos no Spec, não como checklist.
+9. **Guardar o SP com conteúdo hostil ao shell** (2026-09-04/05). O corpo traz backticks, `$`, `!`, aspas e caminhos Windows com espaços. Em Windows/MSYS falham, e todos se resolvem com a MESMA receita: `write_file` (passa pelo bash: `unexpected EOF while looking for matching "'`); `execute_code` com `body = """..."""` (`SyntaxError: unterminated triple-quoted string literal` ou armadilha de backslash em f-string); `A = body.append; A("…) …")` (`SyntaxError: unmatched ')'`: o kernel parseia a célula inteira antes de a correr, e um `)` desbalanceado num fragmento fecha a instrução; gatilho típico `"see step 6), \`dashboard.tsx\`.\n"`). **Receita:** lista de literais simples + `join`, sem alias de `append`:
    ```python
    fragments = [
        "# Super Prompt - <slug> (<date>)\n",
        "\n## 1. Role\n",
        "You are ...\n",
-       # ...etc, one literal per logical paragraph
+       # um literal por parágrafo lógico
    ]
    pathlib.Path(out).write_text("".join(fragments), encoding="utf-8")
    ```
-   Two rules that make this bulletproof for any content:
-   (a) **No triple-quoted strings** for content that may contain backticks,
-       `<...>`, or shell metachars.
-   (b) **No parenthesised calls wrapping the fragment** — bare list entries only,
-       so unbalanced `)`, unmatched `"`, or stray `\\` cannot break the parser.
-   The error messages point at the bash wrapper / Python parser, not at your
-   content; trust the recipe, not the error.
-
-## 10. `clarify` tool shape is fragile; failures are opaque
-
-10. **`clarify` tool shape is fragile; failures are opaque.** (2026-09-05
-    lesson.) The `clarify` tool's `questions` param must be an array of
-    properly-shaped `{question, choices?, multi_select?}` objects. Three
-    failure modes that cost tool calls:
-    - Passing a flat array of plain strings: rejected with
-      `"questions must be an array of question objects"` — looks like a
-      schema mismatch but the message gives no clue about the expected shape.
-    - Passing objects with a `choices` field as a single boolean/string
-      instead of `string[]`: rejected with `"choices field requires array
-      of plain strings"` — the same opaque error.
-    - The free-text path is correct: `[{question: "..."}]` (no `choices`)
-      always works. Adding `choices: null` or omitting the field entirely
-      both render as a free-text question.
-
-    **Recipe for free-text grill-me questions** (this is the one-round
-    pattern from Pitfall #8):
-    ```python
-    clarify(questions=[{
-        "question": "Atlas — modais viram tabs dragáveis. Por defeito: (1) confirms-danger ficam modal; (2) até 4 tabs pinadas; (3) layout persiste em localStorage. Confirma ou altera."
-    }])
-    ```
-    One entry, no `choices`, the defaults are inside the question text.
-    User replies in their own words (or "confirmo todas"). Don't try to
-    split into multi-choice `choices` arrays — the user typing in PT-PT
-    needs prose, not pickable rows, and the defaults-as-question-text
-    pattern collapses multi-round clarify into one turn.
-
-    **When multi-choice IS right:** the user has 2-3 mutually-exclusive
-    options that genuinely need to be picked from a list, AND the list
-    is short (≤4 items). Use `choices: ["Recommended (PT-PT ...)", ...]`
-    — put the recommended option FIRST so the UI marks it
-    `(Recommended)`. Don't put options inside the question text — choices
-    written into the question are dead prose the user can't click.
-
-    11. **`clarify` time-out is silent confirmation, not failure** (2026-09-05
-     lesson). When `clarify` returns `{timed_out: true}` with empty
-     `responses`, treat it as the user accepting every default baked into
-     the question text — do NOT re-ask, do NOT open a second round. This
-     is the silent path of the one-round rule from Pitfall #8: the
-     user's "response" was silence, not refusal. Only re-ask if the goal
-     itself was empty (Pitfall #1 — different signal: no question was
-     even asked). The bake-defaults-into-question-text pattern from
-     Pitfall #8 makes this safe: every default is on the record inside
-     the question, so silent accept IS recorded accept.
-
-    12. **Patching a published SP with anchor strings you've assumed, not copied.** (2026-09-05 lesson, atlas-mundo-workflow-michi.) When iterating an SP across multiple user turns, the file changes: phase numbers shift, sentences get rewritten, an early anchor like "no new dep" becomes a different phrase mid-document. **Recipe (mandatory):** before every `replace(old, new)` on a published SP, **read the exact target bytes from the file** (`read_file`, then `m.group(0)`), then use that literal in `replace`. Do NOT use a paraphrase from your memory of the file's first version. `txt.count(anchor) != 1` is the cheap pre-flight that catches this. If count==0, the assertion will fail loudly and you save 3-5 wasted cells. **Failure mode if you skip:** the `replace` silently no-ops, the SP file doesn't change, downstream assertions fail, and you re-issue the same code 3-4 times before you read the actual file. Cost observed: 10-20 min per missed anchor, 3 missed anchors per session.
-
-    13. **DR mini must cite infra that is alive on the base branch, not infra from prior epics.** (2026-09-05 lesson, atlas-mundo-workflow-michi.) When assembling §6 Seams, do NOT list seams that reference symbols or files removed in a recent cycle — the receiving session will try to extend them and fail the typecheck. The canonical mistake: assuming `Card`, `kops`, `viewTerminal`, `w:kanban:*` routes still exist when the strip-kanban cycle (`58c30cb feat(atlas): strip kanban UI residue + chat cross-mundo workflow docs`) just removed them. **Recipe (mandatory):** for every seam name cited in §6, run `git -C <repo> ls-files --error-unmatch <name-or-path>` (or grep `src/` + `server/` for the symbol) before publishing. The base branch HEAD is the source of truth — what was true last session may not be true this one. Same applies to imports (`run-card.mjs` was deleted 2026-09-05; the previous SP still listed it as a reuse target). **Failure mode if you skip:** the executor builds an SP that won't compile in the worktree, hits typecheck rc=1, wastes an hour tracing the dead seam back to its SP source.
+   (a) sem strings triple-quoted para conteúdo com backticks, `<...>` ou metacaracteres; (b) sem chamadas parentesadas à volta do fragmento, só entradas nuas na lista. As mensagens de erro apontam para o wrapper bash/parser, não para o conteúdo: confiar na receita.
+10. **A forma do `clarify` é frágil e as falhas são opacas** (2026-09-05). `questions` tem de ser array de `{question, choices?, multi_select?}`. Falhas: array de strings simples → `"questions must be an array of question objects"`; `choices` como boolean/string em vez de `string[]` → `"choices field requires array of plain strings"` (o mesmo erro opaco). Caminho free-text certo: `[{question: "..."}]` sem `choices` (omitir ou `choices: null` renderizam ambos free-text). Receita one-round (Pitfall #8): uma entrada, defaults dentro da pergunta, ex.: `clarify(questions=[{"question": "Atlas — modais viram tabs dragáveis. Por defeito: (1) confirms-danger ficam modal; (2) até 4 tabs pinadas; (3) layout persiste em localStorage. Confirma ou altera."}])`. Não partir em `choices` (o user em PT-PT quer prosa, não linhas clicáveis). Multi-escolha serve só com 2-3 opções mutuamente exclusivas, lista ≤4, recomendada PRIMEIRO (a UI marca `(Recommended)`) e as opções em `choices`, nunca no texto da pergunta (prosa morta).
+11. **Time-out do `clarify` = confirmação silenciosa, não falha** (2026-09-05). `{timed_out: true}` com `responses` vazio = o user aceitou todos os defaults do texto: sem re-perguntar nem 2ª ronda (a resposta foi silêncio, não recusa). Re-perguntar só se o objetivo estava vazio (#1: nenhuma pergunta chegou a ser feita). O padrão bake-defaults torna isto seguro: o aceite silencioso fica registado.
+12. **Patch a um SP publicado com âncoras assumidas, não copiadas** (atlas-mundo-workflow-michi, 2026-09-05). Ao iterar um SP ao longo de turnos, o ficheiro muda (fases deslocam-se, frases reescrevem-se). **Obrigatório:** antes de cada `replace(old, new)`, ler os bytes exatos do ficheiro (`read_file`, depois `m.group(0)`) e usar esse literal, nunca paráfrase da memória; `txt.count(anchor) != 1` é o pré-voo barato (count==0 falha alto e poupa 3-5 células). Sem isto o `replace` não faz nada em silêncio, as asserções seguintes falham e repete-se o código 3-4 vezes (10-20 min por âncora, 3 por sessão).
+13. **O DR mini só cita infra viva no ramo base** (atlas-mundo-workflow-michi, 2026-09-05). Em §6 Seams não listar símbolos/ficheiros removidos num ciclo recente (a sessão tentaria estendê-los e falharia o typecheck): `Card`, `kops`, `viewTerminal`, rotas `w:kanban:*` já não existiam depois do strip-kanban (`58c30cb`); `run-card.mjs` foi apagado em 2026-09-05 e o SP anterior ainda o listava para reutilizar. **Obrigatório:** por cada seam de §6, `git -C <repo> ls-files --error-unmatch <nome-ou-caminho>` (ou grep em `src/` + `server/`) antes de publicar; o HEAD do ramo base é a verdade. Sem isto, o executor constrói um SP que não compila (typecheck rc=1) e gasta uma hora a rastrear a seam morta até ao SP.

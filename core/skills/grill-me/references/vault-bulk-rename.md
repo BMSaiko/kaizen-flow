@@ -1,78 +1,43 @@
-# Bulk-rename / wholesale-refactor recipe
+# Receita de rename em bloco
 
-Concrete pattern for renaming a term across a notes vault or a mixed
-repo where the active codebase is small but `grep -ri` returns hundreds
-of hits. Use after the grill-me scope chair has settled the question
-"active codebase only, or every hit including worktrees/backups/history?"
-(default: active codebase only).
+Renomear um termo num vault de notas ou repo misto em que o código ativo é pequeno mas `grep -ri` dá centenas de hits. Usar depois de a ronda de âmbito do grill-me fechar «só codebase ativo, ou todos os hits?» (default: só ativo). Aplica-se a «renomear X para Y», «trocar X por Y em todo o lado», rebrand ou deprecação em bloco, quando o repo mistura **código** (mutável, poucos ficheiros) com **artefactos históricos**; um `rg -l X | xargs sed -i` cego daria um diff de vários MB.
 
-## When this applies
+## Exclusões por defeito (adaptar ao projeto; nunca incluir sem override do user)
 
-- The user says "rename X to Y", "rebrand Z to W", "deprecate A
-  everywhere" (pt-PT: "renomear X para Y", "trocar X por Y em todo o
-  lado"), or any wholesale string change.
-- The repo mixes **source code** (mutable, low count) with
-  **historical artifacts** (changelogs, git worktrees, dated backups,
-  draft plan notes) that should NOT be rewritten.
-- A naive `rg -l 'X' | xargs sed -i 's/X/Y/g'` would produce a
-  multi-MB diff that the user doesn't want.
-
-## Suggested default exclusions
-
-These categories look like "codebase" to a grep but are not. **Never
-include them in a bulk rename** unless the user explicitly overrides.
-Treat the list as a configurable default: adapt it to the project.
-
-| Path pattern | Category | Why skip |
+| Caminho | Categoria | Porquê |
 |---|---|---|
-| `.wt/` | Git worktree copies | Git history; rewriting duplicates the change N times |
-| `.backup/`, `backups/` | Dated backups | Mutable in principle, but rewriting is busywork |
-| `data/`, `live-data/` | Runtime state | Data, not source |
-| `CHANGELOG.md` | Append-only history | Lying about the past |
-| `plans/`, `_draft/`, `.dp_*.md` | Historical design notes / work in progress | Written about the OLD name, or overwritten later |
-| `node_modules/`, `.venv/`, `dist/`, `build/` | Generated / vendored | Never |
-| `*.lock`, `package-lock.json`, `uv.lock` | Lock files | Never |
+| `.wt/` | cópias de worktrees | histórico git; duplica a mudança N vezes |
+| `.backup/`, `backups/` | backups datados | trabalho inútil |
+| `data/`, `live-data/` | estado de runtime | dados, não código |
+| `CHANGELOG.md` | histórico append-only | mentir sobre o passado |
+| `plans/`, `_draft/`, `.dp_*.md` | notas de design / trabalho em curso | escritas com o nome ANTIGO ou reescritas depois |
+| `node_modules/`, `.venv/`, `dist/`, `build/`, `*.lock`, `package-lock.json`, `uv.lock` | gerado/vendored | nunca |
 
-## Python walk recipe (works on Windows, no shell quoting issues)
+## Walk em Python (Windows, sem problemas de quoting)
 
-When `rg`/`sed` are flaky on the host (MSYS path translation, missing
-binaries, BOM/CRLF traps), use plain Python with `os.walk`. Run it from
-the root of the tree to rename, as
-`python rename.py OLD NEW` (dry-run) or `python rename.py OLD NEW --apply`.
+Quando `rg`/`sed` falham no host (tradução de caminhos MSYS, binários em falta, BOM/CRLF). Correr na raiz: `python rename.py OLD NEW` (dry-run) ou `... --apply`.
 
 ```python
-import os
-import re
-import sys
+import os, re, sys
 from pathlib import Path
 
 root = Path.cwd()
 old, new = sys.argv[1], sys.argv[2]
 apply = "--apply" in sys.argv[3:]
-
-# Configurable defaults: adapt to the project.
-SKIP_DIRS = {
-    ".git", ".obsidian", ".venv", "venv", "node_modules", "dist", "build",
-    ".next", "__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache",
-    ".wt",       # git worktrees
-    ".backup",   # dated backups
-    "data", "live-data",  # runtime state
-}
-SKIP_NAMES = {"CHANGELOG.md"}  # add other append-only logs as needed
-KEEP_EXT = {".py", ".ts", ".tsx", ".js", ".mjs", ".md", ".yaml", ".yml",
-            ".toml", ".json", ".sh", ".cmd", ".bat", ".html", ".css", ".vue"}
-
+SKIP_DIRS = {".git", ".obsidian", ".venv", "venv", "node_modules", "dist", "build", ".next",
+             "__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".wt", ".backup",
+             "data", "live-data"}
+SKIP_NAMES = {"CHANGELOG.md"}
+KEEP_EXT = {".py", ".ts", ".tsx", ".js", ".mjs", ".md", ".yaml", ".yml", ".toml", ".json",
+            ".sh", ".cmd", ".bat", ".html", ".css", ".vue"}
 pattern = re.compile(re.escape(old), re.IGNORECASE)
 
-def smart_replace(text: str) -> str:
-    # Preserve case: old -> new, Old -> New, OLD -> NEW
-    def repl(m: re.Match) -> str:
+def smart_replace(text):  # preserva maiúsculas: old->new, Old->New, OLD->NEW
+    def repl(m):
         s = m.group(0)
         if s.isupper():
             return new.upper()
-        if s[0].isupper():
-            return new[:1].upper() + new[1:]
-        return new
+        return new[:1].upper() + new[1:] if s[0].isupper() else new
     return pattern.sub(repl, text)
 
 hits = []
@@ -80,71 +45,32 @@ for dirpath, dirs, files in os.walk(root):
     dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
     for f in files:
         p = Path(dirpath) / f
-        if p.name in SKIP_NAMES or "lock" in p.name.lower():
-            continue
-        if p.suffix.lower() not in KEEP_EXT:
+        if p.name in SKIP_NAMES or "lock" in p.name.lower() or p.suffix.lower() not in KEEP_EXT:
             continue
         try:
             if pattern.search(p.read_text(encoding="utf-8")):
                 hits.append(p)
         except (OSError, UnicodeDecodeError):
             pass
-
 for h in hits:
-    rel = h.relative_to(root)
     if apply:
         h.write_text(smart_replace(h.read_text(encoding="utf-8")), encoding="utf-8")
-        print(f"patched: {rel}")
-    else:
-        print(f"would patch: {rel}")
+    print(("patched: " if apply else "would patch: ") + str(h.relative_to(root)))
 ```
 
-## Verification (do this after the patch)
+## Verificação (depois do patch)
 
-Three quick checks, in order:
+1. Re-pesquisar o termo antigo com as mesmas exclusões (o dry-run): deve dar **zero**; sobras = caso falhado (tipicamente extensão em falta em `KEEP_EXT`).
+2. `git diff --stat`: < 100 ficheiros e < 1 MB. Diff de 5+ MB = exclusão furada (`.wt/` ou `.backup/` entrou): abortar, reset, apertar o filtro.
+3. Verificar 2-3 ficheiros representativos (código, doc, config) por falsos positivos (palavra de domínio, nome de vendor, conceito alheio): o closure trata maiúsculas, não semântica.
 
-1. **Re-search for the old term, scope-excluded:** the dry-run above
-   should now return **zero** hits in the active codebase. If anything
-   remains, it's a missed case (likely a file extension missing from
-   `KEEP_EXT`).
+## Smoke do runtime
 
-2. **`git diff --stat`** on the working tree: should show < 100 files
-   changed, total diff < 1 MB. If the diff is 5+ MB, the exclusion set
-   leaked (most likely `.wt/` or `.backup/` got included). Abort,
-   reset, tighten the filter.
+A superfície afetada (verbo de CLI, vista de dashboard) precisa de uma corrida ponta a ponta: o nome novo aparece onde se espera, o antigo não, a feature funciona (`tool old list` → `tool new list` devolve o mesmo). Env vars, tabelas SQL e nomes de schema de tools que ficaram de propósito têm de continuar a bater com o que a UI renomeada lhes passa; «UI primeiro, backend depois» pede um alias temporário.
 
-3. **Spot-check 2-3 representative files** (one source file, one doc,
-   one config) for false-positive replacements: substrings that match
-   but weren't meant to (a domain word, a vendor name, an unrelated
-   concept). The case-preserving closure handles case, not semantics.
+## Gotchas
 
-## Smoke test the runtime
-
-After renaming, the affected surface (CLI verb, dashboard view, etc.)
-needs at least one end-to-end run:
-
-- The new name appears in the help/UI where expected.
-- The old name does **not** appear (re-search above is the unit test).
-- The feature still works: an action that used to be `tool old list`
-  is now `tool new list` and returns the same data.
-- Backend env vars / SQL table names / tool schema names that you
-  intentionally did **not** rename still match what the renamed UI
-  passes to them. If the UI passes an identifier to the backend, a
-  "rename the UI first, backend later" plan needs a temporary alias.
-
-## Known gotchas
-
-- **MSYS path translation** in a shell can corrupt Windows paths. Use
-  `pathlib.Path("C:/...")` in Python (forward slashes work on Windows).
-- **BOM + CRLF** from PowerShell `Out-File` breaks strict TOML/YAML
-  parsers. Re-read with `encoding="utf-8-sig"` to strip the BOM, or
-  write via Python's `pathlib`.
-- **Worktree on the same path as source**: `.wt/` and the source tree
-  often coexist. The exclusion set prunes `.wt` at the `os.walk` level,
-  but a config file that references `.wt/...` paths should be left
-  alone: it points to the *historical* path, which is what people mean
-  when they say "look at the old worktree from August".
-- **Tool schema names** are passed to the model as tool identifiers. If
-  the user said "frontend only", leave the schema name alone, or the
-  model keeps calling the old name after the UI changes. Surface it in
-  the plan if a backend rename pass is coming.
+- **MSYS** corrompe caminhos Windows no shell: usar `pathlib.Path("C:/...")` (barras normais servem).
+- **BOM + CRLF** do `Out-File` do PowerShell parte parsers TOML/YAML estritos: ler com `encoding="utf-8-sig"` ou escrever via `pathlib`.
+- Config que referencia caminhos `.wt/...` deixa-se em paz: aponta o caminho *histórico* («vê a worktree de agosto»).
+- Nomes de schema de tools chegam ao modelo como identificadores: com «só frontend», não os mexer, ou o modelo continua a chamar o nome antigo; anotar no plano se vem um passe de backend.

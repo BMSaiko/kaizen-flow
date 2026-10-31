@@ -1,7 +1,7 @@
 ---
 name: grill-me
 description: Relentless interview to sharpen a plan or design
-version: 1.3.0
+version: 1.4.0
 author: Matt Pocock (adapted for Hermes)
 license: MIT
 platforms:
@@ -26,276 +26,100 @@ metadata:
 ---
 # Grill-me
 
-Relentless interview protocol. Run it yourself, inline; there is no separate skill to load.
+Protocolo de entrevista implacável. Corre-se inline; não há skill separada para carregar.
 
-# Protocol
+# Protocolo
 
-Interview the user relentlessly until you reach a shared understanding. Map this as a
-**design tree**: every decision branches into the decisions that hang off it.
+Entrevistar o user sem tréguas até haver entendimento partilhado. Mapear como **árvore de decisão**: cada decisão ramifica nas que dela dependem.
 
-Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are
-already settled: the questions you can ask _now_ without guessing at answers you
-haven't heard yet. Ask the whole frontier in one round: number each question and give
-your recommended answer. Then wait for the user's answers before the next round.
-
-Format a round like so:
+Trabalhar a árvore em **rondas**. A **fronteira** é toda a decisão cujos pré-requisitos estão fechados: as perguntas que podes fazer _agora_ sem adivinhar respostas ainda não ouvidas. Perguntar a fronteira inteira numa ronda: numerar cada pergunta e dar a resposta recomendada; depois esperar as respostas antes da ronda seguinte.
 
 ```
-? **Q1** - **<short topic>**: <question>?
-> <your recommended answer with rationale>
+? **Q1** - **<tópico curto>**: <pergunta>?
+> <resposta recomendada com razão>
 
 ---
 
-? **Q2** - **<short topic>**: <question>?
-> <your recommended answer with rationale>
+? **Q2** - **<tópico curto>**: <pergunta>?
+> <resposta recomendada com razão>
 ```
 
-Each round the user answers reshapes the tree: settled decisions push the frontier
-outward and unblock questions that depended on them. Recompute the frontier and ask
-the next round. A question whose answer depends on another question still open in this round
-belongs to a _later_ round, not this one.
+As respostas remodelam a árvore: decisões fechadas empurram a fronteira e desbloqueiam as dependentes. Recalcular e perguntar a ronda seguinte; pergunta cuja resposta depende de outra ainda aberta nesta ronda pertence a uma ronda _posterior_.
 
-Finding _facts_ is your job, never the user's. When a frontier question needs a fact from
-the environment (filesystem, tools, etc.), use `Bash`, `Read`, `Grep`/`Glob`,
-or `WebSearch` to find it; don't ask the user for anything you could look up yourself.
-Don't block on it: a running exploration is an unsettled prerequisite, so only the
-questions downstream of it wait for the report; ask the rest of the frontier now. The
-_decisions_ are the user's: put each to them and wait.
+Descobrir _factos_ é trabalho teu, nunca do user: usar `Bash`, `Read`, `Grep`/`Glob` ou `WebSearch`; não pedir ao user o que podes ver. Exploração em curso só atrasa as perguntas a jusante; perguntar já o resto. As _decisões_ são do user: pô-las e esperar.
 
-The session is done when the frontier is empty: every branch of the design tree visited,
-nothing left silently assumed. Do not act on it until the user confirms you have
-reached a shared understanding.
+Fim: fronteira vazia, todos os ramos visitados, nada assumido em silêncio. Não agir antes de o user confirmar o entendimento partilhado.
 
-# Modal/UI speculation trap (YAGNI, with user-override escape hatch)
+# Armadilha da especulação de modal/UI (YAGNI, com saída por pedido explícito)
 
-In the grilling flow, do not propose **new** UI affordances (modals,
-auto-popups, post-run wizards) unless the user has asked for them.
-Specifically:
+No grilling não propor affordances de UI **novas** (modais, auto-popups, wizards pós-run) que o user não pediu:
 
-- **Do not** propose a "modal pré-run" for the user to type the plan/decision
-  when the card description is **already an editable textarea** that the spawn
-  injects into the prompt (e.g. Atlas kanban cards: the textarea is the
-  `description` field, already wired to `cardDescription` in the spawn prompt).
-  Ponytail rung 1: "Does this need to exist at all?" — the textarea is
-  already there.
-- **Do not** propose an "auto-open refine modal after run" when an existing
-  reject flow already opens the same modal on user click (Atlas: the
-  reject modal already has the refine textarea + submit). Auto-opening
-  speculates a UX the user didn't request.
-- **The rule:** when an existing field or flow already covers the case the
-  user described, point to it and use it. If a feature request is missing,
-  the absence is the answer.
+- **Não** propor «modal pré-run» para escrever o plano/decisão quando a descrição do card **já é uma textarea editável** injetada no prompt do spawn (Atlas: campo `description` ligado a `cardDescription`). Ponytail degrau 1: «isto precisa de existir?» — a textarea já lá está.
+- **Não** propor «auto-abrir modal de refine após o run» se o fluxo de reject já abre o mesmo modal ao clique (Atlas: o modal de reject tem a textarea de refine + submit); auto-abrir especula uma UX não pedida.
+- **Regra:** se um campo ou fluxo existente cobre o caso descrito, apontá-lo e usá-lo; se falta uma feature, a ausência é a resposta.
 
-**Exception (learned 2026-09-01):** the user *explicitly* asked for the
-modal. In that case build it — but build it on the *existing* `openModal`
-helper, not a new framework. The trap fires most often on the Q-round
-*after* the grilling flow starts working ("wouldn't it be nicer if there
-was a modal for X?"). When the user says "I want a modal that...", the
-absence of an existing field is no longer the answer — build it small,
-reuse `openModal`, ship. Same rule: never invent a new modal framework
-to solve this; `openModal` already does the job.
+**Exceção:** se o user pediu *explicitamente* o modal, construir pequeno sobre o helper `openModal` existente, nunca um framework novo. Em chat o grilling é inline; no Atlas o worker trata as rondas.
 
-When invoked from chat (not Atlas), grilling still happens inline. The
-distinction matters: Atlas = worker handles rounds in wezterm; chat = agent
-handles rounds in the same conversation.
+# Validação da entrada — ANTES da 1ª ronda (crítico)
 
-# Input validation — BEFORE the first round (load-bearing)
+A semente do plano/decisão (descrição do card Atlas, mensagem do user, bloco `<descreve o plano>`) é pré-requisito de todas as rondas. Se está **em falta, vazia ou é placeholder literal**, não há fronteira a construir: não improvisar uma adivinhando a intenção, não abrir rondas, nem sequer começar a escrever um bloco de perguntas (escrevê-lo É a falha).
 
-The plan/decision seed (Atlas card description, user message, or `<descreve o plano>`
-block) is the prerequisite for every round. If the seed is **missing, empty, or
-a literal placeholder**, no frontier can be built a frontier — there is nothing
-to stress-test. Do NOT improvise a frontier by guessing what the user meant.
-Do NOT open rounds against assumed intent. Do NOT even start typing a frontier
-block — typing the questions IS the failure mode.
+Sementes inválidas (tratamento igual):
+- String vazia / só espaços;
+- Placeholders literais: `<descreve o plano>`, `<descreve a decisao>`, `<descreve o design>`, `TODO`, `TBD`, `???`, `...`, qualquer `<...>` que pareça slot de template;
+- Só o esqueleto do template sem conteúdo (nome do mundo + slug + «descreve a decisão»);
+- «grill this» apontado a um card Atlas cuja descrição é o template acima (falha silenciosa, ver Pitfall 1).
 
-Treat these as **invalid seeds** (same handling for all):
+**Ação obrigatória (1ª resposta, mais nada):**
+1. PARAR: sem «ronda 1» sobre intenção assumida nem bloco Q1/Q2/Q3.
+2. Reportar numa linha o bloqueio exato (que placeholder/slot) e o que é entrada válida (2-5 linhas).
+3. Próxima ação do user: onde colar (chat ou descrição do card) e o que a próxima sessão fará («DR → grill-me → DP → DA, com notas no fim»).
+4. No Atlas: criar nota com tags `grilled, decision, blocked, needs-input` e mover o card para `review` com `result=BLOCKER` (protocolo e escrita da nota na skill `atlas-wrapper-python`); não arquivar o card.
+5. Sair; sem polling.
 
-- Empty string / whitespace only
-- Literal placeholders: `<descreve o plano>`, `<descreve a decisao>`,
-  `<descreve o design>`, `TODO`, `TBD`, `???`, `...`, any `<...>`-wrapped text
-  that looks like a template slot
-- Only the prompt template scaffolding with no actual content (e.g. just the
-  world name + slug + a one-line "describe the decision" prompt)
-- The user said "grill this" but pointed at an Atlas card whose description
-  is the template above (this is the silent-failure case — see "Atlas
-  auto-load pitfall" below)
+**Carregada pelo user fora do Atlas** («grill me»/«grill this» no chat): plano na mesma mensagem = semente real, avançar; senão perguntar uma vez «cola o plano/decisão em 2-5 linhas aqui, ou aponta-me o card Atlas com description preenchida» e parar (mesma recusa: o chat não difere do Atlas).
 
-**Required action when seed is invalid (FIRST response, no other output):**
+Anti-padrão evitado: construir a fronteira sobre intenção **assumida** (inventar um plano e testar a invenção) é alucinação com verniz socrático.
 
-1. STOP. Do not run a "round 1" against assumed
-   intent. Do not type a Q1/Q2/Q3 frontier block.
-2. One-line report naming the exact blocker: which placeholder/empty slot,
-   and what valid input looks like (concrete length: "2-5 linhas").
-3. Concrete next action for the user: where to paste (chat or card
-   description), and what the next session will do once they do
-   ("DR → grill-me → DP → DA, com notas no fim").
-4. If running inside an Atlas world, create a note with tags
-   `grilled, decision, blocked, needs-input` and move the card to `review`
-   with `result=BLOCKER` (see `atlas-wrapper-python` skill for the run
-   protocol and how to write the note). Do NOT archive the card — the user
-   still needs to act on it.
-5. Exit. Do not poll, do not check again later.
+# Fronteira de âmbito em mudanças em bloco (2026-09-02)
 
-# When the user loads the skill themselves (out-of-band)
+Num **rename/refactor/rebrand em bloco** («renomeia X para Y», «reescreve todo o Z», «depreca W em todo o lado»), a árvore tem uma raiz escondida: o **âmbito**. Três sub-perguntas pedem ronda inicial antes das de design:
 
-Sometimes the user types `grill me` or `grill this` in chat without an
-Atlas card. In that case:
+1. **O que conta como «o codebase»?** Um `grep -r` literal dá 745 hits onde só 30-50 são ficheiros que o user abre; o resto são snapshots, backups, worktrees, artefactos históricos. Determina o tamanho do diff e o risco.
+2. **O que é sagrado vs cosmético?** Artefactos históricos (entradas de CHANGELOG.md, git log, versões nomeadas, nomes de vendor em metadados) são append-only por contrato social; reescrevê-los mente sobre o passado. Strings visíveis ao utilizador são mutáveis.
+3. **Só frontend ou tudo?** Resposta canónica do user («no UI tudo q é kanban passa para michi e futuramente mudamos o código e backend, para já só o que é mostrado ao cliente final»): renomear primeiro o que o user vê, backend para depois. É o default; só perguntar se o user quiser mais.
 
-- If they describe the plan in the same message, proceed (real seed).
-- If they do NOT, ask once: "cola o plano/decisao em 2-5 linhas aqui, ou
-  aponta-me o card Atlas com description preenchida." Then stop. Same
-  refusal — the chat is not different from the Atlas world, the seed rule
-  is the same.
+**Armadilha do rename no vault (Second Brain do user, 2026-09-02):** com centenas de hits de `grep -ri '<termo>'`, ~5% é código/docs ativos e ~95% é isto:
+- `.wt/<branch>/` — worktrees git, cópias quase idênticas; renomear suja o histórico e parte `git log`/bisect;
+- `data/.wt/`, `live-data/`, `data/.backup/` — estado de runtime e backups datados (dados, não código);
+- `knowledge/projects/<X>/plans/<data>-<tópico>-{DR,DP,DA}.md` — notas de design históricas;
+- `CHANGELOG.md` — append-only (reescrever mente sobre o passado): **nunca**;
+- rascunhos `.dp_*.md`, `_draft/` — trabalho em curso.
 
-# Anti-pattern (which this skill existed to prevent)
+**Regra prática:** `grep -ri` > 100 hits e < 50 ficheiros ativos a editar: **parar e perguntar o âmbito primeiro** («só codebase ativo, ou todos os hits incluindo worktrees/backups/histórico?»); decide o diff e se o CHANGELOG também se reescreve. É cadeira de âmbito, não de design: normalmente **Ronda 1** de um grill de mudança em bloco, antes de «o que significa o novo nome». Receita concreta (walk Python com `os.walk`, conjuntos de exclusão, verificação por re-grep e `git diff --stat`): `references/vault-bulk-rename.md`.
 
-A previous version of this skill was loaded against a card with a literal
-`<descreve a decisao>` placeholder. The skill started a round and
-built a frontier against **assumed** intent — i.e. the
-agent invented a plan and stress-tested its own invention. That is not
-grilling; that is hallucination dressed as Socratic method. The rule above
-exists to refuse the round until the seed is real.
+# Invocação no Atlas (ping-pong assíncrono)
 
-# Bulk-rename / wholesale-change scope frontier (learned 2026-09-02)
+Com a invocação a partir de um card Atlas, o template do prompt já traz nome do mundo, slug e descrição. **O grilling é ping-pong assíncrono entre o worker e a UI Atlas; o pane wezterm NÃO é o canal** (um loop «esperar resposta» bloqueia para sempre em headless):
 
-When the topic is a **wholesale rename, refactor, or rebrand** ("rename X to
-Y", "rewrite all Z", "deprecate W everywhere"), the design tree has a hidden
-root that the usual frontier misses: **scope**. Three sub-questions
-that almost always need an early round before any design Qs:
+1. Ler bem a descrição. Placeholder (`<descreve a decisao>`, `TBD`, secção «O que quero grillar» vazia): não disparar às cegas; abortar para nota (ver Validação).
+2. Escrever as perguntas da Ronda 1 numa nota via API do kanban (URL no template). Tags `grilled, decision, awaiting-user, card-<cardId>` (`card-` com hífen, não `card:`; os matchers aceitam ambos). Título = título do card; corpo = Ronda 1 completa com as recomendações.
+3. Mover o card para `review` e escrever o `result` («Round 1 gravado como nota n<id>; à espera de resposta via reply no card»).
+4. Sair limpo (rc=0); o user responde pela UI.
 
-1. **What counts as "the codebase"?** A literal `grep -r` may return 745
-   hits where only 30-50 are files the user actually opens. The rest are
-   snapshots, backups, worktrees, history artifacts. The answer determines
-   the diff size and the risk.
-2. **What's sacred vs cosmetic?** Historical artifacts (CHANGELOG.md
-   entries, git log, named versions, vendor names in package metadata)
-   are **append-only by social contract**. Rewriting them lies about what
-   happened. User-facing strings are mutable.
-3. **Frontend-only or full?** User said "no UI tudo q é kanban passa para
-   michi e futuramente mudamos o codigo e backend, par ajá só o que é
-   mostrado ao cliente final" — that is the **canonical** answer: rename
-   what the user sees first, leave the backend alone for a later pass.
-   This is the default. Re-ask only if the user wants more.
+**Reply (UI Atlas ↔ worker, 2026-09-01).** Botão `reply` nas notas grilled (`src/views/notes.ts::replyGrill`) e `Reply` no modal do terminal (`src/views/kanban.ts::openReplyModal`, `data-act="reply-from-term"`), ambos com modal dividido (markdown do card à esquerda, textarea à direita):
+- **Na nota:** cria um card de grilling **NOVO** (clona a origem, anexa a resposta à descrição, põe em `doing` com `skills: ['grill-me']`, chama `launchRun`, navega); preserva o estado do original e dá uma Ronda 2 limpa.
+- **No modal do terminal:** **re-spawn** do mesmo card (anexa a resposta, chama `runCard`), para manter a sessão viva no pane.
 
-**The vault-rename trap (user's Second Brain, 2026-09-02):** when
-`grep -ri '<term>'` returns hundreds of hits, the breakdown is usually
-~5% active code/docs and ~95% of these categories — each non-obvious until
-you see it once:
+A nota tem a tag `card-<id>` do card **origem**. Numa nova ronda **ler primeiro a nota anterior**; as respostas do user estão na descrição do card novo em `## Reply do user (<timestamp>)`. O padrão-nota sobrevive à morte do worker; sem ele a skill abortava em 3 s com o card em review sem pergunta nenhuma (BUG 3h em `atlas-wrapper-python`).
 
-- `.wt/<branch>/` — git worktrees, one subdir per worktree. Lots of
-  near-duplicate copies of the same code. Renaming them all suja git
-  history, doesn't change what the user sees, and breaks future
-  `git log`/bisect that wants to find "kanban v3 from 27-Aug".
-- `data/.wt/`, `live-data/`, `data/.backup/` — runtime state, board
-  JSON snapshots, dated `.backup/<name>-<iso>.json` files. Mutable data
-  files, not source.
-- `<project>/.backup/` — note/board backups with timestamps in the
-  filename. Mutable in principle, but mass-rewriting timestamps to
-  match the rename is just busywork.
-- `knowledge/projects/<X>/plans/<date>-<topic>-{DR,DP,DA}.md` — design
-  notes. Historical. Renaming the term inside them rewrites what the
-  designer was thinking about at the time. Leave them.
-- `CHANGELOG.md` — append-only log of what shipped. Rewriting an entry
-  from "added kanban terminal control" to "added michi terminal control"
-  is a lie about the past. **Never.**
-- Drafts `.dp_*.md`, `.dp_<id>.md`, `_draft/` dirs — work in progress.
-  Safe to leave (the user hasn't read them) but not worth touching
-  because they may be overwritten tomorrow.
-
-**Rule of thumb:** count the hits. If `grep -ri` returns > 100 and the
-active codebase you actually edit is < 50 files, **stop and ask the
-scope question first** ("active codebase only, or every hit including
-worktrees/backups/history?"). The diff size and the answer to "should
-this also rewrite CHANGELOG" both depend on the answer.
-
-This is a scope chair, not a design chair. It usually belongs in **Round 1**
-of a wholesale-change grill, before any "what does the new name mean"
-questions.
-
-# See also — for vault rename/refactor recipes
-
-`references/vault-bulk-rename.md` — the concrete shell recipe (Python
-walk via `os.walk`, exclusion sets for `.wt/`, `.backup/`, `data/`,
-`live-data/`, `CHANGELOG.md`, etc.) and the verification pattern
-(re-grep for stale hits, `git diff --stat` for diff size sanity check).
-
-# Atlas invocation (async ping-pong)
-
-When invoked from an Atlas card (workdir context), the prompt template already includes
-the world's name, slug, and description. **The grilling session is an async
-ping-pong between the worker and the Atlas UI. The wezterm pane is NOT the
-channel.** A "wait for the user to answer" loop blocks forever in headless
-context. Pattern:
-
-1. **Read the description carefully.** If it contains a placeholder (e.g.
-   `<descreve a decisao>`, `TBD`, `<descreve...>`, an empty "O que quero grillar"
-   section), do NOT shotgun. Detect this and abort into a note.
-2. **Write Round 1's questions to a note** via the kanban API (URL is in the prompt
-   template). Tags: `grilled, decision, awaiting-user, card-<cardId>` (note: user's
-   notes use **`card-` with hyphen**, not `card:` with colon — matchers must accept
-   both). The note title = card title. The note body = the full Round 1 with your
-   recommended answers.
-3. **Move the card to `review`** and write a `result` field on the card with a one-liner
-   ("Round 1 gravado como nota n<id>; à espera de resposta via reply no card").
-4. **Exit cleanly** (rc=0). The user will reply via the Atlas UI.
-
-## Reply flow (Atlas UI ↔ worker, 2026-09-01)
-
-The Atlas UI has a `reply` button on grilled notes (`src/views/notes.ts::replyGrill`)
-and a `Reply` button in the terminal modal (`src/views/kanban.ts::openReplyModal`,
-`data-act="reply-from-term"`). Both open a split-layout modal: card markdown on the
-left, textarea on the right.
-
-- **In the note button:** submitting creates a **NEW** card of grilling (clones the
-  source, appends the reply to description, puts it in `doing` with
-  `skills: ['grill-me']`, calls `launchRun`, navigates to the new card).
-  This preserves the original card's state and gives the user a clean Round 2.
-- **In the terminal modal:** submitting does a **re-spawn** of the same card
-  (appends reply to description, calls `runCard`). Used when the worker is alive in
-  the pane and the user wants to keep that session.
-
-The note has the tag `card-<id>` of the **source** card. The reply button reads this
-tag, finds the source card, and either clones it (note button) or re-spawns it
-(terminal button). When the new round is invoked, **read the previous note FIRST**
-to get the context. The note title is the same as the card title; the note body has
-your previous round's questions and the user's replies will be in the new card's
-description under `## Reply do user (<timestamp>)`.
-
-**Why this shape:** the user is in the Atlas UI, not the terminal. A "wait for the
-user's answers" loop blocks forever in headless context. The note-based pattern
-turns the grilling into an async ping-pong that survives worker death. Without it, the
-skill aborts in 3 seconds and silently moves the card to review with no question ever
-asked (BUG 3h in `atlas-wrapper-python`).
-
-## Auto-detect questions in the worker log (optional, 2026-09-01)
-
-The Atlas `viewTerminal` polls the worker's `.log` for `? **Q\d+**` regex
-(the agent's format). When a new question is detected, a reply modal opens
-automatically with the question hint pre-filled. Format coupling: if the agent changes
-the question format, this regex must be updated. Cheap and useful; not required for
-the skill to function — it's a UI nicety.
+**Auto-deteção (opcional):** o `viewTerminal` do Atlas faz poll do `.log` pela regex `? **Q\d+**` e abre o modal de reply; mudar o formato das perguntas obriga a atualizar a regex.
 
 # Pitfalls
 
-1. **Empty plan = immediate blocker (BUG 3h, 2026-09-01).** If the card description has
-   no real decision (placeholder, "TBD", `<descreve...>`, or the "O que quero grillar"
-   section is empty), do NOT spend a turn trying to infer. Create a note with title
-   "Grilling bloqueado: <card-id> — description vazia", tags
-   `grilled, decision, blocked, needs-input`, body = "Card <id> sem decisão. Worker
-   abortou sem rounds. Ação: user cola plano/decision na description e clica Reply."
-   Move the card to `review`. Do not invent questions.
-2. **Don't shotgun.** If you can't open a clean frontier (e.g. only 1 fact available
-   and 3 things depend on it), ask the 1 question that unblocks the most. Better 1 Q
-   than 5 speculative ones.
-3. **Recommended answer is mandatory.** Each question carries your best guess. The
-   user accepts/rejects — this is the contract. Never ask "what do you think?" without
-   a recommended answer.
-4. **Fact-finding is your job, not the user's.** Don't ask the user to run a command
-   you can run. The exception is when the fact is about user preference or context you
-   cannot observe (e.g. "do you have access to X?").
-5. **Recursion guard.** If the same question appears in your frontier twice (you
-   already asked it, or it was already settled in a prior note), drop it. If the
-   frontier is empty after dedup, write a "0 rounds" note and exit.
-6. **Skill is one-shot.** Don't promise "I'll wait for your answer then ask Round 2" —
-   you won't be alive when the user replies. Each invocation is ONE round. Document
-   the round in a note; the next invocation reads it and continues.
+1. **Plano vazio = bloqueio imediato (BUG 3h, 2026-09-01).** Descrição sem decisão real (placeholder, «TBD», `<descreve...>`, «O que quero grillar» vazio): não gastar um turno a inferir. Criar nota «Grilling bloqueado: <card-id> — description vazia», tags `grilled, decision, blocked, needs-input`, corpo «Card <id> sem decisão. Worker abortou sem rounds. Ação: user cola plano/decision na description e clica Reply.»; mover para `review`; não inventar perguntas.
+2. **Sem rajadas.** Sem fronteira limpa (1 facto disponível e 3 coisas dependentes), fazer a 1 pergunta que desbloqueia mais; melhor 1 do que 5 especulativas.
+3. **Resposta recomendada obrigatória.** Cada pergunta leva o teu melhor palpite; o user aceita/rejeita (é o contrato). Nunca «o que achas?» sem recomendação.
+4. **Factos são teus.** Não pedir ao user comandos que podes correr; exceção: preferência ou contexto que não observas («tens acesso a X?»).
+5. **Guarda de recursão.** Pergunta que já apareceu na fronteira (feita, ou fechada numa nota anterior): largar; fronteira vazia após dedup = nota «0 rounds» e sair.
+6. **A skill é one-shot.** Não prometer «espero a resposta e faço a Ronda 2» (não estarás vivo): cada invocação é UMA ronda, documentada numa nota; a invocação seguinte lê-a e continua.
