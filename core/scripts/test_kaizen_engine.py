@@ -71,3 +71,27 @@ def test_precisa_perguntar_irreversivel_pergunta_sempre():
 def test_parse_permitir_separa_por_ponto_e_virgula():
     assert ke.parse_permitir("a b; c ;;d") == ["a b", "c", "d"]
     assert ke.parse_permitir(None) == []
+
+
+def _git(cwd, *args):
+    import subprocess
+    return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True, check=True)
+
+
+def test_relocate_untracked_renames_and_creates_parent(tmp_path):
+    src = tmp_path / "a.md"
+    src.write_text("x\r\ny\r\n", encoding="utf-8", newline="")
+    dst = tmp_path / "novo" / "dir" / "a.md"
+    ke.relocate(src, dst)
+    assert not src.exists() and dst.read_bytes() == b"x\r\ny\r\n"
+
+
+def test_relocate_tracked_uses_git_mv(tmp_path):
+    _git(tmp_path, "init", "-q")
+    src = tmp_path / "TODO" / "a.md"
+    src.parent.mkdir()
+    src.write_text("x\n", encoding="utf-8")
+    _git(tmp_path, "add", "TODO/a.md")
+    ke.relocate(src, tmp_path / "Doing" / "a.md")
+    status = _git(tmp_path, "status", "--porcelain").stdout
+    assert status.strip() == "A  Doing/a.md"  # git mv deixa o destino em stage; rename simples dava «??»

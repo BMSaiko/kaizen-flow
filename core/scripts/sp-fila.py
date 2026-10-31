@@ -24,7 +24,6 @@ frontmatter. Contam por corrida (retomar = nova corrida): tempo desde o arranque
 à mãe (feitos, falhados, por correr) além do relatório.
 """
 import argparse
-import importlib.util
 import json
 from urllib.parse import unquote
 import os
@@ -36,15 +35,12 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
-_spec = importlib.util.spec_from_file_location("sp_list", Path(__file__).with_name("sp-list.py"))
-sp_list = importlib.util.module_from_spec(_spec)
-sys.modules.setdefault("sp_list", sp_list)
-_spec.loader.exec_module(sp_list)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_engine  # noqa: E402
 
+sp_list = kaizen_engine.load("sp-list")
 REPO = Path(__file__).resolve().parent.parent
-_cspec = importlib.util.spec_from_file_location("kaizen_config", Path(__file__).with_name("kaizen_config.py"))
-_cfg = importlib.util.module_from_spec(_cspec)
-_cspec.loader.exec_module(_cfg)
+_cfg = kaizen_engine.load("kaizen_config")
 USER = _cfg.user_name(REPO)
 SCRIPTS = Path(__file__).resolve().parent
 ESTADO = Path.home() / ".claude" / "sp-fila-estado.json"
@@ -644,10 +640,7 @@ def _custos_seguros(custo_fn=None):
 
 
 def _custos():
-    spec = importlib.util.spec_from_file_location("sp_metricas", SCRIPTS / "sp-metricas.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod.custo_por_slug()
+    return kaizen_engine.load("sp-metricas").custo_por_slug()
 
 
 AJUDA = """Orquestrador do sp-fila (regras):

@@ -9,11 +9,10 @@ import sys
 import time
 from pathlib import Path
 
-import importlib.util as _ilu
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_engine  # noqa: E402
 
-_cspec = _ilu.spec_from_file_location("kaizen_config", Path(__file__).with_name("kaizen_config.py"))
-_kc = _ilu.module_from_spec(_cspec)
-_cspec.loader.exec_module(_kc)
+_kc = kaizen_engine.load("kaizen_config")
 REPO = Path(__file__).resolve().parent.parent
 
 

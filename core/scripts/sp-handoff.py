@@ -55,10 +55,7 @@ def _agent_claims():
     """Slugs reclamados pelo agente deste worktree; None fora de worktrees (comportamento original)."""
     if not Path(__file__).with_name("sb-agent.py").is_file():
         return None
-    spec = importlib.util.spec_from_file_location("sb_agent", Path(__file__).with_name("sb-agent.py"))
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["sb_agent"] = mod
-    spec.loader.exec_module(mod)
+    mod = kaizen_engine.load("sb-agent")
     try:
         agent = mod.current_agent(Path.cwd())
         return set(mod.claims_of(Path.cwd(), agent)) if agent else None

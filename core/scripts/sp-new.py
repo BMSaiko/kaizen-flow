@@ -13,24 +13,18 @@ Uso:
 Em `--children`, `b:a` = b depende de a; `c:a+b` = c depende de a e b. Valida tudo antes de escrever.
 """
 import argparse
-import importlib.util
 import re
 import sys
 from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_engine  # noqa: E402
 import kaizen_hooks  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_list", Path(__file__).with_name("sp-list.py"))
-sp_list = importlib.util.module_from_spec(_spec)
-sys.modules["sp_list"] = sp_list
-_spec.loader.exec_module(sp_list)
+sp_list = kaizen_engine.load("sp-list")
 
-_gspec = importlib.util.spec_from_file_location("sp_gates", Path(__file__).with_name("sp-gates.py"))
-sp_gates = importlib.util.module_from_spec(_gspec)
-sys.modules["sp_gates"] = sp_gates
-_gspec.loader.exec_module(sp_gates)
+sp_gates = kaizen_engine.load("sp-gates")
 
 SECTIONS = (
     "1. Role", "2. Context", "3. Objective (single sentence)", "4. Success criteria (verifiable)",

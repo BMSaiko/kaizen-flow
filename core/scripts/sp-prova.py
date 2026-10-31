@@ -8,15 +8,15 @@ este script; assim não há `$` nem crases numa linha de comando que peça aprov
 Copia bytes (preserva CRLF); recusa nomes com separadores e não sobrescreve sem --forcar.
 """
 import argparse
-import importlib.util
 import re
 import shutil
 import sys
 from pathlib import Path
 
-_cspec = importlib.util.spec_from_file_location("kaizen_config", Path(__file__).with_name("kaizen_config.py"))
-_cfg = importlib.util.module_from_spec(_cspec)
-_cspec.loader.exec_module(_cfg)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_engine  # noqa: E402
+
+_cfg = kaizen_engine.load("kaizen_config")
 
 NOME_OK = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 

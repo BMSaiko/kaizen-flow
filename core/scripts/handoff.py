@@ -23,14 +23,15 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_engine  # noqa: E402
+
 _spec = importlib.util.spec_from_file_location("sp_handoff", Path(__file__).with_name("sp-handoff.py"))
 sp_handoff = importlib.util.module_from_spec(_spec)
 sys.modules["sp_handoff"] = sp_handoff
 _spec.loader.exec_module(sp_handoff)
 
-_cspec = importlib.util.spec_from_file_location("kaizen_config", Path(__file__).with_name("kaizen_config.py"))
-_cfg = importlib.util.module_from_spec(_cspec)
-_cspec.loader.exec_module(_cfg)
+_cfg = kaizen_engine.load("kaizen_config")
 
 HandoffError = sp_handoff.HandoffError
 HANDOFFS_DIR = _cfg.sp_root(Path(__file__).resolve().parent.parent) / "handoffs"
