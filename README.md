@@ -20,11 +20,19 @@ Works with **Claude Code** and **Codex CLI** (plus any harness that reads `AGENT
 ## How it works
 
 <p align="center">
-  <img src="docs/assets/sp-workflow.svg" alt="SP workflow: brainstorm, swot, grill-me and dr build an 8-section Super Prompt that moves TODO, Doing, Done" width="100%">
+  <img src="docs/assets/sp-workflow.svg" alt="SP workflow: brainstorm, swot, grill-me and dr build an 8-section Super Prompt that moves TODO, Doing, Done, closes with sp-fechar and runs through sp-fila, sequential or parallel" width="100%">
 </p>
 
 <p align="center">
-  <img src="docs/assets/michi-cycle.svg" alt="michi cycle: dr, grill, dp, da, gates, report, reflect, commit proposal" width="100%">
+  <img src="docs/assets/michi-cycle.svg" alt="michi cycle: dr, grill, dp, da, then gates, pentest, review-ciclo and pr-fase, then report, reflect and commit proposal" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/assets/architecture.svg" alt="Architecture: one core of skills, commands and scripts is rendered by the claude, codex and agents-md adapters into your project" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/assets/sp-fila-parallel.svg" alt="sp-fila parallel: up to N panes, one worktree each, a watcher that brings blocked panes to you" width="100%">
 </p>
 
 ## Why it uses fewer tokens and ships more
