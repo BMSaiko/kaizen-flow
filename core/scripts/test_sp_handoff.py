@@ -249,7 +249,8 @@ def test_main_launch_auto_recusa_sp_fora_de_doing(tmp_path, capsys):
     assert "só com SP em Doing" in capsys.readouterr().err
 
 
-def test_main_launch_auto_com_doing_mostra_os_comandos(tmp_path, capsys):
+def test_main_launch_auto_com_doing_mostra_os_comandos(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("WEZTERM_PANE", "3")
     doing = make_sp(tmp_path, "atlas/sp/Doing", "a")
     assert sp_handoff.main(["--launch", str(doing), "--auto", "--dry-run", "--pane", "3"]) == 0
     assert "/clear" in capsys.readouterr().out

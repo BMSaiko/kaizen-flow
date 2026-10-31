@@ -82,7 +82,8 @@ def _atividade(sessao, run, inicio_fila=None):
 def _norm_caminho(caminho):
     """Caminho comparável: sem `file://`, com `/`, minúsculas e sem barra final (cwd do wezterm vs. worktree registada)."""
     c = unquote(str(caminho)).replace("\\", "/")
-    c = re.sub(r"^file://(?:[^/]*)/(?=[A-Za-z]:)", "", c)
+    c = re.sub(r"^file://[^/]*/(?=[A-Za-z]:)", "", c)
+    c = re.sub(r"^file://[^/]*(?=/)", "", c)
     return c.rstrip("/").lower()
 
 
