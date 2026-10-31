@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="t d">
+  <title id="t">sp-fila parallel</title>
+  <desc id="d">sp-fila parallel mode: the orchestrator opens up to N panes, each running one SP in its own worktree, while a watcher reports state changes and brings blocked panes to the user.</desc>
+  <rect width="1200" height="680" rx="24" fill="#0f172a"/>
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<text x="600.0" y="62" text-anchor="middle" font-size="40" font-weight="700" fill="#f8fafc">sp-fila --concorrencia N</text>
+<text x="600.0" y="96" text-anchor="middle" font-size="20" fill="#cbd5e1">Up to N stories at once, each isolated</text>
+<rect x="400" y="120" width="400" height="84" rx="18" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/><text x="600.0" y="160.0" text-anchor="middle" font-size="22" font-weight="600" fill="#fbbf24">sp-fila.py</text><text x="600.0" y="184.0" text-anchor="middle" font-size="15" fill="#cbd5e1">picks eligible SPs (auto, gates, deps met)</text>
+<rect x="85" y="290" width="290" height="90" rx="18" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/><text x="230.0" y="333.0" text-anchor="middle" font-size="22" font-weight="600" fill="#a78bfa">pane 1 · /michi SP-1</text><text x="230.0" y="357.0" text-anchor="middle" font-size="15" fill="#cbd5e1">own session</text>
+<path d="M600 206V248H230V282" stroke="#94a3b8" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M230 290l-6-10h12z" fill="#94a3b8"/>
+<rect x="85" y="430" width="290" height="70" rx="18" fill="#1e293b" stroke="#94a3b8" stroke-width="2"/><text x="230.0" y="463.0" text-anchor="middle" font-size="22" font-weight="600" fill="#94a3b8">worktree 1</text><text x="230.0" y="487.0" text-anchor="middle" font-size="15" fill="#cbd5e1">own branch, no clashes</text>
+<path d="M230 382V422" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M230 430l-6-10h12z" fill="#94a3b8"/>
+<rect x="455" y="290" width="290" height="90" rx="18" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/><text x="600.0" y="333.0" text-anchor="middle" font-size="22" font-weight="600" fill="#a78bfa">pane 2 · /michi SP-2</text><text x="600.0" y="357.0" text-anchor="middle" font-size="15" fill="#cbd5e1">own session</text>
+<path d="M600 206V282" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M600 290l-6-10h12z" fill="#94a3b8"/>
+<rect x="455" y="430" width="290" height="70" rx="18" fill="#1e293b" stroke="#94a3b8" stroke-width="2"/><text x="600.0" y="463.0" text-anchor="middle" font-size="22" font-weight="600" fill="#94a3b8">worktree 2</text><text x="600.0" y="487.0" text-anchor="middle" font-size="15" fill="#cbd5e1">own branch, no clashes</text>
+<path d="M600 382V422" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M600 430l-6-10h12z" fill="#94a3b8"/>
+<rect x="825" y="290" width="290" height="90" rx="18" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/><text x="970.0" y="333.0" text-anchor="middle" font-size="22" font-weight="600" fill="#a78bfa">pane 3 · /michi SP-3</text><text x="970.0" y="357.0" text-anchor="middle" font-size="15" fill="#cbd5e1">own session</text>
+<path d="M600 206V248H970V282" stroke="#94a3b8" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M970 290l-6-10h12z" fill="#94a3b8"/>
+<rect x="825" y="430" width="290" height="70" rx="18" fill="#1e293b" stroke="#94a3b8" stroke-width="2"/><text x="970.0" y="463.0" text-anchor="middle" font-size="22" font-weight="600" fill="#94a3b8">worktree 3</text><text x="970.0" y="487.0" text-anchor="middle" font-size="15" fill="#cbd5e1">own branch, no clashes</text>
+<path d="M970 382V422" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M970 430l-6-10h12z" fill="#94a3b8"/>
+<rect x="85" y="560" width="640" height="84" rx="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="405.0" y="600.0" text-anchor="middle" font-size="22" font-weight="600" fill="#38bdf8">watcher  --vigiar --destacado</text><text x="405.0" y="624.0" text-anchor="middle" font-size="15" fill="#cbd5e1">reports each state change: running, closed, blocked, dead</text>
+<rect x="755" y="560" width="360" height="84" rx="18" fill="#1e293b" stroke="#f87171" stroke-width="2"/><text x="935.0" y="600.0" text-anchor="middle" font-size="22" font-weight="600" fill="#f87171">blocked pane</text><text x="935.0" y="624.0" text-anchor="middle" font-size="15" fill="#cbd5e1">brought to you, never auto-approved</text>
+<path d="M727 602H745" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M753 602l-10-6v12z" fill="#94a3b8"/>
+<text x="600" y="534" text-anchor="middle" font-size="15" fill="#94a3b8">each branch merges via its own PR; the queue pushes nothing</text>
+  </g>
+</svg>
