@@ -76,7 +76,7 @@ def move(root, slug, dest, project=None):
     if project:
         matches = [sp for sp in matches if sp.project == project]
     if not matches:
-        raise SpMoveError(f"SP '{slug}' não encontrado")
+        raise SpMoveError(f"SP '{slug}' não encontrado; ver scripts/sp-list.py")
     if len(matches) > 1:
         opts = ", ".join(f"{sp.project} ({sp.status})" for sp in matches)
         raise SpMoveError(f"SP '{slug}' ambíguo: {opts}; usar --project")
@@ -143,12 +143,17 @@ def advance(root, slug, project=None):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Move um SP entre TODO, Doing e Done")
-    ap.add_argument("slug")
-    ap.add_argument("dest", help="todo | doing | done")
+    ap.add_argument("slug", nargs="?")
+    ap.add_argument("--slug", dest="slug_opt", help="alias de slug posicional")
+    ap.add_argument("dest", nargs="?", help="todo | doing | done")
     ap.add_argument("--project")
     ap.add_argument("--next", action="store_true", help="com done: abre o próximo filho elegível do programa")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    if args.slug_opt:
+        args.slug, args.dest = args.slug_opt, args.dest or args.slug
+    if not args.slug or not args.dest:
+        ap.error("falta o slug (posicional ou --slug); ver scripts/sp-list.py")
     if argv is None and args.root == str(sp_list.DEFAULT_ROOT):
         rc = wt_redirect.redirect(__file__, args.slug, sys.argv[1:])
         if rc is not None:
@@ -156,7 +161,7 @@ def main(argv=None):
     try:
         if args.next:
             if args.dest.lower() != "done":
-                raise SpMoveError("--next só se usa com 'done'")
+                raise SpMoveError(f"--next só se usa com 'done'; corre sp-move.py {args.slug} done --next")
             print(advance(args.root, args.slug, args.project))
         else:
             print(move(args.root, args.slug, args.dest, args.project))

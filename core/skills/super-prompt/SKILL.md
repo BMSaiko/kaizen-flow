@@ -1,7 +1,7 @@
 ---
 name: super-prompt
 description: Build Super Prompt — chains brainstorm+swot+grill-me+dr
-version: 1.2.0
+version: 2.0.0
 author: Hermes Agent (user)
 license: MIT
 triggers:
@@ -27,121 +27,42 @@ metadata:
     - eisenhower-matrix
     - ooda-loop
 changelog:
+- '2.0.0: SKILL ≤5 KB; template, frontmatter e flags completas do sp-new.py movidos para references/super-prompt-detalhe.md.'
 - '1.2.0: encolhida (changelog antigo no git, texto repetido passado a ligações); regras mantidas.'
 - '1.1.0: validateSuperPrompt() no save, --quick, templates de grill por domínio.'
 ---
 # Super Prompt
 
-Constrói um **Super Prompt**: instruções autónomas, prontas a colar, para qualquer objetivo. Funil de 4 fases (`brainstorm` → `swot` → `grill-me` → `dr`) e montagem num único prompt para uma sessão nova (`/michi <conteúdo>`). Corre **fora** do ciclo michi; o Super Prompt é o artefacto, não a implementação.
+Constrói um **Super Prompt**: instruções autónomas, prontas a colar, para uma sessão nova (`/michi <conteúdo>`). Funil `brainstorm` → `swot` → `grill-me` → `dr` e montagem. Corre **fora** do ciclo michi; o SP é o artefacto, não a implementação.
 
 ## Quando usar / não usar
-
-- Usar: objetivo, bug, refactor, feature ou projeto para o qual queres o melhor prompt para outro agente/sessão; autónomo (sem «podes clarificar…») e que sobrevive à fronteira de sessão (corre-se a frio amanhã).
-- Não usar: já dentro de um ciclo michi (usar `/dp` ou `/dr`); tarefa trivial de uma linha; execução já (usar `/michi <ideia>`).
+- Usar: objetivo, bug, refactor, feature ou projeto para outro agente/sessão; autónomo e a frio (sobrevive à fronteira de sessão).
+- Não usar: já dentro de um ciclo michi (`/dp` ou `/dr`); tarefa trivial de uma linha; execução já (`/michi <ideia>`).
 
 ## Invocação
+`/super-prompt <objetivo>` ou `--quick <objetivo ≤3 linhas>` (salta brainstorm e dr; vai a grill-me + DP; secções ≤3 linhas). Sem objetivo: perguntar uma vez e arrancar.
 
-`/super-prompt <objetivo>` ou `/super-prompt --quick <objetivo trivial>`. Sem objetivo: perguntar uma vez (free-text) e arrancar.
+## Pipeline (por ordem; cada fase aperta a seguinte)
+1. **brainstorm** — skill `brainstorm` (encadeado): Ideias + Picks para `## Brainstorm`. Sem a skill, 60 s inline; nunca bloquear.
+2. **swot** — skill `swot` (encadeado) sobre o top 1: constrangimento dominante + recomendação para `## SWOT`. Mesmo fallback.
+3. **grill-me** — skill `grill-me` até objetivo, âmbito, sucesso, constrangimentos e não-objetivos ficarem inequívocos; parar em «ok», «basta», «go»; respostas em `## Spec (grill-me output)`. Objetivo vazio/placeholder: nota de bloqueio e sair. Domínio conhecido: templates em `references/super-prompt-extra.md`. No mesmo lote de perguntas: prioridade, modo (auto/manual), autorizações (commit/push/PR/restrições, uma pergunta), perfil, escalão (`sp-escalao.py`), escopo, gates («como se verifica?») e `--decisao`. **Flag a flag: `references/super-prompt-detalhe.md`.**
+4. **dr (mini)** — skill `dr`: o mínimo de caminhos/contexto/integração; ≤1 ecrã, cada afirmação ancorada em fonte primária, em `## DR (mini)`. Não-código: «DR skipped: non-code goal».
 
-`--quick` (objetivo ≤3 linhas): salta a Fase 1 (brainstorm) e a 4 (dr), vai direto a grill-me + DP; as 8 secções ficam concisas (≤3 linhas cada).
+## Gerar o SP
+1. Só com `python -I scripts/sp-new.py --project <p> --slug <slug> --priority P1|P2|P3 --modo auto|manual [flags]` (nunca criar o ficheiro à mão). Projeto não inferível ou inexistente: `AskUserQuestion`; nunca inventar pasta.
+2. Preencher as **8 secções** (template: `super-prompt-detalhe.md`); §4 com critérios verificáveis, §7 com passos concretos, gates executáveis. Secção vazia = voltar ao grill-me; nunca publicar incompleto.
+3. Validar: `python -I scripts/sp-validate.py <ficheiro>` sem avisos.
 
-## Pipeline (4 fases, depois montar)
-
-Por ordem, cada uma é um ponto de paragem que escreve no rascunho. Não saltar fases: cada uma aperta a seguinte.
-
-1. **brainstorm** — skill `brainstorm`: 8-15 ideias, 2-5 clusters, top 1-3 para `## Brainstorm`. Sem a skill, brainstorm de 60 s inline; nunca bloquear.
-2. **swot** — skill `swot` sobre o top da Fase 1: matriz 2x2, constrangimento dominante e movimento mais alavancado para `## SWOT`. Mesmo fallback inline.
-3. **grill-me** — skill `grill-me`: entrevistar até objetivo, âmbito, sucesso, constrangimentos e não-objetivos ficarem inequívocos (a fase mais longa); parar no sinal de alinhamento («ok», «basta», «go», «continua»); respostas consolidadas em `## Spec (grill-me output)`. Se o objetivo está vazio/placeholder: não entrevistar, escrever nota de bloqueio e sair. Quando o domínio é conhecido (código, design, infra, docs) partir dos templates em `references/super-prompt-extra.md` (adaptáveis).
-   No mesmo lote de perguntas:
-   - **Prioridade** P1/P2/P3 (default P3) → `priority:`.
-   - **Modo do michi** auto/manual (default manual) → `modo:` (`sp-new.py --modo`); com `auto` ou `manual` o michi não repete a pergunta de arranque.
-   - **Autorizações**, UMA pergunta agrupada: commit, push, PR (valores e defaults: `michi-modo-auto.md` §Autorizações do SP; conservador: `pergunta`, `nunca` para push/PR) e restrições extra (pastas intocáveis, repos, ações externas) → `commit:`/`push:`/`pr:`/`restricoes:` (`sp-new.py --commit/--push/--pr/--restricoes`). Comandos pré-aprovados (`--permitir`) e decisões do grill (`--decisao`): `michi-modo-auto.md` §Autorizações do SP. Na mesma pergunta o **perfil** (`cauteloso|normal|autonomo`, recomendado `normal`; `autonomo` só com gates): `--perfil` (+ `--max-tentativas/--max-requests/--parar-se`), semântica em `michi/references/michi-perfis.md`.
-   - **Escalão**: propor com `python -I scripts/sp-escalao.py` (pequena = 1 SP; média = pai+filhos; grande = árvore), override numa linha; critérios no playbook `kaizen-flow` §Escalões.
-   - **Escopo**: derivar `escopo:` (globs) de «Relevant files» e `fora_de_escopo:` do intocável (`--escopo a/**,b.py --fora-de-escopo x/**`); sem `escopo` o hook não guarda nada.
-   - **Gates**: «Como se verifica que está certo?». Propor gates do projeto (`package.json` → `npm test`/`vitest`/lint/build; `scripts/test_*.py` → `python -I scripts/test_sp_list.py`) e confirmar. Grava `gates:` (um `- cmd:` por gate, `cwd`/`timeout` opcionais) e `prova:` (`--gate` repetível, `--prova`). `sp-validate.py` recusa comandos proibidos (`--force`, `reset --hard`, `git add -A`, `.env*`).
-4. **dr (mini)** — skill `dr`: o **mínimo** de caminhos de código/contexto/integração que a sessão nova precisa; ≤1 ecrã; cada afirmação ancorada em fonte primária (caminho, URL, string de erro) em `## DR (mini)`. Objetivo não-código: saltar e anotar «DR skipped: non-code goal».
-
-## Montagem (o Super Prompt)
-
-Usar **sempre** este template de 8 secções (é o contrato; a sessão que recebe tem de executar só com ele):
-
-```markdown
-# Super Prompt - <slug> (<YYYY-MM-DD>)
-
-> Generated by `/super-prompt`. Execute with `/michi <paste this file's body>`.
-
-## 1. Role
-You are <role>. You operate with <constraints on style, scope, decision authority>.
-
-## 2. Context
-- Project: <name + 1-line description>
-- Repo: <path or URL>
-- State: <branch, last commit, key facts the executor must know>
-- Relevant files: <paths the executor will touch>
-
-## 3. Objective (single sentence)
-<One sentence. If you cannot write it in one sentence, the goal is not clear enough — restart grill-me.>
-
-## 4. Success criteria (verifiable)
-- [ ] <observable thing 1>
-- [ ] <observable thing N>
-
-## 5. Constraints / invariants
-- Must keep: <anything that must NOT change>
-- Must avoid: <anti-patterns the executor must not introduce>
-- Performance / size / scope limits: <if any>
-
-## 6. Seams (public interfaces to test / change)
-- `<Module.func>` — <what it does today, what changes>
-- `<API.route>` — <request/response shape, validation rules>
-
-## 7. Steps (numbered, ordered)
-1. <Step 1 — concrete action, file path or command>
-
-## 8. Done-when
-<The single observable signal that means "ship it". No "looks good".>
-```
-
-Todas as 8 obrigatórias; secção vazia = especificação em falta: voltar ao grill-me nessa secção, nunca publicar incompleto.
-
-## Onde guardar
-
-Caminho único: `python -I scripts/sp-new.py --project <projeto> --slug <slug> --priority P1|P2|P3 --modo auto|manual [--commit C] [--push P] [--pr R] [--restricoes "..."] [--perfil P]` devolve `knowledge/projects/kaizen/<projeto>/sp/TODO/<slug>-<YYYY-MM-DD>.md` (frontmatter + 8 secções vazias). Preencher e validar com `python -I scripts/sp-validate.py <ficheiro>`. `<slug>`: minúsculas ascii, hífens, ≤48 caracteres. Projeto não inferível da pasta ou inexistente (sp-new recusa): `AskUserQuestion`; nunca inventar pasta, nem `kaizen/sp/` global nem `./super-prompts/`. SPs fora do padrão: `python -I scripts/sp-organize.py` (dry-run; `--apply` só com aprovação).
-
-## Frontmatter
-
-```yaml
----
-status: TODO          # TODO | Doing | Done
-created: <ISO8601>    # igual a updated na criação
-updated: <ISO8601>
-phase: SP
-slug: <slug>
-date: <YYYY-MM-DD>
-project: <project>
-priority: P2          # P1 | P2 | P3, default P3 (usado por /sp-list)
-modo: manual          # auto | manual (default manual)
-commit: pergunta      # auto | pergunta | nunca (idem push, pr); restricoes: texto opcional
-perfil: normal        # cauteloso | normal | autonomo (opcional)
----
-```
-
-## Reutilizar numa sessão nova
-
-Colar o corpo (ou passar como objetivo do `/michi`). A sessão nova salta grill + DR (já consumidos), começa no DP (ou DA se pedido) e trata as secções 1-8 como contrato assinado (desvios só com sinal explícito do user). **Não pode re-perguntar factos das secções 2/3/4/5**: se o fizer, o SP estava incompleto (registar no post-mortem).
+## Reutilizar
+Colar o corpo no `/michi`: salta grill+DR, começa no DP e trata as secções 2/3/4/5 como contrato; re-perguntar esses factos = SP incompleto.
 
 ## Mais
-
-Templates do grill, skills suplementares, helpers de persistência, regras de estilo e checklist de verificação: `references/super-prompt-extra.md`; pitfalls: `references/super-prompt-pitfalls.md`. Ler a pedido.
+Templates do grill, helpers e checklist: `references/super-prompt-extra.md`; pitfalls: `references/super-prompt-pitfalls.md`; frontmatter, template e flags: `references/super-prompt-detalhe.md`. Ler a pedido.
 
 ## Output ao user (sempre)
-
-Depois de guardado e verificado, exatamente:
-
 ```
 Super Prompt saved: <abs path>
 Sections: 1.Role 2.Context 3.Objective 4.Success 5.Constraints 6.Seams 7.Steps 8.Done-when
 Reuse:    /michi <paste body of this file> in a new session
 ```
-
-Sem commit, sem push, sem DA: o passo seguinte do user é abrir sessão nova e dar o SP ao `/michi`.
+Sem commit, push nem DA: o passo seguinte é uma sessão nova com o SP no `/michi`.

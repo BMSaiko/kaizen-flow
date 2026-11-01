@@ -33,25 +33,34 @@ def reflect_lacunas(slug, texto):
             if l.startswith("Reflect ") and not l.rstrip(". ").endswith("sem patch")]
 
 
+MAX_LINHAS = 30
+
+
 def relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora, custos=None, sps=None):
+    """Relatório final em ≤ MAX_LINHAS linhas: feito, parado, porquê, próximo passo (listas longas cortam em «+N mais»)."""
     rel_dir.mkdir(parents=True, exist_ok=True)
     path = rel_dir / f"fila-{agora:%Y-%m-%d-%H%M}.md"
     commits = commits_desde(estado["inicio"], run)
-    listar = lambda xs: [f"- {x}" for x in xs] or ["- nenhum"]
-    linhas = ["---", "type: report", "tags: [sp-fila]", f"date: {agora:%Y-%m-%d}", "---",
-              f"# Fila de SPs ({agora:%Y-%m-%d %H:%M})", "", f"Fim: {motivo}.", "",
-              "## Feitos", *listar(estado["feitos"]), "", "## Falhados", *listar(estado["falhados"]), "",
-              "## Saltados", *listar(f"{s}: {w}" for s, w in excluidos), "", "## Gasto", *listar(
-                  f"{s}: {c:.2f} USD" for s, c in gastos(estado, custos or {})[0]), "", "## Commits", *listar(commits), "",
-              "## Reflect (lacunas)", *listar(l for s, (_, t) in (sps or {}).items() for l in reflect_lacunas(s, t)), "",
-              "## Falhas", *listar(f"{s}: não chegou a Done (fase {sps[s][0]})" if s in (sps or {}) else f"{s}: não chegou a Done"
-                                   for s in estado["falhados"]), "",
-              "## Próximos passos"]
     passos = [f"inspecionar o SP falhado `{s}` (continua em Doing) e correr `/michi` à mão" for s in estado["falhados"]]
     passos += [f"por correr: `{sp.slug}`" for sp in fila if sp.slug not in estado["falhados"]]
     passos += ["rever os saltados e, se fizer sentido, dar-lhes `modo: auto` e `gates:`"] if excluidos else []
-    linhas += listar(passos) + [""]
-    path.write_text("\n".join(linhas), encoding="utf-8")
+    secoes = [("Feitos", list(estado["feitos"])), ("Falhados", list(estado["falhados"])),
+              ("Saltados", [f"{s}: {w}" for s, w in excluidos]),
+              ("Gasto", [f"{s}: {c:.2f} USD" for s, c in gastos(estado, custos or {})[0]]), ("Commits", commits),
+              ("Reflect (lacunas)", [l for s, (_, t) in (sps or {}).items() for l in reflect_lacunas(s, t)]),
+              ("Falhas", [f"{s}: não chegou a Done (fase {sps[s][0]})" if s in (sps or {}) else f"{s}: não chegou a Done"
+                          for s in estado["falhados"]]),
+              ("Próximos passos", passos)]
+    cabeca = ["---", "type: report", "tags: [sp-fila]", f"date: {agora:%Y-%m-%d}", "---",
+              f"# Fila de SPs ({agora:%Y-%m-%d %H:%M})", f"Fim: {motivo}."]
+    for cap in range(len(passos) + len(excluidos) + len(commits) + 99, 0, -1):
+        corpo = []
+        for nome, xs in secoes:
+            corpo.append(f"## {nome}")
+            corpo += [f"- {x}" for x in xs[:cap]] + ([f"- … +{len(xs) - cap} mais"] if len(xs) > cap else []) or ["- nenhum"]
+        if len(cabeca) + len(corpo) <= MAX_LINHAS:
+            break
+    path.write_text(chr(10).join(cabeca + corpo) + chr(10), encoding="utf-8")
     return path
 
 

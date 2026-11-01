@@ -1,9 +1,12 @@
 ---
 name: brainstorm
-description: 'Brainstorm + SWOT: generate ideas, then stress-test them.'
-version: 1
+description: 'Brainstorm + SWOT: gerar ideias, depois testá-las. Saída fixa e curta.'
+version: 2.0.0
 author: user
 license: MIT
+changelog:
+- '2.0.0: Formato fixo (≤10 ideias de 1 linha), modos standalone/encadeado, saída pronta para --decisao.'
+- '1: Versão inicial.'
 metadata:
   hermes:
     tags:
@@ -11,44 +14,36 @@ metadata:
     - brainstorm
     category: brainstorm
 ---
-# Brainstorm + SWOT
+# Brainstorm
 
-User typed a topic/project after `/brainstorm`. Generate, then filter.
+Tema dado após `/brainstorm`. Gerar, agrupar, filtrar. Sem prosa de enchimento.
 
-## How to run
+## Modos
+- **Standalone:** resposta completa no formato abaixo; terminar com os Picks.
+- **Encadeado** (`super-prompt` fase 1): só `## Ideias` e `## Picks`, para `## Brainstorm` do SP; o `swot` corre a seguir sobre o top 1.
 
-1. **Generate**: 8-15 ideas, fast, no filter yet. Quantity > quality at this step.
-2. **Cluster**: group by theme (2-5 clusters max).
-3. **SWOT** the top cluster (or all, if small):
-   - Strengths (intrinsic advantages)
-   - Weaknesses (intrinsic limits)
-   - Opportunities (extrinsic enablers)
-   - Threats (extrinsic risks)
-4. **Pick**: 1-3 candidates worth pursuing. Justify in one line each.
-5. **Next step**: the smallest concrete action for each picked candidate.
+## Passos
+1. **Gerar** 8-10 ideias, sem filtro; 1 linha cada.
+2. **Agrupar** em 2-5 temas (só se ajudar).
+3. **Filtrar** com um SWOT de 1 linha por ideia candidata (detalhe: `swot`).
+4. **Escolher** 1-3 Picks; justificar em 1 linha; dar o Next (menor ação concreta).
 
-## Output shape
+## Formato (fixo)
 
 ```
-# Brainstorm: <topic>
+# Brainstorm: <tema>
 
-## Ideas
-- ...
-
-## Clusters
-### <cluster>
-- ...
-
-## SWOT (top: <cluster>)
-| S | W |
-|---|---|
-| ... | ... |
-| **O** | **T** |
-| ... | ... |
+## Ideias
+- <ideia> — <1 linha>          (≤ 10)
 
 ## Picks
-1. <idea> — <one-line why>
-   - Next: <concrete action>
+1. <ideia> — <porquê, 1 linha>
+   - Next: <ação>
 ```
 
-No filler. Pick the ideas that survive their own SWOT row.
+Limites: ≤ 10 ideias, ≤ 3 Picks, 1 linha por item.
+
+## Para o Super Prompt
+Cada Pick, numa frase, serve de `--decisao "<ideia>: <porquê>"` do `sp-new.py`.
+
+Exemplo e variante com clusters: `references/formato.md`.

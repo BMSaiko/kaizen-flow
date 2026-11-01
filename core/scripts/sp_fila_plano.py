@@ -97,8 +97,18 @@ def plan(items, maximo=None, so=None, por_commitar=()):
     return (fila[:maximo] if maximo else fila), sorted(excluidos)
 
 
+def falhas(estado):
+    """Motivo para parar por falhas seguidas, ou None (vale também no modo paralelo)."""
+    teto = estado.get("max_falhas")
+    if teto and estado.get("seguidas", 0) >= teto:
+        return f"{estado['seguidas']} falhas seguidas (máximo {teto})"
+    return None
+
+
 def limite(estado, agora, custo=0.0):
     """Motivo para parar a fila, ou None. `custo`: USD gasto nesta corrida (só conta com orcamento_usd)."""
+    if motivo := falhas(estado):
+        return motivo
     if len(estado["feitos"]) + len(estado["falhados"]) + len(estado.get("sessoes", {})) >= estado["max"]:
         return f"atingido o máximo de {estado['max']} SPs"
     if estado.get("ate"):

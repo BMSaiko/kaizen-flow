@@ -939,3 +939,78 @@ def test_ajuda_descreve_arranque_automatico_e_monitor_unico(capsys):
     sp_fila.main(["--ajuda"])
     out = capsys.readouterr().out
     assert "lança o seguinte" in out and "substitui" in out
+
+
+# --- limites de segurança (skill-sp-fila) ---
+
+def test_limite_falhas_seguidas_para_com_motivo():
+    estado = {"max": 9, "ate": None, "orcamento": None, "usados": 0, "feitos": [], "falhados": ["a", "b"], "seguidas": 2, "max_falhas": 2}
+    assert "falhas seguidas" in sp_fila.limite(estado, datetime(2026, 10, 25, 12, 0))
+    estado["seguidas"] = 1
+    assert sp_fila.limite(estado, datetime(2026, 10, 25, 12, 0)) is None
+
+
+def test_seguidas_conta_falhas_e_um_feito_repoe_a_zero(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "mau", folder="Doing")
+    make_sp(root, "bom", folder="Done")
+    make_sp(root, "livre")
+    st = _estado(tmp_path, sessoes={"mau": {}}, max=9, max_falhas=3, seguidas=0)
+    sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0), slug="mau")
+    assert json.loads(st.read_text(encoding="utf-8"))["seguidas"] == 1
+    estado = json.loads(st.read_text(encoding="utf-8"))
+    estado["sessoes"] = {"bom": {}}
+    st.write_text(json.dumps(estado), encoding="utf-8")
+    sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0), slug="bom")
+    assert json.loads(st.read_text(encoding="utf-8"))["seguidas"] == 0
+
+
+def test_falhas_seguidas_param_a_fila_e_nao_lancam(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "mau", folder="Doing")
+    make_sp(root, "livre")
+    calls = []
+    st = _estado(tmp_path, sessoes={"mau": {}}, max=9, max_falhas=1, seguidas=0)
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0))
+    assert out["acao"] == "fim" and "falhas seguidas" in out["motivo"]
+    assert all(c[0] == "git" for c in calls)
+
+
+def test_paralelo_tambem_para_nas_falhas_seguidas(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "mau", folder="Doing")
+    make_sp(root, "livre")
+    calls = []
+    st = _estado(tmp_path, sessoes={"mau": {}}, concorrencia=2, max_falhas=1, seguidas=0)
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0))
+    assert out["acao"] == "fim" and "falhas seguidas" in out["motivo"]
+
+
+def test_nunca_lanca_sp_sem_auto_nem_gates(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Done")
+    make_sp(root, "manual", modo="manual")
+    make_sp(root, "semgates", gates=False)
+    calls = []
+    st = _estado(tmp_path, sessoes={"a": {}})
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0))
+    assert out["acao"] == "fim"
+    assert all(c[0] == "git" for c in calls)
+
+
+def test_relatorio_tem_no_maximo_30_linhas(tmp_path):
+    root = tmp_path / "sps"
+    for i in range(25):
+        make_sp(root, f"f{i}", folder="Done")
+        make_sp(root, f"x{i}", modo="manual")
+    st = _estado(tmp_path, sessoes={f"f{i}": {} for i in range(25)}, max=99)
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0))
+    texto = Path(out["relatorio"]).read_text(encoding="utf-8")
+    assert len(texto.splitlines()) <= 30
+    assert "mais" in texto and "## Próximos passos" in texto and "Fim:" in texto
+
+
+def test_cli_dry_run_mostra_o_limite_de_falhas(tmp_path, capsys):
+    make_sp(tmp_path, "um")
+    assert sp_fila.main(["--dry-run", "--root", str(tmp_path), "--max-falhas", "3"]) == 0
+    assert "Limites:" in capsys.readouterr().out

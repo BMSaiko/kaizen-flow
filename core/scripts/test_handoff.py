@@ -127,3 +127,26 @@ def test_write_aceita_25_linhas_e_recusa_secao_copiada_do_sp(tmp_path):
     handoff.write(tmp_path / "handoffs", "x\n" * 25, "z", now=datetime(2026, 10, 18, 9, 5))
     with pytest.raises(handoff.HandoffError, match="secção do SP"):
         handoff.write(tmp_path / "handoffs", "## Objective\nc\n", "z", now=datetime(2026, 10, 18, 9, 6))
+
+
+CAMPOS = ("Estado", "Último passo", "Próximo passo", "Ficheiros tocados", "Gates por correr")
+_RAIZ = Path(__file__).resolve().parents[1]
+COMANDOS = _RAIZ / ".claude" / "commands" if (_RAIZ / ".claude").is_dir() else _RAIZ / "commands"
+
+
+def test_retoma_so_com_o_handoff_regista_campos_e_apaga(tmp_path, capsys):
+    body = "".join(f"**{c}**\n- x\n\n" for c in CAMPOS)
+    path = handoff.write(tmp_path / "handoffs", body, "retoma")
+    assert "consume" in handoff.continuation_prompt(path) and str(path) in handoff.continuation_prompt(path)
+    handoff.consume(path)
+    out = capsys.readouterr().out
+    assert all(f"**{c}**" in out for c in CAMPOS)
+    assert not path.exists()
+
+
+@pytest.mark.parametrize("nome", ["handoff.md", "sp-handoff.md"])
+def test_comandos_usam_o_nucleo_comum_e_pedem_os_campos(nome):
+    texto = (COMANDOS / nome).read_text(encoding="utf-8")
+    assert "handoff-launch" in texto
+    assert "Gates por correr" in texto
+    assert "Modo automático" not in texto
