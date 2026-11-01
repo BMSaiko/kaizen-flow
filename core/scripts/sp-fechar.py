@@ -37,11 +37,11 @@ def find_doing(root, slug, project=None):
     found = [sp for sp in sp_list.collect(root, include_done=True)
              if sp.slug == slug and (not project or sp.project == project)]
     if not found:
-        raise FecharError(f"SP '{slug}' não encontrado")
+        raise FecharError(f"SP '{slug}' não encontrado; ver scripts/sp-list.py")
     if len(found) > 1:
         raise FecharError(f"SP '{slug}' ambíguo; usar --project")
     if found[0].status != "Doing":
-        raise FecharError(f"SP '{slug}' está em {found[0].status}, não em Doing")
+        raise FecharError(f"SP '{slug}' está em {found[0].status}, não em Doing; corre sp-move.py {slug} doing")
     return found[0]
 
 
@@ -170,7 +170,8 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Fecha um SP: gates, orçamento, Done e COMMIT_*.md")
-    ap.add_argument("slug")
+    ap.add_argument("slug", nargs="?")
+    ap.add_argument("--slug", dest="slug_opt", help="alias de slug posicional")
     ap.add_argument("--project")
     ap.add_argument("--next", action="store_true", help="abre o próximo filho elegível do programa")
     ap.add_argument("--msg", help="assunto do commit (defeito: vault: fecha <slug>)")
@@ -180,6 +181,9 @@ def main(argv=None):
     ap.add_argument("--commit-dir", default=".", help="repo onde gerar o COMMIT_*.md (defeito: cwd)")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    args.slug = args.slug_opt or args.slug
+    if not args.slug:
+        ap.error("falta o slug (posicional ou --slug); ver scripts/sp-list.py")
     if argv is None and args.root == str(sp_list.DEFAULT_ROOT):
         rc = wt_redirect.redirect(__file__, args.slug, sys.argv[1:])
         if rc is not None:

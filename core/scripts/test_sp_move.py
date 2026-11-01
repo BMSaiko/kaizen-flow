@@ -229,3 +229,20 @@ def test_doing_fora_de_worktree_nao_exige_claim(tmp_path, monkeypatch):
     monkeypatch.chdir(vault)
     sp_move.move(sps, "abc", "doing")
     assert not (vault / ".git" / "sb-claims" / "abc.lock").exists()
+
+
+def test_erro_nao_encontrado_sugere_sp_list(tmp_path):
+    with pytest.raises(sp_move.SpMoveError, match="sp-list.py"):
+        sp_move.move(tmp_path, "nada", "doing")
+
+
+def test_next_sem_done_sugere_correcao(tmp_path, capsys):
+    make_sp(tmp_path, "atlas/sp/TODO", "abc")
+    rc = sp_move.main(["--root", str(tmp_path), "abc", "doing", "--next"])
+    assert rc == 1 and "done --next" in capsys.readouterr().err
+
+
+def test_alias_slug_flag(tmp_path):
+    make_sp(tmp_path, "atlas/sp/TODO", "abc")
+    assert sp_move.main(["--root", str(tmp_path), "--slug", "abc", "doing"]) == 0
+    assert (tmp_path / "atlas/sp/Doing/abc.md").exists()

@@ -18,6 +18,7 @@ ESTADO = Path.home() / ".claude" / "sp-fila-estado.json"
 RELATORIOS = REPO / "knowledge" / "infra" / "reports" / "sp-fila"
 REQ_POR_SP = 50  # unidade de contagem do teto opt-in (--orcamento / orcamento_requests); por defeito sem limite
 ORCAMENTO = None  # sem limite de requests
+MAX_FALHAS_DEFEITO = 2  # falhas seguidas até parar a fila
 MAX_DEFEITO = 5
 LOCK_VELHO_S = 60  # um bloqueio mais antigo é de uma sessão morta
 

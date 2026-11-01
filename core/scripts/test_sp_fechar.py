@@ -104,3 +104,20 @@ def test_avisos_sem_prova_nem_reflect():
 def test_avisos_com_prova_e_reflect():
     txt = "## Prova de done\nfast 2 s\n\n## Reflect\nReflect final: sem patch\n"
     assert _mod().avisos(txt) == []
+
+
+def test_erro_nao_encontrado_sugere_sp_list(root):
+    rc, _, err = fechar(root, "inexistente")
+    assert rc == 2 and "sp-list.py" in err
+
+
+def test_erro_fora_de_doing_sugere_sp_move(root):
+    assert novo(root, "todo2")[0] == 0
+    rc, _, err = fechar(root, "todo2")
+    assert rc == 2 and "sp-move.py todo2 doing" in err
+
+
+def test_alias_slug_flag(root):
+    rc, _, err = run("sp-fechar.py", "--root", str(root / "vault"), "--project", PROJECT,
+                     "--slug", "inexistente", "--sem-budget", "--commit-dir", str(root / "repo"))
+    assert rc == 2 and "sp-list.py" in err

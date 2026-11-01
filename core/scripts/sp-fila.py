@@ -6,7 +6,7 @@ prioridade, depois idade, com `depends_on` a mandar. Nunca faz push/PR: isso é 
 
 Uso:
   python -I scripts/sp-fila.py --dry-run [--max N] [--ate HH:MM] [--projeto P]   # ordem e exclusões
-  python -I scripts/sp-fila.py [--max N] [--ate HH:MM] [--projeto P] [--orcamento N]   # arranca a fila
+  python -I scripts/sp-fila.py [--max N] [--max-falhas N] [--ate HH:MM] [--projeto P] [--orcamento N]   # arranca a fila (para ao fim de N falhas seguidas, defeito 2)
   python -I scripts/sp-fila.py [--concorrencia N]   # modo paralelo: até N painéis via sp-handoff --spawn, sem orçamento nem máximo
   python -I scripts/sp-fila.py --programa <slug-mãe> [--max N]   # só a árvore da mãe; orçamento lido dela
   python -I scripts/sp-fila.py --seguinte [--slug S]   # no fecho de cada SP da fila: regista e lança o seguinte
@@ -34,7 +34,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 # Módulos irmãos (a CLI e os testes continuam a ver tudo aqui): estado, plano, relatório, execução, paralelo.
-from sp_fila_estado import (LOCK_VELHO_S, MAX_DEFEITO, NO_WINDOW, ORCAMENTO, REPO, REQ_POR_SP, RELATORIOS, SCRIPTS, ESTADO, USER,  # noqa: E402,F401
+from sp_fila_estado import (LOCK_VELHO_S, MAX_DEFEITO, MAX_FALHAS_DEFEITO, NO_WINDOW, ORCAMENTO, REPO, REQ_POR_SP, RELATORIOS, SCRIPTS, ESTADO, USER,  # noqa: E402,F401
                             atualizar, bloqueio, guardar, ler, migrar, run_hidden)
 from sp_fila_plano import autorizacao, descendentes, estatico, limite, load, plan, render_plan, sem_commit, sp_list  # noqa: E402,F401
 from sp_fila_relatorio import commits_desde, gastos, progresso, reflect_lacunas, relatorio, render_gastos  # noqa: E402,F401
@@ -79,6 +79,7 @@ def main(argv=None):
     ap.add_argument("--ate", metavar="HH:MM", help="hora limite")
     ap.add_argument("--concorrencia", type=int, metavar="N", help="modo paralelo: até N sessões em painéis próprios, sem limite de quota (só o guard de contexto, via handoff)")
     ap.add_argument("--orcamento", type=int, default=ORCAMENTO, help=f"teto opcional de requests totais; cada SP gasta {REQ_POR_SP} (sem ele, sem limite)")
+    ap.add_argument("--max-falhas", type=int, default=MAX_FALHAS_DEFEITO, metavar="N", help=f"para a fila após N SPs falhados seguidos (defeito {MAX_FALHAS_DEFEITO}; 0 = sem este limite)")
     ap.add_argument("--projeto")
     ap.add_argument("--programa", metavar="SLUG", help="só a árvore deste SP-mãe; orçamento lido do frontmatter dela")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
@@ -148,6 +149,8 @@ def main(argv=None):
     if args.dry_run:
         fila, excluidos = plan(items, args.max, so, sem_commit(items))
         print(render_plan(fila, excluidos))
+        print(f"Limites: máx {args.max} SPs · {args.max_falhas or 'sem'} falhas seguidas · "
+              f"{'até ' + args.ate if args.ate else 'sem hora limite'} · {args.orcamento or 'sem'} requests")
         return 0
     if args.seguinte:
         if not estado.exists():
@@ -162,7 +165,7 @@ def main(argv=None):
         num = lambda k: float(fm[k]) if fm.get(k) not in (None, "") else None
         usd = num("orcamento_usd")
         novo = {"max": args.max, "concorrencia": max(1, args.concorrencia or 0) if args.concorrencia else None, "ate": args.ate, "orcamento": int(num("orcamento_requests") or args.orcamento or 0) or None,
-                "usados": 0, "feitos": [], "falhados": [], "sessoes": {}, "projeto": args.projeto,
+                "max_falhas": max(0, args.max_falhas), "seguidas": 0, "usados": 0, "feitos": [], "falhados": [], "sessoes": {}, "projeto": args.projeto,
                 "programa": args.programa, "horas": num("orcamento_horas"), "usd": usd,
                 "inicio": datetime.now().isoformat(timespec="seconds")}
         if usd is not None:

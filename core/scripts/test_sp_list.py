@@ -306,3 +306,64 @@ def test_tree_closed_via_main_codigos_de_saida(tmp_path, capsys):
     assert sp_list.main(["--root", str(tmp_path), "--repo", str(repo), "--tree-closed", "nada"]) == 2
     assert sp_list.main(["--root", str(tmp_path), "--repo", str(repo), "--tree-closed", "mae"]) == 1
     assert "sem COMMIT_*.md gerado" in capsys.readouterr().out
+
+
+# --- próximo elegível, bloqueados, limite de linhas ---
+
+def test_eligibility_proximo_e_bloqueados(tmp_path):
+    sps = program(tmp_path)
+    eligible, blocked = sp_list.eligibility(sps)
+    # Doing antes de TODO; mãe (program) e Done nunca entram
+    assert [sp.slug for sp in eligible] == ["b", "solto"]
+    assert [(sp.slug, unmet) for sp, unmet in blocked] == [("c", ["b"])]
+
+
+def test_eligibility_dependencia_inexistente_bloqueia(tmp_path):
+    make_sp(tmp_path, "atlas/sp/TODO", "x", project="atlas", depends_on=["fantasma"])
+    eligible, blocked = sp_list.eligibility(sp_list.collect(tmp_path, include_done=True))
+    assert eligible == []
+    assert [(sp.slug, unmet) for sp, unmet in blocked] == [("x", ["fantasma"])]
+
+
+def test_eligibility_sem_frontmatter_e_elegivel(tmp_path):
+    path = tmp_path / "atlas" / "sp" / "TODO" / "cru.md"
+    path.parent.mkdir(parents=True)
+    path.write_text("# sem frontmatter\n", encoding="utf-8")
+    eligible, blocked = sp_list.eligibility(sp_list.collect(tmp_path, include_done=True))
+    assert [sp.slug for sp in eligible] == ["cru"] and blocked == []
+
+
+def test_main_mostra_proximo_e_bloqueados(tmp_path, capsys):
+    program(tmp_path)
+    assert sp_list.main(["--root", str(tmp_path)]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert any(line.startswith("Próximo: b") for line in out)
+    assert any(line.startswith("Bloqueados") for line in out)
+    assert any("c ← b" in line for line in out)
+    assert out[-1] == "3 TODO, 1 Doing, 0 avisos"
+
+
+def test_main_sem_elegivel_diz_nenhum(tmp_path, capsys):
+    make_sp(tmp_path, "atlas/sp/TODO", "x", project="atlas", depends_on=["fantasma"])
+    sp_list.main(["--root", str(tmp_path)])
+    assert "Próximo: nenhum" in capsys.readouterr().out
+
+
+def test_main_limita_a_40_linhas_e_tudo_mostra_o_resto(tmp_path, capsys):
+    for i in range(60):
+        make_sp(tmp_path, "atlas/sp/TODO", f"sp{i:02d}", project="atlas")
+    sp_list.main(["--root", str(tmp_path)])
+    out = capsys.readouterr().out.splitlines()
+    assert len(out) <= 40
+    assert any("--tudo" in line for line in out)
+    assert out[-1] == "60 TODO, 0 Doing, 0 avisos"
+    sp_list.main(["--root", str(tmp_path), "--tudo"])
+    full = capsys.readouterr().out.splitlines()
+    assert len(full) > 60 and not any("--tudo" in line for line in full)
+    assert sum(" sp" in line for line in full) >= 60
+
+
+def test_main_limite_nao_corta_listas_curtas(tmp_path, capsys):
+    program(tmp_path)
+    sp_list.main(["--root", str(tmp_path)])
+    assert not any("--tudo" in line for line in capsys.readouterr().out.splitlines())

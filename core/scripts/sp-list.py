@@ -12,10 +12,17 @@ Uso:
   python -I scripts/sp-list.py --status doing       # todo | doing
   python -I scripts/sp-list.py --all                # inclui Done
   python -I scripts/sp-list.py --flat               # tabela plana (sem agrupar programas)
+  python -I scripts/sp-list.py --tudo               # sem limite de 40 linhas (predefinido)
   # por omissão: programas agrupados (filhos sob o SP-mãe, com dependências por cumprir); --tree é sinónimo
 
 Um programa é um SP-mãe (`kind: program`) com filhos que têm `parent: <slug-mãe>` e, opcionalmente,
 `depends_on: [a, b]`. O estado de cada filho vem da pasta; dependências por cumprir só avisam.
+
+Cabeçalho `Próximo:`/`Bloqueados` (`eligibility`) e limite de 40 linhas (`--tudo` levanta-o).
+
+Fronteira com os vizinhos (não duplicar): `sp-list` = visão do conjunto de SPs (todos os projetos, árvore,
+próximo elegível); `sp-estado.py` = um SP (passos, gates, git); `sp-painel.py` = sessões paralelas do sp-fila; `sp-organize.py` =
+detetar/corrigir SPs fora do padrão; `sp-metricas.py` = linha de métricas por SP fechado. Aqui só leitura.
 """
 import argparse
 import os
@@ -233,6 +240,52 @@ def render_tree(groups, loose, visible):
     return "\n".join(lines)
 
 
+def eligibility(sps):
+    """Elegíveis e bloqueados entre os SPs pendentes. `sps` inclui Done (dependências cumpridas).
+
+    Elegível = TODO/Doing, não-mãe (`kind: program` é só agrupador) e com todas as `depends_on` em Done
+    (mesmo projeto). Bloqueado = o resto, com as dependências em falta (inexistentes também contam).
+    Ordem: Doing antes de TODO, P1->P3, mais antigo primeiro. Função pura, sem FS.
+    """
+    done = {(sp.project, sp.slug) for sp in sps if sp.status == "Done"}
+    pending = [sp for sp in sort_sps(sps) if sp.status != "Done" and sp.kind != "program"]
+    eligible, blocked = [], []
+    for sp in pending:
+        unmet = [d for d in sp.depends_on if (sp.project, d) not in done]
+        (blocked.append((sp, unmet)) if unmet else eligible.append(sp))
+    return eligible, blocked
+
+
+MAX_LINES = 40
+MAX_BLOCKED = 5
+
+
+def next_block(sps, tudo=False):
+    """Linhas de cabeçalho: próximo SP elegível e bloqueados com a dependência em falta."""
+    eligible, blocked = eligibility(sps)
+    if not eligible and not blocked:
+        return []
+    if eligible:
+        sp = eligible[0]
+        lines = [f"Próximo: {sp.slug} ({ICONS[sp.status]} {sp.status}, {sp.priority}, {sp.project})"]
+    else:
+        lines = ["Próximo: nenhum elegível"]
+    if blocked:
+        lines.append(f"Bloqueados ({len(blocked)}):")
+        shown = blocked if tudo else blocked[:MAX_BLOCKED]
+        lines += [f"  {sp.slug} ← {', '.join(unmet)}" for sp, unmet in shown]
+        if len(shown) < len(blocked):
+            lines.append(f"  … +{len(blocked) - len(shown)} (--tudo)")
+    return lines
+
+
+def clip(lines, budget, tudo=False):
+    """Corta `lines` a `budget` linhas, com aviso de `--tudo`, salvo se `tudo`."""
+    if tudo or len(lines) <= budget:
+        return lines
+    return lines[:max(budget - 1, 0)] + [f"… +{len(lines) - budget + 1} linhas (--tudo)"]
+
+
 def summary(sps):
     todo = sum(sp.status == "TODO" for sp in sps)
     doing = sum(sp.status == "Doing" for sp in sps)
@@ -252,8 +305,12 @@ def main_tree(args):
     def visible(sp):
         return (args.all or sp.status != "Done") and (not args.status or sp.status.lower() == args.status)
 
-    print(render_tree(groups, loose, visible))
-    print(summary([sp for sp in sps if visible(sp)]))
+    head = next_block(sps, args.tudo)
+    foot = summary([sp for sp in sps if visible(sp)])
+    body = render_tree(groups, loose, visible).splitlines() or [""]
+    head = head + [""] if head else []
+    budget = MAX_LINES - len(head) - 1  # resumo
+    print("\n".join(head + clip(body, budget, args.tudo) + [foot]))
     return 0
 
 
@@ -298,6 +355,7 @@ def main(argv=None):
     ap.add_argument("--status", choices=("todo", "doing"))
     ap.add_argument("--all", action="store_true", help="inclui Done")
     ap.add_argument("--flat", action="store_true", help="tabela plana (sem agrupar programas)")
+    ap.add_argument("--tudo", action="store_true", help="sem limite de 40 linhas (nem de bloqueados)")
     ap.add_argument("--tree", action="store_true", help="(predefinido) agrupa os filhos sob o SP-mãe")
     ap.add_argument("--root", default=str(DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)

@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 from sp_fila_estado import REQ_POR_SP, SCRIPTS, bloqueio, guardar, ler, run_hidden
-from sp_fila_plano import descendentes, limite, load, plan, sem_commit
+from sp_fila_plano import descendentes, falhas, limite, load, plan, sem_commit
 from sp_fila_relatorio import progresso, relatorio
 
 
@@ -43,7 +43,9 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
         if fechada not in estado["sessoes"]:
             continue
         sp = next((s for s, _ in items if s.slug == fechada), None)
-        (estado["feitos"] if sp is not None and sp.status == "Done" else estado["falhados"]).append(fechada)
+        feito = sp is not None and sp.status == "Done"
+        (estado["feitos"] if feito else estado["falhados"]).append(fechada)
+        estado["seguidas"] = 0 if feito else estado.get("seguidas", 0) + 1
         del estado["sessoes"][fechada]
     # Paralelo (--concorrencia N): sem orçamento nem máximo; o único travão é o guard de contexto, que continua a sessão por handoff.
     paralelo = bool(estado.get("concorrencia"))
@@ -59,7 +61,7 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
         custo = sum(custos.get(s, 0.0) for s in so) - estado.get("custo_inicio", 0.0)
     lancados, motivo = [], None
     for alvo in (sp for sp in fila if all(d in done for d in sp.depends_on)):
-        motivo = None if paralelo else limite(estado, agora, custo)
+        motivo = falhas(estado) if paralelo else limite(estado, agora, custo)
         if motivo or len(estado["sessoes"]) >= teto:
             break
         doing = alvo.path.parent.parent / "Doing" / alvo.path.name
@@ -71,6 +73,7 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
             if r.returncode != 0:
                 motivo = f"erro a lançar {alvo.slug}: {(r.stderr or r.stdout).strip()}"
                 estado["falhados"].append(alvo.slug)
+                estado["seguidas"] = estado.get("seguidas", 0) + 1
                 break
         else:
             estado["sessoes"][alvo.slug] = {"inicio": agora.isoformat(timespec="seconds"), "requests": REQ_POR_SP,
@@ -79,7 +82,7 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
             lancados.append(alvo)
             motivo = None
     if not lancados and not estado["sessoes"]:
-        motivo = motivo or (None if paralelo else limite(estado, agora, custo)) or "fila vazia"
+        motivo = motivo or (falhas(estado) if paralelo else limite(estado, agora, custo)) or "fila vazia"
         sps = {sp.slug: (sp.status, _ler_sp(sp)) for sp, _ in items
                if sp.slug in estado["feitos"] + estado["falhados"]}
         path = relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora, _custos_seguros(custo_fn), sps)
