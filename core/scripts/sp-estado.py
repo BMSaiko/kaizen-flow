@@ -62,12 +62,15 @@ def estado(ref, root=None, project=None, git_lines=None):
     gl = git_lines if git_lines is not None else git_state()
     ramo, ficheiros = (gl[0] if gl else "?"), gl[1:]
 
+    filhos = [s for s in sps if s.parent == alvo.slug and s.project == alvo.project]
     out = [
         f"{alvo.slug} · {alvo.status} · {alvo.priority} · {alvo.project} · modo {fm.get('modo', '-')}",
         f"parent: {alvo.parent or '-'} · dependências: " + (("por cumprir " + ", ".join(unmet)) if unmet else ("ok" if alvo.depends_on else "-")),
         f"critérios: {feitos}/{len(crit)} · gates: {len(sp_gates.parse_gates(text))}",
         f"passos ({len(passos)}): " + " | ".join(s.rstrip(".") for s in passos[:6]),
     ]
+    if filhos:
+        out.append(f"filhos: {len(filhos)} filhos · perguntar concorrência (com/sem; defeito sem) antes de arrancar a fila")
     if prog:
         out.append("progresso:")
         out += [f"  {l.strip()}" for l in prog]

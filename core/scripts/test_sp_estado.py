@@ -72,3 +72,15 @@ def test_limita_ficheiros_git(tmp_path):
     make(tmp_path, "Doing", "alvo")
     out = sp_estado.estado("alvo", root=tmp_path, git_lines=["master"] + [f"M f{i}" for i in range(50)])
     assert len(out.splitlines()) <= 30
+
+
+def test_mae_pergunta_concorrencia(tmp_path):
+    make(tmp_path, "Doing", "filho")  # parent: mae
+    d = tmp_path / "demo" / "sp" / "TODO"
+    d.mkdir(parents=True)
+    (d / "mae-2026-10-26.md").write_text(
+        SP.format(st="TODO", slug="mae").replace("parent: mae\n", "kind: program\n"), encoding="utf-8")
+    mae = sp_estado.estado("mae", root=tmp_path, git_lines=["master"])
+    filho = sp_estado.estado("filho", root=tmp_path, git_lines=["master"])
+    assert "perguntar concorrência" in mae and "1 filhos" in mae
+    assert "perguntar concorrência" not in filho

@@ -13,6 +13,8 @@ Modo hook (eventos UserPromptSubmit e PostToolUse): recebe `session_id`, `transc
 - `limite`: `additionalContext` curto a mandar correr, em modo automático e uma vez por sessão,
   `/sp-handoff` se a sessão trabalha num SP (correu `/michi <SP>` nela e o SP está em Doing) ou
   `/handoff` (ficheiro efémero em `handoffs/`) se é conversa livre. Um SP em Doing noutra sessão não conta.
+Arranque do michi: `/michi ...` (exceto help) num `UserPromptSubmit` com contexto >= 40K
+(`CLAUDE_MICHI_START_LIMIT`, omissão 40000) manda correr `/sp-handoff --launch --auto` sem perguntar, uma vez por sessão.
 Chamadas de subagentes (payload com `agent_id`) são ignoradas: partilham o `session_id` do principal.
 `/michi <caminho>.md` num `UserPromptSubmit` grava o SP em `<session_id>.sp`.
 Os marcadores vivem em `%TEMP%/claude-context-guard/<session_id>.<nível>`. Qualquer erro no hook é
@@ -143,6 +145,40 @@ def _k(n):
     return f"{n // 1000}K"
 
 
+START_LIMIT = 40_000
+MICHI_START = r"^\s*/michi(?:\s+(\S.*?))?\s*$"
+
+
+def start_limit_from_env(env=None):
+    raw = (os.environ if env is None else env).get("CLAUDE_MICHI_START_LIMIT", "")
+    try:
+        value = int(raw)
+    except ValueError:
+        return START_LIMIT
+    return value if value > 0 else START_LIMIT
+
+
+def michi_start(marker_dir, session_id, payload, tokens, env=None):
+    """Arranque do /michi numa sessão já cheia (>= 40K): handoff automático e sessão nova, sem perguntar."""
+    prompt = payload.get("prompt")
+    if payload.get("hook_event_name") != "UserPromptSubmit" or not isinstance(prompt, str):
+        return None
+    import re
+
+    match = re.match(MICHI_START, prompt.strip(), re.IGNORECASE)
+    if not match or (match.group(1) or "").lower() in ("help", "--help", "-h", "?"):
+        return None
+    limit = start_limit_from_env(env)
+    if tokens < limit or not _claim(marker_dir, session_id, "arranque"):
+        return None
+    target = match.group(1) or "o SP indicado"
+    text = (f"[context-guard] /michi arrancou com contexto {_k(tokens)} >= {_k(limit)}. Não comeces o ciclo aqui: "
+            f"corre já /sp-handoff em modo automático sem perguntar (`sp-handoff.py --launch <SP> --auto`, SP: "
+            f"{target}) para retomar numa sessão nova. Se ainda não há SP em Doing, passa-o a Doing primeiro. "
+            "Não repitas este aviso.")
+    return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": text}}
+
+
 def hook(payload, env=None, marker_dir=None):
     session_id = payload.get("session_id")
     transcript = payload.get("transcript_path")
@@ -157,6 +193,9 @@ def hook(payload, env=None, marker_dir=None):
     tokens = context_tokens(transcript)
     if tokens is None:
         return None
+    started = michi_start(marker_dir, session_id, payload, tokens, env)
+    if started:
+        return started
     limit = limit_from_env(env)
     level = state(tokens, limit)
     if level == "ok":

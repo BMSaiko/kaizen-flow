@@ -121,3 +121,52 @@ def test_alias_slug_flag(root):
     rc, _, err = run("sp-fechar.py", "--root", str(root / "vault"), "--project", PROJECT,
                      "--slug", "inexistente", "--sem-budget", "--commit-dir", str(root / "repo"))
     assert rc == 2 and "sp-list.py" in err
+
+
+def _prog(tmp_path, estados):
+    """Mãe 'mae' + filhos a,b,c com o estado dado (pasta TODO/Doing/Done); b depende de a."""
+    for slug, st in estados.items():
+        d = tmp_path / PROJECT / "sp" / st
+        d.mkdir(parents=True, exist_ok=True)
+        extra = "kind: program\n" if slug == "mae" else "parent: mae\n" + ("depends_on: [a]\n" if slug == "b" else "")
+        (d / f"{slug}-2026-11-01.md").write_text(
+            f"---\nstatus: {st}\nupdated: 2026-11-01T00:00:00Z\nslug: {slug}\nproject: {PROJECT}\npriority: P3\nmodo: manual\n{extra}---\n# SP\n",
+            encoding="utf-8")
+
+
+def test_seguinte_proximo_filho(tmp_path):
+    _prog(tmp_path, {"mae": "TODO", "a": "Done", "b": "TODO", "c": "TODO"})
+    out = _mod().seguinte(tmp_path, "a", PROJECT)
+    assert out.startswith("PRÓXIMO FILHO:") and "b" in out
+
+
+def test_seguinte_ultimo_filho_fecha_mae(tmp_path):
+    _prog(tmp_path, {"mae": "TODO", "a": "Done", "b": "Done", "c": "Done"})
+    out = _mod().seguinte(tmp_path, "c", PROJECT)
+    assert out.startswith("ÚLTIMO FILHO:") and "mae" in out
+
+
+def test_seguinte_sem_parent_nada(tmp_path):
+    _prog(tmp_path, {"mae": "TODO", "a": "Done"})
+    assert _mod().seguinte(tmp_path, "mae", PROJECT) == ""
+
+
+def test_guarda_fecho_filho_anuncia_seguinte(tmp_path):
+    """Guarda: fechar um filho (sem --next) nunca omite PRÓXIMO FILHO / ÚLTIMO FILHO."""
+    _prog(tmp_path, {"mae": "TODO", "a": "Doing", "b": "TODO", "c": "TODO"})
+    sp = tmp_path / PROJECT / "sp" / "Doing" / "a-2026-11-01.md"
+    sp.write_text(sp.read_text(encoding="utf-8") + "\n## Prova de done\nok\n", encoding="utf-8")
+    rc, out, err = run("sp-fechar.py", "--root", str(tmp_path), "--project", PROJECT, "a",
+                       "--sem-budget", "--sem-testes", "--sem-commit")
+    assert rc == 0, err
+    assert "PRÓXIMO FILHO:" in out
+
+
+def test_guarda_skill_michi_regista_regra():
+    """Guarda: o SKILL.md do michi mantém a regra do passo seguinte ao fechar um filho."""
+    caminhos = [SCRIPTS.parent / ".claude" / "skills" / "michi" / "SKILL.md", SCRIPTS.parent / "skills" / "michi" / "SKILL.md"]
+    existente = next((c for c in caminhos if c.is_file()), None)
+    if existente is None:
+        pytest.skip("SKILL.md do michi não existe neste layout")
+    skill = existente.read_text(encoding="utf-8")
+    assert "PRÓXIMO FILHO" in skill and "ÚLTIMO FILHO" in skill and "Nunca omitir" in skill
