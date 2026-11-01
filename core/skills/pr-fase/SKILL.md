@@ -23,4 +23,8 @@ Outros rc: 2 review não aprovado; 5 corpo sem «feito» ou sem «prova»; 6 bas
 
 A «Prova» inclui os paths `proofs/...` citados no SP, os comandos das `gates:` e o veredicto do review. Base: `--base` manda; senão a única entre `origin/main|master|dev`; mais de uma = rc 6, perguntar ao user. O corpo é limpo de linhas `Co-Authored-By`/`Generated with` (regra em AGENTS.md).
 
-Testes: `python scripts/test_pr_corpo.py`.
+## Vigia do PR
+
+Depois de `gh pr create` (rc 0), armar a vigia sem perguntar: `Monitor` sobre `python -I scripts/pr_watch.py <nº|URL> --repo <repo>` (polling de 60 s, máx. 120 min, só leitura). Uma linha por mudança: `erro` (nome+URL do check), `conflito`, `pendente`, `aguarda-review`, `pronto`, `merged`. Vigia até `pronto`/`merged` (rc 0), `closed` (2), `erro` (5) ou `conflito` (6); outros rc: 3 limite, 4 gh falhou. Avisar o user ao parar; nunca fazer merge nem push.
+
+Testes: `python scripts/test_pr_corpo.py` · `python scripts/test_pr_watch.py`.
