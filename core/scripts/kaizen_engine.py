@@ -4,6 +4,7 @@ Os scripts `sp-*` importam isto em vez de repetirem parsers e `importlib`.
 """
 import importlib.util
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -20,6 +21,20 @@ def load(name):
     sys.modules[key] = mod
     spec.loader.exec_module(mod)
     return mod
+
+
+def relocate(src, dst):
+    """Move `src` para `dst` (cria a pasta): `git mv` se rastreado, senão `rename`."""
+    src, dst = Path(src), Path(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    tracked = subprocess.run(
+        ["git", "-C", str(src.parent), "ls-files", "--error-unmatch", src.name],
+        capture_output=True,
+    ).returncode == 0
+    if tracked:
+        subprocess.run(["git", "-C", str(src.parent), "mv", str(src), str(dst)], check=True, capture_output=True)
+    else:
+        src.rename(dst)
 
 
 def frontmatter_lines(text):

@@ -10,16 +10,15 @@ Uso:
 rc=0 se nada a fazer (ou tudo aplicado); rc=1 se há desvios por aplicar ou bloqueados.
 """
 import argparse
-import importlib.util
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-_spec = importlib.util.spec_from_file_location("sp_list", Path(__file__).with_name("sp-list.py"))
-sp_list = importlib.util.module_from_spec(_spec)
-sys.modules["sp_list"] = sp_list
-_spec.loader.exec_module(sp_list)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_engine  # noqa: E402
+
+sp_list = kaizen_engine.load("sp-list")
 
 SKIP_DIRS = {"arquivo", "_sessions"}
 ATTACHMENT_RE = re.compile(r"-(DP|REPORT)$")

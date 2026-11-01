@@ -18,4 +18,4 @@ function render(core) {
   };
 }
 
-module.exports = { render, name: "claude" };
+module.exports = { render };

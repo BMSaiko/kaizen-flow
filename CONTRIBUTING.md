@@ -25,3 +25,23 @@ Thanks for helping. The rules are short:
 4. Write a `COMMIT_*.md` and wait for the maintainer's confirmation before committing. Nothing here commits or pushes on its own; push only on explicit request.
 
 What counts as a piece is defined once, in `bin/sync.js`. Project SPs stay in the vault and are never mirrored.
+
+## Code layout
+
+- `bin/kaizen.js` only routes; each command lives in `bin/commands/<name>.js` (`adapters`, `audit`, `doctor`, `init`, `python`, `sync`).
+- `adapters/` renders the core per harness (`claude`, `codex`, `agents-md`); the last two share `agentsAdapter()` in `adapters/util.js`.
+- `core/scripts/` shares helpers through `kaizen_engine.py` (`load`, `relocate`, frontmatter). `sp-fila.py` and `sp-handoff.py` are thin entry points over `sp_fila_*.py`, `handoff_pane.py`, `handoff_spawn.py` and `sp_progresso.py`; no module is above 300 lines.
+- Dead imports and exports were removed; public behaviour (CLI, commands, skills) is unchanged.
+- Architecture diagram: `docs/assets/architecture.svg`, regenerated with `python -I docs/assets/build-diagrams.py` run from `docs/assets/`.
+
+### Before / after the cleanup (non-test `.py`/`.js`)
+
+| | before (`main`) | after |
+|---|---|---|
+| files | 38 | 52 |
+| lines | 9722 | 10206 |
+| `sp-fila.py` | 784 | 187 |
+| `sp-handoff.py` | 549 | 162 |
+| `bin/kaizen.js` | 268 | 37 |
+
+Lines grew because the monoliths became small modules and new tests went in; the gain is in module size and shared helpers, not total lines.

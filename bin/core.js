@@ -18,4 +18,4 @@ function loadCore(dir = CORE) {
   return out.sort((a, b) => (a.rel < b.rel ? -1 : 1));
 }
 
-module.exports = { loadCore, CORE };
+module.exports = { loadCore };
