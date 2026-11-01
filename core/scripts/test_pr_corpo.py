@@ -61,10 +61,11 @@ class PrTest(unittest.TestCase):
 
     def test_auto_cria_com_gh(self):
         with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)) as m:
-            rc, _, _ = correr(montar("auto") + ["--criar"])
+            rc, _, _ = correr(montar("auto") + ["--criar", "--base", "main"])
         self.assertEqual(rc, 0)
         cmd = m.call_args[0][0]
         self.assertEqual(cmd[:3], ["gh", "pr", "create"])
+        self.assertEqual(cmd[cmd.index("--base") + 1], "main")
         self.assertNotIn("Co-Authored-By", cmd[-1])
 
     def test_pergunta_nunca_e_review_reprovado_nao_criam(self):
@@ -72,7 +73,52 @@ class PrTest(unittest.TestCase):
             self.assertEqual(correr(montar("pergunta") + ["--criar"])[0], 3)
             self.assertEqual(correr(montar("nunca") + ["--criar"])[0], 4)
             self.assertEqual(correr(montar("auto", "ESCALAR") + ["--criar"])[0], 2)
-        m.assert_not_called()
+        self.assertFalse(any(c[0][0][:1] == ["gh"] for c in m.call_args_list))
+
+    def test_dry_run_imprime_e_nunca_cria(self):
+        with mock.patch("subprocess.run") as m:
+            rc, out, err = correr(montar("auto") + ["--criar", "--dry-run", "--base", "main"])
+        self.assertEqual(rc, 0)
+        self.assertIn("## Prova", out)
+        self.assertIn("Base: main", err)
+        self.assertFalse(any(c[0][0][:1] == ["gh"] for c in m.call_args_list))
+
+    def test_base_unica_e_ambigua(self):
+        def git(saida):
+            return mock.Mock(stdout=saida, returncode=0)
+        uma = "  origin/HEAD -> origin/main\n  origin/main\n  origin/feat\n"
+        tres = "  origin/main\n  origin/master\n  origin/dev\n"
+        with mock.patch("subprocess.run", return_value=git(uma)):
+            self.assertEqual(pr_corpo.detetar_base(".")[0], "main")
+        with mock.patch("subprocess.run", return_value=git(tres)):
+            base, cand = pr_corpo.detetar_base(".")
+        self.assertIsNone(base)
+        self.assertEqual(cand, ["main", "master", "dev"])
+
+    def test_base_ambigua_com_criar_pede_confirmacao(self):
+        amb = mock.Mock(stdout="  origin/main\n  origin/master\n", returncode=0)
+        with mock.patch("subprocess.run", return_value=amb) as m:
+            rc, _, _ = correr(montar("auto") + ["--criar"])
+        self.assertEqual(rc, 6)
+        self.assertFalse(any(c[0][0][:3] == ["gh", "pr", "create"] for c in m.call_args_list))
+
+    def test_corpo_tem_provas_e_gates(self):
+        sp = SP.format(pol="auto").replace("slug: demo", "slug: demo\ngates:\n  - cmd: python -I x.py\n") + "\nVer proofs/dry-run.txt\n"
+        d = Path(tempfile.mkdtemp())
+        (d / "sp.md").write_text(sp, encoding="utf-8")
+        (d / "r.json").write_text(json.dumps({"veredicto": "APROVADO", "iteracao": 1}), encoding="utf-8")
+        _, out, _ = correr([str(d / "sp.md"), "--review", str(d / "r.json")])
+        self.assertIn("`proofs/dry-run.txt`", out)
+        self.assertIn("`python -I x.py`", out)
+
+    def test_atribuicao_removida_do_corpo(self):
+        sp = SP.format(pol="auto") + "\nCo-Authored-By: bot\nGenerated with tool\n"
+        d = Path(tempfile.mkdtemp())
+        (d / "sp.md").write_text(sp, encoding="utf-8")
+        (d / "r.json").write_text(json.dumps({"veredicto": "APROVADO", "iteracao": 1}), encoding="utf-8")
+        _, out, _ = correr([str(d / "sp.md"), "--review", str(d / "r.json")])
+        self.assertNotIn("Co-Authored-By", out)
+        self.assertNotIn("Generated with", out)
 
 
 if __name__ == "__main__":

@@ -1,138 +1,56 @@
 ---
 name: dr
 description: 'Use when starting any Deep-Planning (DP) session or COMPLEX task requiring structured context gathering — performs systematic research across vault, codebase, and mistake logs before planning begins. Trigger: start of DP, ''research this first'', ''gather context for'', or any multi-step task where context is incomplete.'
-version: 2.1.0
+version: 3.0.0
 ---
 # Deep-Research (DR)
 
-Fase de pesquisa estruturada que alimenta o Deep-Planning. Evidência antes de assunções.
+Fase 0 do DP: evidência antes de assunções. **Sem planeamento sem pesquisa**; o Analyze do DP lê o Brief, não repete a pesquisa. Detalhe (fases, template, erros, red flags, mapa de ferramentas): `references/dr-detalhe.md`.
 
-## Visão geral
-
-DR é a **Fase 0**: corre antes do «Analyze» do DP. Pesquisar antes de analisar, analisar antes de desenhar, desenhar antes de codar. **Lei de ferro: sem planeamento sem pesquisa**; sem o Research Brief completo o Analyze do DP não arranca.
+## Quando
 
 | Cenário | Aplicar? |
 |---|---|
-| Início de Deep-Planning | **OBRIGATÓRIO** |
-| Tarefa COMPLEX com contexto desconhecido | **OBRIGATÓRIO** |
-| User diz «research this first» | **OBRIGATÓRIO** |
+| Início de DP, tarefa COMPLEX com contexto desconhecido, «research this first» | Sim |
 | Multi-passo com contexto incompleto | Recomendado |
-| Tarefa TRIVIAL ou contexto já conhecido | Saltar |
-| Pergunta rápida / one-liner | Nunca |
+| TRIVIAL, contexto já conhecido, pergunta rápida | Não |
 
-Session Start dá o contexto da **sessão** (inbox, erros, nota diária; horizontal); DR dá o do **projeto/tarefa** (vault + código + padrões; vertical); Brainstorming explora o design depois do DR.
+## Scope Gate (dono único; o `dp` só o cita)
 
-## Scope Gate (Fase 0.5)
-
-Antes do DR completo, confirmar que a tarefa o justifica: (1) TRIVIAL ou contexto conhecido → **saltar DR**; (2) pergunta respondível com uma `sb_search` → **só essa**; (3) várias subsistemas ou dependências desconhecidas → **DR completo**; (4) dúvida → só a Fase 1, e se o alvo for claro e estreito, reduzir a delta. Registar no Brief em `## Executive Summary` como `Scope Gate: Full/Delta/Skipped`.
+1. TRIVIAL ou contexto conhecido → **Skipped**.
+2. Respondível com uma pesquisa → só essa (**Delta**).
+3. Vários subsistemas ou dependências desconhecidas → **Full**.
+4. Dúvida → Fase 1 e, se o alvo for estreito, Delta. Trabalho nas últimas 24 h no projeto → Delta (só commits e notas novas).
 
 ## Fases
 
-Sequencial Fase 1 → Fase 2; as Fases 2-5 são independentes (em paralelo se possível); a Fase 6 consolida. Cada fase: entrada → ferramentas → saída → verificar. Orçamento: F1 2 min, F2 5, F3 5, F4 3, F5 3, F6 3 (~21 min; `/dr <tópico> --deep` alarga).
+1. **Alvo:** projeto, âmbito, entidades-chave (MOC do projeto → caminho do código, nunca hardcoded).
+2. **Vault:** MOC, docs relacionados, links partidos. `mcp__vault__sb_*` primeiro, `Grep`/`Glob` depois.
+3. **Código:** estrutura, `git log --oneline -10`, TODO/FIXME, `git status --short`.
+4. **Erros:** padrões no MISTAKE_LOG por projeto, stack e tipo de tarefa (nunca bloqueia).
+5. **Temporal:** daily notes de hoje e ontem, sessões dos últimos 3 dias (feito, em curso, bloqueios).
+6. **Brief:** `knowledge/projects/<projeto>/research/YYYY-MM-DD-<tópico>-brief.md`.
 
-1. **Identificar o alvo.** Projeto, âmbito, entidades-chave. Fast-path: trabalhou-se neste projeto nas últimas 24 h (`sb_list` de sessões recentes) → **Delta-Only** (commits, ficheiros e notas novas), senão **Full**. Ferramentas: `sb_resolve` (wikilink do projeto → caminho de código), `sb_search` (o projeto existe?), `project_detect` (cwd). Saída: declaração do alvo.
-2. **Pesquisa no vault.** Ler o MOC do projeto (`knowledge/projects/<projeto>/MOC.md`), pesquisar conteúdo relacionado, verificar saúde dos links, estatísticas do vault. Ferramentas: `sb_read`, `sb_search`, `sb_list`, `sb_resolve`, `maintenance_link_audit` (links partidos), `dashboard_status`. Pré-requisito: vault sincronizado (`sync_daily_notes(dryRun=true)`; se houver mudanças relevantes, `sync_daily_notes()`). Saída: caminho/estado do MOC (found/new/missing), docs relacionados, saúde dos links, stats.
-3. **Pesquisa no código.** Estrutura, padrões, commits recentes, TODOs. Ferramentas: `bash` (`ls`, `rg`, `git log`), `win_git` (repos Windows, fallback de caminho), `git_status`. Caminho resolvido dinamicamente via `sb_resolve` a partir do MOC (**nunca hardcoded**; fallback `sb_search`). Verificações: `ls` de `src/ lib/ config/ docs/`; `git log --oneline -10`; `rg "TODO|FIXME|HACK|XXX"`; `git status --short`. Sem git: «not checked» nos Research Gaps; caminho não resolvido: «path unresolved» e saltar para a Fase 6.
-4. **Padrões de erro.** Procurar no MISTAKE_LOG (`sb_search` em escopo de projeto e `knowledge/infra/`; fallback `find`) padrões do domínio, stack e tipo de tarefa, filtrando por nome do projeto (substring ≥3 chars), stack («Next.js», «Supabase», «Python») e tipo de tarefa («deployment», «RLS», «migration»). Saída: padrões com passos de prevenção, ou `_None relevant_`; MISTAKE_LOG ausente: `_MISTAKE_LOG not found_` nos Gaps. Nunca bloqueia o DR.
-5. **Contexto temporal.** Daily notes de hoje e ontem e sessões dos últimos 3 dias: feito, em curso, bloqueado. Pré-requisito: `sync_daily_notes(dryRun=true)` e, se houver pendentes, `sync_daily_notes()`. Ferramentas: `sync_sessions`, `sb_read` (`knowledge/YYYY-MM-DD.md`), `sb_list`. Extrair itens de hoje, concluído/em curso de ontem, bloqueios e decisões pendentes, flags (WIP, abandonado, escalado).
-6. **Compilar o Brief.** Escrever em `knowledge/projects/<projeto>/research/YYYY-MM-DD-<tópico>-brief.md` com todas as secções; fases saltadas ou com erro preenchem a secção com a lacuna/razão.
+Fases 2-5 são independentes: chamadas paralelas na mesma resposta. Falha de uma fase = registar em Lacunas e continuar; nunca abortar o DR.
 
-## Template do Research Brief
+## Orçamento e paragem
 
-```markdown
-# Research Brief — {Topic}
-
-> **Date:** YYYY-MM-DD
-> **Project:** {project}
-> **Scope:** {scope}
-> **Fast-Path Applied:** {Full/Delta/Skipped}
-> **Scope Gate:** {Full/Delta/Skipped}
-> **Duration:** {total minutes}
-
-## Executive Summary
-{2-3 frases: o que se pesquisou, achados, confiança global}
-
-## Vault Findings
-- **MOC:** {path} — {found/new/missing}
-- **Related Docs:** {list}
-- **Link Health:** {healthy / N broken links}
-- **Vault Stats:** {files, size, active skills}
-
-## Codebase State
-- **Location:** {abs path}
-- **Structure:** {key dirs}
-- **Recent Changes:** {last N commits or "no git"}
-- **Open TODOs:** {count + key items}
-
-## Mistake Patterns
-- **[{category}]** {pattern} → Prevention: {step}   (ou _None relevant_ / _MISTAKE_LOG not found_)
-
-## Temporal Context
-- **Today:** · **Yesterday:** · **Blockers:**
-
-## Open Questions
-1. {question}
-
-## Research Gaps
-- {o que não se determinou; fases com erro ou saltadas, com razão}
-
-## Confidence Assessment
-| Section | Confidence | Basis |
+| Gate | Leituras | Greps/Glob |
 |---|---|---|
-| Vault / Codebase / Mistakes / Temporal | high/medium/low | {razão} |
-| **Overall** | **high/medium/low** | |
+| Skipped | 0 | ≤1 |
+| Delta | ≤5 | ≤4 |
+| Full | ≤15 | ≤10 |
 
-## Tool Audit
-| Phase | Tools Used | Status |
-|---|---|---|
-| Phase 2..5 | {tools} | ✓/⚠/✗ |
-```
+`Read` com `offset`/`limit`, nunca ficheiros inteiros. **Parar quando** (a) as 3 perguntas da Síntese têm resposta com fonte, (b) o orçamento acaba (o resto vai para Lacunas) ou (c) duas pesquisas seguidas não trazem nada novo. Registar no Brief `Orçamento: N leituras, M greps; parou porque…`.
 
-**Confiança:** *High* = ≥3 fontes independentes concordam ou a fonte primária bate diretamente; *Medium* = 1-2 fontes ou uma única autoritativa; *Low* = sem fonte, evidência contraditória ou fase com erro.
+## Saída (fixa)
 
-## Integrações
+Brief com cabeçalho `Scope Gate` + `Orçamento`, secção **`## Síntese` ≤25 linhas** e cada afirmação com fonte `ficheiro:linha`:
+onde a mudança cai · o que tem de respeitar · o que é arriscado.
+Depois: Padrões de erro, Contexto temporal, Perguntas abertas, Lacunas, Confiança (high ≥3 fontes concordam; medium 1-2; low sem fonte ou fase com erro) e Tool Audit. Template completo em `references/dr-detalhe.md`.
 
-`grounded-citations` (Fase 2 precisa de afirmações web verificáveis); `link-audit` (Fase 2 encontra wikilinks partidos, após `sb_resolve`); `sb-sync` (`sync_daily_notes` antes de ler notas temporais); `project-setup` (Fase 1 não acha o projeto no vault: sinalizar «project not initialized»).
+Validar: `python -I scripts/dr-check.py <brief>` (rc 0). Sem Brief gravado, «não documentado = não aconteceu».
 
 ## Handoff DR → DP
 
-1. O Brief fica gravado. 2. O «Analyze» do DP **lê o Brief**, não repete a pesquisa. 3. O plano cita-o: `> Research: knowledge/projects/<projeto>/research/YYYY-MM-DD-<tópico>-brief.md`. 4. Secções de baixa confiança viram riscos no plano. 5. O Scope Gate (Full/Delta/Skipped) ajusta a profundidade do plano. 6. Cada Research Gap é endereçado ou aceite explicitamente como risco.
-
-## Erros
-
-| Falha | Ação |
-|---|---|
-| Fase 1 | Reportar; saltar DR; escalar ao user |
-| Fase 2 (vault) | Continuar F3-5; vault «unverified» nos Gaps |
-| Fase 3 (código) | Continuar; «not checked» nos Gaps |
-| Fase 4 (erros) | Continuar; `_MISTAKE_LOG not found_` nos Gaps |
-| Fase 5 (temporal) | Continuar; «temporal context unavailable» |
-| Fase 6 (escrita) | Brief para o terminal; avisar o user |
-
-**Nunca abortar o DR inteiro por falha de uma fase: registar a lacuna e continuar.**
-
-## Red flags
-
-Saltar fases «para poupar tempo» (pesquisa rasa = planos maus); viés de confirmação; pesquisar sem escrever o Brief («não documentado = não aconteceu»); ignorar secções de baixa confiança (são riscos); re-pesquisar no DP o que o DR já cobriu; caminhos hardcoded (resolver com `sb_resolve`); saltar o Scope Gate (over-research de tarefas triviais); correr F2-5 em sequência quando são independentes.
-
-## Observabilidade
-
-- [ ] Scope Gate e fast-path documentados
-- [ ] Brief com todas as secções, Tool Audit completo e confiança com base objetiva por secção
-- [ ] MISTAKE_LOG verificado (padrões ou «not found»); notas temporais sincronizadas antes de ler
-- [ ] Brief referenciado no plano DP
-- [ ] Nenhuma fase saltada sem justificação; Research Gaps preenchido com as falhas
-
-## Adaptação Claude Code (the agent)
-
-Ferramentas Pi → Claude Code. Sem sub-agentes (sequencial; ver CLAUDE.md).
-
-| Pi | Claude Code |
-|----|-------------|
-| `sb_search` | `Grep` (conteúdo) / `Glob` (nomes) |
-| `sb_read` | `Read` (usar `offset`/`limit`) |
-| `sb_list` | `Glob` (ordenar por data) |
-| `sb_resolve` | `Glob` por `**/<nome>.md` (wikilink → caminho) |
-| `bash` + `find`/`grep` | Proibido; usar `Glob`/`Grep` |
-| `subagents` / paralelo | Chamadas de ferramentas paralelas na mesma resposta; nunca `Agent` salvo pedido do user |
-| `sync_daily_notes` | Ler/editar a daily note à mão |
+O plano cita `> Research: <caminho do Brief>`; confiança baixa vira risco; cada Lacuna é endereçada ou aceite como risco. Super Prompt de 8 secções como input: saltar fases 1-2 do michi e não repetir factos das secções 2-5.
