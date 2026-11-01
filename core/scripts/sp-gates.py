@@ -12,6 +12,8 @@ RC 0 = todos verdes (ou SP sem gates); 1 = gate vermelho/timeout; 2 = gate invá
 Uso:
   python -I scripts/sp-gates.py <caminho.md>          # incremental: salta gates verdes com inputs iguais
   python -I scripts/sp-gates.py <caminho.md> --full   # corre todos (o fecho, sp-fechar.py, usa sempre isto)
+  python -I scripts/sp-gates.py --sugerir <repo>      # gates por tipo de repo (Node, Python, Tauri, vault), bloco `gates:` pronto
+Ordem da fase 5: gates -> harden -> pentest -> review (michi/references/michi-gates.md).
 """
 import argparse
 import hashlib
@@ -34,6 +36,35 @@ FORBIDDEN = (
     (re.compile(r"\bgit\s+add\s+(-A\b|--all\b|\.(\s|$))"), "git add -A/."),
     (re.compile(r"\.env(\.|\b)|\.(key|pem|p12|pfx)\b|\bid_rsa|\bsecrets?\.|\.secrets"), "leitura de segredos"),
 )
+
+
+def detect_gates(repo):
+    """Comandos de gate sugeridos para o tipo de repo em `repo` (lista de `cmd`, por ordem)."""
+    r = Path(repo)
+    if (r / "tools" / "vault-mcp").exists() and (r / "scripts" / "context-budget.py").exists():
+        return ["python -I scripts/context-budget.py", "python -I scripts/test-fast.py"]
+    cmds = []
+    if (r / "src-tauri" / "Cargo.toml").exists():
+        cmds.append("cargo check --manifest-path src-tauri/Cargo.toml")
+    if (r / "package.json").exists():
+        try:
+            scripts = json.loads((r / "package.json").read_text(encoding="utf-8")).get("scripts", {})
+        except (OSError, ValueError):
+            scripts = {}
+        cmds += [f"npm run {n}" for n in ("lint", "typecheck", "build") if n in scripts]
+        if "test" in scripts:
+            cmds.append("npm test")
+    if (r / "pyproject.toml").exists() or (r / "pytest.ini").exists() or (r / "setup.cfg").exists():
+        cmds.append("python -m pytest -q")
+    return cmds
+
+
+def suggestion(repo):
+    """Bloco `gates:` de frontmatter para o repo, ou texto vazio se o tipo é desconhecido."""
+    cmds = detect_gates(repo)
+    if not cmds:
+        return ""
+    return "gates:\n" + "\n".join(f"  - cmd: {c}\n    timeout: 300" for c in cmds)
 
 
 def forbidden(cmd):
@@ -158,11 +189,28 @@ def summary(results):
     return "\n".join(lines)
 
 
+def table(results, total):
+    """Tabela final `# | comando | RC | estado`; gates não corridos (após um vermelho) ficam «não correu»."""
+    rows = ["| # | comando | RC | estado |", "|---|---|---|---|"]
+    for i, r in enumerate(results, 1):
+        state = "TIMEOUT" if r["timeout"] else ("cache" if r.get("cached") else ("verde" if r["rc"] == 0 else "VERMELHO"))
+        rows.append(f"| {i} | `{r['cmd']}` | {r['rc']} | {state} |")
+    rows += [f"| {i} | — | — | não correu |" for i in range(len(results) + 1, total + 1)]
+    return "\n".join(rows)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Corre os gates do frontmatter de um SP")
-    ap.add_argument("path")
+    ap.add_argument("path", nargs="?")
+    ap.add_argument("--sugerir", metavar="REPO", help="imprime o bloco gates: sugerido para o tipo de repo")
     ap.add_argument("--full", action="store_true", help="ignora a cache: corre todos os gates")
     args = ap.parse_args(argv)
+    if args.sugerir:
+        block = suggestion(args.sugerir)
+        print(block or "tipo de repo desconhecido: declarar os gates à mão", file=None if block else sys.stderr)
+        return 0 if block else 1
+    if not args.path:
+        ap.error("falta o caminho do SP (ou --sugerir REPO)")
     try:
         text = Path(args.path).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
@@ -178,6 +226,7 @@ def main(argv=None):
         return 2
     results = run(gates, cache_path=None if args.full else CACHE_PATH)
     print(summary(results))
+    print(table(results, len(gates)))
     return 0 if all(r["rc"] == 0 for r in results) and len(results) == len(gates) else 1
 
 

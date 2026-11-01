@@ -145,3 +145,47 @@ def test_sem_cache_path_corre_tudo(tmp_path):
     (tmp_path / "f.txt").write_text("1", encoding="utf-8")
     g = [_gate(tmp_path, 'python -c "print(1)"', ["f.txt"])]
     assert not sp_gates.run(g)[0].get("cached") and not sp_gates.run(g)[0].get("cached")
+
+
+def test_tabela_marca_gates_nao_corridos_apos_vermelho(tmp_path):
+    cwd = str(tmp_path)
+    gates = [
+        {"cmd": f'{PY} -c "print(1)"', "cwd": cwd, "timeout": 30},
+        {"cmd": f'{PY} -c "raise SystemExit(3)"', "cwd": cwd, "timeout": 30},
+        {"cmd": f'{PY} -c "print(2)"', "cwd": cwd, "timeout": 30},
+    ]
+    rows = sp_gates.table(sp_gates.run(gates), len(gates)).splitlines()
+    assert "verde" in rows[2] and "VERMELHO" in rows[3] and "não correu" in rows[4]
+
+
+def test_main_imprime_tabela_e_nao_corre_gate_apos_vermelho(tmp_path, capsys):
+    f = tmp_path / "sp.md"
+    marker = tmp_path / "ran.txt"
+    f.write_text(sp_text((f'{PY} -c "raise SystemExit(1)"', {"cwd": str(tmp_path)}),
+                         (f'{PY} -c "import pathlib; pathlib.Path(\'ran.txt\').touch()"', {"cwd": str(tmp_path)})),
+                 encoding="utf-8")
+    assert sp_gates.main([str(f), "--full"]) == 1
+    assert not marker.exists()
+    assert "| 2 | — | — | não correu |" in capsys.readouterr().out
+
+
+def test_detect_gates_por_tipo_de_repo(tmp_path):
+    (tmp_path / "package.json").write_text('{"scripts": {"test": "x", "lint": "y"}}', encoding="utf-8")
+    (tmp_path / "src-tauri").mkdir()
+    (tmp_path / "src-tauri" / "Cargo.toml").write_text("", encoding="utf-8")
+    assert sp_gates.detect_gates(tmp_path) == ["cargo check --manifest-path src-tauri/Cargo.toml", "npm run lint", "npm test"]
+
+
+def test_detect_gates_python_e_desconhecido(tmp_path, capsys):
+    assert sp_gates.detect_gates(tmp_path) == [] and sp_gates.suggestion(tmp_path) == ""
+    assert sp_gates.main(["--sugerir", str(tmp_path)]) == 1
+    (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
+    assert sp_gates.main(["--sugerir", str(tmp_path)]) == 0
+    assert "cmd: python -m pytest -q" in capsys.readouterr().out
+
+
+def test_sugestao_nunca_usa_or_true(tmp_path):
+    (tmp_path / "package.json").write_text('{"scripts": {"build": "b", "test": "t"}}', encoding="utf-8")
+    assert "|| true" not in sp_gates.suggestion(tmp_path)
+    text = "---\n" + sp_gates.suggestion(tmp_path) + "\n---\n"
+    assert sp_gates.problems(sp_gates.parse_gates(text)) == []

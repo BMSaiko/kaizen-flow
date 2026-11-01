@@ -41,6 +41,37 @@ class CicloTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.run_(est, ach, ["--criar-sps"])
 
+    def test_achado_com_verificar(self):
+        est, ach = ficheiros("[bloqueante] x.py:3 bug | verificar: pytest x\n")
+        rc.main([str(est), "--achados", str(ach)])
+        h = json.loads(est.read_text())["historico"][0]
+        self.assertEqual(h["achados"][0]["verificar"], "pytest x")
+
+    def test_incremental_so_ficheiros_alterados(self):
+        est, ach = ficheiros("[bloqueante] x.py:3 bug\n")
+        raiz = est.parent
+        (raiz / "x.py").write_text("a", encoding="utf-8")
+        (raiz / "y.py").write_text("b", encoding="utf-8")
+        base = ["--raiz", str(raiz), "--ficheiros", "x.py", "y.py"]
+        rc.main([str(est), "--achados", str(ach), *base])
+        e = json.loads(est.read_text())
+        self.assertEqual(e["historico"][0]["rever"], ["x.py", "y.py"])
+        (raiz / "x.py").write_text("a2", encoding="utf-8")
+        rc.main([str(est), "--achados", str(ach), *base])
+        e = json.loads(est.read_text())
+        self.assertEqual(e["historico"][1]["rever"], ["x.py"])
+
+    def test_resumo_de_iteracoes(self):
+        est, ach = ficheiros("[bloqueante] x.py:3 bug\n")
+        rc.main([str(est), "--achados", str(ach)])
+        txt = rc.resumo(json.loads(est.read_text()))
+        self.assertIn("| 1 | 1 | 0 |", txt)
+
+    def test_checklist_por_tipo(self):
+        self.assertIn("testes", rc.checklist("codigo").lower())
+        with self.assertRaises(KeyError):
+            rc.checklist("xyz")
+
 
 if __name__ == "__main__":
     unittest.main()
