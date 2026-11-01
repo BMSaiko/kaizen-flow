@@ -299,3 +299,50 @@ def test_permitir_proibido_ou_com_quebra_de_linha_e_recusado(tmp_path):
     with pytest.raises(sp_new.SpNewError, match="permitir"):
         sp_new.create(root, "atlas", "p", "P2", TODAY, permitir=["a\nb"])
     assert list((root / "atlas/sp/TODO").glob("*.md")) == []
+
+
+def program(tmp_path):
+    root = project(tmp_path)
+    sp_new.create_program(root, "atlas", "prog", "P2", TODAY, [("a", [])])
+    return root
+
+
+def mother_children(root):
+    text = (root / "atlas/sp/TODO/prog-2026-10-18.md").read_text(encoding="utf-8")
+    return text.split("---\n")[1].split("children:\n")[1]
+
+
+def test_parent_acrescenta_filho_a_children_da_mae(tmp_path):
+    root = program(tmp_path)
+    sp_new.main(["--root", str(root), "--project", "atlas", "--slug", "b", "--priority", "P2",
+                 "--parent", "prog", "--depends-on", "a"])
+    assert mother_children(root) == (
+        "  - slug: a\n    depends_on: []\n    state: TODO\n"
+        "  - slug: b\n    depends_on: [a]\n    state: TODO\n"
+    )
+
+
+def test_parent_repetido_nao_duplica_entrada(tmp_path):
+    root = program(tmp_path)
+    sp_new.link_parent(root, "atlas", "prog", "b", ["a"])
+    sp_new.link_parent(root, "atlas", "prog", "b", ["a"])
+    assert mother_children(root).count("slug: b") == 1
+
+
+def test_parent_inexistente_ou_nao_programa_falha_sem_criar_filho(tmp_path):
+    root = program(tmp_path)
+    sp_new.create(root, "atlas", "plain", "P2", TODAY)
+    for parent, msg in (("nada", "não existe"), ("plain", "kind: program")):
+        argv = ["--root", str(root), "--project", "atlas", "--slug", "x", "--priority", "P2", "--parent", parent]
+        assert sp_new.main(argv) == 1
+        assert not list((root / "atlas/sp/TODO").glob("x-*.md"))
+
+
+def test_link_parent_preserva_crlf(tmp_path):
+    root = program(tmp_path)
+    mother = root / "atlas/sp/TODO/prog-2026-10-18.md"
+    mother.write_bytes(mother.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+    sp_new.link_parent(root, "atlas", "prog", "b", [])
+    data = mother.read_bytes()
+    assert b"\n" not in data.replace(b"\r\n", b"")
+    assert b"  - slug: b\r\n    depends_on: []\r\n    state: TODO\r\n" in data

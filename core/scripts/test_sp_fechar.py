@@ -144,6 +144,8 @@ def test_seguinte_ultimo_filho_fecha_mae(tmp_path):
     _prog(tmp_path, {"mae": "TODO", "a": "Done", "b": "Done", "c": "Done"})
     out = _mod().seguinte(tmp_path, "c", PROJECT)
     assert out.startswith("ÚLTIMO FILHO:") and "mae" in out
+    # o fecho da mãe passa por worktree + commit + merge, nunca pelo checkout principal
+    assert "sb-worktree.py ensure mae" in out and "merge" in out and "checkout principal" in out
 
 
 def test_seguinte_sem_parent_nada(tmp_path):

@@ -246,3 +246,77 @@ def test_alias_slug_flag(tmp_path):
     make_sp(tmp_path, "atlas/sp/TODO", "abc")
     assert sp_move.main(["--root", str(tmp_path), "--slug", "abc", "doing"]) == 0
     assert (tmp_path / "atlas/sp/Doing/abc.md").exists()
+
+
+# --- arranque: filho + cadeia de mães para Doing ---
+def make_mae_todo(root, slug="mae", parent=None):
+    path = root / f"atlas/sp/TODO/{slug}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    par = f"parent: {parent}\n" if parent else ""
+    path.write_bytes(
+        (f"---\nstatus: TODO\ncreated: 2026-10-01T10:00:00Z\nupdated: 2026-10-01T10:00:00Z\nslug: {slug}\nproject: atlas\n"
+         f"{par}kind: program\nchildren:\n  - slug: a\n    depends_on: []\n    state: TODO\n---\n# mãe\n").encode("utf-8"))
+    return path
+
+
+def test_start_sp_simples_vai_para_doing(tmp_path):
+    make_sp(tmp_path, "atlas/sp/TODO", "abc")
+    out = sp_move.start(tmp_path, "abc", "atlas")
+    assert (tmp_path / "atlas/sp/Doing/abc.md").exists()
+    assert "abc: TODO → Doing" in out
+
+
+def test_start_filho_com_mae_em_todo_deixa_ambos_em_doing(tmp_path):
+    make_mae_todo(tmp_path)
+    make_child(tmp_path, "TODO", "a")
+    sp_move.start(tmp_path, "a", "atlas")
+    assert (tmp_path / "atlas/sp/Doing/a.md").exists()
+    assert (tmp_path / "atlas/sp/Doing/mae.md").exists()
+    assert not (tmp_path / "atlas/sp/TODO/mae.md").exists()
+
+
+def test_start_sobe_a_cadeia_de_ancestrais(tmp_path):
+    make_mae_todo(tmp_path, "avo")
+    make_mae_todo(tmp_path, "mae", parent="avo")
+    make_child(tmp_path, "TODO", "a")
+    sp_move.start(tmp_path, "a", "atlas")
+    for slug in ("a", "mae", "avo"):
+        assert (tmp_path / f"atlas/sp/Doing/{slug}.md").exists()
+
+
+def test_start_mae_ja_em_doing_ou_done_nao_muda(tmp_path):
+    mae = make_mae_todo(tmp_path)
+    mae.unlink()
+    mae_doing = tmp_path / "atlas/sp/Doing/mae.md"
+    mae_doing.parent.mkdir(parents=True, exist_ok=True)
+    mae_doing.write_bytes(b"---\nstatus: Doing\ncreated: 2026-10-01T10:00:00Z\nupdated: 2026-10-01T10:00:00Z\nslug: mae\nproject: atlas\nkind: program\n---\n# mae\n")
+    before = mae_doing.read_bytes()
+    make_child(tmp_path, "TODO", "a")
+    sp_move.start(tmp_path, "a", "atlas")
+    assert mae_doing.read_bytes() == before
+    assert (tmp_path / "atlas/sp/Doing/a.md").exists()
+
+
+def test_start_e_idempotente(tmp_path):
+    make_mae_todo(tmp_path)
+    make_child(tmp_path, "TODO", "a")
+    sp_move.start(tmp_path, "a", "atlas")
+    snap = {p: p.read_bytes() for p in (tmp_path / "atlas/sp/Doing").glob("*.md")}
+    out = sp_move.start(tmp_path, "a", "atlas")
+    assert {p: p.read_bytes() for p in (tmp_path / "atlas/sp/Doing").glob("*.md")} == snap
+    assert "já está" in out
+
+
+def test_start_nao_move_os_irmaos(tmp_path):
+    make_mae_todo(tmp_path)
+    make_child(tmp_path, "TODO", "a")
+    make_child(tmp_path, "TODO", "b")
+    sp_move.start(tmp_path, "a", "atlas")
+    assert (tmp_path / "atlas/sp/TODO/b.md").exists()
+
+
+def test_main_start_via_cli(tmp_path):
+    make_mae_todo(tmp_path)
+    make_child(tmp_path, "TODO", "a")
+    assert sp_move.main(["--root", str(tmp_path), "a", "--start"]) == 0
+    assert (tmp_path / "atlas/sp/Doing/mae.md").exists()

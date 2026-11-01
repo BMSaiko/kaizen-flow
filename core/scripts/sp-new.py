@@ -9,6 +9,7 @@ Uso:
   python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--parent <slug>] [--depends-on <slug> ...]
   python -I scripts/sp-new.py --project <nome> --program <slug> --children a,b:a,c:a+b --priority P1|P2|P3
 
+`--parent <mãe>` exige que a mãe seja `kind: program` e acrescenta o filho a `children:` dela (depends_on, `state: TODO`, sem duplicar).
 `--program` cria o SP-mãe (`kind: program`, `children:`) e os filhos (`parent`, `depends_on`) em sp/TODO/.
 Em `--children`, `b:a` = b depende de a; `c:a+b` = c depende de a e b. Valida tudo antes de escrever.
 """
@@ -173,6 +174,31 @@ def check_links(root, project, parent, depends_on):
             raise SpNewError(f"slug inválido '{link!r}' em --parent/--depends-on")
         if link not in known:
             raise SpNewError(f"'{link}' não existe no projeto '{project}'")
+    if parent:
+        mother = next(sp for sp in sp_list.collect(root, include_done=True) if sp.project == project and sp.slug == parent)
+        if mother.kind != "program":
+            raise SpNewError(f"'{parent}' não é um programa (falta kind: program)")
+
+
+def link_parent(root, project, parent, slug, depends_on=()):
+    """Acrescenta `slug` a `children:` do SP-mãe (depends_on, state: TODO), sem duplicar; edita bytes e mantém o fim de linha."""
+    mother = next((sp for sp in sp_list.collect(root, include_done=True) if sp.project == project and sp.slug == parent), None)
+    if mother is None or mother.kind != "program":
+        raise SpNewError(f"'{parent}' não é um programa (falta kind: program)")
+    data = mother.path.read_bytes().decode("utf-8")
+    eol = "\r\n" if "\r\n" in data else "\n"
+    lines = data.split(eol)
+    end = lines.index("---", 1)
+    if f"  - slug: {slug}" in lines[:end]:
+        return mother.path
+    if "children:" not in lines[:end]:
+        raise SpNewError(f"'{parent}' não tem children:")
+    at = lines.index("children:") + 1
+    while at < end and lines[at].startswith(" "):
+        at += 1
+    lines[at:at] = [f"  - slug: {slug}", f"    depends_on: [{', '.join(depends_on)}]", "    state: TODO"]
+    mother.path.write_bytes(eol.join(lines).encode("utf-8"))
+    return mother.path
 
 
 def parse_children(text):
@@ -244,7 +270,7 @@ def main(argv=None):
     ap.add_argument("--parar-se", help="lista separada por vírgulas: gate-falha,ambiguidade,ficheiro-fora-de-escopo,custo")
     ap.add_argument("--escopo", help="globs permitidos, separados por vírgulas (documentação do SP)")
     ap.add_argument("--fora-de-escopo", help="globs negados, separados por vírgulas")
-    ap.add_argument("--parent")
+    ap.add_argument("--parent", help="SP-mãe (kind: program); o filho é acrescentado a children: da mãe")
     ap.add_argument("--depends-on", nargs="*", default=[])
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
@@ -260,7 +286,10 @@ def main(argv=None):
             print("\n".join(str(p) for p in paths))
         elif args.slug:
             check_links(args.root, args.project, args.parent, args.depends_on)
-            print(create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao))
+            path = create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao)
+            if args.parent:
+                link_parent(args.root, args.project, args.parent, args.slug, args.depends_on)
+            print(path)
         else:
             raise SpNewError("indicar --slug (ou --program com --children)")
     except SpNewError as exc:

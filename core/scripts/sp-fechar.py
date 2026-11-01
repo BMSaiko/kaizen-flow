@@ -145,7 +145,9 @@ def seguinte(root, slug, project=None):
     if prontos:
         return f"PRÓXIMO FILHO: {prontos[0].slug} (manual: AskUserQuestion «abrir?»; auto: sp-fechar --next)"
     if all(s.status == "Done" for s in irmaos):
-        return f"ÚLTIMO FILHO: fechar a mãe {kid.parent} (manual: AskUserQuestion «fechar?»; auto: fechar sozinho)"
+        return (f"ÚLTIMO FILHO: fechar a mãe {kid.parent} numa worktree, nunca no checkout principal: "
+                f"sb-worktree.py ensure {kid.parent} → sp-move.py {kid.parent} done → commit → sb-worktree.py merge {kid.parent} "
+                f"(manual: AskUserQuestion «fechar?»; auto: fechar sozinho)")
     return f"SEGUINTE: nenhum filho elegível de {kid.parent} (os restantes dependem de SPs por fechar)"
 
 

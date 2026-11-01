@@ -6,6 +6,7 @@ Nunca faz commit. Usa `git mv` se o SP estiver tracked, senão renomeia.
 
 Uso:
   python -I scripts/sp-move.py <slug> <todo|doing|done> [--project <nome>]
+  python -I scripts/sp-move.py <slug> --start        # arranque: SP e mães (cadeia `parent`) em TODO passam a Doing
   python -I scripts/sp-move.py <filho> done --next   # programa: abre o próximo filho elegível; a mãe nunca é movida
 """
 import argparse
@@ -141,6 +142,26 @@ def advance(root, slug, project=None):
     return "\n".join(out)
 
 
+def start(root, slug, project=None):
+    """Arranque: move o SP e a cadeia `parent` (só os que estão em TODO) para Doing. Nunca toca em irmãos nem filhos."""
+    sps = sp_list.collect(root, include_done=True)
+    kid = next((sp for sp in sps if sp.slug == slug and (not project or sp.project == project)), None)
+    if kid is None:
+        return move(root, slug, "doing", project)  # levanta o erro habitual (não encontrado/ambíguo)
+    chain, seen, cur = [kid], {kid.slug}, kid
+    while cur.parent and cur.parent not in seen:
+        cur = next((sp for sp in sps if sp.project == kid.project and sp.slug == cur.parent), None)
+        if cur is None:
+            break
+        chain.append(cur)
+        seen.add(cur.slug)
+    out = [move(root, sp.slug, "doing", sp.project) for sp in reversed(chain) if sp.status == "TODO" or sp is kid]
+    if kid.parent:
+        opened = _find(root, slug, kid.project)
+        sp_handoff.sync_program_ready(root, opened.path)
+    return "\n".join(out)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Move um SP entre TODO, Doing e Done")
     ap.add_argument("slug", nargs="?")
@@ -148,10 +169,13 @@ def main(argv=None):
     ap.add_argument("dest", nargs="?", help="todo | doing | done")
     ap.add_argument("--project")
     ap.add_argument("--next", action="store_true", help="com done: abre o próximo filho elegível do programa")
+    ap.add_argument("--start", action="store_true", help="arranque: move o SP e as mães em TODO para Doing")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     if args.slug_opt:
         args.slug, args.dest = args.slug_opt, args.dest or args.slug
+    if args.start and not args.dest:
+        args.dest = "doing"
     if not args.slug or not args.dest:
         ap.error("falta o slug (posicional ou --slug); ver scripts/sp-list.py")
     if argv is None and args.root == str(sp_list.DEFAULT_ROOT):
@@ -159,7 +183,11 @@ def main(argv=None):
         if rc is not None:
             return rc
     try:
-        if args.next:
+        if args.start:
+            if args.dest.lower() != "doing" or args.next:
+                raise SpMoveError("--start não se combina com outro destino nem com --next")
+            print(start(args.root, args.slug, args.project))
+        elif args.next:
             if args.dest.lower() != "done":
                 raise SpMoveError(f"--next só se usa com 'done'; corre sp-move.py {args.slug} done --next")
             print(advance(args.root, args.slug, args.project))
