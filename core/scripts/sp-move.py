@@ -9,8 +9,6 @@ Uso:
   python -I scripts/sp-move.py <filho> done --next   # programa: abre o próximo filho elegível; a mãe nunca é movida
 """
 import argparse
-import re
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,24 +41,12 @@ def _rewrite_frontmatter(raw, status, updated):
     return kaizen_engine.rewrite_fields(raw, {"status": status, "updated": updated}, SpMoveError)
 
 
-def _relocate(src, dst):
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    tracked = subprocess.run(
-        ["git", "-C", str(src.parent), "ls-files", "--error-unmatch", src.name],
-        capture_output=True,
-    ).returncode == 0
-    if tracked:
-        subprocess.run(["git", "-C", str(src.parent), "mv", str(src), str(dst)], check=True, capture_output=True)
-    else:
-        src.rename(dst)
-
-
 def _move_proofs(sp, dst):
     """Leva as provas `proofs/<slug>-*` do SP para a pasta de destino."""
     src_dir = sp.path.parent / "proofs"
     files = sorted(src_dir.glob(f"{sp.slug}-*")) if src_dir.is_dir() else []
     for f in files:
-        _relocate(f, dst.parent / "proofs" / f.name)
+        kaizen_engine.relocate(f, dst.parent / "proofs" / f.name)
     if src_dir.is_dir() and not any(src_dir.iterdir()):
         src_dir.rmdir()
     return len(files)
@@ -109,7 +95,7 @@ def move(root, slug, dest, project=None):
         kaizen_hooks.fire("sp.moved", ctx, phase="pre")
     except kaizen_hooks.HookBlocked as exc:
         raise SpMoveError(str(exc))
-    _relocate(sp.path, dst)
+    kaizen_engine.relocate(sp.path, dst)
     dst.write_bytes(new_raw)
     n = _move_proofs(sp, dst)
     if target == "Done":

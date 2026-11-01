@@ -29,4 +29,14 @@ function agentsBlock(core, skillsDir, commandsDir) {
   return lines.join("\n");
 }
 
-module.exports = { MARKER, remap, skillNames, agentsBlock };
+// adapter que só difere nas pastas de destino e se anuncia por um bloco em AGENTS.md
+function agentsAdapter(skillsDir, commandsDir) {
+  return {
+    render: (core) => ({
+      files: remap(core, [["skills/", `${skillsDir}/`], ["commands/", `${commandsDir}/`], ["scripts/", "scripts/"]]),
+      agents: agentsBlock(core, skillsDir, commandsDir),
+    }),
+  };
+}
+
+module.exports = { MARKER, remap, agentsBlock, agentsAdapter };
