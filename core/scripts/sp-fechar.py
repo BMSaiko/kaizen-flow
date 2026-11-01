@@ -19,6 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import kf_ligados  # noqa: E402
 import wt_redirect  # noqa: E402
 
 sp_list = kaizen_engine.load("sp-list")
@@ -109,6 +110,18 @@ def changed_paths(cwd):
     return sorted(set(paths))
 
 
+def kf_por_sincronizar(cwd):
+    """Mensagem de bloqueio se o diff altera ficheiros do motor cuja cópia no pacote kaizen-flow difere; senão ''."""
+    core = kf_ligados.core_dir()
+    if core is None:
+        return ""
+    nomes = kf_ligados.tocados(changed_paths(cwd), core)
+    difs = kf_ligados.fora_de_sincronia(Path(cwd) / "scripts", core, nomes)
+    if not difs:
+        return ""
+    return f"kaizen-flow fora de sincronia ({', '.join(difs)}): correr /kaizen-sync e repetir o fecho"
+
+
 def write_commit(cwd, slug, subject, paths):
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out = Path(cwd) / f"COMMIT_{stamp}.md"
@@ -165,6 +178,10 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
         if rc:
             return 1, lines + [f"{slug}: test-fast vermelho, SP continua em Doing"]
     lines += avisos(sp.path.read_text(encoding="utf-8"))
+    if commit:
+        bloqueio = kf_por_sincronizar(commit_dir)
+        if bloqueio:
+            return 1, lines + [bloqueio, f"{slug}: kaizen-flow por sincronizar, SP continua em Doing"]
     if budget:
         rc, text = run_budget()
         lines.append(text)
