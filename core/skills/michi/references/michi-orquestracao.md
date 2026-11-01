@@ -46,6 +46,7 @@ Se aparecer `[context-guard] Contexto … >= limite`: acabar o passo em curso (n
 | `[context-guard]` ≥ limite | `--launch --auto`, sem perguntar | acabar o passo em curso primeiro |
 | Modo auto (`--auto`) | `--launch --auto` por fase | sem `AskUserQuestion` |
 | Sem SP em Doing | nada (`/handoff` só em conversa livre) | |
+| `/michi` com contexto ≥ 40K (`CLAUDE_MICHI_START_LIMIT`) | `[context-guard]` no arranque: `/sp-handoff --launch --auto`, sem perguntar | uma vez por sessão; não começar o ciclo na sessão cheia |
 
 ## Review restart (pushback)
 

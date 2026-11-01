@@ -46,9 +46,14 @@ def test_resolve_nenhum_doing(tmp_path):
         sp_handoff.resolve(tmp_path)
 
 
-def test_resolve_slug_fora_de_doing(tmp_path):
-    make_sp(tmp_path, "atlas/sp/TODO", "a", status="TODO")
-    with pytest.raises(sp_handoff.HandoffError, match="não está em Doing"):
+def test_resolve_slug_em_todo_resolve(tmp_path):
+    todo = make_sp(tmp_path, "atlas/sp/TODO", "a", status="TODO")
+    assert sp_handoff.resolve(str(tmp_path), "a") == todo.resolve()
+
+
+def test_resolve_slug_em_done_recusa(tmp_path):
+    make_sp(tmp_path, "atlas/sp/Done", "a", status="Done")
+    with pytest.raises(sp_handoff.HandoffError, match="não está em TODO nem Doing"):
         sp_handoff.resolve(tmp_path, "a")
 
 
@@ -239,14 +244,23 @@ def test_require_doing_aceita_doing_e_recusa_o_resto(tmp_path):
     doing = make_sp(tmp_path, "atlas/sp/Doing", "a")
     todo = make_sp(tmp_path, "atlas/sp/TODO", "b", status="TODO")
     sp_handoff.require_doing(doing)
-    with pytest.raises(sp_handoff.HandoffError, match="só com SP em Doing"):
-        sp_handoff.require_doing(todo)
+    sp_handoff.require_doing(todo)
+    with pytest.raises(sp_handoff.HandoffError, match="só com SP em TODO ou Doing"):
+        sp_handoff.require_doing(make_sp(tmp_path, "atlas/sp/Done", "c", status="Done"))
 
 
-def test_main_launch_auto_recusa_sp_fora_de_doing(tmp_path, capsys):
+def test_main_launch_auto_aceita_sp_em_todo_sem_o_mover(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("WEZTERM_PANE", "3")
     todo = make_sp(tmp_path, "atlas/sp/TODO", "b", status="TODO")
-    assert sp_handoff.main(["--launch", str(todo), "--auto", "--dry-run", "--pane", "3"]) == 1
-    assert "só com SP em Doing" in capsys.readouterr().err
+    assert sp_handoff.main(["--launch", str(todo), "--auto", "--dry-run", "--pane", "3"]) == 0
+    assert "/clear" in capsys.readouterr().out
+    assert todo.is_file() and "status: TODO" in todo.read_text(encoding="utf-8")
+
+
+def test_main_launch_auto_recusa_sp_em_done(tmp_path, capsys):
+    done = make_sp(tmp_path, "atlas/sp/Done", "b", status="Done")
+    assert sp_handoff.main(["--launch", str(done), "--auto", "--dry-run", "--pane", "3"]) == 1
+    assert "só com SP em TODO ou Doing" in capsys.readouterr().err
 
 
 def test_main_launch_auto_com_doing_mostra_os_comandos(tmp_path, capsys, monkeypatch):

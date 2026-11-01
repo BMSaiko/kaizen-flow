@@ -64,8 +64,9 @@ def test_write_recusa_sem_frontmatter_ou_sem_updated(tmp_path):
 
 def test_require_doing(tmp_path):
     p = tmp_path / "x.md"
-    p.write_text("---\nstatus: TODO\n---\n", encoding="utf-8")
-    with pytest.raises(HandoffError, match="Doing"):
+    p.write_text("---\nstatus: Done\n---\n", encoding="utf-8")
+    with pytest.raises(HandoffError, match="TODO ou Doing"):
         sp_progresso.require_doing(p)
-    p.write_text("---\nstatus: Doing\n---\n", encoding="utf-8")
-    sp_progresso.require_doing(p)
+    for st in ("TODO", "Doing"):
+        p.write_text(f"---\nstatus: {st}\n---\n", encoding="utf-8")
+        sp_progresso.require_doing(p)

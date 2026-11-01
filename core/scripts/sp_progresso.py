@@ -41,9 +41,9 @@ def resolve(root, slug=None, mine=None):
         matches = [sp for sp in sps if sp.slug == slug]
         if not matches:
             raise HandoffError(f"SP '{slug}' não encontrado")
-        doing = [sp for sp in matches if sp.status == "Doing"]
+        doing = [sp for sp in matches if sp.status in ("Doing", "TODO")]  # TODO: o michi da sessão nova move-o para Doing
         if not doing:
-            raise HandoffError(f"SP '{slug}' não está em Doing (está em {matches[0].status})")
+            raise HandoffError(f"SP '{slug}' não está em TODO nem Doing (está em {matches[0].status})")
         if len(doing) > 1:
             raise HandoffError("slug em vários projetos: " + ", ".join(f"{sp.slug} ({sp.project})" for sp in doing))
         return doing[0].path.resolve()
@@ -148,5 +148,5 @@ def sync_program_ready(root, child_path):
 
 def require_doing(path):
     status = sp_list.parse_frontmatter(Path(path).read_text(encoding="utf-8")).get("status", "")
-    if status.lower() != "doing":
-        raise HandoffError(f"modo automático só com SP em Doing (este está em {status or 'estado desconhecido'})")
+    if status.lower() not in ("doing", "todo"):
+        raise HandoffError(f"modo automático só com SP em TODO ou Doing (este está em {status or 'estado desconhecido'})")

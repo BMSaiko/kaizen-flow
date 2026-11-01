@@ -12,7 +12,7 @@ Uso:
 `--launch` não abre janelas: em segundo plano, passados ~5 s (para o turno atual acabar), escreve
 `/clear` e depois `/michi <caminho>` no painel do WezTerm onde o Claude Code já corre ($WEZTERM_PANE),
 via `wezterm cli send-text`. Não faz nada fora desse painel. `--auto` (usado após o aviso do
-context-guard) recusa lançar se o SP não estiver em Doing.
+context-guard) recusa lançar se o SP estiver em Done; em TODO lança sem o mover (o michi da sessão nova faz `sp-move doing`).
 
 `--spawn` abre um painel novo por SP (worktree própria via `sb-worktree ensure`, `claude`, `/michi --auto <slug>`)
 e regista-o em `sessoes` do estado do `sp-fila`; a falha de um SP não afeta os outros (rc 1 se algum falhou).
@@ -104,7 +104,7 @@ def main(argv=None):
     ap.add_argument("--backend", choices=BACKENDS, help="default: deteção automática; sem painel, clipboard")
     ap.add_argument("--harness", choices=tuple(HARNESSES), default="claude", help="comando de retoma (default: claude)")
     ap.add_argument("--dry-run", action="store_true", help="com --launch ou --spawn: só mostra, sem efeitos")
-    ap.add_argument("--auto", action="store_true", help="com --launch: modo do context-guard, exige SP em Doing")
+    ap.add_argument("--auto", action="store_true", help="com --launch: modo do context-guard, exige SP em TODO ou Doing")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     try:

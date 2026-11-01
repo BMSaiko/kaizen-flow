@@ -27,14 +27,15 @@ license: MIT
 | 10 | Reflect | `/reflect final` | A/B/C proposto; o user aplica | user |
 | 11 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | user |
 
-`skip <fase>` salta só essa fase (`skip harden|pentest|review`; nunca os gates). SP completo: `sp-fechar.py <slug>` faz gates + context-budget + `done` + `COMMIT_*.md`, antes com `## Prova de done`.
+`skip <fase>` salta só essa fase (`skip harden|pentest|review`; nunca os gates). SP completo: `sp-fechar.py <slug>` faz gates + context-budget + `done` + `COMMIT_*.md`, antes com `## Prova de done`. Linha `PRÓXIMO FILHO`/`ÚLTIMO FILHO` no output: manual = `AskUserQuestion` «abrir o próximo?»/«fechar a mãe?»; auto = `--next` e fechar a mãe sozinho, sempre numa worktree (`sb-worktree.py ensure <mãe>` → `sp-move done` → commit → `merge`; nunca no checkout principal; fechar antes do `clean` do filho ou numa worktree nova). Nunca omitir.
 
 ## Arranque
 
 1. `python -I scripts/sp-estado.py <slug>` (fase, passos, gates, ramo) e ler `perfil`/`max_tentativas`/`parar_se`.
-2. `python -I scripts/sb-worktree.py ensure <slug>`; editar pelo caminho absoluto da worktree; `merge` + `clean` só no fecho com o SP em Done.
+2. SP em TODO (p.ex. vindo de `/sp-handoff`): `python -I scripts/sp-move.py <slug> --start` (move o SP e as mães em TODO para Doing, idempotente). `python -I scripts/sb-worktree.py ensure <slug>`; editar pelo caminho absoluto da worktree; `merge` + `clean` só no fecho com o SP em Done.
 3. `python -I scripts/tab-title.py <slug>`.
 4. Modo: `--auto` ou `modo: auto` no frontmatter = sem `AskUserQuestion` (`modo: manual` = sem auto, sem pergunta); sem nenhum, perguntar «com/sem auto» (`michi-modo-auto.md`).
+   Se o `sp-estado` diz «perguntar concorrência» (SP com filhos), mesmo em `modo: manual`, `AskUserQuestion` «com ou sem concorrência?» (defeito: sem; com → N): sem = fila em série; com = `/sp-fila --programa <slug> --concorrencia N`.
 5. Checkpoint: `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate.
 
 Hooks (`michi.<phase.start|phase.end|gate.failed|commit|closed>`), sessão suja, handoff por fase e `[context-guard]`: `references/michi-orquestracao.md`.

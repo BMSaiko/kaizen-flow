@@ -133,6 +133,24 @@ def worktree_hint(cwd, slug):
             f"python -I scripts/sb-worktree.py clean {slug}")
 
 
+def seguinte(root, slug, project=None):
+    """Linha com o passo seguinte de um filho fechado: próximo elegível, fecho da mãe, ou '' (SP sem mãe)."""
+    sps = sp_list.collect(root, include_done=True)
+    kid = next((s for s in sps if s.slug == slug and (not project or s.project == project)), None)
+    if not kid or not kid.parent:
+        return ""
+    irmaos = [s for s in sps if s.project == kid.project and s.parent == kid.parent and s.slug != slug]
+    feitos = {s.slug for s in irmaos if s.status == "Done"} | {slug}
+    prontos = [s for s in irmaos if s.status == "TODO" and all(d in feitos for d in s.depends_on)]
+    if prontos:
+        return f"PRÓXIMO FILHO: {prontos[0].slug} (manual: AskUserQuestion «abrir?»; auto: sp-fechar --next)"
+    if all(s.status == "Done" for s in irmaos):
+        return (f"ÚLTIMO FILHO: fechar a mãe {kid.parent} numa worktree, nunca no checkout principal: "
+                f"sb-worktree.py ensure {kid.parent} → sp-move.py {kid.parent} done → commit → sb-worktree.py merge {kid.parent} "
+                f"(manual: AskUserQuestion «fechar?»; auto: fechar sozinho)")
+    return f"SEGUINTE: nenhum filho elegível de {kid.parent} (os restantes dependem de SPs por fechar)"
+
+
 def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True):
     """Corre o fecho. Devolve (rc, linhas)."""
     sp = find_doing(root, slug, project)
@@ -156,6 +174,9 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
         lines.append(sp_move.advance(root, slug, sp.project))
     else:
         lines.append(sp_move.move(root, slug, "done", sp.project))
+    prox = "" if nxt else seguinte(root, slug, sp.project)
+    if prox:
+        lines.append(prox)
     if commit:
         paths = changed_paths(commit_dir)
         if paths:
