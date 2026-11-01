@@ -41,7 +41,7 @@ def redirect(script, slug, argv):
         sbwt = kaizen_engine.load("sb-worktree")
         try:
             wt = sbwt.ensure(here.parent.parent, slug)
-        except sbwt.SbWorktreeError as e:
+        except Exception as e:  # SbWorktreeError ou imprevisto: nunca traceback, nunca escrever em master
             print(f"erro: não foi possível criar a worktree de '{slug}': {e}", file=sys.stderr)
             return 2
     target = wt / "scripts" / here.name if wt else None
