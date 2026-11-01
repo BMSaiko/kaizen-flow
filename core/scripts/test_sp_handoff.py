@@ -249,7 +249,8 @@ def test_require_doing_aceita_doing_e_recusa_o_resto(tmp_path):
         sp_handoff.require_doing(make_sp(tmp_path, "atlas/sp/Done", "c", status="Done"))
 
 
-def test_main_launch_auto_aceita_sp_em_todo_sem_o_mover(tmp_path, capsys):
+def test_main_launch_auto_aceita_sp_em_todo_sem_o_mover(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("WEZTERM_PANE", "3")
     todo = make_sp(tmp_path, "atlas/sp/TODO", "b", status="TODO")
     assert sp_handoff.main(["--launch", str(todo), "--auto", "--dry-run", "--pane", "3"]) == 0
     assert "/clear" in capsys.readouterr().out
