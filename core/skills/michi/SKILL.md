@@ -27,7 +27,7 @@ license: MIT
 | 10 | Reflect | `/reflect final` | A/B/C proposto; o user aplica | user |
 | 11 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | user |
 
-`skip <fase>` salta só essa fase (`skip harden|pentest|review`; nunca os gates). SP completo: `sp-fechar.py <slug>` faz gates + context-budget + `done` + `COMMIT_*.md`, antes com `## Prova de done`. Linha `PRÓXIMO FILHO`/`ÚLTIMO FILHO` no output: manual = `AskUserQuestion` «abrir o próximo?»/«fechar a mãe?»; auto = `--next` e fechar a mãe sozinho, sempre numa worktree (`sb-worktree.py ensure <mãe>` → `sp-move done` → commit → `merge`; nunca no checkout principal; fechar antes do `clean` do filho ou numa worktree nova). Nunca omitir.
+`skip <fase>` salta só essa fase (`skip harden|pentest|review`; nunca os gates). SP completo: `sp-fechar.py <slug>` faz gates + context-budget + `done` + `COMMIT_*.md` (bloqueia se o diff altera scripts do motor com o pacote kf desatualizado: `/kaizen-sync`), antes com `## Prova de done`. Linha `PRÓXIMO FILHO`/`ÚLTIMO FILHO` no output: manual = `AskUserQuestion` «abrir o próximo?»/«fechar a mãe?»; auto = `--next` e fechar a mãe sozinho, sempre numa worktree (`sb-worktree.py ensure <mãe>` → `sp-move done` → commit → `merge`; nunca no checkout principal; fechar antes do `clean` do filho ou numa worktree nova). Nunca omitir.
 
 ## Arranque
 
