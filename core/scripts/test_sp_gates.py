@@ -189,3 +189,33 @@ def test_sugestao_nunca_usa_or_true(tmp_path):
     assert "|| true" not in sp_gates.suggestion(tmp_path)
     text = "---\n" + sp_gates.suggestion(tmp_path) + "\n---\n"
     assert sp_gates.problems(sp_gates.parse_gates(text)) == []
+
+
+def _sp_em(root, slug, pasta="Doing"):
+    import kaizen_engine
+    d = kaizen_engine.load("sp-list").default_root(root) / "x" / "sp" / pasta
+    d.mkdir(parents=True)
+    f = d / f"{slug}-2026-01-01.md"
+    f.write_text(f"---\nstatus: {pasta}\nslug: {slug}\nproject: x\n---\n", encoding="utf-8")
+    return f
+
+
+def test_resolve_sp_slug_so_na_worktree(tmp_path):
+    wt, main = tmp_path / "wt", tmp_path / "main"
+    f = _sp_em(wt, "so-wt")
+    main.mkdir()
+    assert sp_gates.resolve_sp("so-wt", roots=[wt, main]) == (f, wt)
+
+
+def test_resolve_sp_slug_em_master_sem_worktree(tmp_path):
+    main = tmp_path / "main"
+    f = _sp_em(main, "em-master", "TODO")
+    assert sp_gates.resolve_sp("em-master", roots=[main]) == (f, main)
+
+
+def test_resolve_sp_caminho_e_inexistente(tmp_path):
+    f = tmp_path / "a.md"
+    f.write_text("x", encoding="utf-8")
+    assert sp_gates.resolve_sp(str(f)) == (f, None)
+    assert sp_gates.resolve_sp("nao-existe", roots=[tmp_path]) == (None, None)
+    assert sp_gates.resolve_sp(str(tmp_path / "b.md")) == (None, None)
