@@ -29,3 +29,4 @@ Texto integral em `references/michi-pitfalls.md` (30 entradas, numeradas como ab
 28. "Duplicada" num SP de inventário: ler o corpo antes de remover (dev-workflow-refactorizar-inventario, 2026-10-18)
 29. MCP numa worktree nova: verificar com `claude -p --mcp-config` (vault-mcp-uso-maximo, 2026-10-27)
 30. Gates sobre repo externo: `cd` no comando (kaizen-sync-igual-ao-vault, 2026-10-27)
+31. Código com escapes: `Edit`, nunca Python por heredoc no Bash (usage-todas-diarias, 2026-11-02)
