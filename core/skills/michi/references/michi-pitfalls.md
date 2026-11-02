@@ -123,3 +123,8 @@ Movido de `SKILL.md` (## Pitfalls); condensado em 2026-10-31 (regras todas manti
 ## 30. Gates sobre repo externo: `cd` no comando (kaizen-sync-igual-ao-vault, 2026-10-27)
 
 - `sp-gates.py` corre cada `gates[].cmd` com o `cwd` do vault. `node K/bin/kaizen.js audit` sem `cd` analisou o vault (14214 hits falsos em `_templates/`) e travou o fecho. Todo o `cmd` que opera num repo externo ou worktree de código começa com `cd <repo> &&`, para a worktree K do SP, não o checkout principal.
+
+## 31. Código com escapes: `Edit`, nunca Python por heredoc no Bash (usage-todas-diarias, 2026-11-02)
+
+- Reescrever código com `
+`/`\` por `python - <<E` no Bash deixou `newline="` partido e custou 5 tentativas; o `Edit` corrigiu à primeira. Editar código sempre com `Edit`/`Write`; heredoc Python só para dados sem escapes.

@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 
 DEFAULT_TIMEOUT = 300
+HERE_REPO = Path(__file__).resolve().parent.parent
 CACHE_PATH = Path(__file__).resolve().parent.parent / ".sp-gates-cache.json"
 FORBIDDEN = (
     (re.compile(r"(?<![\w-])--force(?![\w-])|\bgit\s+push\b.*\s-f\b"), "--force"),
@@ -36,6 +37,34 @@ FORBIDDEN = (
     (re.compile(r"\bgit\s+add\s+(-A\b|--all\b|\.(\s|$))"), "git add -A/."),
     (re.compile(r"\.env(\.|\b)|\.(key|pem|p12|pfx)\b|\bid_rsa|\bsecrets?\.|\.secrets"), "leitura de segredos"),
 )
+
+
+def sp_roots(slug, repo=None):
+    """Raízes onde procurar o SP `slug`: a worktree do slug primeiro (o SP pode só existir lá), depois `repo`."""
+    repo = Path(repo or HERE_REPO)
+    roots = []
+    try:
+        wt_mod = kaizen_engine.load("sb-worktree")
+        wt = wt_mod._find(wt_mod.agent.main_root(repo), wt_mod.name_of(slug))
+        if wt:
+            roots.append(Path(wt))
+    except Exception:  # sem git/worktree: cai para `repo`
+        pass
+    roots.append(repo)
+    return roots
+
+
+def resolve_sp(arg, roots=None):
+    """(caminho do SP, raiz) para um caminho .md existente ou um slug; (None, None) se não existe."""
+    p = Path(arg)
+    if p.suffix == ".md" or p.exists():
+        return (p, None) if p.exists() else (None, None)
+    sp_list = kaizen_engine.load("sp-list")
+    for root in (roots if roots is not None else sp_roots(arg)):
+        for sp in sp_list.collect(sp_list.default_root(root), include_done=True):
+            if sp.slug == arg:
+                return sp.path, Path(root)
+    return None, None
 
 
 def detect_gates(repo):
@@ -211,8 +240,11 @@ def main(argv=None):
         return 0 if block else 1
     if not args.path:
         ap.error("falta o caminho do SP (ou --sugerir REPO)")
+    sp_path, _ = resolve_sp(args.path)
     try:
-        text = Path(args.path).read_text(encoding="utf-8")
+        if sp_path is None:
+            raise FileNotFoundError(args.path)
+        text = sp_path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         print(f"{args.path}: erro de leitura ({exc.__class__.__name__})", file=sys.stderr)
         return 2

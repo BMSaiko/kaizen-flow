@@ -84,3 +84,14 @@ def test_em_aberto_lista_criterios_por_cumprir():
 def test_provas_lista_a_seccao_prova():
     out = sp_report.gerar(SP, "exemplo", diff_stat=STAT)
     assert "proofs/exemplo.txt" in out
+
+
+def test_aviso_atraso_so_quando_ha_commits_em_falta():
+    assert sp_report.aviso_atraso(0) == ""
+    assert "3 commit(s) atrás de master" in sp_report.aviso_atraso(3)
+
+
+def test_report_mostra_aviso_na_seccao_alterado():
+    out = sp_report.gerar(SP, "exemplo", ["a | 1 +"], None, atras=2)
+    assert out.split("## Alterado\n")[1].startswith("AVISO: a worktree está 2 commit(s)")
+    assert "AVISO" not in sp_report.gerar(SP, "exemplo", ["a | 1 +"], None)

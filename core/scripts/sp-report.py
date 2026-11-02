@@ -55,7 +55,18 @@ def _bullets(linhas: list[str], vazio: str) -> str:
     return "\n".join(f"- {l}" for l in linhas) if linhas else f"- {vazio}"
 
 
-def gerar(text: str, slug: str, diff_stat: list[str] | None = None, gates: list[dict] | None = None) -> str:
+def aviso_atraso(atras: int, base: str = "master") -> str:
+    if atras <= 0:
+        return ""
+    return f"AVISO: a worktree está {atras} commit(s) atrás de {base}; o diff pode mostrar remoções que não são deste SP (fazer rebase/merge de {base}).\n"
+
+
+def _atras(base: str, cwd) -> int:
+    r = subprocess.run(["git", "rev-list", "--count", f"HEAD..{base}"], capture_output=True, text=True, cwd=cwd, encoding="utf-8")
+    return int(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip().isdigit() else 0
+
+
+def gerar(text: str, slug: str, diff_stat: list[str] | None = None, gates: list[dict] | None = None, atras: int = 0) -> str:
     sp_gates = _load("sp_gates_report", "sp-gates.py")
     rc_por_cmd = {g["cmd"]: g for g in (gates or [])}
     verificado = []
@@ -68,7 +79,7 @@ def gerar(text: str, slug: str, diff_stat: list[str] | None = None, gates: list[
     dif = dificuldades(text)
     partes = [
         f"# Report — {slug}",
-        "## Alterado\n" + ("\n".join(f"    {l}" for l in diff_stat) if diff_stat else "- sem diff contra a base"),
+        "## Alterado\n" + aviso_atraso(atras) + ("\n".join(f"    {l}" for l in diff_stat) if diff_stat else "- sem diff contra a base"),
         "## Verificado\n" + _bullets(verificado, "sem gates no frontmatter"),
         "## Provas\n" + _bullets(provas, "sem `## Prova` no SP"),
         "## Dificuldades\n" + (_bullets(dif, "") if dif else "- SEM DIFICULDADES REGISTADAS: escrever «nenhuma» com a justificação ou correr `/reflect fase`"),
@@ -77,8 +88,8 @@ def gerar(text: str, slug: str, diff_stat: list[str] | None = None, gates: list[
     return "\n\n".join(partes) + "\n"
 
 
-def _git_stat(base: str) -> list[str]:
-    r = subprocess.run(["git", "diff", "--stat", base], capture_output=True, text=True, cwd=HERE.parent, encoding="utf-8")
+def _git_stat(base: str, cwd=None) -> list[str]:
+    r = subprocess.run(["git", "diff", "--stat", base], capture_output=True, text=True, cwd=cwd or HERE.parent, encoding="utf-8")
     return r.stdout.splitlines() if r.returncode == 0 else []
 
 
@@ -91,23 +102,27 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--gates", action="store_true", help="corre os gates do SP para registar o RC")
     ap.add_argument("--project")
     a = ap.parse_args(argv)
+    sp_gates = _load("sp_gates_run", "sp-gates.py")
     sp_list = _load("sp_list_report", "sp-list.py")
-    alvo = None
+    alvo, raiz = None, None
     p = Path(a.sp)
-    for sp in sp_list.collect(sp_list.default_root(), include_done=True):
-        if (p.suffix == ".md" and sp.path.resolve() == p.resolve()) or sp.slug == a.sp:
-            if a.project is None or sp.project == a.project:
-                alvo = sp
-                break
+    roots = [Path(r) for r in sp_gates.sp_roots(a.sp)] if p.suffix != ".md" else [Path(HERE.parent)]
+    for root in roots:
+        for sp in sp_list.collect(sp_list.default_root(root), include_done=True):
+            if (p.suffix == ".md" and sp.path.resolve() == p.resolve()) or sp.slug == a.sp:
+                if a.project is None or sp.project == a.project:
+                    alvo, raiz = sp, root
+                    break
+        if alvo:
+            break
     if alvo is None:
         print(f"SP não encontrado: {a.sp}")
         return 1
     text = alvo.path.read_text(encoding="utf-8")
     res = None
     if a.gates:
-        sp_gates = _load("sp_gates_run", "sp-gates.py")
         res = sp_gates.run(sp_gates.parse_gates(text))
-    print(gerar(text, alvo.slug, _git_stat(a.base), res))
+    print(gerar(text, alvo.slug, _git_stat(a.base, raiz), res, _atras(a.base, raiz)))
     return 0 if dificuldades_ok(text) else 3
 
 
