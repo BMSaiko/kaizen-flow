@@ -109,6 +109,19 @@ def collect(root, include_done=False):
     return sps
 
 
+def normalize_ref(root, ref):
+    """Aceita o slug ou o nome do ficheiro (com .md e/ou data AAAA-MM-DD) e devolve o slug."""
+    sps = collect(root, include_done=True)
+    slugs = {sp.slug for sp in sps}
+    if ref in slugs:
+        return ref
+    base = re.sub(r"\.md$", "", Path(ref).name)
+    for cand in (base, re.sub(r"-\d{4}-\d{2}-\d{2}$", "", base)):
+        if cand in slugs:
+            return cand
+    return ref
+
+
 def sort_sps(sps, key="status", reverse=False):
     def created_key(sp):
         return (sp.created is None, sp.created or date.min)

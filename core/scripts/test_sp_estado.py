@@ -84,3 +84,11 @@ def test_mae_pergunta_concorrencia(tmp_path):
     filho = sp_estado.estado("filho", root=tmp_path, git_lines=["master"])
     assert "perguntar concorrência" in mae and "1 filhos" in mae
     assert "perguntar concorrência" not in filho
+
+
+def test_aceita_nome_do_ficheiro_com_data(tmp_path):
+    make(tmp_path, "Doing", "alvo")  # ficheiro alvo-2026-10-26.md
+    for ref in ("alvo-2026-10-26", "alvo-2026-10-26.md"):
+        out = sp_estado.estado(ref, root=tmp_path, git_lines=["master"])
+        assert out.startswith("alvo · Doing")
+    assert "não encontrado" in sp_estado.estado("outro-2026-10-26", root=tmp_path, git_lines=["master"])

@@ -43,6 +43,7 @@ def estado(ref, root=None, project=None, git_lines=None):
     sps = sp_list.collect(root, include_done=True)
     alvo = None
     p = Path(ref)
+    ref = sp_list.normalize_ref(root, ref)
     for sp in sps:
         if (p.suffix == ".md" and sp.path.resolve() == p.resolve()) or sp.slug == ref:
             if project is None or sp.project == project:

@@ -222,6 +222,7 @@ def main(argv=None):
     args.slug = args.slug_opt or args.slug
     if not args.slug:
         ap.error("falta o slug (posicional ou --slug); ver scripts/sp-list.py")
+    args.slug = sp_list.normalize_ref(args.root, args.slug)
     if argv is None and args.root == str(sp_list.DEFAULT_ROOT):
         rc = wt_redirect.redirect(__file__, args.slug, sys.argv[1:])
         if rc is not None:
