@@ -31,7 +31,7 @@ license: MIT
 
 ## Arranque
 
-1. `python -I scripts/sp-estado.py <slug>` (fase, passos, gates, ramo) e ler `perfil`/`max_tentativas`/`parar_se`.
+1. `python -I scripts/sp-estado.py <slug>` (fase, passos, gates, ramo) e ler `perfil`/`max_tentativas`/`parar_se`. SP vazio = Grill, não paragem; correr sempre o Arranque todo e a «sessão suja» (`michi-orquestracao.md`) antes da fase 1.
 2. SP em TODO (p.ex. vindo de `/sp-handoff`): `python -I scripts/sp-move.py <slug> --start` (move o SP e as mães em TODO para Doing, idempotente). `python -I scripts/sb-worktree.py ensure <slug>`; editar pelo caminho absoluto da worktree; `merge` + `clean` só no fecho com o SP em Done.
 3. `python -I scripts/tab-title.py <slug>`.
 4. Modo: `--auto` ou `modo: auto` no frontmatter = sem `AskUserQuestion` (`modo: manual` = sem auto, sem pergunta); sem nenhum, perguntar «com/sem auto» (`michi-modo-auto.md`).

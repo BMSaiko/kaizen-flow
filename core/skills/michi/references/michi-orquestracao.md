@@ -13,7 +13,7 @@ Regras que saíram do `SKILL.md` sem alteração de contrato. Prova, reflect por
 - **Worktree:** `python -I scripts/sb-worktree.py ensure <slug>` e editar pelo caminho absoluto da worktree (o guard bloqueia o checkout principal); `sp-move`/`sp-fechar` saltam sozinhos para ela; commits por fase lá; `merge` (recusa SP fora de Done, `--force` explícito) + `clean` só no fecho.
 - **Tab:** `python -I scripts/tab-title.py <slug>` (best-effort, rc 0; imprime `/rename <slug>`). Vale para a sessão nova do `/sp-handoff`.
 - **Checkpoint/rollback:** `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate (`michi-modo-auto.md` §Paragem).
-- **Sessão suja:** se o contexto já tem conversa anterior (não veio de `/clear` nem de handoff), um só AskUserQuestion: «Limpar e iniciar o SP em sessão nova?» + modo; com «sim», `python -I scripts/sp-handoff.py --launch <caminho>` (`--auto` se escolhido) e terminar o turno.
+- **Sessão suja:** se o contexto já tem conversa anterior (não veio de `/clear` nem de handoff), um só AskUserQuestion: «Limpar e iniciar o SP em sessão nova?» + modo; com «sim», `python -I scripts/sp-handoff.py --launch <caminho>` (`--auto` se escolhido) e terminar o turno. Conta como suja qualquer sessão onde já correu trabalho (SP criado ou `/michi` anterior). SP com secções vazias (sem objetivo/passos) não é «nada a fazer»: entra no Grill (fase 1), nunca parar nem saltar o Arranque (passos 2-5, incluindo esta verificação).
 - O user pode parar após qualquer passo (`/stop`) e retomar (`/resume` ou novo `/michi` no mesmo contexto).
 
 ## Fase 1 — Grill
