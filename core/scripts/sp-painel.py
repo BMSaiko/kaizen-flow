@@ -47,4 +47,6 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
+    import kf_errlog
+    sys.exit(kf_errlog.executar("sp-painel", main))
