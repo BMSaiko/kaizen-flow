@@ -258,4 +258,6 @@ if __name__ == "__main__":
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
-    sys.exit(main())
+    sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
+    import kf_errlog
+    sys.exit(kf_errlog.executar("sp-fechar", main))

@@ -105,6 +105,7 @@ If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the blo
 | [Config](docs/config.md) | `kaizen.config.json`, `kaizen-hooks.json` and project folders |
 | [Handoff](docs/handoff.md) | fresh-context handoff, parallel panes, backends, CLI vs desktop app |
 | [Privacy audit](docs/privacy-audit.md) | what `kaizen audit` scans for |
+| [Error log](docs/error-log.md) | `kf_errlog`: JSONL log of script failures, location, fields, secret filtering |
 
 Quickstart:
 
