@@ -14,6 +14,7 @@ import argparse
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -44,6 +45,17 @@ def find_doing(root, slug, project=None):
     if found[0].status != "Doing":
         raise FecharError(f"SP '{slug}' está em {found[0].status}, não em Doing; corre sp-move.py {slug} doing")
     return found[0]
+
+
+def passo(nome, fn, *args):
+    """Corre um passo com progresso no stderr (início, fim e duração); devolve o resultado de fn."""
+    print(f"[sp-fechar] > {nome} ...", file=sys.stderr, flush=True)
+    t0 = time.monotonic()
+    res = fn(*args)
+    rc = res[0] if isinstance(res, tuple) else 0
+    print(f"[sp-fechar] {'ok' if not rc else 'FALHA rc=' + str(rc)} {nome} {time.monotonic() - t0:.1f}s",
+          file=sys.stderr, flush=True)
+    return res
 
 
 def run_gates(sp):
@@ -166,14 +178,15 @@ def seguinte(root, slug, project=None):
 
 def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True):
     """Corre o fecho. Devolve (rc, linhas)."""
+    t_total = time.monotonic()
     sp = find_doing(root, slug, project)
     lines = []
-    rc, text = run_gates(sp)
+    rc, text = passo("gates", run_gates, sp)
     lines.append(text)
     if rc:
         return rc, lines + [f"{slug}: gate vermelho, SP continua em Doing"]
     if testes and not sp_gates.parse_gates(sp.path.read_text(encoding="utf-8")):
-        rc, text = run_fast()
+        rc, text = passo("test-fast", run_fast)
         lines.append(text)
         if rc:
             return 1, lines + [f"{slug}: test-fast vermelho, SP continua em Doing"]
@@ -183,7 +196,7 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
         if bloqueio:
             return 1, lines + [bloqueio, f"{slug}: kaizen-flow por sincronizar, SP continua em Doing"]
     if budget:
-        rc, text = run_budget()
+        rc, text = passo("context-budget", run_budget)
         lines.append(text)
         if rc:
             return 1, lines + [f"{slug}: orçamento de contexto excedido, SP continua em Doing"]
@@ -203,6 +216,7 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
     hint = worktree_hint(commit_dir, slug)
     if hint:
         lines.append(hint)
+    print(f"[sp-fechar] total {time.monotonic() - t_total:.1f}s", file=sys.stderr, flush=True)
     return 0, lines
 
 
