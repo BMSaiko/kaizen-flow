@@ -172,3 +172,22 @@ def test_guarda_skill_michi_regista_regra():
         pytest.skip("SKILL.md do michi não existe neste layout")
     skill = existente.read_text(encoding="utf-8")
     assert "PRÓXIMO FILHO" in skill and "ÚLTIMO FILHO" in skill and "Nunca omitir" in skill
+
+def test_changed_paths_ignora_apagamento_em_stage(tmp_path):
+    """Rename TODO->Done: o stage não lista a origem já apagada (git add falhava)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("sp_fechar_mod", SCRIPTS / "sp-fechar.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.path.insert(0, str(SCRIPTS))
+    spec.loader.exec_module(mod)
+    g = lambda *a: subprocess.run(["git", "-C", str(tmp_path), "-c", "user.email=a@b", "-c", "user.name=a", *a],
+                                  check=True, capture_output=True)
+    g("init", "-q")
+    (tmp_path / "TODO").mkdir()
+    (tmp_path / "Done").mkdir()
+    (tmp_path / "TODO" / "x.md").write_text("a", encoding="utf-8")
+    g("add", ".")
+    g("commit", "-qm", "i")
+    (tmp_path / "TODO" / "x.md").rename(tmp_path / "Done" / "x.md")
+    g("rm", "--cached", "-q", "TODO/x.md")
+    assert mod.changed_paths(tmp_path) == ["Done/x.md"]

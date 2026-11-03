@@ -114,6 +114,8 @@ def changed_paths(cwd):
         return []
     paths = []
     for line in r.stdout.splitlines():
+        if line[:2] == "D ":  # apagamento já em stage (ex.: origem de um rename): `git add` falharia
+            continue
         p = line[3:].split(" -> ")[-1].strip().strip('"')
         name = Path(p).name
         if name.startswith("COMMIT_") or any(s in name for s in SECRETS):
