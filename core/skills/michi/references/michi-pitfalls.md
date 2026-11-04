@@ -128,3 +128,7 @@ Movido de `SKILL.md` (## Pitfalls); condensado em 2026-10-31 (regras todas manti
 
 - Reescrever código com `
 `/`\` por `python - <<E` no Bash deixou `newline="` partido e custou 5 tentativas; o `Edit` corrigiu à primeira. Editar código sempre com `Edit`/`Write`; heredoc Python só para dados sem escapes.
+
+## 32. Comandos para o user correr com `!`: sintaxe bash (wt-clean-base-inexistente, 2026-11-04)
+
+- O `!` corre em bash: um `cd` com caminho Windows de barras invertidas perde as barras e falha. Dar sempre `cd /c/Users/... && cmd` com barras normais, nunca caminhos PowerShell.

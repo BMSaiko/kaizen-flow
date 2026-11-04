@@ -47,7 +47,7 @@ def cenario(tmp_path):
 
 def fechar(base, env=None):
     return run("sp-fechar.py", "--root", str(base / "vault"), "--project", PROJECT, "s1",
-               "--sem-budget", "--commit-dir", str(base / "repo"),
+               "--sem-budget", "--sem-prova", "teste", "--commit-dir", str(base / "repo"),
                env={"KAIZEN_FLOW_HOME": str(base / "pkg"), **(env or {})})
 
 

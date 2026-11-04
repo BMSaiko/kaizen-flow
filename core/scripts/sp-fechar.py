@@ -2,12 +2,12 @@
 """Fecha um SP numa só chamada: gates -> context-budget -> sp-move done -> COMMIT_*.md.
 
 Pára sem mover o SP se um gate (ou o orçamento de contexto) falhar. Sem gates declarados corre
-`test-fast.py fast`; avisa (sem bloquear) se faltar `## Prova de done` ou `## Reflect`. Nunca faz commit nem push.
+`test-fast.py fast`; bloqueia (RC 1) se faltar `## Prova de done` ou `## Reflect`, salvo `--sem-prova "motivo"` (fica registado no SP). Nunca faz commit nem push.
 O COMMIT_*.md lista o stage explícito (um `git add` por caminho, sem o próprio COMMIT_*.md).
 
 Uso:
   python -I scripts/sp-fechar.py <slug> [--project P] [--next] [--msg "assunto"]
-                                 [--sem-budget] [--sem-testes] [--sem-commit] [--commit-dir DIR]
+                                 [--sem-budget] [--sem-testes] [--sem-commit] [--commit-dir DIR] [--sem-prova "motivo"]
 RC 0 = fechado; 1 = gate/orçamento vermelho (SP fica em Doing); 2 = erro de uso.
 """
 import argparse
@@ -94,16 +94,24 @@ def run_fast():
 
 
 def avisos(sp_text):
-    """Avisos (não bloqueiam) se faltar a prova de done ou o Reflect de fase/final."""
+    """Faltas (bloqueiam o fecho sem --sem-prova) se faltar a prova de done ou o Reflect de fase/final."""
     def body(title):
         m = re.search(rf"^## {title}[^\n]*\n(.*?)(?=^## |\Z)", sp_text, re.S | re.M)
         return m.group(1) if m else ""
     out = []
     if not body("Prova de done").strip():
-        out.append("AVISO: sem '## Prova de done' no SP (registar a prova como cliente final)")
+        out.append("FALTA: sem '## Prova de done' no SP (registar a prova como cliente final)")
     if not re.search(r"^Reflect \S", body("Reflect"), re.M):
-        out.append("AVISO: sem linhas 'Reflect <fase>:' no SP (correr /reflect fase|final)")
+        out.append("FALTA: sem linhas 'Reflect <fase>:' no SP (correr /reflect fase|final)")
     return out
+
+
+def registar_dispensa(path, motivo):
+    """Acrescenta ao SP a dispensa consciente de prova/reflect (bytes: preserva CRLF)."""
+    nl = "\r\n" if b"\r\n" in path.read_bytes() else "\n"
+    linha = nl + "## Dispensa de prova/reflect" + nl + nl + f"{datetime.now():%Y-%m-%d}: {motivo}" + nl
+    with open(path, "ab") as fh:
+        fh.write(linha.encode("utf-8"))
 
 
 def changed_paths(cwd):
@@ -178,7 +186,7 @@ def seguinte(root, slug, project=None):
     return f"SEGUINTE: nenhum filho elegível de {kid.parent} (os restantes dependem de SPs por fechar)"
 
 
-def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True):
+def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True, sem_prova=None):
     """Corre o fecho. Devolve (rc, linhas)."""
     t_total = time.monotonic()
     sp = find_doing(root, slug, project)
@@ -192,7 +200,12 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
         lines.append(text)
         if rc:
             return 1, lines + [f"{slug}: test-fast vermelho, SP continua em Doing"]
-    lines += avisos(sp.path.read_text(encoding="utf-8"))
+    faltas = avisos(sp.path.read_text(encoding="utf-8"))
+    if faltas and not sem_prova:
+        return 1, lines + faltas + [f"{slug}: sem prova/reflect, SP continua em Doing (registar, ou --sem-prova \"motivo\")"]
+    if faltas:
+        registar_dispensa(sp.path, sem_prova)
+        lines += [f.replace("AVISO", "DISPENSADO") for f in faltas]
     if commit:
         bloqueio = kf_por_sincronizar(commit_dir)
         if bloqueio:
@@ -232,6 +245,7 @@ def main(argv=None):
     ap.add_argument("--sem-budget", action="store_true")
     ap.add_argument("--sem-testes", action="store_true", help="não correr test-fast quando o SP não tem gates")
     ap.add_argument("--sem-commit", action="store_true")
+    ap.add_argument("--sem-prova", metavar="MOTIVO", help="dispensa consciente de '## Prova de done'/Reflect; fica registada no SP")
     ap.add_argument("--commit-dir", default=".", help="repo onde gerar o COMMIT_*.md (defeito: cwd)")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
@@ -246,7 +260,7 @@ def main(argv=None):
     try:
         rc, lines = fechar(args.root, args.slug, args.project, args.next, args.msg,
                            not args.sem_budget, not args.sem_commit, args.commit_dir,
-                           not args.sem_testes)
+                           not args.sem_testes, args.sem_prova)
     except (FecharError, sp_move.SpMoveError) as exc:
         print(f"erro: {exc}", file=sys.stderr)
         return 2

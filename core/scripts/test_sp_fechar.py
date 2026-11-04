@@ -41,9 +41,41 @@ def novo_doing(root, slug, gate_cmd):
     assert run("sp-move.py", "--root", str(vault), "--project", PROJECT, slug, "doing")[0] == 0
 
 
-def fechar(root, slug):
+def fechar(root, slug, *extra, dispensa=True):
+    d = ("--sem-prova", "teste") if dispensa else ()
     return run("sp-fechar.py", "--root", str(root / "vault"), "--project", PROJECT, slug,
-               "--sem-budget", "--commit-dir", str(root / "repo"))
+               "--sem-budget", "--commit-dir", str(root / "repo"), *d, *extra)
+
+
+def test_sem_prova_nem_reflect_bloqueia(root):
+    novo_doing(root, "semprova", f'"{sys.executable}" -c "import sys; sys.exit(0)"')
+    rc, out, err = fechar(root, "semprova", dispensa=False)
+    assert rc == 1, out + err
+    assert list((root / "vault" / PROJECT / "sp" / "Doing").glob("semprova-*.md"))
+    assert not list((root / "vault" / PROJECT / "sp" / "Done").glob("semprova-*.md"))
+    assert not list((root / "repo").glob("COMMIT_*.md"))
+
+
+def test_sem_prova_dispensa_regista_no_sp(root):
+    novo_doing(root, "dispensa", f'"{sys.executable}" -c "import sys; sys.exit(0)"')
+    rc, out, err = fechar(root, "dispensa")
+    assert rc == 0, out + err
+    sp = next((root / "vault" / PROJECT / "sp" / "Done").glob("dispensa-*.md"))
+    assert "## Dispensa de prova/reflect" in sp.read_text(encoding="utf-8")
+
+
+def test_sp_completo_fecha_sem_dispensa(root):
+    novo_doing(root, "completo", f'"{sys.executable}" -c "import sys; sys.exit(0)"')
+    f = next((root / "vault" / PROJECT / "sp" / "Doing").glob("completo-*.md"))
+    txt = f.read_text(encoding="utf-8")
+    for sec in ("Prova de done", "Reflect"):
+        txt = re.sub(rf"^## {sec}[^\n]*\n.*?(?=^## |\Z)", "", txt, flags=re.S | re.M)
+    txt += "\n## Prova de done\n\nfast 2 s\n\n## Reflect\n\nReflect final: sem patch\n"
+    f.write_text(txt, encoding="utf-8")
+    rc, out, err = fechar(root, "completo", dispensa=False)
+    assert rc == 0, out + err
+    done = next((root / "vault" / PROJECT / "sp" / "Done").glob("completo-*.md"))
+    assert "## Dispensa" not in done.read_text(encoding="utf-8")
 
 
 def test_gate_verde_fecha_e_gera_commit(root):
@@ -157,7 +189,7 @@ def test_guarda_fecho_filho_anuncia_seguinte(tmp_path):
     """Guarda: fechar um filho (sem --next) nunca omite PRÓXIMO FILHO / ÚLTIMO FILHO."""
     _prog(tmp_path, {"mae": "TODO", "a": "Doing", "b": "TODO", "c": "TODO"})
     sp = tmp_path / PROJECT / "sp" / "Doing" / "a-2026-11-01.md"
-    sp.write_text(sp.read_text(encoding="utf-8") + "\n## Prova de done\nok\n", encoding="utf-8")
+    sp.write_text(sp.read_text(encoding="utf-8") + "\n## Prova de done\nok\n\n## Reflect\nReflect final: sem patch\n", encoding="utf-8")
     rc, out, err = run("sp-fechar.py", "--root", str(tmp_path), "--project", PROJECT, "a",
                        "--sem-budget", "--sem-testes", "--sem-commit")
     assert rc == 0, err
