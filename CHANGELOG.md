@@ -5,6 +5,12 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-05
+
+### Added
+- Publicação no npm (`npx kaizen-flow`): metadados do pacote e workflow `publish` por tag com provenance.
+
+
 ## [0.1.0] - 2026-11-05
 
 Primeira release do kaizen-flow (histórico desde 2026-10-22).
@@ -25,5 +31,6 @@ Primeira release do kaizen-flow (histórico desde 2026-10-22).
 - Testes e caminhos POSIX independentes do ambiente e do WezTerm no CI.
 - `sync` copia as fixtures do `sp-fila`; fixture sem literais de caminho Windows.
 
-[Unreleased]: https://github.com/BMSaiko/kaizen-flow/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/BMSaiko/kaizen-flow/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/BMSaiko/kaizen-flow/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/BMSaiko/kaizen-flow/releases/tag/v0.1.0
