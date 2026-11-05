@@ -284,6 +284,9 @@ def main(argv=None):
             paths = create_program(args.root, args.project, args.program, args.priority, date.today(),
                                    parse_children(args.children), args.modo, auth)
             print("\n".join(str(p) for p in paths))
+            if args.modo != "auto":
+                print("aviso: programa em modo: manual; sp-fila para a cada pergunta/commit. "
+                      "Para uma fila sem paragens: --modo auto --commit auto", file=sys.stderr)
         elif args.slug:
             check_links(args.root, args.project, args.parent, args.depends_on)
             path = create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao)

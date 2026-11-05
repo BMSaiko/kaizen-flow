@@ -174,6 +174,32 @@ def test_cli_program(tmp_path, capsys):
     assert "--slug" in capsys.readouterr().err
 
 
+def test_cli_program_avisa_se_modo_manual(tmp_path, capsys):
+    root = project(tmp_path)
+    args = ["--project", "atlas", "--program", "prog", "--children", "a,b:a", "--priority", "P2", "--root", str(root)]
+    assert sp_new.main(args) == 0
+    err = capsys.readouterr().err
+    assert "aviso" in err and "modo: manual" in err and "--modo auto" in err
+
+
+def test_cli_program_modo_auto_sem_aviso(tmp_path, capsys):
+    root = project(tmp_path)
+    args = ["--project", "atlas", "--program", "prog", "--children", "a,b:a", "--priority", "P2", "--root", str(root),
+            "--modo", "auto", "--commit", "auto"]
+    assert sp_new.main(args) == 0
+    assert "aviso" not in capsys.readouterr().err
+
+
+def test_cli_program_aplica_modo_e_commit_aos_filhos(tmp_path):
+    root = project(tmp_path)
+    args = ["--project", "atlas", "--program", "prog", "--children", "a,b:a", "--priority", "P2", "--root", str(root),
+            "--modo", "auto", "--commit", "auto"]
+    assert sp_new.main(args) == 0
+    for p in (root / "atlas/sp/TODO").glob("*.md"):
+        text = p.read_text(encoding="utf-8")
+        assert "\nmodo: auto\n" in text and "commit: auto" in text
+
+
 def test_autorizacoes_vao_para_o_frontmatter_e_validam(tmp_path):
     auth = {"commit": "auto", "push": "nunca", "pr": "nunca", "restricoes": "não tocar em AGENTS.md"}
     path = sp_new.create(project(tmp_path), "atlas", "abc", "P2", TODAY, auth=auth)

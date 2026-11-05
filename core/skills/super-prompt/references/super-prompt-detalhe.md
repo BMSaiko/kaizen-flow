@@ -14,7 +14,7 @@
 | `--permitir "<cmd>"` (repetível) | comandos pré-aprovados | `michi-modo-auto.md` §Autorizações do SP |
 | `--decisao "<texto>"` (repetível) | `## Decisões` | decisões do grill, uma por flag |
 | `--parent <slug>`, `--depends-on <slug> ...` | `parent:`/`depends_on:` | só em SP filho |
-| `--program <slug> --children a,b:a,c:a+b` | SP-mãe (`kind: program`) + filhos | escalão grande/médio; `b:a` = b depende de a |
+| `--program <slug> --children a,b:a,c:a+b` | SP-mãe (`kind: program`) + filhos | escalão grande/médio; `b:a` = b depende de a; `--modo auto --commit auto` vai à mãe e aos filhos (sem `--modo auto` há aviso: a fila pára a cada commit) |
 | `--root` | raiz alternativa | testes |
 
 `sp-validate.py` recusa comandos proibidos (`--force`, `reset --hard`, `git add -A`, `.env*`).
