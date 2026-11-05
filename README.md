@@ -8,6 +8,12 @@
 
 # kaizen-flow
 
+[![npm](https://img.shields.io/npm/v/kaizen-flow)](https://www.npmjs.com/package/kaizen-flow)
+
+```bash
+npx kaizen-flow --help      # or: npm i -g kaizen-flow && kaizen --help
+```
+
 A small workflow for working with coding agents:
 
 - **SP** (Super Prompt): a user story in 8 fixed sections (role, context, objective, success criteria, constraints, seams, steps, done-when).
