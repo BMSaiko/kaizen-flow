@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Kaizen workflow: SPs (user stories) + michi (improvement cycle) for Claude Code, Codex and other agent harnesses",
   "license": "MIT",
-  "author": "Bruno Silva <1221514@isep.ipp.pt>",
+  "author": { "name": "BMSaiko", "url": "https://github.com/BMSaiko" },
   "repository": { "type": "git", "url": "git+https://github.com/BMSaiko/kaizen-flow.git" },
   "homepage": "https://github.com/BMSaiko/kaizen-flow#readme",
   "bugs": { "url": "https://github.com/BMSaiko/kaizen-flow/issues" },
