@@ -3,8 +3,14 @@
   "version": "0.1.0",
   "description": "Kaizen workflow: SPs (user stories) + michi (improvement cycle) for Claude Code, Codex and other agent harnesses",
   "license": "MIT",
+  "author": { "name": "BMSaiko", "url": "https://github.com/BMSaiko" },
+  "repository": { "type": "git", "url": "git+https://github.com/BMSaiko/kaizen-flow.git" },
+  "homepage": "https://github.com/BMSaiko/kaizen-flow#readme",
+  "bugs": { "url": "https://github.com/BMSaiko/kaizen-flow/issues" },
+  "keywords": ["kaizen", "workflow", "claude-code", "codex", "agents", "user-stories", "cli"],
   "bin": { "kaizen": "bin/kaizen.js" },
   "files": ["bin", "core", "adapters", "usage", "README.md", "LICENSE"],
   "scripts": { "test": "node bin/run-tests.js" },
-  "engines": { "node": ">=18" }
+  "engines": { "node": ">=18" },
+  "publishConfig": { "access": "public", "provenance": true }
 }

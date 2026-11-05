@@ -12,10 +12,12 @@
   <a href="https://github.com/BMSaiko/kaizen-flow/actions/workflows/ci.yml"><img src="https://github.com/BMSaiko/kaizen-flow/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D18-339933.svg" alt="Node >= 18">
-  <!-- npm badge: add after the package is published (kf-gh-packages)
   <a href="https://www.npmjs.com/package/kaizen-flow"><img src="https://img.shields.io/npm/v/kaizen-flow.svg" alt="npm version"></a>
-  -->
 </p>
+
+```bash
+npx kaizen-flow --help      # or: npm i -g kaizen-flow && kaizen --help
+```
 
 A small workflow for working with coding agents:
 
