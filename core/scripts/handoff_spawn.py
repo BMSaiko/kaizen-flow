@@ -8,12 +8,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from handoff_pane import ENTER_GAP, HandoffError, _argvs, _copy, detect_backend, prompt_has_text, run_hidden  # noqa: E402
+from handoff_pane import (ENTER_SETTLE, ENTER_TRIES, HandoffError, _argvs, _copy, detect_backend, read_screen,  # noqa: E402
+                          run_hidden, send_confirmed)
 
 MAX_SPAWN = 3
 SPAWN_READY_S = 40  # espera máxima pelo prompt do Claude Code num painel novo
-SPAWN_ENTER_TRIES = 3
-SPAWN_SETTLE = 6.0  # o Claude Code demora a limpar o prompt (hooks UserPromptSubmit)
+SPAWN_ENTER_TRIES = ENTER_TRIES
+SPAWN_SETTLE = ENTER_SETTLE
 
 
 def _sp_fila():
@@ -39,9 +40,7 @@ def _spawn_pane(backend, wt, run):
 
 
 def _screen(backend, pane, run):
-    argv = (["wezterm", "cli", "get-text", "--pane-id", str(pane)] if backend == "wezterm"
-            else ["tmux", "capture-pane", "-p", "-t", str(pane)])
-    return run(argv, check=True, capture_output=True, text=True, encoding="utf-8").stdout
+    return read_screen(backend, pane, run)
 
 
 _KEYS = {"wezterm": {"Down": chr(27) + "[B", "Space": " ", "Enter": chr(13)}}
@@ -84,14 +83,8 @@ def _wait_prompt(backend, pane, run, sleep):
 def _send_line(backend, pane, text, run, sleep):
     """Envia `text` e Enter; se o texto continuar no prompt (Enter perdido), repete o Enter."""
     text_argv, key_argv = _argvs(backend, pane)
-    run(text_argv(pane, text), check=True)
-    for _ in range(SPAWN_ENTER_TRIES):
-        sleep(ENTER_GAP)
-        run(key_argv(pane), check=True)
-        sleep(SPAWN_SETTLE)
-        if not prompt_has_text(_screen(backend, pane, run)):
-            return
-    raise HandoffError(f"painel {pane}: o Enter não submeteu {text!r}")
+    send_confirmed(pane, text, text_argv, key_argv, lambda p: _screen(backend, p, run), run, sleep,
+                   tries=SPAWN_ENTER_TRIES, settle=SPAWN_SETTLE)
 
 
 def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.sleep, estado_path=None, copy=None, registar=True, dry_run=False):

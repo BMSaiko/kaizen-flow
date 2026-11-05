@@ -12,6 +12,8 @@ from pathlib import Path
 SEND_DELAY = 5.0
 SEND_GAP = 2.0
 ENTER_GAP = 0.5
+ENTER_TRIES = 3
+ENTER_SETTLE = 6.0  # o Claude Code demora a limpar o prompt (hooks UserPromptSubmit)
 
 
 class HandoffError(Exception):
@@ -101,10 +103,36 @@ def _copy(text):
     raise OSError("nenhuma ferramenta de área de transferência")
 
 
+def read_screen(backend, pane, run=run_hidden):
+    """Texto do ecrã do painel (`wezterm cli get-text` ou `tmux capture-pane`)."""
+    argv = (["wezterm", "cli", "get-text", "--pane-id", str(pane)] if backend == "wezterm"
+            else ["tmux", "capture-pane", "-p", "-t", str(pane)])
+    return run(argv, check=True, capture_output=True, text=True, encoding="utf-8").stdout
+
+
+def send_confirmed(pane, text, text_argv, key_argv, screen, run=run_hidden, sleep=time.sleep, enter_gap=ENTER_GAP,
+                   tries=ENTER_TRIES, settle=ENTER_SETTLE):
+    """Envia `text` e Enter e lê o ecrã (`screen(pane)`); se o texto continuar no prompt (Enter perdido), repete o Enter."""
+    run(text_argv(pane, text), check=True)
+    for _ in range(tries):
+        sleep(enter_gap)
+        run(key_argv(pane), check=True)
+        sleep(settle)
+        if not prompt_has_text(screen(pane)):
+            return
+    raise HandoffError(f"painel {pane}: o Enter não submeteu {text!r}")
+
+
 def send_lines(lines, pane, text_argv, key_argv, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=run_hidden,
-               sleep=time.sleep, inspect=None):
-    """Espera `delay`, confere o prompt (`inspect`) e envia cada linha de `lines` com Enter, com `gap` entre elas."""
+               sleep=time.sleep, inspect=None, screen=None):
+    """Espera `delay`, confere o prompt (`inspect`) e envia cada linha de `lines` com Enter, com `gap` entre elas.
+
+    Com `screen(pane)` cada linha passa por `send_confirmed` (Enter reenviado se o texto ficar no prompt).
+    """
     def line(text):
+        if screen:
+            send_confirmed(pane, text, text_argv, key_argv, screen, run, sleep, enter_gap)
+            return
         run(text_argv(pane, text), check=True)
         sleep(enter_gap)
         run(key_argv(pane), check=True)

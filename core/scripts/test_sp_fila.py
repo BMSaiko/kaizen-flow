@@ -1,7 +1,10 @@
 """Testes de scripts/sp-fila.py (planeador, limites, passo seguinte; fixtures em ficheiros temporários)."""
 import importlib.util
 import json
+import os
 import sys
+import time
+import pytest
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -378,6 +381,63 @@ def test_bloqueio_antigo_e_removido_e_escrita_e_atomica(tmp_path):
     sp_fila.atualizar(st, lambda e: e["sessoes"].update({"z": {}}))
     assert not lock.exists() and "z" in json.loads(st.read_text(encoding="utf-8"))["sessoes"]
     assert not list(tmp_path.glob("*.tmp"))
+
+
+def _pid_morto():
+    import subprocess
+    p = subprocess.Popen([sys.executable, "-I", "-c", "pass"])
+    p.wait()
+    return p.pid
+
+
+def test_bloqueio_com_pid_morto_e_recuperado_de_imediato(tmp_path):
+    # lock recente (mtime de agora) mas o dono já morreu: não esperar os LOCK_VELHO_S
+    st = _estado(tmp_path)
+    lock = Path(f"{st}.lock")
+    lock.write_text(str(_pid_morto()), encoding="utf-8")
+    t0 = time.monotonic()
+    sp_fila.atualizar(st, lambda e: e["sessoes"].update({"z": {}}))
+    assert time.monotonic() - t0 < 5 and not lock.exists()
+    assert "z" in json.loads(st.read_text(encoding="utf-8"))["sessoes"]
+
+
+def test_bloqueio_regista_o_pid_do_dono(tmp_path):
+    st = _estado(tmp_path)
+    with sp_fila.bloqueio(st):
+        assert Path(f"{st}.lock").read_text(encoding="utf-8").strip() == str(os.getpid())
+
+
+def test_bloqueio_com_pid_vivo_nao_e_roubado(tmp_path):
+    st = _estado(tmp_path)
+    lock = Path(f"{st}.lock")
+    lock.write_text(str(os.getpid()), encoding="utf-8")
+    with pytest.raises(TimeoutError):
+        with sp_fila.bloqueio(st, espera=0.2):
+            pass
+    assert lock.exists()
+
+
+def test_seguinte_com_estado_bloqueado_sai_rc1_sem_tocar_no_estado(tmp_path, monkeypatch, capsys):
+    # caso observado: «estado bloqueado há demasiado tempo» com 2 painéis ainda a correr; a fila não acaba nem marca falhados
+    st = _estado(tmp_path, sessoes={"a": {"painel": "1"}, "b": {"painel": "2"}})
+    antes = st.read_bytes()
+
+    def bloqueado(*a, **k):
+        raise TimeoutError(f"estado bloqueado há demasiado tempo: {st}.lock")
+
+    monkeypatch.setattr(sp_fila, "seguinte", bloqueado)
+    rc = sp_fila.main(["--seguinte", "--slug", "a", "--estado", str(st), "--root", str(tmp_path), "--relatorios", str(tmp_path / "rel")])
+    assert rc == 1 and st.read_bytes() == antes
+    assert "bloqueado" in capsys.readouterr().err
+    assert not (tmp_path / "rel").exists()
+
+
+def test_vigia_sobrevive_a_estado_bloqueado_e_avisa(tmp_path):
+    def bloqueado(*a, **k):
+        raise TimeoutError("estado bloqueado há demasiado tempo")
+
+    ok, razao = sp_fila.lancar_seguinte_auto("r", "e", "rel", "a", seguinte_fn=bloqueado)
+    assert ok is False and "bloqueado" in razao
 
 
 def test_concorrencia_so_lanca_ate_ao_teto(tmp_path):
@@ -1014,3 +1074,45 @@ def test_cli_dry_run_mostra_o_limite_de_falhas(tmp_path, capsys):
     make_sp(tmp_path, "um")
     assert sp_fila.main(["--dry-run", "--root", str(tmp_path), "--max-falhas", "3"]) == 0
     assert "Limites:" in capsys.readouterr().out
+
+
+def _runner_worktree(calls, wt):
+    """Runner cujo `git worktree list --porcelain` devolve uma worktree `agent/<nome>` em `wt`."""
+    def run(argv, **_):
+        calls.append(argv)
+
+        class R:
+            returncode = 0
+            stderr = ""
+            stdout = f"worktree {wt}\nHEAD abc\nbranch refs/heads/agent/{wt.name}\n\n" if "worktree" in argv else ""
+        return R()
+    return run
+
+
+def test_seguinte_recusa_fechar_sp_done_so_na_worktree(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Doing")
+    wt = tmp_path / "a"
+    make_sp(wt, "a", folder="Done")
+    calls = []
+    st = _estado(tmp_path, sessoes={"a": {}})
+    antes = st.read_text(encoding="utf-8")
+    try:
+        sp_fila.seguinte(root, st, tmp_path / "rel", _runner_worktree(calls, wt), datetime(2026, 10, 25, 12, 0), slug="a")
+    except sp_fila.IntegracaoPendente as e:
+        assert "sb-worktree.py merge a" in str(e)
+    else:
+        raise AssertionError("devia recusar: Done só na worktree")
+    assert st.read_text(encoding="utf-8") == antes
+    assert not any("handoff" in " ".join(map(str, c)) for c in calls)
+
+
+def test_seguinte_sp_ja_integrado_continua_a_avancar(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Done")
+    make_sp(root, "b")
+    wt = tmp_path / "a"
+    make_sp(wt, "a", folder="Done")
+    st = _estado(tmp_path, sessoes={"a": {}})
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner_worktree([], wt), datetime(2026, 10, 25, 12, 0), slug="a")
+    assert out["acao"] == "lancou" and out["slug"] == "b"

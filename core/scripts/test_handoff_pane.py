@@ -52,6 +52,65 @@ class _Res:
         self.stdout = stdout
 
 
+class _Painel:
+    """Ecrã simulado: o texto fica no prompt até o Enter número `enters_perdidos + 1`."""
+
+    def __init__(self, enters_perdidos=0):
+        self.perdidos = enters_perdidos
+        self.enters = 0
+        self.texto = ""
+
+    def run(self, argv, **kw):
+        if argv[-1] == "\r":
+            self.enters += 1
+            if self.enters > self.perdidos:
+                self.texto = ""
+            return _Res("")
+        if "get-text" in argv:
+            return _Res("saida\n❯ " + self.texto)
+        self.texto = argv[-1]
+        return _Res("")
+
+
+def _enviar(painel, **kw):
+    return hp.send_confirmed(3, "/michi x", hp.send_argv, hp.enter_argv, lambda p: hp.read_screen("wezterm", p, painel.run),
+                             run=painel.run, sleep=lambda s: None, **kw)
+
+
+def test_send_confirmed_um_enter_basta_quando_o_prompt_fica_vazio():
+    p = _Painel()
+    _enviar(p)
+    assert p.enters == 1
+
+
+def test_send_confirmed_reenvia_o_enter_ate_o_prompt_esvaziar():
+    p = _Painel(enters_perdidos=2)
+    _enviar(p)
+    assert p.enters == 3
+
+
+def test_send_confirmed_esgota_tentativas_e_falha():
+    p = _Painel(enters_perdidos=99)
+    with pytest.raises(hp.HandoffError, match="Enter não submeteu"):
+        _enviar(p)
+    assert p.enters == hp.ENTER_TRIES
+
+
+def test_read_screen_usa_get_text_no_wezterm_e_capture_pane_no_tmux():
+    vistos = []
+    run = lambda argv, **k: vistos.append(argv) or _Res("x")  # noqa: E731
+    assert hp.read_screen("wezterm", 3, run) == "x"
+    hp.read_screen("tmux", "%1", run)
+    assert vistos == [["wezterm", "cli", "get-text", "--pane-id", "3"], ["tmux", "capture-pane", "-p", "-t", "%1"]]
+
+
+def test_send_lines_com_screen_confirma_cada_linha():
+    p = _Painel(enters_perdidos=1)
+    hp.send_lines(["/clear", "/michi y"], 3, hp.send_argv, hp.enter_argv, run=p.run, sleep=lambda s: None,
+                  screen=lambda pane: hp.read_screen("wezterm", pane, p.run))
+    assert p.enters == 3  # 1.ª linha: Enter perdido + reenvio; 2.ª linha: um Enter (o contador perdido já passou)
+
+
 def test_pane_exists_e_check_prompt_com_run_falso():
     run = lambda *a, **k: _Res('[{"pane_id": 4}]')  # noqa: E731
     hp.pane_exists(4, run=run)

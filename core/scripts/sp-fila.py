@@ -39,7 +39,7 @@ from sp_fila_estado import (LOCK_VELHO_S, MAX_DEFEITO, MAX_FALHAS_DEFEITO, NO_WI
 from sp_fila_plano import autorizacao, descendentes, estatico, limite, load, plan, render_plan, sem_commit, sp_list  # noqa: E402,F401
 from sp_fila_relatorio import commits_desde, gastos, progresso, reflect_lacunas, relatorio, render_gastos  # noqa: E402,F401
 from sp_fila_execucao import (_cwd_neutro, _custos, _custos_seguros, _ler_sp, _painel_lancado, _seguinte,  # noqa: E402,F401
-                              lancar_seguinte_auto, seguinte)
+                              lancar_seguinte_auto, seguinte, IntegracaoPendente)
 from sp_fila_paralelo import (ARRANQUE_S, BATIDA_MAX_S, INATIVIDADE_S, PERGUNTAS, REAVISO_S, TURNO_ACABADO, VIGIA_LOG, VIVO,  # noqa: E402,F401
                               _AVISO, _atividade, _chave, _norm_caminho, _resumo_pedido, aviso_vigia, batida_vigia, classificar,
                               contar_tails, estado_vivo, fechar_painel_sessao, linha, vigiar)
@@ -171,7 +171,14 @@ def main(argv=None):
         if usd is not None:
             novo["custo_inicio"] = sum(_custos().get(s, 0.0) for s in so)
         guardar(estado, novo)
-    out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug)
+    try:
+        out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug)
+    except IntegracaoPendente as e:
+        print(f"erro: {e}", file=sys.stderr)
+        return 1
+    except TimeoutError as e:  # lock preso: o estado fica intacto (sem «fila vazia» nem falhados); repetir `--seguinte --slug`
+        print(f"erro: {e}; o estado não foi alterado, repetir `--seguinte`", file=sys.stderr)
+        return 1
     if out["acao"] == "espera":
         print(f"a aguardar · {', '.join(out['sessoes'])}")
     elif out["acao"] == "lancou":

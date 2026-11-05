@@ -32,18 +32,62 @@ def run_hidden(*args, **kwargs):
     return subprocess.run(*args, **kwargs)
 
 
+def pid_vivo(pid):
+    """True se o processo `pid` existe. Windows: OpenProcess + GetExitCodeProcess (259 = ainda ativo); nunca `os.kill(pid, 0)`, que lá termina o processo."""
+    if pid <= 0:
+        return False
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except OSError:  # PermissionError: existe, é de outro utilizador
+            return True
+        return True
+    import ctypes
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.OpenProcess.restype = wintypes.HANDLE
+    k32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    k32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+    k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    h = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return ctypes.get_last_error() == 5  # ERROR_ACCESS_DENIED: existe; qualquer outro erro (87 = pid inválido): não existe
+    try:
+        codigo = wintypes.DWORD()
+        return bool(k32.GetExitCodeProcess(h, ctypes.byref(codigo))) and codigo.value == 259  # STILL_ACTIVE
+    finally:
+        k32.CloseHandle(h)
+
+
+def _lock_obsoleto(lock):
+    """Com pid legível manda o pid (dono morto = obsoleto, vivo = nunca); sem ele (formato antigo, escrita a meio) manda a idade."""
+    try:
+        pid = int(lock.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return time.time() - lock.stat().st_mtime > LOCK_VELHO_S
+    return not pid_vivo(pid)
+
+
 @contextmanager
 def bloqueio(path, espera=15.0):
-    """Exclusão mútua entre sessões sobre `path`: ficheiro `<path>.lock` criado com O_CREAT|O_EXCL."""
+    """Exclusão mútua entre sessões sobre `path`: ficheiro `<path>.lock` (guarda o pid do dono) criado com O_CREAT|O_EXCL.
+
+    Recupera o lock de um dono morto de imediato e o de mtime > LOCK_VELHO_S (sem pid legível)."""
     lock = Path(f"{path}.lock")
     limite_t = time.monotonic() + espera
     while True:
         try:
-            os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            try:
+                os.write(fd, str(os.getpid()).encode())
+            finally:
+                os.close(fd)
             break
         except (FileExistsError, PermissionError):  # Windows: PermissionError se o dono está a apagar o .lock
             try:
-                if time.time() - lock.stat().st_mtime > LOCK_VELHO_S:
+                if _lock_obsoleto(lock):
                     lock.unlink(missing_ok=True)
                     continue
             except OSError:

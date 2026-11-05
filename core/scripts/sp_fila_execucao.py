@@ -20,6 +20,24 @@ def seguinte(root, estado_path, rel_dir, run=run_hidden, agora=None, custo_fn=No
         return _seguinte(root, estado_path, rel_dir, run, agora or datetime.now(), custo_fn, slug)
 
 
+class IntegracaoPendente(RuntimeError):
+    """Um SP lançado está em Done só na worktree: fechar a fila agora daria um «fila vazia» falso."""
+
+
+def _done_so_na_worktree(root, slug, run):
+    """Caminho da worktree `agent/<nome>` do SP se aí o SP está em Done; None se não houver worktree ou o SP não estiver em Done lá."""
+    nome = re.sub(r"[^a-z0-9-]+", "-", slug.lower()).strip("-")[:31].rstrip("-")  # igual a sb-worktree.name_of (o pacote kf não o inclui)
+    r = run(["git", "-C", str(root), "worktree", "list", "--porcelain"], capture_output=True, text=True, encoding="utf-8")
+    atual = None
+    for linha in (r.stdout or "").splitlines():
+        if linha.startswith("worktree "):
+            atual = linha[9:].strip()
+        elif linha.strip() == f"branch refs/heads/agent/{nome}" and atual and Path(atual).resolve() != Path(root).resolve():
+            if any(Path(atual).glob(f"**/sp/Done/{slug}*.md")):
+                return atual
+    return None
+
+
 def _ler_sp(sp):
     """Texto do SP onde estiver agora: o `sp-move` pode tê-lo mudado de pasta depois do `load`."""
     for pasta in (sp.path.parent, *(sp.path.parent.parent / n for n in ("Doing", "Done", "TODO"))):
@@ -39,6 +57,13 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
     estado = ler(estado_path)
     items = load(root, estado.get("projeto"))
     so = descendentes(items, estado["programa"]) if estado.get("programa") else None
+    for fechada in ([slug] if slug else list(estado["sessoes"])):
+        sp = next((s for s, _ in items if s.slug == fechada), None)
+        if fechada in estado["sessoes"] and (sp is None or sp.status != "Done"):
+            wt = _done_so_na_worktree(root, fechada, run)
+            if wt:
+                raise IntegracaoPendente(f"{fechada} está em Done só na worktree ({wt}), não em master; "
+                                         f"integrar com `python -I scripts/sb-worktree.py merge {fechada}` e repetir `--seguinte`")
     for fechada in ([slug] if slug else list(estado["sessoes"])):
         if fechada not in estado["sessoes"]:
             continue

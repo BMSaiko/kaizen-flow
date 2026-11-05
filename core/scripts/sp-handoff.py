@@ -32,7 +32,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 from handoff_pane import (ENTER_GAP, NO_WINDOW, SEND_DELAY, SEND_GAP, HandoffError, _argvs, _copy, check_prompt,  # noqa: E402,F401
-                          detect_backend, enter_argv, launch_detached, pane_exists, pane_id, prompt_has_text, run_hidden,
+                          detect_backend, enter_argv, launch_detached, pane_exists, pane_id, prompt_has_text, read_screen, run_hidden,
                           send_argv, send_lines, tmux_enter_argv, tmux_send_argv)
 from handoff_spawn import MAX_SPAWN, spawn  # noqa: E402,F401
 from sp_progresso import (MAX_BODY_LINES, SP_SECTION_RE, _agent_claims, check_delta, require_doing, resolve,  # noqa: E402,F401
@@ -68,9 +68,11 @@ def deliver_clipboard(harness, sp_path, copy=None):
 
 
 def send(sp_path, pane, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=run_hidden, sleep=time.sleep,
-         inspect=None, backend="wezterm", harness="claude"):
+         inspect=None, backend="wezterm", harness="claude", confirm=False):
     text_argv, key_argv = _argvs(backend, pane)
-    send_lines(resume_commands(harness, sp_path), pane, text_argv, key_argv, delay, gap, enter_gap, run, sleep, inspect)
+    screen = (lambda p: read_screen(backend, p, run)) if confirm else None
+    send_lines(resume_commands(harness, sp_path), pane, text_argv, key_argv, delay, gap, enter_gap, run, sleep, inspect,
+               screen=screen)
 
 
 def launch(sp_path, pane=None, backend=None, harness="claude"):
@@ -134,7 +136,7 @@ def main(argv=None):
         elif args.send:
             backend = args.backend or "wezterm"
             send(args.send, args.pane or pane_id(), backend=backend, harness=args.harness,
-                 inspect=check_prompt if backend == "wezterm" else None)
+                 inspect=check_prompt if backend == "wezterm" else None, confirm=True)
         elif args.dry_run:
             backend, found = (args.backend, None) if args.backend else detect_backend()
             pane = args.pane or found

@@ -88,8 +88,10 @@ def continuation_prompt(path):
 
 
 def send(text, pane, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=pane_lib.run_hidden, sleep=time.sleep,
-         inspect=None):
-    pane_lib.send_lines(["/clear", text], pane, pane_lib.send_argv, pane_lib.enter_argv, delay, gap, enter_gap, run, sleep, inspect)
+         inspect=None, confirm=False):
+    screen = (lambda p: pane_lib.read_screen("wezterm", p, run)) if confirm else None
+    pane_lib.send_lines(["/clear", text], pane, pane_lib.send_argv, pane_lib.enter_argv, delay, gap, enter_gap, run, sleep, inspect,
+                        screen=screen)
 
 
 def launch(path, pane=None):
@@ -123,7 +125,7 @@ def main(argv=None):
         elif args.consume:
             consume(args.consume)
         elif args.send:
-            send(continuation_prompt(args.send), args.pane or pane_lib.pane_id(), inspect=pane_lib.check_prompt)
+            send(continuation_prompt(args.send), args.pane or pane_lib.pane_id(), inspect=pane_lib.check_prompt, confirm=True)
         else:
             if args.auto:
                 _check(args.launch)
