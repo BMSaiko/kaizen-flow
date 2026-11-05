@@ -9,6 +9,22 @@ Thanks for helping. The rules are short:
 - Keep adapters pure: `Adapter.render(core, target)` returns files, it does not write them.
 - Commit messages: conventional (`feat`, `fix`, `docs`, `chore`), subject up to 72 characters.
 
+## Setup
+
+```
+git clone https://github.com/BMSaiko/kaizen-flow.git
+cd kaizen-flow
+python -m pip install pytest
+npm test
+node bin/kaizen.js audit .
+```
+
+Requires Node 18+ and Python 3. Use a branch per change (`feat/<slug>`, `fix/<slug>`) and open the PR against `main`; the PR template asks for done, decisions, not done and proof.
+
+## Workflow (SP and michi)
+
+Larger changes follow the kaizen flow this project ships: write the story as an SP (see `docs/commands.md`), then run it through the michi phases (research, plan, act, gates, review, PR). Small fixes do not need an SP. By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md); report vulnerabilities as described in [SECURITY.md](SECURITY.md).
+
 ## Where `core/` comes from
 
 `core/` (skills, commands, scripts) is generated: the maintainer edits the source files in a private vault and runs `kaizen sync` (source folder from `KAIZEN_SOURCE`). Do not edit `core/` by hand; the next `sync` overwrites it, and `sync` fails with a clear message when the source folder does not exist (contributors without the vault do not need it).

@@ -1,0 +1,32 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Expected versus actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Commands run and their output. Do not paste secrets or transcripts.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: kaizen-flow version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: OS, Node and Python versions
+      placeholder: "Windows 11, Node 22, Python 3.12"
+    validations:
+      required: true
