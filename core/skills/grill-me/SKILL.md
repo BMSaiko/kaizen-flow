@@ -48,7 +48,7 @@ Antes de perguntar, resolver com `Read`/`Grep`/`Glob`/`Bash`/`WebSearch` o que o
 
 ## 4. Paragem: «alinhado»
 
-Parar quando a fronteira está vazia **e** estão fechados os cinco pontos: **quê** (resultado), **porquê** (motivo), **forma** (abordagem), **limites** (âmbito, fora de âmbito, invariantes) e **prova** (como se verifica). Sinal do user («ok», «basta», «go») também pára, mas o que ficou aberto vai para `Assunções`. Nada assumido em silêncio; não agir antes de o user confirmar.
+Parar quando a fronteira está vazia **e** estão fechados os cinco pontos: **quê** (resultado), **porquê** (motivo), **forma** (abordagem), **limites** (âmbito, fora de âmbito, invariantes) e **prova** (como se verifica). Sexto ponto, **Definition of Ready**: um **gate executável** (comando que prova o resultado). Faltando algum dos seis, o SP não passa ao DP: listar o que falta e voltar à ronda. Incerteza técnica de viabilidade: marcar `spike: incerto` no SP (fase 2b, `michi/references/michi-spike.md`). Sinal do user («ok», «basta», «go») ou `skip grill` também pára, mas o que ficou aberto vai para `Assunções` em vez de bloquear. Nada assumido em silêncio; não agir antes de o user confirmar.
 
 ## 5. Saída: decisões
 

@@ -70,6 +70,8 @@ def estado(ref, root=None, project=None, git_lines=None):
         f"critérios: {feitos}/{len(crit)} · gates: {len(sp_gates.parse_gates(text))}",
         f"passos ({len(passos)}): " + " | ".join(s.rstrip(".") for s in passos[:6]),
     ]
+    if str(fm.get("spike", "")).strip() == "incerto":
+        out.append(f"spike: incerto · max_requests {fm.get('max_requests', 15)} · fase 2b antes do DP")
     if filhos:
         out.append(f"filhos: {len(filhos)} filhos · perguntar concorrência (com/sem; defeito sem) antes de arrancar a fila")
     if prog:

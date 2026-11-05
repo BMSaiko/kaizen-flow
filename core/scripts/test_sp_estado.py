@@ -92,3 +92,17 @@ def test_aceita_nome_do_ficheiro_com_data(tmp_path):
         out = sp_estado.estado(ref, root=tmp_path, git_lines=["master"])
         assert out.startswith("alvo · Doing")
     assert "não encontrado" in sp_estado.estado("outro-2026-10-26", root=tmp_path, git_lines=["master"])
+
+
+def test_spike_incerto_mostra_timebox(tmp_path):
+    f = make(tmp_path, "Doing", "alvo")
+    f.write_text(f.read_text(encoding="utf-8").replace("modo: manual\n", "modo: manual\nspike: incerto\n"), encoding="utf-8")
+    out = sp_estado.estado("alvo", root=tmp_path, git_lines=["master"])
+    assert "spike: incerto · max_requests 15" in out
+    f.write_text(f.read_text(encoding="utf-8").replace("spike: incerto\n", "spike: incerto\nmax_requests: 8\n"), encoding="utf-8")
+    assert "max_requests 8" in sp_estado.estado("alvo", root=tmp_path, git_lines=["master"])
+
+
+def test_sem_spike_nao_mostra_linha(tmp_path):
+    make(tmp_path, "Doing", "alvo")
+    assert "spike" not in sp_estado.estado("alvo", root=tmp_path, git_lines=["master"])

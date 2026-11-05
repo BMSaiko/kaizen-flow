@@ -24,6 +24,7 @@ Research Brief em `knowledge/projects/<projeto>/research/` não vazio, com baixa
    - 2-7 fases (3-7 em DP completo), cada uma um ciclo TDD (Seams → Red → Green → tautologia).
    - Cada fase tem **Done when** (observável), **Gate** (comando copiável para `gates:` do SP) e **Risco** (com mitigação e gatilho).
    - Tabela de auditoria `phase | existe hoje | muda depois | redundant?`; `redundant=yes` sai do plano.
+   - SP de código (Scope fora de `knowledge/`): a fase 1 é o **walking skeleton**, o fluxo mais fino ponta a ponta; vault/docs dispensados. `plan-validate.py` avisa (rc inalterado).
    - Sem código no corpo; `Out of Scope` explícito.
 3. **Quality Gate (3 min).** `python -I scripts/plan-validate.py <plano>` tem de dar rc 0; depois rever Brief referenciado, assunções críticas ⚠️, rollback, Open Questions. Falha: corrigir antes de apresentar.
 4. **Apresentar (≤2 rondas).** ≤5 bullets: objetivo, fases, riscos, fora de âmbito, estimativa. Ronda 3 = abortar e escalar («Plan rejected after 2 iterations»).
