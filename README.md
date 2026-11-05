@@ -8,7 +8,12 @@
 
 # kaizen-flow
 
-[![npm](https://img.shields.io/npm/v/kaizen-flow)](https://www.npmjs.com/package/kaizen-flow)
+<p align="center">
+  <a href="https://github.com/BMSaiko/kaizen-flow/actions/workflows/ci.yml"><img src="https://github.com/BMSaiko/kaizen-flow/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D18-339933.svg" alt="Node >= 18">
+  <a href="https://www.npmjs.com/package/kaizen-flow"><img src="https://img.shields.io/npm/v/kaizen-flow.svg" alt="npm version"></a>
+</p>
 
 ```bash
 npx kaizen-flow --help      # or: npm i -g kaizen-flow && kaizen --help
@@ -22,6 +27,31 @@ A small workflow for working with coding agents:
 - **Usage analysis**: tokens and API-equivalent cost per day, session, model and 5 h window, from your local transcripts (metrics only, never conversation content).
 
 Works with **Claude Code** and **Codex CLI** (plus any harness that reads `AGENTS.md`). Node stdlib and Python stdlib only; no telemetry.
+
+## Quickstart
+
+Requirements: Node >= 18, Python 3.
+
+```sh
+git clone https://github.com/BMSaiko/kaizen-flow && cd kaizen-flow && npm link
+cd your-project
+kaizen init --harness codex                                             # or: claude | agents-md
+python scripts/sp-new.py --project _default --slug login --priority P2   # write a story
+kaizen usage --days 30                                                  # what it cost
+```
+
+More detail in [Install](#install) and the [documentation](#documentation).
+
+## Contents
+
+- [Quickstart](#quickstart)
+- [How it works](#how-it-works)
+- [Why it uses fewer tokens and ships more](#why-it-uses-fewer-tokens-and-ships-more)
+- [Install](#install)
+- [Using it with Codex](#using-it-with-codex-codex-sets-up-the-codex-specific-parts)
+- [Documentation](#documentation)
+- [Known limits](#known-limits)
+- [Contributing and license](#contributing-and-license)
 
 ## How it works
 
@@ -113,14 +143,6 @@ If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the blo
 | [Privacy audit](docs/privacy-audit.md) | what `kaizen audit` scans for |
 | [Error log](docs/error-log.md) | `kf_errlog`: JSONL log of script failures, location, fields, secret filtering |
 
-Quickstart:
-
-```sh
-kaizen init --harness codex
-python scripts/sp-new.py --project _default --slug login --priority P2   # write a story
-kaizen usage --days 30                                                  # what it cost
-```
-
 ## Known limits
 
 - The Codex transcript parser follows the rollout format (`event_msg` / `token_count`, `last_token_usage`) and is tested with synthetic fixtures; if your Codex version logs usage differently, open an issue with an anonymised sample.
@@ -128,6 +150,6 @@ kaizen usage --days 30                                                  # what i
 - Cursor, Gemini CLI, opencode and similar are supported only through the `agents-md` fallback.
 - The `new conversation` command used by the Codex handoff (`/new`) is an assumption to verify on your version.
 
-## License
+## Contributing and license
 
-MIT. See [LICENSE](LICENSE) and [CONTRIBUTING](CONTRIBUTING.md).
+Contributions are welcome: read [CONTRIBUTING](CONTRIBUTING.md) first (tests with `npm test`, `kaizen audit` clean, conventional commits). Released under the MIT license, see [LICENSE](LICENSE).
