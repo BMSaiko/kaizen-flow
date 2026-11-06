@@ -17,6 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import sp_indice  # noqa: E402
 
 REL = Path("knowledge/infra/reports/sp-metricas.md")
 HEADER = (
@@ -49,7 +50,7 @@ def _parse(value):
 
 def linha(sp_path, custos, project=None, now=None):
     text = Path(sp_path).read_text(encoding="utf-8")
-    fm = kaizen_engine.parse_frontmatter(text)
+    fm = sp_indice.frontmatter(sp_path)
     slug = fm.get("slug") or re.sub(r"-\d{4}-\d{2}-\d{2}$", "", Path(sp_path).stem)
     fim = _parse(fm.get("updated")) or now or datetime.now(timezone.utc)
     ini = _parse(str(fm.get("created", "")))

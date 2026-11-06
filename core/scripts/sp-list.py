@@ -34,6 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import sp_indice  # noqa: E402
 
 _kc = kaizen_engine.load("kaizen_config")
 REPO = Path(__file__).resolve().parent.parent
@@ -80,14 +81,14 @@ def parse_date(value):
 def collect(root, include_done=False):
     folders = FOLDERS if include_done else FOLDERS[:2]
     sps = []
-    for path in sorted(Path(root).rglob("*.md")):
+    for path in sp_indice.listar(root):
         parts = path.relative_to(root).parts
         if "arquivo" in parts or len(parts) < 3 or parts[-3] != "sp" or parts[-2] not in folders:
             continue
         if path.name == "MOC.md":
             continue
         try:
-            fm = parse_frontmatter(path.read_text(encoding="utf-8"))
+            fm = sp_indice.frontmatter(path)
         except (OSError, UnicodeDecodeError) as exc:
             print(f"aviso: {path.name} ignorado ({exc.__class__.__name__})", file=sys.stderr)
             continue

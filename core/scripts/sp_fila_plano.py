@@ -6,6 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import sp_indice  # noqa: E402
 from sp_fila_estado import REQ_POR_SP, USER, run_hidden
 
 sp_list = kaizen_engine.load("sp-list")
@@ -17,7 +18,7 @@ def load(root, project=None):
     for sp in sp_list.collect(root, include_done=True):
         if project and sp.project != project:
             continue
-        fm = sp_list.parse_frontmatter(sp.path.read_text(encoding="utf-8"))
+        fm = sp_indice.frontmatter(sp.path)
         items.append((sp, fm))
     return items
 
