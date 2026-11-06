@@ -997,6 +997,41 @@ def test_vigia_destacado_nao_arma_segunda_vigia(tmp_path, capsys, monkeypatch):
     assert chamadas == [] and "vigia já ativo (pid 77)" in capsys.readouterr().out
 
 
+class _Proc:
+    def __init__(self, pid):
+        self.pid = pid
+
+
+def test_garantir_vigia_ausente_arma():
+    armadas = []
+    res = sp_fila.garantir_vigia({"sessoes": {"a": {}}}, lambda: armadas.append(1) or _Proc(5), AGORA)
+    assert res == ("armada", 5) and armadas == [1]
+
+
+def test_garantir_vigia_parada_rearma():
+    velha = {"sessoes": {"a": {}}, "vigia": {"pid": 9, "ts": (AGORA - timedelta(minutes=10)).isoformat(timespec="seconds")}}
+    assert sp_fila.garantir_vigia(velha, lambda: _Proc(6), AGORA) == ("armada", 6)
+
+
+def test_garantir_vigia_viva_nao_arma():
+    nova = {"sessoes": {"a": {}}, "vigia": {"pid": 9, "ts": AGORA.isoformat(timespec="seconds")}}
+    armadas = []
+    assert sp_fila.garantir_vigia(nova, lambda: armadas.append(1) or _Proc(1), AGORA) == ("viva", 9)
+    assert armadas == []
+
+
+def test_armar_vigia_do_handoff_chama_sp_fila_destacado(capsys):
+    handoff = __import__("importlib").util.spec_from_file_location("sp_handoff_t", Path(__file__).parent / "sp-handoff.py")
+    mod = __import__("importlib").util.module_from_spec(handoff)
+    handoff.loader.exec_module(mod)
+    chamadas = []
+
+    class R:
+        returncode, stdout, stderr = 0, "vigia destacado (pid 3)\n", ""
+    assert mod.armar_vigia(run=lambda argv, **kw: chamadas.append(argv) or R()) == 0
+    assert chamadas[0][-2:] == ["--vigiar", "--destacado"] and "vigia destacado (pid 3)" in capsys.readouterr().out
+
+
 def test_ajuda_descreve_arranque_automatico_e_monitor_unico(capsys):
     sp_fila.main(["--ajuda"])
     out = capsys.readouterr().out

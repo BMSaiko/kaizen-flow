@@ -42,7 +42,7 @@ from sp_fila_execucao import (_cwd_neutro, _custos, _custos_seguros, _ler_sp, _p
                               lancar_seguinte_auto, seguinte, IntegracaoPendente)
 from sp_fila_paralelo import (ARRANQUE_S, BATIDA_MAX_S, INATIVIDADE_S, PERGUNTAS, REAVISO_S, TURNO_ACABADO, VIGIA_LOG, VIVO,  # noqa: E402,F401
                               _AVISO, _atividade, _chave, _norm_caminho, _resumo_pedido, aviso_vigia, batida_vigia, classificar,
-                              contar_tails, estado_vivo, fechar_painel_sessao, linha, vigiar)
+                              contar_tails, estado_vivo, fechar_painel_sessao, garantir_vigia, linha, vigiar)
 
 def destacar(args, log, popen=subprocess.Popen):
     """Arranca `sp-fila.py <args>` num processo próprio (fora do prazo do Monitor), com a saída em `log`."""
@@ -99,14 +99,13 @@ def main(argv=None):
         if not estado.exists():
             print("erro: sem fila em curso", file=sys.stderr)
             return 1
-        vivo = ler(estado).get("vigia")
-        if vivo and not aviso_vigia({"sessoes": {"x": {}}, "vigia": vivo}, datetime.now()):
-            print(f"vigia já ativo (pid {vivo['pid']}); log: {VIGIA_LOG}")
-            return 0
         extra = [a for flag, val in (("--intervalo", args.intervalo), ("--inatividade", args.inatividade), ("--estado", args.estado), ("--root", args.root)) for a in (flag, str(val))]
         extra += (["--projeto", args.projeto] if args.projeto else []) + (["--ate", args.ate] if args.ate else [])
-        proc = destacar(["--vigiar", *extra], VIGIA_LOG)
-        print(f"vigia destacado (pid {proc.pid}); acompanhar com o Monitor: `tail -F {VIGIA_LOG}` (re-armar o tail aos 30 min); sem a fila a correr, sai sozinho")
+        res, pid = garantir_vigia(ler(estado), lambda: destacar(["--vigiar", *extra], VIGIA_LOG), datetime.now())
+        if res == "viva":
+            print(f"vigia já ativo (pid {pid}); log: {VIGIA_LOG}")
+        else:
+            print(f"vigia destacado (pid {pid}); acompanhar com o Monitor: `tail -F {VIGIA_LOG}` (re-armar o tail aos 30 min); sem a fila a correr, sai sozinho")
         return 0
     if args.vigiar:
         def lido():
@@ -184,7 +183,8 @@ def main(argv=None):
     elif out["acao"] == "lancou":
         print(f"lançado · {', '.join(out['slugs'])} · terminar o turno")
         if ler(estado).get("concorrencia"):
-            print("VIGIAR · `sp-fila.py --vigiar --destacado` + um só Monitor `tail -F` ao log · regras: `sp-fila.py --ajuda`")
+            main(["--vigiar", "--destacado", "--estado", args.estado, "--root", args.root])
+            print(f"VIGIAR · um só Monitor `tail -F {VIGIA_LOG}` · regras: `sp-fila.py --ajuda`")
     else:
         print(f"fila terminada: {out['motivo']}\nrelatório: {out['relatorio']}")
     return 0

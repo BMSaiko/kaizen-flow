@@ -139,8 +139,15 @@ def aviso_vigia(estado, agora):
     return None
 
 
+def garantir_vigia(estado, armar, agora):
+    """Idempotente: ('viva', pid) se a vigia bate a tempo; senão arma uma (`armar()` devolve o processo) e dá ('armada', pid)."""
+    vivo = estado.get("vigia")
+    if vivo and not aviso_vigia({"sessoes": {"x": {}}, "vigia": vivo}, agora):
+        return "viva", vivo["pid"]
+    return "armada", armar().pid
 
-_AVISO = {"a arrancar": "arrancou", "a correr": "a correr", "fechado": "terminou", "morto": "morreu", "parada sem fechar": "PARADA SEM FECHAR"}
+
+_AVISO ={"a arrancar": "arrancou", "a correr": "a correr", "fechado": "terminou", "morto": "morreu", "parada sem fechar": "PARADA SEM FECHAR"}
 
 
 def linha(slug, estado, acao=""):
