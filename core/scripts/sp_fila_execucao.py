@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
 from sp_fila_estado import REQ_POR_SP, SCRIPTS, bloqueio, guardar, ler, run_hidden
 from sp_fila_plano import descendentes, falhas, limite, load, plan, sem_commit
@@ -27,7 +28,7 @@ class IntegracaoPendente(RuntimeError):
 def _done_so_na_worktree(root, slug, run):
     """Caminho da worktree `agent/<nome>` do SP se aí o SP está em Done; None se não houver worktree ou o SP não estiver em Done lá."""
     nome = re.sub(r"[^a-z0-9-]+", "-", slug.lower()).strip("-")[:31].rstrip("-")  # igual a sb-worktree.name_of (o pacote kf não o inclui)
-    r = run(["git", "-C", str(root), "worktree", "list", "--porcelain"], capture_output=True, text=True, encoding="utf-8")
+    r = kf_git.run(root, "worktree", "list", "--porcelain", run=run)
     atual = None
     for linha in (r.stdout or "").splitlines():
         if linha.startswith("worktree "):
@@ -49,7 +50,7 @@ def _ler_sp(sp):
 
 def _cwd_neutro(root):
     """Checkout principal (master): `sp-move doing` aí não reclama o SP para o agente do worktree que orquestra; quem reclama é o `sb-worktree ensure` do spawn."""
-    r = run_hidden(["git", "-C", str(root), "rev-parse", "--path-format=absolute", "--git-common-dir"], capture_output=True, text=True)
+    r = kf_git.run(root, "rev-parse", "--path-format=absolute", "--git-common-dir", run=run_hidden)
     return Path(r.stdout.strip()).parent if r.returncode == 0 and r.stdout.strip() else None
 
 

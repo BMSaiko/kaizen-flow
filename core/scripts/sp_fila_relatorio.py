@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
 from sp_fila_estado import REPO
 
@@ -22,8 +23,7 @@ def render_gastos(estado, custos):
 
 
 def commits_desde(inicio, run):
-    out = run(["git", "-C", str(REPO), "log", f"--since={inicio}", "--format=%h %s"], capture_output=True,
-              text=True, encoding="utf-8").stdout or ""
+    out = kf_git.run(REPO, "log", f"--since={inicio}", "--format=%h %s", run=run).stdout or ""
     return [ln for ln in out.splitlines() if ln.strip()]
 
 

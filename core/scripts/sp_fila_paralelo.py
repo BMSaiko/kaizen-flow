@@ -10,6 +10,7 @@ from urllib.parse import unquote
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kf_git  # noqa: E402
 from sp_fila_estado import USER, atualizar, ler
 
 
@@ -72,7 +73,7 @@ def _atividade(sessao, run, inicio_fila=None):
     ult = datetime.fromisoformat(sessao.get("inicio") or inicio_fila or "1970-01-01T00:00:00").replace(tzinfo=None)
     if sessao.get("worktree"):
         try:
-            r = run(["git", "-C", sessao["worktree"], "log", "-1", "--format=%ct"], capture_output=True, text=True, encoding="utf-8")
+            r = kf_git.run(sessao["worktree"], "log", "-1", "--format=%ct", run=run)
             ult = max(ult, datetime.fromtimestamp(int(r.stdout.strip())))
         except (OSError, ValueError, subprocess.SubprocessError):
             pass

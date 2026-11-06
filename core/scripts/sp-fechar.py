@@ -19,6 +19,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
 import kf_ligados  # noqa: E402
 import wt_redirect  # noqa: E402
@@ -159,7 +160,7 @@ def write_commit(cwd, slug, subject, paths):
 def worktree_hint(cwd, slug):
     """Se `cwd` é uma worktree (não o checkout principal), o passo que falta depois do commit."""
     def git(*a):
-        r = subprocess.run(["git", "-C", str(cwd), *a], capture_output=True, text=True, encoding="utf-8")
+        r = kf_git.run(cwd, *a, run=subprocess.run)
         return r.stdout.strip() if r.returncode == 0 else None
     gd, common = git("rev-parse", "--path-format=absolute", "--git-dir"), git("rev-parse", "--path-format=absolute", "--git-common-dir")
     if not gd or not common or gd == common:

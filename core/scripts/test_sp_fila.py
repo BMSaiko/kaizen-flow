@@ -721,7 +721,9 @@ def test_sem_commit_so_marca_sps_fora_do_head(tmp_path):
                 stderr = ""
             return R()
         return run
-    assert sp_fila.sem_commit(items, git(lambda a: a[-1] if a[-1].startswith("a") else "")) == {"b"}
+    chamadas = []
+    assert sp_fila.sem_commit(items, git(lambda a: chamadas.append(a) or "a.md\n")) == {"b"}
+    assert len(chamadas) == 1  # uma chamada por diretório, não por SP
     assert sp_fila.sem_commit(items, git(lambda a: "", rc=128)) == set()
 
 

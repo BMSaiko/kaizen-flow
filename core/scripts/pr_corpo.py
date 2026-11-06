@@ -15,6 +15,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kf_git  # noqa: E402
+
 RAIZ = Path(__file__).resolve().parent.parent
 TEMPLATE = next((p for p in (RAIZ / ".claude" / "skills" / "pr-fase" / "PR_TEMPLATE.md", RAIZ / "skills" / "pr-fase" / "PR_TEMPLATE.md") if p.exists()), None)
 TEMPLATE_FALLBACK = "## O que foi feito\n{feito}\n\n## Decisões tomadas\n{decisoes}\n\n## O que ficou por fazer\n{por_fazer}\n\n## Prova\n{prova}\n"
@@ -52,7 +55,7 @@ def provas_e_gates(sp_texto):
 
 def detetar_base(repo):
     """(base, candidatos): ramos remotos main/master/dev; base só se houver exatamente um."""
-    r = subprocess.run(["git", "branch", "-r"], cwd=repo, text=True, capture_output=True)
+    r = kf_git.run(repo, "branch", "-r", run=subprocess.run)
     nomes = {l.strip().split("/", 1)[1] for l in r.stdout.splitlines() if "/" in l and "->" not in l}
     cand = [b for b in ("main", "master", "dev") if b in nomes]
     return (cand[0] if len(cand) == 1 else None), cand
