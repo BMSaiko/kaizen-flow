@@ -163,6 +163,7 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
     path = root / project / "sp" / "TODO" / f"{slug}-{today.isoformat()}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(head + body), encoding="utf-8")
+    sp_list.sp_indice.invalidar()  # mtime de pasta é grosseiro no Windows: sem isto o slug novo fica fora da cache
     return path
 
 

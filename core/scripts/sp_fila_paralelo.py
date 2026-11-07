@@ -118,9 +118,30 @@ BATIDA_MAX_S = 180  # heartbeat mais velho que isto = vigia parado (ciclo medido
 
 
 def batida_vigia(estado_path, agora=datetime.now):
-    """Regista `vigia = {pid, ts}` no estado; não faz nada se a fila já acabou."""
+    """Regista `vigia = {pid, ts, incidentes}` no estado; não faz nada se a fila já acabou.
+
+    Preserva os incidentes e junta «vigia parou N min» quando a batida anterior é mais velha que `BATIDA_MAX_S`."""
     def fn(e):
-        e["vigia"] = {"pid": os.getpid(), "ts": agora().isoformat(timespec="seconds")}
+        antes, agora_ = e.get("vigia") or {}, agora()
+        incidentes = list(antes.get("incidentes", []))
+        if antes.get("ts"):
+            idade = (agora_ - datetime.fromisoformat(antes["ts"])).total_seconds()
+            if idade > BATIDA_MAX_S and e.get("sessoes"):
+                incidentes.append(f"vigia parou {int(idade // 60)} min")
+        e["vigia"] = {"pid": os.getpid(), "ts": agora_.isoformat(timespec="seconds"), "incidentes": incidentes}
+    try:
+        atualizar(estado_path, fn)
+    except (OSError, ValueError):
+        pass
+
+
+def registar_incidente(estado_path, texto):
+    """Acrescenta `texto` a `estado["vigia"]["incidentes"]` (sem duplicar); alimenta a secção `## Vigia` do relatório."""
+    def fn(e):
+        vigia = e.setdefault("vigia", {})
+        incidentes = vigia.setdefault("incidentes", [])
+        if texto not in incidentes:
+            incidentes.append(texto)
     try:
         atualizar(estado_path, fn)
     except (OSError, ValueError):
@@ -194,7 +215,7 @@ def _chave(est, motivo):
     return (est, re.sub(r"\d+", "N", motivo) if motivo.startswith("inativa há") else motivo)
 
 
-def vigiar(ler_estado, intervalo_s, espera, saida, passou_o_fim=lambda: False, batida=lambda: None, fechar_painel=lambda slug: None, relogio=time.monotonic, lancar_seguinte=lambda slug: (False, "")):
+def vigiar(ler_estado, intervalo_s, espera, saida, passou_o_fim=lambda: False, batida=lambda: None, fechar_painel=lambda slug: None, relogio=time.monotonic, lancar_seguinte=lambda slug: (False, ""), incidente=lambda texto: None):
     """Repete `ler_estado()` ([(slug, estado, motivo)] ou None se a fila acabou) e emite só as mudanças por sessão.
 
     «bloqueado» por inatividade (ou outro igual) só se repete a cada `REAVISO_S`; qualquer outra transição emite logo.
@@ -218,6 +239,8 @@ def vigiar(ler_estado, intervalo_s, espera, saida, passou_o_fim=lambda: False, b
             repetido = ultimo.get(slug) == chave
             ultimo[slug], quando[slug] = chave, agora
             razao = ""
+            if est in ("morto", "parada sem fechar"):
+                incidente(f"{slug}: {'morto' if est == 'morto' else 'PARADA SEM FECHAR'}")
             if est == "fechado":
                 fechar_painel(slug)
                 lancou, razao = lancar_seguinte(slug)

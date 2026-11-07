@@ -42,7 +42,7 @@ from sp_fila_execucao import (_cwd_neutro, _custos, _custos_seguros, _ler_sp, _p
                               lancar_seguinte_auto, seguinte, IntegracaoPendente)
 from sp_fila_paralelo import (ARRANQUE_S, BATIDA_MAX_S, INATIVIDADE_S, PERGUNTAS, REAVISO_S, TURNO_ACABADO, VIGIA_LOG, VIVO,  # noqa: E402,F401
                               _AVISO, _atividade, _chave, _norm_caminho, _resumo_pedido, aviso_vigia, batida_vigia, classificar,
-                              contar_tails, estado_vivo, fechar_painel_sessao, garantir_vigia, linha, parar_vigia, vigiar)
+                              contar_tails, estado_vivo, fechar_painel_sessao, garantir_vigia, linha, parar_vigia, registar_incidente, vigiar)
 
 def destacar(args, log, popen=subprocess.Popen):
     """Arranca `sp-fila.py <args>` num processo próprio (fora do prazo do Monitor), com a saída em `log`."""
@@ -119,7 +119,8 @@ def main(argv=None):
             fim = datetime.now().replace(hour=h, minute=m, second=0, microsecond=0)
         return vigiar(lido, args.intervalo, time.sleep, lambda m: print(m, flush=True), lambda: fim is not None and datetime.now() >= fim,
                       lambda: batida_vigia(estado), lambda slug: fechar_painel_sessao(estado, slug, run_hidden),
-                      lancar_seguinte=lambda slug: lancar_seguinte_auto(args.root, estado, Path(args.relatorios), slug))
+                      lancar_seguinte=lambda slug: lancar_seguinte_auto(args.root, estado, Path(args.relatorios), slug),
+                      incidente=lambda texto: registar_incidente(estado, texto))
     if args.estado_vivo:
         if not estado.exists():
             print("erro: sem fila em curso", file=sys.stderr)
