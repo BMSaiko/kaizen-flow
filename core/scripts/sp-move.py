@@ -133,14 +133,21 @@ def advance(root, slug, project=None):
     child = next(sp for sp in sps if sp.slug == slug and (not project or sp.project == project))
     if not child.parent:
         return "\n".join(out)
-    ready, line = sp_handoff.sync_program_ready(root, child.path)
+    try:
+        ready, line = sp_handoff.sync_program_ready(root, child.path)
+    except sp_handoff.HandoffError as exc:  # o filho já está em Done: avisar em vez de rebentar
+        out.append(f"aviso: {exc}")
+        return "\n".join(out)
     doing = [sp for sp in sps if sp.project == child.project and sp.parent == child.parent and sp.status == "Doing"]
     if ready and doing:
         out.append(f"próximo elegível: {ready.slug}, não aberto: {doing[0].slug} já está em Doing")
     elif ready:
         out.append(move(root, ready.slug, "doing", child.project))
         opened = _find(root, ready.slug, child.project)
-        sp_handoff.sync_program_ready(root, opened.path)
+        try:
+            sp_handoff.sync_program_ready(root, opened.path)
+        except sp_handoff.HandoffError as exc:
+            out.append(f"aviso: {exc}")
         out.append(f"/michi {opened.path}")
     else:
         out.append(line)
@@ -163,7 +170,10 @@ def start(root, slug, project=None):
     out = [move(root, sp.slug, "doing", sp.project) for sp in reversed(chain) if sp.status == "TODO" or sp is kid]
     if kid.parent:
         opened = _find(root, slug, kid.project)
-        sp_handoff.sync_program_ready(root, opened.path)
+        try:
+            sp_handoff.sync_program_ready(root, opened.path)
+        except sp_handoff.HandoffError as exc:  # o SP já foi movido: avisar em vez de rebentar
+            out.append(f"aviso: {exc}")
     return "\n".join(out)
 
 

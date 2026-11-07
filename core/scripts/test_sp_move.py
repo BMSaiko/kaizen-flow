@@ -320,3 +320,20 @@ def test_main_start_via_cli(tmp_path):
     make_child(tmp_path, "TODO", "a")
     assert sp_move.main(["--root", str(tmp_path), "a", "--start"]) == 0
     assert (tmp_path / "atlas/sp/Doing/mae.md").exists()
+
+
+def test_start_com_mae_em_falta_avisa_sem_traceback(tmp_path, capsys):
+    make_child(tmp_path, "TODO", "a", parent="fantasma")
+    rc = sp_move.main(["a", "--start", "--project", "atlas", "--root", str(tmp_path)])
+    cap = capsys.readouterr()
+    assert rc == 0
+    assert (tmp_path / "atlas/sp/Doing/a.md").exists()
+    assert "aviso:" in cap.out and "fantasma" in cap.out
+
+
+def test_next_com_mae_em_falta_nao_move_nada(tmp_path, capsys):
+    make_child(tmp_path, "Doing", "a", parent="fantasma")
+    rc = sp_move.main(["a", "done", "--next", "--root", str(tmp_path)])
+    assert rc == 1
+    assert (tmp_path / "atlas/sp/Doing/a.md").exists()
+    assert "fantasma" in capsys.readouterr().err
