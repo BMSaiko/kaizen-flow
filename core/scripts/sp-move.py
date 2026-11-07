@@ -99,6 +99,11 @@ def move(root, slug, dest, project=None):
     kaizen_engine.relocate(sp.path, dst)
     dst.write_bytes(new_raw)
     n = _move_proofs(sp, dst)
+    if sp.parent:  # o `state` do filho na mãe acompanha todo o movimento, não só --start/--next
+        try:
+            sp_handoff.sync_program_ready(root, dst)
+        except Exception:  # mãe em falta ou ilegível: o movimento já está feito, não bloquear
+            pass
     if target == "Done":
         _agent_claim(slug, target)
     extra = f" (+{n} provas)" if n else ""

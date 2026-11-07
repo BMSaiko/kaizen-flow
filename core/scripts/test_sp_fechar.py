@@ -180,6 +180,28 @@ def test_seguinte_ultimo_filho_fecha_mae(tmp_path):
     assert "sb-worktree.py ensure mae" in out and "merge" in out and "checkout principal" in out
 
 
+def test_seguinte_ultimo_filho_nao_com_irmaos_invisiveis(tmp_path):
+    """Regressão: a mãe lista a,b,c mas só a e b existem neste ramo; c (TODO em master) conta como irmão por fechar."""
+    _prog(tmp_path, {"mae": "TODO", "a": "Done", "b": "Done"})
+    mae = next((tmp_path / PROJECT / "sp" / "TODO").glob("mae-*.md"))
+    txt = mae.read_text(encoding="utf-8").replace(
+        "kind: program\n", "kind: program\nchildren:\n  - slug: a\n  - slug: b\n  - slug: c\n")
+    mae.write_text(txt, encoding="utf-8")
+    out = _mod().seguinte(tmp_path, "b", PROJECT)
+    assert not out.startswith("ÚLTIMO FILHO") and "c" in out
+
+
+def test_move_filho_atualiza_state_na_mae(tmp_path):
+    _prog(tmp_path, {"mae": "TODO", "a": "Doing", "b": "TODO"})
+    mae = next((tmp_path / PROJECT / "sp" / "TODO").glob("mae-*.md"))
+    mae.write_text(mae.read_text(encoding="utf-8").replace(
+        "kind: program\n", "kind: program\nchildren:\n  - slug: a\n    state: Doing\n  - slug: b\n    state: TODO\n"),
+        encoding="utf-8")
+    rc, out, err = run("sp-move.py", "--root", str(tmp_path), "--project", PROJECT, "a", "done")
+    assert rc == 0, out + err
+    assert "  - slug: a\n    state: Done\n" in mae.read_text(encoding="utf-8")
+
+
 def test_seguinte_sem_parent_nada(tmp_path):
     _prog(tmp_path, {"mae": "TODO", "a": "Done"})
     assert _mod().seguinte(tmp_path, "mae", PROJECT) == ""

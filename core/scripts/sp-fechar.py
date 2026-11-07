@@ -181,6 +181,16 @@ def em_fila(slug, estado=None):
         return False
 
 
+def filhos_da_mae(sps, kid):
+    """Slugs em `children:` do frontmatter da mãe de `kid` (vazio se a mãe não existe ou não os lista)."""
+    mae = next((s for s in sps if s.slug == kid.parent and s.project == kid.project), None)
+    if not mae:
+        return []
+    texto = mae.path.read_text(encoding="utf-8").replace("\r\n", "\n")
+    fim = texto.find("\n---", 4)
+    return re.findall(r"^\s+- slug:\s*(\S+)", texto[:fim] if fim > 0 else texto, flags=re.M)
+
+
 def seguinte(root, slug, project=None, fila=False):
     """Linha com o passo seguinte de um filho fechado: próximo elegível, fecho da mãe, ou '' (SP sem mãe).
 
@@ -196,6 +206,12 @@ def seguinte(root, slug, project=None, fila=False):
     prontos = [s for s in irmaos if s.status == "TODO" and all(d in feitos for d in s.depends_on)]
     if prontos:
         return f"PRÓXIMO FILHO: {prontos[0].slug} (manual: AskUserQuestion «abrir?»; auto: sp-fechar --next)"
+    # irmãos listados em `children` da mãe mas não vistos (ramo atrás de master): contam como por fechar
+    vistos = {s.slug for s in irmaos} | {slug}
+    invisiveis = [c for c in filhos_da_mae(sps, kid) if c not in vistos]
+    if invisiveis:
+        return (f"SEGUINTE: {kid.parent} lista filhos que este ramo não vê ({', '.join(invisiveis)}); "
+                f"`git merge master` e repetir antes de fechar a mãe")
     if all(s.status == "Done" for s in irmaos):
         return (f"ÚLTIMO FILHO: fechar a mãe {kid.parent} numa worktree, nunca no checkout principal: "
                 f"sb-worktree.py ensure {kid.parent} → sp-move.py {kid.parent} done → commit → sb-worktree.py merge {kid.parent} "
