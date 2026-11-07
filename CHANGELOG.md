@@ -5,6 +5,12 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 
 ## [Unreleased]
 
+### Changed
+- CI: workflow reutilizável `test.yml` (matriz Node x Python 3.10/3.13, cache npm/pip) usado por `ci`, `publish` e `release`.
+
+### Added
+- CI: job `smoke` (`npm pack` + `kaizen init` + `kaizen audit` num diretório temporário) e artefacto de cobertura (JS nativo, Python `pytest-cov`; `KAIZEN_COVERAGE=1 npm test`), sem limiar bloqueante.
+
 ## [0.1.1] - 2026-11-05
 
 ### Added
