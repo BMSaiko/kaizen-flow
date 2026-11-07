@@ -59,6 +59,42 @@ function configDir(dest, key, fallback) {
   return rel.startsWith("..") || path.isAbsolute(rel) ? fallback : v;
 }
 
+// comando de testes do projeto-alvo, só a partir de ficheiros de manifesto (nunca executa nada); sem testes -> null
+function detectTestCmd(dest) {
+  const read = (f) => { try { return fs.readFileSync(path.join(dest, f), "utf8").replace(/^﻿/, ""); } catch (e) { return null; } };
+  const pkg = read("package.json");
+  if (pkg !== null) {
+    try {
+      const t = JSON.parse(pkg).scripts?.test;
+      if (typeof t === "string" && t.trim() && !/no test specified/.test(t)) return "npm test";
+    } catch (e) { /* package.json inválido: ignora */ }
+  }
+  if (read("pytest.ini") !== null) return "pytest";
+  const pyproject = read("pyproject.toml");
+  if (pyproject !== null && /^\s*\[tool\.pytest/m.test(pyproject)) return "pytest";
+  if (read("Cargo.toml") !== null) return "cargo test";
+  if (read("go.mod") !== null) return "go test ./...";
+  return null;
+}
+
+// grava test.cmd em kaizen.config.json: nunca sobrescreve um valor existente nem uma config ilegível
+function writeTestCmd(dest) {
+  const file = path.join(dest, "kaizen.config.json");
+  let cfg = {};
+  if (fs.existsSync(file)) {
+    try { cfg = JSON.parse(fs.readFileSync(file, "utf8").replace(/^﻿/, "")); } catch (e) { return null; }
+    if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) return null;
+  }
+  const cur = cfg.test;
+  if (cur !== undefined && (!cur || typeof cur !== "object" || Array.isArray(cur))) return null;
+  if (typeof cur?.cmd === "string" && cur.cmd.trim()) return null;
+  const cmd = detectTestCmd(dest);
+  if (!cmd) return null;
+  cfg.test = { ...cur, cmd };
+  fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
+  return cmd;
+}
+
 function init(target, harness = "claude") {
   const adapter = ADAPTERS[harness];
   if (!adapter) throw new Error(`harness desconhecido: ${harness} (claude|codex|agents-md)`);
@@ -75,6 +111,8 @@ function init(target, harness = "claude") {
   const docsRel = configDir(dest, "docsRoot", "");
   const docsRoot = docsRel ? path.join(dest, docsRel) : spRoot;
   for (const d of ["sp", "dr", "dp"]) for (const s of ["TODO", "Doing", "Done"]) fs.mkdirSync(path.join(d === "sp" ? spRoot : docsRoot, "_default", d, s), { recursive: true });
+  const testCmd = writeTestCmd(dest);
+  if (testCmd) console.log(`test.cmd detetado: ${testCmd} (editável em kaizen.config.json)`);
   console.log(`init (${harness}): ${n} peças copiadas para ${dest}`);
   return n;
 }

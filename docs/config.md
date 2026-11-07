@@ -1,6 +1,6 @@
 # `kaizen.config.json`
 
-Optional, in the project root. `init` does not create it; without it the defaults below apply.
+Optional, in the project root. Without it the defaults below apply. `init` only writes it to record the detected test command (`test.cmd`); a project with no recognised tests gets no file.
 
 ```json
 {
@@ -9,7 +9,8 @@ Optional, in the project root. `init` does not create it; without it the default
   "reportsDir": "reports/usage",
   "sources": ["claude", "codex"],
   "prices": "my-prices.json",
-  "userName": "Ana"
+  "userName": "Ana",
+  "test": { "cmd": "npm test" }
 }
 ```
 
@@ -20,11 +21,25 @@ Optional, in the project root. `init` does not create it; without it the default
 | `reportsDir` | `reports/usage` | `kaizen report` |
 | `sources` | `["claude", "codex"]` | `kaizen usage`, `kaizen report` |
 | `prices` | bundled `usage/prices.json` | cost calculation |
+| `test.cmd` | detected by `init` | command that runs the target project's tests (see below) |
 | `userName` | `user` | name the scripts' warnings use for you; empty or non-string falls back to `user` |
 
 `sources` must be a list; malformed values stop with a one-line message.
 
 `spRoot` and `docsRoot` are relative to the project root. `init` and `status` follow `spRoot` too; when `docsRoot` is not set, DR/DP folders sit next to the stories.
+
+### `test.cmd`
+
+`kaizen init` looks for the target project's test command by reading manifest files only (it never runs anything and never reads `.env` or secrets), first match wins:
+
+| File | `test.cmd` |
+|---|---|
+| `package.json` with a real `scripts.test` | `npm test` |
+| `pytest.ini`, or `pyproject.toml` with `[tool.pytest...]` | `pytest` |
+| `Cargo.toml` | `cargo test` |
+| `go.mod` | `go test ./...` |
+
+The value is saved in `kaizen.config.json` (the file is created if missing) and you can edit it freely: a repeated `init` never overwrites an existing `test.cmd`, and keeps all other keys. Nothing is written when no test command is detected, or when the config is not valid JSON.
 
 ## `kaizen-hooks.json`
 

@@ -51,3 +51,65 @@ test("doctor avisa que codex e agents-md não têm hook de contexto; claude não
     assert.strictEqual(/context hook: none/.test(r.stdout), expected, h);
   }
 });
+
+const cfgOf = (d) => JSON.parse(fs.readFileSync(path.join(d, "kaizen.config.json"), "utf8"));
+const write = (d, rel, data) => fs.writeFileSync(path.join(d, rel), data);
+
+test("init deteta o comando de testes pelos manifestos", () => {
+  const casos = [
+    ["package.json", JSON.stringify({ scripts: { test: "vitest" } }), "npm test"],
+    ["pytest.ini", "[pytest]\n", "pytest"],
+    ["pyproject.toml", "[tool.pytest.ini_options]\naddopts = \"-q\"\n", "pytest"],
+    ["Cargo.toml", "[package]\nname = \"x\"\n", "cargo test"],
+    ["go.mod", "module x\n", "go test ./..."],
+  ];
+  for (const [file, data, cmd] of casos) {
+    const d = tmp();
+    write(d, file, data);
+    assert.strictEqual(init(d).status, 0);
+    assert.strictEqual(cfgOf(d).test.cmd, cmd, file);
+  }
+});
+
+test("projeto sem testes não cria config nem chave test", () => {
+  const d = tmp();
+  write(d, "package.json", JSON.stringify({ scripts: { build: "tsc" } }));
+  assert.strictEqual(init(d).status, 0);
+  assert.ok(!has(d, "kaizen.config.json"));
+  const e = tmp();
+  assert.strictEqual(init(e).status, 0);
+  assert.ok(!has(e, "kaizen.config.json"));
+});
+
+test("init repetido nunca sobrescreve test.cmd manual e preserva as outras chaves", () => {
+  const d = tmp();
+  write(d, "package.json", JSON.stringify({ scripts: { test: "vitest" } }));
+  write(d, "kaizen.config.json", JSON.stringify({ spRoot: "work/stories", test: { cmd: "make check", extra: 1 } }));
+  assert.strictEqual(init(d).status, 0);
+  assert.strictEqual(init(d).status, 0);
+  assert.deepStrictEqual(cfgOf(d), { spRoot: "work/stories", test: { cmd: "make check", extra: 1 } });
+});
+
+test("deteção acrescenta test.cmd a uma config existente sem perder chaves", () => {
+  const d = tmp();
+  write(d, "Cargo.toml", "[package]\n");
+  write(d, "kaizen.config.json", JSON.stringify({ userName: "Ana" }));
+  assert.strictEqual(init(d).status, 0);
+  assert.deepStrictEqual(cfgOf(d), { userName: "Ana", test: { cmd: "cargo test" } });
+});
+
+test("config com JSON inválido não é reescrita pela deteção", () => {
+  const d = tmp();
+  write(d, "go.mod", "module x\n");
+  write(d, "kaizen.config.json", "{ nope");
+  assert.strictEqual(init(d).status, 0);
+  assert.strictEqual(fs.readFileSync(path.join(d, "kaizen.config.json"), "utf8"), "{ nope");
+});
+
+test("a deteção não executa nada nem lê .env", () => {
+  const d = tmp();
+  write(d, "package.json", JSON.stringify({ scripts: { test: "node -e \"require('fs').writeFileSync('pwned','x')\"" } }));
+  write(d, ".env", "SEGREDO=1\n");
+  assert.strictEqual(init(d).status, 0);
+  assert.ok(!has(d, "pwned"));
+});
