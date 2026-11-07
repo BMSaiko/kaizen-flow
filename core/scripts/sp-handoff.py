@@ -24,6 +24,7 @@ imprime o próximo filho elegível (TODO com todas as dependências em Done). De
 Com a mesma data a secção é substituída; com data diferente é acrescentada ao fim.
 """
 import argparse
+import json
 import subprocess
 import sys
 import time
@@ -55,7 +56,6 @@ HARNESSES = {
     "claude": ("/clear ", "/michi {sp}"),  # espaço final fecha o menu de sugestões
     "codex": ("/new", "Follow .agents/skills/michi/SKILL.md on {sp}"),
 }
-BACKENDS = ("wezterm", "tmux", "clipboard")
 
 
 def resume_commands(harness, sp_path):
@@ -110,6 +110,7 @@ def main(argv=None):
     group.add_argument("--send", metavar="CAMINHO", help=argparse.SUPPRESS)
     group.add_argument("--spawn", nargs="+", metavar="SLUG", help="painel novo + worktree por SP, a correr /michi --auto")
     ap.add_argument("--sem-registo", action="store_true", help="com --spawn: não escreve no estado (quem chama, o sp-fila, já o faz)")
+    ap.add_argument("--json", action="store_true", help="com --spawn: imprime o resultado como JSON (uma lista de {slug, ok, painel, worktree}) para o sp-fila")
     ap.add_argument("--max", type=int, default=MAX_SPAWN, help=f"com --spawn: painéis em simultâneo (default {MAX_SPAWN})")
     ap.add_argument("--file", help="ficheiro com o corpo do progresso (com --write)")
     ap.add_argument("--pane", help="painel do multiplexer (default: $WEZTERM_PANE ou $TMUX_PANE)")
@@ -136,7 +137,11 @@ def main(argv=None):
                 print(nxt)
         elif args.spawn:
             falhou = False
-            for r in spawn(args.spawn, args.backend, args.max, registar=not args.sem_registo, dry_run=args.dry_run):
+            resultados = spawn(args.spawn, args.backend, args.max, registar=not args.sem_registo, dry_run=args.dry_run)
+            if args.json:
+                print(json.dumps(resultados, ensure_ascii=False))
+                return 1 if any(not r["ok"] for r in resultados) else 0
+            for r in resultados:
                 if r.get("dry_run"):
                     print(f"{r['slug']}: dry-run (sem worktree nem painel)")
                     continue

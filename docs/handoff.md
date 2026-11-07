@@ -9,7 +9,7 @@ python scripts/sp-handoff.py --launch PATH               # clear context and res
 python scripts/sp-handoff.py --spawn SLUG [SLUG...]      # new pane + worktree per story, running /michi --auto
 ```
 
-`--spawn` is what `sp-fila.py --concorrencia N` uses: one pane per story (at most `--max` at once), with `--dry-run` to preview and `--sem-registo` to skip writing the queue state.
+`--spawn` is what `sp-fila.py --concorrencia N` uses: one pane per story (at most `--max` at once), with `--dry-run` to preview and `--sem-registo` to skip writing the queue state, and `--json` to print the result as data for `sp-fila.py`.
 
 ![sp-fila parallel: up to N panes, one worktree each, a watcher that brings blocked panes to you](assets/sp-fila-parallel.svg)
 

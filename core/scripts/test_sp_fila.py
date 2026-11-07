@@ -575,9 +575,23 @@ def test_vivo_a_arrancar_sem_painel_registado_ou_sem_prompt():
     assert _arranque(inicio="2026-10-29T11:00:00") == "morto"
 
 
-def test_painel_lancado_le_a_linha_do_spawn():
-    assert sp_fila._painel_lancado("a", "x\na: painel 9 em C:\\wt\\sb-a\n") == {"painel": "9", "worktree": "C:\\wt\\sb-a"}
-    assert sp_fila._painel_lancado("a", "a: painel - em C:\\wt") == {} and sp_fila._painel_lancado("a", None) == {}
+def test_painel_lancado_le_o_json_do_spawn():
+    saida = json.dumps([{"slug": "b", "ok": True, "painel": "3", "worktree": "C:\\wt\\sb-b"},
+                        {"slug": "a", "ok": True, "painel": 9, "worktree": "C:\\wt\\sb-a"}])
+    assert sp_fila._painel_lancado("a", saida) == {"painel": "9", "worktree": "C:\\wt\\sb-a"}
+    sem_painel = json.dumps([{"slug": "a", "ok": True, "painel": None, "worktree": "C:\\wt"}])
+    assert sp_fila._painel_lancado("a", sem_painel) == {} and sp_fila._painel_lancado("a", None) == {}
+    assert sp_fila._painel_lancado("a", "a: painel 9 em C:\\wt") == {}  # texto livre já não é lido
+
+
+def test_concorrencia_1_lanca_por_spawn_como_qualquer_paralelo(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a")
+    calls = []
+    st = _estado(tmp_path, concorrencia=1, max=5)
+    sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0))
+    flat = [" ".join(map(str, c)) for c in calls]
+    assert any("--spawn" in c and "--json" in c for c in flat) and not any("--launch" in c for c in flat)
 
 
 def test_vivo_inatividade_configuravel():

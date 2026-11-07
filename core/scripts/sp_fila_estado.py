@@ -70,6 +70,11 @@ def _lock_obsoleto(lock):
     return not pid_vivo(pid)
 
 
+def registar_sessao(dados, slug, inicio, **campos):
+    """Único sítio que escreve `estado["sessoes"][slug]`: `inicio` mais os campos dados (painel, worktree, requests, ...)."""
+    dados["sessoes"][slug] = {"inicio": inicio, **campos}
+
+
 @contextmanager
 def bloqueio(path, espera=15.0):
     """Exclusão mútua entre sessões sobre `path`: ficheiro `<path>.lock` (guarda o pid do dono) criado com O_CREAT|O_EXCL.

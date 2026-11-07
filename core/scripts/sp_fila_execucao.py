@@ -1,4 +1,5 @@
 """Sp-fila: passo seguinte (registar o SP fechado, respeitar limites, lançar o próximo)."""
+import json
 import re
 import sys
 from datetime import datetime
@@ -7,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
-from sp_fila_estado import RELATORIOS, REPO, REQ_POR_SP, SCRIPTS, bloqueio, guardar, ler, run_hidden
+from sp_fila_estado import RELATORIOS, REPO, REQ_POR_SP, SCRIPTS, bloqueio, guardar, ler, registar_sessao, run_hidden
 from sp_fila_paralelo import parar_vigia
 from sp_fila_plano import descendentes, falhas, limite, load, plan, sem_commit
 from sp_fila_relatorio import destino_relatorio, escrever_commit_md, progresso, relatorio
@@ -75,8 +76,8 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
         estado["seguidas"] = 0 if feito else estado.get("seguidas", 0) + 1
         del estado["sessoes"][fechada]
     # Paralelo (--concorrencia N): sem orçamento nem máximo; o único travão é o guard de contexto, que continua a sessão por handoff.
-    paralelo = bool(estado.get("concorrencia"))
     teto = estado.get("concorrencia") or 1
+    paralelo = bool(estado.get("concorrencia"))  # um só critério: com `concorrencia` (mesmo 1) lança por --spawn
     if len(estado["sessoes"]) >= teto:
         guardar(estado_path, estado)
         return {"acao": "espera", "sessoes": list(estado["sessoes"])}
@@ -94,9 +95,9 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
         if motivo or len(estado["sessoes"]) >= teto:
             break
         doing = alvo.path.parent.parent / "Doing" / alvo.path.name
-        arranque = ([sys.executable, "-I", str(SCRIPTS / "sp-handoff.py"), "--spawn", alvo.slug, "--sem-registo"] if teto > 1
+        arranque = ([sys.executable, "-I", str(SCRIPTS / "sp-handoff.py"), "--spawn", alvo.slug, "--sem-registo", "--json"] if paralelo
                     else [sys.executable, "-I", str(SCRIPTS / "sp-handoff.py"), "--launch", str(doing), "--auto"])
-        cwd = _cwd_neutro(root) if teto > 1 else None
+        cwd = _cwd_neutro(root) if paralelo else None
         for argv in ([sys.executable, "-I", str(SCRIPTS / "sp-move.py"), "--root", str(root), "--project", alvo.project, alvo.slug, "doing"], arranque):
             r = run(argv, capture_output=True, text=True, encoding="utf-8", cwd=cwd if argv[2].endswith("sp-move.py") else None)
             if r.returncode != 0:
@@ -105,8 +106,8 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
                 estado["seguidas"] = estado.get("seguidas", 0) + 1
                 break
         else:
-            estado["sessoes"][alvo.slug] = {"inicio": agora.isoformat(timespec="seconds"), "requests": REQ_POR_SP,
-                                            **_painel_lancado(alvo.slug, r.stdout)}
+            registar_sessao(estado, alvo.slug, agora.isoformat(timespec="seconds"), requests=REQ_POR_SP,
+                            **_painel_lancado(alvo.slug, r.stdout))
             estado["usados"] += REQ_POR_SP
             lancados.append(alvo)
             motivo = None
@@ -134,9 +135,15 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
 
 
 def _painel_lancado(slug, saida):
-    """{painel, worktree} lidos da linha `<slug>: painel <id> em <worktree>` do `sp-handoff --spawn`; {} se não houver."""
-    m = re.search(rf"^{re.escape(slug)}: painel (\S+) em (.+)$", saida or "", re.MULTILINE)
-    return {"painel": m.group(1), "worktree": m.group(2).strip()} if m and m.group(1) != "-" else {}
+    """{painel, worktree} do resultado JSON de `sp-handoff --spawn --json` para `slug`; {} se não houver (ou saída sem JSON)."""
+    linhas = (saida or "").strip().splitlines()
+    try:
+        for r in json.loads(linhas[-1] if linhas else "[]"):  # JSON na última linha (o backend clipboard imprime antes)
+            if r.get("slug") == slug and r.get("painel"):
+                return {"painel": str(r["painel"]), "worktree": r.get("worktree")}
+    except (ValueError, AttributeError, TypeError):
+        pass
+    return {}
 
 
 def lancar_seguinte_auto(root, estado, rel_dir, slug, seguinte_fn=seguinte):

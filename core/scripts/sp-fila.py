@@ -34,14 +34,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 # Módulos irmãos (a CLI e os testes continuam a ver tudo aqui): estado, plano, relatório, execução, paralelo.
-from sp_fila_estado import (LOCK_VELHO_S, MAX_DEFEITO, MAX_FALHAS_DEFEITO, NO_WINDOW, ORCAMENTO, REPO, REQ_POR_SP, RELATORIOS, SCRIPTS, ESTADO, USER,  # noqa: E402,F401
+from sp_fila_estado import (MAX_DEFEITO, MAX_FALHAS_DEFEITO, NO_WINDOW, ORCAMENTO, REQ_POR_SP, RELATORIOS, ESTADO, USER,  # noqa: E402,F401
                             atualizar, bloqueio, guardar, ler, migrar, run_hidden)
-from sp_fila_plano import autorizacao, descendentes, estatico, limite, load, plan, render_plan, sem_commit, sp_list  # noqa: E402,F401
-from sp_fila_relatorio import commits_desde, gastos, progresso, reflect_lacunas, relatorio, render_gastos  # noqa: E402,F401
-from sp_fila_execucao import (_cwd_neutro, _custos, _custos_seguros, _ler_sp, _painel_lancado, _seguinte,  # noqa: E402,F401
+from sp_fila_plano import descendentes, limite, load, plan, render_plan, sem_commit, sp_list  # noqa: E402,F401
+from sp_fila_relatorio import gastos, relatorio, render_gastos  # noqa: E402,F401
+from sp_fila_execucao import (_custos, _ler_sp, _painel_lancado,  # noqa: E402,F401
                               lancar_seguinte_auto, seguinte, IntegracaoPendente)
-from sp_fila_paralelo import (ARRANQUE_S, BATIDA_MAX_S, INATIVIDADE_S, PERGUNTAS, REAVISO_S, TURNO_ACABADO, VIGIA_LOG, VIVO,  # noqa: E402,F401
-                              _AVISO, _atividade, _chave, _norm_caminho, _resumo_pedido, aviso_vigia, batida_vigia, classificar,
+from sp_fila_paralelo import (INATIVIDADE_S, VIGIA_LOG, aviso_vigia, batida_vigia, classificar,
                               contar_tails, estado_vivo, fechar_painel_sessao, garantir_vigia, linha, parar_vigia, registar_incidente, vigiar)
 
 def destacar(args, log, popen=subprocess.Popen):
@@ -60,6 +59,16 @@ AJUDA = """Orquestrador do sp-fila (regras):
 - Relato por linha: ≤3 linhas + TLDR; não narrar avisos repetidos nem reler ecrãs.
 - Pergunta/aprovação de painel: `wezterm cli get-text --pane-id N`, um AskUserQuestion («Painel N»), só depois `send-text --no-paste`; nunca aprovar sozinho.
 - `--estado-vivo` avisa «SEM VIGIA»/«VIGIA PAROU» (rearmar) e «N Monitores» (deixar só um)."""
+
+
+def armar_vigia(args, estado):
+    """Único caminho para armar a vigia: destaca-a se não está viva (idempotente) e devolve a mensagem."""
+    extra = [a for flag, val in (("--intervalo", args.intervalo), ("--inatividade", args.inatividade), ("--estado", args.estado), ("--root", args.root)) for a in (flag, str(val))]
+    extra += (["--projeto", args.projeto] if args.projeto else []) + (["--ate", args.ate] if args.ate else [])
+    res, pid = garantir_vigia(ler(estado), lambda: destacar(["--vigiar", *extra], VIGIA_LOG), datetime.now())
+    if res == "viva":
+        return f"vigia já ativo (pid {pid}); log: {VIGIA_LOG}"
+    return f"vigia destacado (pid {pid}); acompanhar com o Monitor: `tail -F {VIGIA_LOG}` (re-armar o tail aos 30 min); sem a fila a correr, sai sozinho"
 
 
 def main(argv=None):
@@ -102,13 +111,7 @@ def main(argv=None):
         if not estado.exists():
             print("erro: sem fila em curso", file=sys.stderr)
             return 1
-        extra = [a for flag, val in (("--intervalo", args.intervalo), ("--inatividade", args.inatividade), ("--estado", args.estado), ("--root", args.root)) for a in (flag, str(val))]
-        extra += (["--projeto", args.projeto] if args.projeto else []) + (["--ate", args.ate] if args.ate else [])
-        res, pid = garantir_vigia(ler(estado), lambda: destacar(["--vigiar", *extra], VIGIA_LOG), datetime.now())
-        if res == "viva":
-            print(f"vigia já ativo (pid {pid}); log: {VIGIA_LOG}")
-        else:
-            print(f"vigia destacado (pid {pid}); acompanhar com o Monitor: `tail -F {VIGIA_LOG}` (re-armar o tail aos 30 min); sem a fila a correr, sai sozinho")
+        print(armar_vigia(args, estado))
         return 0
     if args.vigiar:
         def lido():
@@ -187,7 +190,7 @@ def main(argv=None):
     elif out["acao"] == "lancou":
         print(f"lançado · {', '.join(out['slugs'])} · terminar o turno")
         if ler(estado).get("concorrencia"):
-            main(["--vigiar", "--destacado", "--estado", args.estado, "--root", args.root])
+            print(armar_vigia(args, estado))
             print(f"VIGIAR · um só Monitor `tail -F {VIGIA_LOG}` · regras: `sp-fila.py --ajuda`")
     else:
         print(f"fila terminada: {out['motivo']}\nrelatório: {out['relatorio']}")

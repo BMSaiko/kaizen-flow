@@ -497,3 +497,22 @@ def test_cli_spawn_dry_run_nao_lanca_nada(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(sp_handoff, "detect_backend", lambda env=None: ("wezterm", None))
     assert sp_handoff.main(["--spawn", "a", "--dry-run"]) == 0
     assert run.calls == [] and "a: dry-run" in capsys.readouterr().out
+
+
+def test_registar_sessao_e_o_unico_formato_de_entrada():
+    import sp_fila_estado as fe
+    dados = {"sessoes": {}}
+    fe.registar_sessao(dados, "a", "2026-11-07T10:00:00", worktree="wt", painel="7", estado="lancado")
+    assert dados["sessoes"]["a"] == {"inicio": "2026-11-07T10:00:00", "worktree": "wt", "painel": "7", "estado": "lancado"}
+
+
+def test_dois_registos_em_simultaneo_nao_perdem_sessoes(tmp_path):
+    import threading
+    import sp_fila_estado as fe
+    path = tmp_path / "estado.json"
+    fe.guardar(path, {"sessoes": {}})
+    ts = [threading.Thread(target=fe.atualizar, args=(path, lambda e, s=s: fe.registar_sessao(e, s, "t", painel=s)))
+          for s in ("a", "b", "c", "d")]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert sorted(json.loads(path.read_text(encoding="utf-8"))["sessoes"]) == ["a", "b", "c", "d"]

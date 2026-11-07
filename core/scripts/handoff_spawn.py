@@ -1,5 +1,4 @@
 """`sp-handoff.py --spawn`: um painel e uma worktree por SP, a correr `/michi --auto <slug>`."""
-import importlib.util
 import os
 import subprocess
 import sys
@@ -11,18 +10,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from handoff_pane import (ENTER_SETTLE, ENTER_TRIES, HandoffError, _argvs, _copy, detect_backend, read_screen,  # noqa: E402
                           run_hidden, send_confirmed)
 
+from sp_fila_estado import ESTADO, atualizar, guardar, registar_sessao  # noqa: E402
+
 MAX_SPAWN = 3
 SPAWN_READY_S = 40  # espera máxima pelo prompt do Claude Code num painel novo
 SPAWN_ENTER_TRIES = ENTER_TRIES
 SPAWN_SETTLE = ENTER_SETTLE
-
-
-def _sp_fila():
-    spec = importlib.util.spec_from_file_location("sp_fila_spawn", Path(__file__).with_name("sp-fila.py"))
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["sp_fila_spawn"] = mod
-    spec.loader.exec_module(mod)
-    return mod
 
 
 def _spawn_pane(backend, wt, run):
@@ -37,10 +30,6 @@ def _spawn_pane(backend, wt, run):
     else:
         argv = ["tmux", "split-window", "-P", "-F", "#{pane_id}", "-c", wt, "claude"]
     return run(argv, check=True, capture_output=True, text=True, encoding="utf-8").stdout.strip()
-
-
-def _screen(backend, pane, run):
-    return read_screen(backend, pane, run)
 
 
 _KEYS = {"wezterm": {"Down": chr(27) + "[B", "Space": " ", "Enter": chr(13)}}
@@ -68,7 +57,7 @@ def _aprovar_mcp(backend, pane, run, sleep):
 def _wait_prompt(backend, pane, run, sleep):
     """Espera que o prompt `❯` apareça (o Claude Code descarta teclas enviadas durante o arranque)."""
     for _ in range(SPAWN_READY_S):
-        screen = _screen(backend, pane, run)
+        screen = read_screen(backend, pane, run)
         if _aviso_mcp(screen):
             _aprovar_mcp(backend, pane, run, sleep)
             sleep(2)
@@ -83,7 +72,7 @@ def _wait_prompt(backend, pane, run, sleep):
 def _send_line(backend, pane, text, run, sleep):
     """Envia `text` e Enter; se o texto continuar no prompt (Enter perdido), repete o Enter."""
     text_argv, key_argv = _argvs(backend, pane)
-    send_confirmed(pane, text, text_argv, key_argv, lambda p: _screen(backend, p, run), run, sleep,
+    send_confirmed(pane, text, text_argv, key_argv, lambda p: read_screen(backend, p, run), run, sleep,
                    tries=SPAWN_ENTER_TRIES, settle=SPAWN_SETTLE)
 
 
@@ -96,11 +85,10 @@ def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.slee
     backend = backend or detect_backend()[0]
     if dry_run:  # sem efeitos: nem worktree, nem painel, nem estado
         return [{"slug": s, "ok": True, "painel": None, "worktree": None, "dry_run": True} for s in slugs[:maximo]] +                [{"slug": s, "ok": False, "painel": None, "worktree": None, "erro": f"adiado: máximo de {maximo} painéis em simultâneo"} for s in slugs[maximo:]]
-    fila = _sp_fila()
-    estado_path = Path(estado_path or fila.ESTADO)
+    estado_path = Path(estado_path or ESTADO)
     estado_path.parent.mkdir(parents=True, exist_ok=True)
     if registar and not estado_path.exists():
-        fila.guardar(estado_path, {"sessoes": {}})
+        guardar(estado_path, {"sessoes": {}})
     results = []
     for n, slug in enumerate(slugs):
         res = {"slug": slug, "ok": False, "painel": None, "worktree": None}
@@ -125,9 +113,8 @@ def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.slee
             continue
         if not registar:
             continue
-        entrada = {"worktree": wt, "painel": res["painel"], "estado": "lancado",
-                   "inicio": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-        fila.atualizar(estado_path, lambda e, s=slug, v=entrada: e["sessoes"].__setitem__(s, v))
+        inicio = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        atualizar(estado_path, lambda e, s=slug, i=inicio: registar_sessao(e, s, i, worktree=wt, painel=res["painel"], estado="lancado"))
     if backend == "clipboard":
         ok = [r["slug"] for r in results if r["ok"]]
         if ok:
