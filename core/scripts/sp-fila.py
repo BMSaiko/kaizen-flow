@@ -39,7 +39,7 @@ from sp_fila_estado import (MAX_DEFEITO, MAX_FALHAS_DEFEITO, NO_WINDOW, ORCAMENT
 from sp_fila_plano import descendentes, limite, load, plan, render_plan, sem_commit, sp_list  # noqa: E402,F401
 from sp_fila_relatorio import gastos, relatorio, render_gastos  # noqa: E402,F401
 from sp_fila_execucao import (_custos, _ler_sp, _painel_lancado,  # noqa: E402,F401
-                              lancar_seguinte_auto, seguinte, IntegracaoPendente)
+                              lancar_seguinte_auto, seguinte, IntegracaoPendente, SlugObrigatorio)
 from sp_fila_paralelo import (INATIVIDADE_S, VIGIA_LOG, aviso_vigia, batida_vigia, classificar,
                               contar_tails, estado_vivo, fechar_painel_sessao, garantir_vigia, linha, parar_vigia, registar_incidente, vigiar)
 
@@ -93,9 +93,9 @@ def main(argv=None):
     ap.add_argument("--inatividade", type=int, default=INATIVIDADE_S // 60, metavar="MIN", help="com --estado-vivo: minutos sem atividade até «bloqueado»")
     ap.add_argument("--ajuda", action="store_true", help="regras do orquestrador (vigia, Monitor, perguntas dos painéis, relato)")
     ap.add_argument("--parar", action="store_true", help="abandona a fila")
-    ap.add_argument("--max", type=int, default=MAX_DEFEITO, help=f"nº máximo de SPs (defeito {MAX_DEFEITO})")
+    ap.add_argument("--max", type=int, default=None, help=f"nº máximo de SPs (defeito {MAX_DEFEITO}; em --concorrencia só conta se passado)")
     ap.add_argument("--ate", metavar="HH:MM", help="hora limite")
-    ap.add_argument("--concorrencia", type=int, metavar="N", help="modo paralelo: até N sessões em painéis próprios, sem limite de quota (só o guard de contexto, via handoff)")
+    ap.add_argument("--concorrencia", type=int, metavar="N", help="modo paralelo (N=1 também: um painel próprio): até N sessões em painéis próprios, sem limite de quota (só o guard de contexto, via handoff)")
     ap.add_argument("--orcamento", type=int, default=ORCAMENTO, help=f"teto opcional de requests totais; cada SP gasta {REQ_POR_SP} (sem ele, sem limite)")
     ap.add_argument("--max-falhas", type=int, default=MAX_FALHAS_DEFEITO, metavar="N", help=f"para a fila após N SPs falhados seguidos (defeito {MAX_FALHAS_DEFEITO}; 0 = sem este limite)")
     ap.add_argument("--projeto")
@@ -104,6 +104,8 @@ def main(argv=None):
     ap.add_argument("--estado", default=str(ESTADO), help=argparse.SUPPRESS)
     ap.add_argument("--relatorios", default=str(RELATORIOS), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    if args.max is None and not args.concorrencia:
+        args.max = MAX_DEFEITO  # em paralelo None = sem máximo
     estado = Path(args.estado)
     if args.concorrencia is not None and args.concorrencia < 1:
         print(f"erro: --concorrencia exige N >= 1 (recebido {args.concorrencia}); sem a opção a fila corre em série", file=sys.stderr)
@@ -175,7 +177,7 @@ def main(argv=None):
     if args.dry_run:
         fila, excluidos = plan(items, args.max, so, sem_commit(items))
         print(render_plan(fila, excluidos))
-        print(f"Limites: máx {args.max} SPs · {args.max_falhas or 'sem'} falhas seguidas · "
+        print(f"Limites: máx {args.max or 'sem'} SPs · {args.max_falhas or 'sem'} falhas seguidas · "
               f"{'até ' + args.ate if args.ate else 'sem hora limite'} · {args.orcamento or 'sem'} requests")
         return 0
     if args.seguinte:
@@ -199,7 +201,7 @@ def main(argv=None):
         guardar(estado, novo)
     try:
         out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug)
-    except IntegracaoPendente as e:
+    except (IntegracaoPendente, SlugObrigatorio) as e:
         print(f"erro: {e}", file=sys.stderr)
         return 1
     except ValueError as e:  # estado ilegível (JSON truncado/corrompido): não adivinhar, o user decide

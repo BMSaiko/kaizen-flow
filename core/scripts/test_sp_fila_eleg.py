@@ -1,0 +1,158 @@
+"""Testes de scripts/sp-fila.py: elegibilidade e planeamento (ordem, dependências, filtros, limites)."""
+from datetime import datetime
+from sp_fila_testlib import (
+    sp_fila,
+    make_sp,
+    plan,
+    slugs,
+    reasons,
+    _runner,
+    _estado,
+    _arvore,
+)
+
+
+def test_ordem_prioridade_depois_idade(tmp_path):
+    make_sp(tmp_path, "c", priority="P2", created="2026-10-02T00:00:00Z")
+    make_sp(tmp_path, "b", priority="P2", created="2026-10-01T00:00:00Z")
+    make_sp(tmp_path, "a", priority="P1", created="2026-10-09T00:00:00Z")
+    assert slugs(plan(tmp_path)) == ["a", "b", "c"]
+
+
+def test_dependencia_manda_sobre_prioridade(tmp_path):
+    make_sp(tmp_path, "base", priority="P3")
+    make_sp(tmp_path, "topo", priority="P1", depends_on=["base"])
+    assert slugs(plan(tmp_path)) == ["base", "topo"]
+
+
+def test_dependencia_ja_done_nao_bloqueia(tmp_path):
+    make_sp(tmp_path, "feito", folder="Done")
+    make_sp(tmp_path, "x", depends_on=["feito"])
+    assert slugs(plan(tmp_path)) == ["x"]
+
+
+def test_exclui_manual_e_sem_modo(tmp_path):
+    make_sp(tmp_path, "m", modo="manual")
+    make_sp(tmp_path, "s", modo=None)
+    r = plan(tmp_path)
+    assert slugs(r) == []
+    assert "modo" in reasons(r)["m"] and "modo" in reasons(r)["s"]
+
+
+def test_exclui_sem_gates(tmp_path):
+    make_sp(tmp_path, "g", gates=False)
+    assert "gates" in reasons(plan(tmp_path))["g"]
+
+
+def test_exclui_dependencia_em_falta_e_cascata(tmp_path):
+    make_sp(tmp_path, "a", depends_on=["inexistente"])
+    make_sp(tmp_path, "b", depends_on=["a"])
+    r = plan(tmp_path)
+    assert slugs(r) == []
+    assert "dependência" in reasons(r)["a"] and "dependência" in reasons(r)["b"]
+
+
+def test_dependencia_em_sp_manual_exclui(tmp_path):
+    make_sp(tmp_path, "m", modo="manual")
+    make_sp(tmp_path, "x", depends_on=["m"])
+    assert "dependência" in reasons(plan(tmp_path))["x"]
+
+
+def test_ciclo(tmp_path):
+    make_sp(tmp_path, "a", depends_on=["b"])
+    make_sp(tmp_path, "b", depends_on=["a"])
+    make_sp(tmp_path, "ok")
+    r = plan(tmp_path)
+    assert slugs(r) == ["ok"]
+    assert "ciclo" in reasons(r)["a"] and "ciclo" in reasons(r)["b"]
+
+
+def test_exclui_doing_programa_e_done(tmp_path):
+    make_sp(tmp_path, "em-curso", folder="Doing")
+    make_sp(tmp_path, "mae", kind="program")
+    make_sp(tmp_path, "feito", folder="Done")
+    r = plan(tmp_path)
+    assert slugs(r) == []
+    assert "Doing" in reasons(r)["em-curso"] and "programa" in reasons(r)["mae"]
+    assert "feito" not in reasons(r)
+
+
+def test_autorizacao_insuficiente(tmp_path):
+    make_sp(tmp_path, "pp", extra={"push": "pergunta"})
+    make_sp(tmp_path, "pc", extra={"commit": "nunca", "push": "auto"})
+    make_sp(tmp_path, "pr", extra={"commit": "auto", "push": "pergunta", "pr": "auto"})
+    make_sp(tmp_path, "ok", extra={"commit": "auto", "push": "auto", "pr": "auto"})
+    make_sp(tmp_path, "nunca", extra={"commit": "nunca", "push": "nunca", "pr": "nunca"})
+    r = plan(tmp_path)
+    assert sorted(slugs(r)) == ["nunca", "ok"]
+    for s in ("pp", "pc", "pr"):
+        assert "autorização" in reasons(r)[s]
+
+
+def test_filtro_projeto(tmp_path):
+    make_sp(tmp_path, "a", project="p1")
+    make_sp(tmp_path, "b", project="p2")
+    assert slugs(plan(tmp_path, project="p2")) == ["b"]
+
+
+def test_max_corta_a_lista(tmp_path):
+    for s in "abc":
+        make_sp(tmp_path, s)
+    assert slugs(plan(tmp_path, maximo=2)) == ["a", "b"]
+
+
+def test_limite_razoes():
+    estado = {"max": 2, "ate": "18:00", "orcamento": 100, "usados": 0, "feitos": ["a", "b"], "falhados": []}
+    noon = datetime(2026, 10, 25, 12, 0)
+    assert "máximo" in sp_fila.limite(estado, noon)
+    estado = {"max": 5, "ate": "18:00", "orcamento": 100, "usados": 0, "feitos": [], "falhados": []}
+    assert sp_fila.limite(estado, datetime(2026, 10, 25, 18, 0)) and "hora" in sp_fila.limite(estado, datetime(2026, 10, 25, 18, 0))
+    assert sp_fila.limite(estado, noon) is None
+    estado["usados"] = 60
+    estado["orcamento"] = 100
+    assert "orçamento" in sp_fila.limite(estado, noon)
+
+
+def test_sem_orcamento_de_requests_nao_ha_limite():
+    estado = {"max": 5, "ate": None, "orcamento": None, "usados": 9999, "feitos": [], "falhados": []}
+    assert sp_fila.limite(estado, datetime(2026, 10, 25, 12, 0)) is None
+
+
+def test_cli_dry_run_mostra_ordem_e_exclusoes(tmp_path, capsys):
+    make_sp(tmp_path, "um", priority="P1")
+    make_sp(tmp_path, "man", modo="manual")
+    rc = sp_fila.main(["--dry-run", "--root", str(tmp_path)])
+    out = capsys.readouterr().out
+    assert rc == 0 and "um" in out and "man" in out and "modo" in out
+
+
+def test_programa_restringe_a_arvore(tmp_path):
+    _arvore(tmp_path, {})
+    items = sp_fila.load(tmp_path)
+    assert slugs(sp_fila.plan(items, so=sp_fila.descendentes(items, "mae"))) == ["f1", "f2", "f3"]
+
+
+def test_orcamento_tempo_e_custo_em_limite():
+    base = {"max": 9, "ate": None, "orcamento": 999, "usados": 0, "feitos": [], "falhados": [],
+            "inicio": "2026-10-25T10:00:00", "horas": 2.0, "usd": 5.0}
+    assert "tempo" in sp_fila.limite(base, datetime(2026, 10, 25, 12, 0))
+    assert sp_fila.limite(base, datetime(2026, 10, 25, 11, 0)) is None
+    assert "custo" in sp_fila.limite(base, datetime(2026, 10, 25, 11, 0), custo=5.0)
+
+
+def test_nunca_lanca_sp_sem_auto_nem_gates(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Done")
+    make_sp(root, "manual", modo="manual")
+    make_sp(root, "semgates", gates=False)
+    calls = []
+    st = _estado(tmp_path, sessoes={"a": {}})
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0))
+    assert out["acao"] == "fim"
+    assert all(c[0] == "git" for c in calls)
+
+
+def test_cli_dry_run_mostra_o_limite_de_falhas(tmp_path, capsys):
+    make_sp(tmp_path, "um")
+    assert sp_fila.main(["--dry-run", "--root", str(tmp_path), "--max-falhas", "3"]) == 0
+    assert "Limites:" in capsys.readouterr().out

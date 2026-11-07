@@ -18,7 +18,7 @@ Todo o script tem teste dedicado, exceto os da tabela, que têm justificação.
 | `sp-validate-hook.py` | `test_sp_validate_hook.py` |
 | `sp_progresso.py` | `test_sp_progresso.py` |
 | `handoff_pane.py` | `test_handoff_pane.py` (argv, backend, prompt; sem painéis reais) |
-| `sp_fila_estado/execucao/paralelo/plano/relatorio.py` | módulos internos de `sp-fila.py`, exercitados por `test_sp_fila.py` |
+| `sp_fila_estado/execucao/paralelo/plano/relatorio.py` | módulos internos de `sp-fila.py`, exercitados por `test_sp_fila_*.py` (auxiliares em `sp_fila_testlib.py`) |
 | `handoff_spawn.py` | `test_handoff_spawn.py` (`run`/`sleep`/`copy` falsos) |
 | `context-guard.py` | hook do vault; o teste (`test_context_guard.py`) fica no vault porque afirma textos em português (ver `SKIP` em `bin/sync.js`) |
 | `wt_redirect.py` | depende de `sb-worktree.py` do vault; o teste (`test_wt_redirect.py`) fica no vault (`SKIP`) |

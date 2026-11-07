@@ -106,6 +106,20 @@ def falhas(estado):
     return None
 
 
+def limite_paralelo(estado, agora):
+    """Motivo para parar no modo paralelo: falhas seguidas, `max` só se passado explicitamente (None = sem máximo) e hora limite; sem orçamento."""
+    if motivo := falhas(estado):
+        return motivo
+    maximo = estado.get("max")
+    if maximo is not None and len(estado["feitos"]) + len(estado["falhados"]) + len(estado.get("sessoes", {})) >= maximo:
+        return f"atingido o máximo de {maximo} SPs"
+    if estado.get("ate"):
+        h, m = (int(x) for x in estado["ate"].split(":"))
+        if (agora.hour, agora.minute) >= (h, m):
+            return f"atingida a hora limite {estado['ate']}"
+    return None
+
+
 def limite(estado, agora, custo=0.0):
     """Motivo para parar a fila, ou None. `custo`: USD gasto nesta corrida (só conta com orcamento_usd)."""
     if motivo := falhas(estado):

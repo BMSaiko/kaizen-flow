@@ -39,6 +39,8 @@ function plan(vault) {
     const t = `test_${n.replace(/-/g, "_")}`;
     if (!n.startsWith("test_") && scripts.includes(t) && !SKIP.has(t)) chosen.add(t);
   }
+  // testes divididos por tema (test_sp_fila_<tema>.py) sem módulo homónimo
+  for (const n of scripts) if (/^test_(sp|doc)_[a-z_]+\.py$/.test(n) && !SKIP.has(n)) chosen.add(n);
   for (const n of [...chosen].sort()) parts.push([`scripts/${n}`, `scripts/${n}`]);
   if (fs.existsSync(path.join(vault, FIXTURES))) parts.push([FIXTURES, FIXTURES]);
 

@@ -2,6 +2,7 @@
 import json
 import re
 import sys
+from contextlib import ExitStack
 from datetime import datetime
 from pathlib import Path
 
@@ -10,7 +11,7 @@ import kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
 from sp_fila_estado import RELATORIOS, REPO, REQ_POR_SP, SCRIPTS, bloqueio, guardar, ler, registar_sessao, run_hidden
 from sp_fila_paralelo import parar_vigia
-from sp_fila_plano import descendentes, falhas, limite, load, plan, sem_commit
+from sp_fila_plano import descendentes, limite, limite_paralelo, load, plan, sem_commit
 from sp_fila_relatorio import destino_relatorio, escrever_commit_md, progresso, relatorio
 
 
@@ -19,8 +20,13 @@ def seguinte(root, estado_path, rel_dir, run=run_hidden, agora=None, custo_fn=No
 
     `slug`: só essa sessão fecha (as outras continuam); sem ele fecham todas as registadas (formato antigo).
     Com sessões ainda em curso não lança nada (`acao: espera`) até haver teto de concorrência."""
-    with bloqueio(estado_path):
-        return _seguinte(root, estado_path, rel_dir, run, agora or datetime.now(), custo_fn, slug)
+    with ExitStack() as pilha:  # o lock é solto durante o spawn (`_seguinte` fecha-o e volta a prendê-lo) e solto no fim
+        pilha.enter_context(bloqueio(estado_path))
+        return _seguinte(root, estado_path, rel_dir, run, agora or datetime.now(), custo_fn, slug, pilha)
+
+
+class SlugObrigatorio(ValueError):
+    """Em modo paralelo `--seguinte` sem `--slug` fecharia sessões ainda vivas."""
 
 
 class IntegracaoPendente(RuntimeError):
@@ -56,8 +62,10 @@ def _cwd_neutro(root):
     return Path(r.stdout.strip()).parent if r.returncode == 0 and r.stdout.strip() else None
 
 
-def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
+def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha):
     estado = ler(estado_path)
+    if not slug and estado.get("concorrencia") and estado["sessoes"]:
+        raise SlugObrigatorio("em modo paralelo `--seguinte` exige `--slug <SP que fechou>`; sem ele fecharia sessões ainda vivas")
     items = load(root, estado.get("projeto"))
     so = descendentes(items, estado["programa"]) if estado.get("programa") else None
     for fechada in ([slug] if slug else list(estado["sessoes"])):
@@ -75,7 +83,7 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
         (estado["feitos"] if feito else estado["falhados"]).append(fechada)
         estado["seguidas"] = 0 if feito else estado.get("seguidas", 0) + 1
         del estado["sessoes"][fechada]
-    # Paralelo (--concorrencia N): sem orçamento nem máximo; o único travão é o guard de contexto, que continua a sessão por handoff.
+    # Paralelo (--concorrencia N): sem orçamento; só `--ate` e `--max` explícito; o único travão é o guard de contexto, que continua a sessão por handoff.
     teto = estado.get("concorrencia") or 1
     paralelo = bool(estado.get("concorrencia"))  # um só critério: com `concorrencia` (mesmo 1) lança por --spawn
     if len(estado["sessoes"]) >= teto:
@@ -88,31 +96,43 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
         custos = (custo_fn or _custos)()
         custo = sum(custos.get(s, 0.0) for s in so) - estado.get("custo_inicio", 0.0)
     lancados, motivo = [], None
-    # Único decisor: nunca lançar SP já iniciado (Doing), nem um que a fila já lançou/fechou (a sessão e a vigia podem chamar este passo a seguir).
-    vistos = set(estado["sessoes"]) | set(estado["feitos"]) | set(estado["falhados"])
-    for alvo in (sp for sp in fila if sp.status == "TODO" and sp.slug not in vistos and all(d in done for d in sp.depends_on)):
-        motivo = falhas(estado) if paralelo else limite(estado, agora, custo)
+    # Único decisor: nunca lançar SP já iniciado (Doing), nem um que a fila já lançou/fechou ou reservou (outro `--seguinte` corre enquanto o spawn tem o lock solto).
+    for alvo in (sp for sp in fila if sp.status == "TODO" and all(d in done for d in sp.depends_on)):
+        if alvo.slug in set(estado["sessoes"]) | set(estado["feitos"]) | set(estado["falhados"]):
+            continue
+        motivo = limite_paralelo(estado, agora) if paralelo else limite(estado, agora, custo)
         if motivo or len(estado["sessoes"]) >= teto:
             break
         doing = alvo.path.parent.parent / "Doing" / alvo.path.name
         arranque = ([sys.executable, "-I", str(SCRIPTS / "sp-handoff.py"), "--spawn", alvo.slug, "--sem-registo", "--json"] if paralelo
                     else [sys.executable, "-I", str(SCRIPTS / "sp-handoff.py"), "--launch", str(doing), "--auto"])
         cwd = _cwd_neutro(root) if paralelo else None
+        inicio = agora.isoformat(timespec="seconds")
+        registar_sessao(estado, alvo.slug, inicio, requests=REQ_POR_SP, reserva=True)  # reservar o slug antes de soltar o lock
+        guardar(estado_path, estado)
+        pilha.close()
+        erro = None
         for argv in ([sys.executable, "-I", str(SCRIPTS / "sp-move.py"), "--root", str(root), "--project", alvo.project, alvo.slug, "doing"], arranque):
             r = run(argv, capture_output=True, text=True, encoding="utf-8", cwd=cwd if argv[2].endswith("sp-move.py") else None)
             if r.returncode != 0:
-                motivo = f"erro a lançar {alvo.slug}: {(r.stderr or r.stdout).strip()}"
-                estado["falhados"].append(alvo.slug)
-                estado["seguidas"] = estado.get("seguidas", 0) + 1
+                erro = f"erro a lançar {alvo.slug}: {(r.stderr or r.stdout).strip()}"
                 break
+        pilha.enter_context(bloqueio(estado_path))
+        estado = ler(estado_path)  # outros `--seguinte` podem ter alterado o estado durante o spawn
+        if erro:
+            motivo = erro
+            estado["sessoes"].pop(alvo.slug, None)
+            estado["falhados"].append(alvo.slug)
+            estado["seguidas"] = estado.get("seguidas", 0) + 1
         else:
             registar_sessao(estado, alvo.slug, agora.isoformat(timespec="seconds"), requests=REQ_POR_SP,
                             **_painel_lancado(alvo.slug, r.stdout))
             estado["usados"] += REQ_POR_SP
             lancados.append(alvo)
             motivo = None
+        guardar(estado_path, estado)
     if not lancados and not estado["sessoes"]:
-        motivo = motivo or (falhas(estado) if paralelo else limite(estado, agora, custo)) or "fila vazia"
+        motivo = motivo or (limite_paralelo(estado, agora) if paralelo else limite(estado, agora, custo)) or "fila vazia"
         sps = {sp.slug: (sp.status, _ler_sp(sp)) for sp, _ in items
                if sp.slug in estado["feitos"] + estado["falhados"]}
         rel_dir, wt_slug = destino_relatorio(rel_dir, agora, run)
