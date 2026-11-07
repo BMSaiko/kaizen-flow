@@ -11,6 +11,7 @@ Uso:
 RC 0 = fechado; 1 = gate/orçamento vermelho (SP fica em Doing); 2 = erro de uso.
 """
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -169,8 +170,23 @@ def worktree_hint(cwd, slug):
             f"python -I scripts/sb-worktree.py clean {slug}")
 
 
-def seguinte(root, slug, project=None):
-    """Linha com o passo seguinte de um filho fechado: próximo elegível, fecho da mãe, ou '' (SP sem mãe)."""
+FILA_ESTADO = Path.home() / ".claude" / "sp-fila-estado.json"
+
+
+def em_fila(slug, estado=None):
+    """True se `slug` é uma sessão lançada pela fila (consta de `sessoes` no estado)."""
+    try:
+        return slug in json.loads(Path(estado or FILA_ESTADO).read_text(encoding="utf-8")).get("sessoes", {})
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def seguinte(root, slug, project=None, fila=False):
+    """Linha com o passo seguinte de um filho fechado: próximo elegível, fecho da mãe, ou '' (SP sem mãe).
+
+    Em fila só o driver lança o seguinte: a sessão regista e reporta (`sp-fila.py --seguinte --slug`)."""
+    if fila:
+        return f"FILA: {slug} feito; só reportar e fechar, o driver lança o seguinte (sp-fila.py --seguinte --slug {slug})"
     sps = sp_list.collect(root, include_done=True)
     kid = next((s for s in sps if s.slug == slug and (not project or s.project == project)), None)
     if not kid or not kid.parent:
@@ -216,11 +232,14 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
         lines.append(text)
         if rc:
             return 1, lines + [f"{slug}: orçamento de contexto excedido, SP continua em Doing"]
+    fila = em_fila(slug)
+    if nxt and fila:
+        return 1, lines + [f"{slug}: sessão da fila, --next não se aplica (o driver lança o seguinte)"]
     if nxt:
         lines.append(sp_move.advance(root, slug, sp.project))
     else:
         lines.append(sp_move.move(root, slug, "done", sp.project))
-    prox = "" if nxt else seguinte(root, slug, sp.project)
+    prox = "" if nxt else seguinte(root, slug, sp.project, fila)
     if prox:
         lines.append(prox)
     if commit:

@@ -42,7 +42,7 @@ from sp_fila_execucao import (_cwd_neutro, _custos, _custos_seguros, _ler_sp, _p
                               lancar_seguinte_auto, seguinte, IntegracaoPendente)
 from sp_fila_paralelo import (ARRANQUE_S, BATIDA_MAX_S, INATIVIDADE_S, PERGUNTAS, REAVISO_S, TURNO_ACABADO, VIGIA_LOG, VIVO,  # noqa: E402,F401
                               _AVISO, _atividade, _chave, _norm_caminho, _resumo_pedido, aviso_vigia, batida_vigia, classificar,
-                              contar_tails, estado_vivo, fechar_painel_sessao, garantir_vigia, linha, vigiar)
+                              contar_tails, estado_vivo, fechar_painel_sessao, garantir_vigia, linha, parar_vigia, vigiar)
 
 def destacar(args, log, popen=subprocess.Popen):
     """Arranca `sp-fila.py <args>` num processo próprio (fora do prazo do Monitor), com a saída em `log`."""
@@ -92,8 +92,11 @@ def main(argv=None):
         print(AJUDA)
         return 0
     if args.parar:
+        vigia = ler(estado).get("vigia") if estado.exists() else None
         estado.unlink(missing_ok=True)
         print("fila abandonada")
+        if vigia:
+            print(parar_vigia(vigia)[1])
         return 0
     if args.vigiar and args.destacado:
         if not estado.exists():
@@ -187,6 +190,8 @@ def main(argv=None):
             print(f"VIGIAR · um só Monitor `tail -F {VIGIA_LOG}` · regras: `sp-fila.py --ajuda`")
     else:
         print(f"fila terminada: {out['motivo']}\nrelatório: {out['relatorio']}")
+        if out.get("vigia") and "sem vigia" not in out["vigia"]:
+            print(out["vigia"])
     return 0
 
 

@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import signal
 import subprocess
 import time
 from datetime import datetime
@@ -146,8 +147,41 @@ def garantir_vigia(estado, armar, agora):
         return "viva", vivo["pid"]
     return "armada", armar().pid
 
+AVISO_TAIL = f"parar o Monitor `tail -F {VIGIA_LOG}` antigo (já não há vigia a escrever)"
 
-_AVISO ={"a arrancar": "arrancou", "a correr": "a correr", "fechado": "terminou", "morto": "morreu", "parada sem fechar": "PARADA SEM FECHAR"}
+
+def _comando_pid(pid, run=subprocess.run):
+    """Linha de comandos do processo `pid`; "" se não existe ou não dá para ver."""
+    cmd = (["powershell", "-NoProfile", "-Command", f"(Get-CimInstance Win32_Process -Filter 'ProcessId={int(pid)}').CommandLine"]
+           if os.name == "nt" else ["ps", "-p", str(int(pid)), "-o", "args="])
+    try:
+        return (run(cmd, capture_output=True, text=True, encoding="utf-8").stdout or "").strip()
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return ""
+
+
+def parar_vigia(vigia, run=subprocess.run, matar=os.kill, eu=os.getpid):
+    """Termina o processo da vigia registada (`estado["vigia"]`) e devolve (parou, mensagem numa linha).
+
+    Só mata o pid registado e só se a linha de comandos for mesmo `sp-fila ... --vigiar` (pid morto ou reutilizado
+    por outro processo: não toca em nada). Nunca se mata a si próprio: a vigia que fecha a fila sai sozinha."""
+    try:
+        pid = int((vigia or {}).get("pid"))
+    except (TypeError, ValueError):
+        return False, "sem vigia registada"
+    if pid == eu():
+        return False, "a vigia sai sozinha"
+    comando = _comando_pid(pid, run)
+    if "sp-fila" not in comando or "--vigiar" not in comando:
+        return False, f"pid {pid} já não é a vigia (nada a parar)"
+    try:
+        matar(pid, signal.SIGTERM)
+    except OSError as e:
+        return False, f"não consegui parar a vigia (pid {pid}): {e}"
+    return True, f"vigia parada (pid {pid}); {AVISO_TAIL}"
+
+
+_AVISO = {"a arrancar": "arrancou", "a correr": "a correr", "fechado": "terminou", "morto": "morreu", "parada sem fechar": "PARADA SEM FECHAR"}
 
 
 def linha(slug, estado, acao=""):

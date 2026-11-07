@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
 from sp_fila_estado import REQ_POR_SP, SCRIPTS, bloqueio, guardar, ler, run_hidden
+from sp_fila_paralelo import parar_vigia
 from sp_fila_plano import descendentes, falhas, limite, load, plan, sem_commit
 from sp_fila_relatorio import progresso, relatorio
 
@@ -86,7 +87,9 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
         custos = (custo_fn or _custos)()
         custo = sum(custos.get(s, 0.0) for s in so) - estado.get("custo_inicio", 0.0)
     lancados, motivo = [], None
-    for alvo in (sp for sp in fila if all(d in done for d in sp.depends_on)):
+    # Único decisor: nunca lançar SP já iniciado (Doing), nem um que a fila já lançou/fechou (a sessão e a vigia podem chamar este passo a seguir).
+    vistos = set(estado["sessoes"]) | set(estado["feitos"]) | set(estado["falhados"])
+    for alvo in (sp for sp in fila if sp.status == "TODO" and sp.slug not in vistos and all(d in done for d in sp.depends_on)):
         motivo = falhas(estado) if paralelo else limite(estado, agora, custo)
         if motivo or len(estado["sessoes"]) >= teto:
             break
@@ -117,7 +120,8 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
             if mae is not None:
                 progresso(mae.path, estado, fila, motivo, agora)
         Path(estado_path).unlink()
-        return {"acao": "fim", "motivo": motivo, "relatorio": str(path)}
+        _, aviso = parar_vigia(estado.get("vigia"))
+        return {"acao": "fim", "motivo": motivo, "relatorio": str(path), "vigia": aviso}
     guardar(estado_path, estado)
     if not lancados:
         return {"acao": "espera", "sessoes": list(estado["sessoes"])}

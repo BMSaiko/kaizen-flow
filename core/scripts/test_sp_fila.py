@@ -1153,3 +1153,74 @@ def test_seguinte_sp_ja_integrado_continua_a_avancar(tmp_path):
     st = _estado(tmp_path, sessoes={"a": {}})
     out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner_worktree([], wt), datetime(2026, 10, 25, 12, 0), slug="a")
     assert out["acao"] == "lancou" and out["slug"] == "b"
+
+
+def _ps(saida):
+    class R:
+        stdout = saida
+    return lambda *a, **k: R()
+
+
+def test_parar_vigia_viva_mata_so_o_pid_registado_e_avisa_do_tail():
+    mortos = []
+    parou, msg = sp_fila.parar_vigia({"pid": 4242}, run=_ps("python -I scripts/sp-fila.py --vigiar --intervalo 20"),
+                                     matar=lambda pid, sig: mortos.append(pid), eu=lambda: 1)
+    assert parou and mortos == [4242] and "4242" in msg and "tail" in msg
+
+
+def test_parar_vigia_pid_morto_nao_mata_nada():
+    mortos = []
+    parou, msg = sp_fila.parar_vigia({"pid": 4242}, run=_ps(""), matar=lambda pid, sig: mortos.append(pid), eu=lambda: 1)
+    assert not parou and mortos == [] and "4242" in msg
+
+
+def test_parar_vigia_pid_reutilizado_por_processo_alheio_nao_mata_nada():
+    mortos = []
+    parou, _ = sp_fila.parar_vigia({"pid": 4242}, run=_ps("notepad.exe leiame.txt"), matar=lambda pid, sig: mortos.append(pid), eu=lambda: 1)
+    assert not parou and mortos == []
+
+
+def test_parar_vigia_sem_registo_ou_pid_invalido_e_nao_se_mata_a_si_propria():
+    mortos = []
+    for v in (None, {}, {"pid": "x"}, {"pid": 7}):
+        assert not sp_fila.parar_vigia(v, run=_ps("sp-fila --vigiar"), matar=lambda pid, sig: mortos.append(pid), eu=lambda: 7)[0]
+    assert mortos == []
+
+
+def test_parar_vigia_erro_ao_matar_nao_levanta():
+    def falha(pid, sig):
+        raise PermissionError("negado")
+    parou, msg = sp_fila.parar_vigia({"pid": 9}, run=_ps("sp-fila.py --vigiar"), matar=falha, eu=lambda: 1)
+    assert not parou and "negado" in msg
+
+
+def test_fim_da_fila_para_a_vigia_registada(tmp_path, monkeypatch):
+    import sp_fila_execucao
+    vistos = []
+    monkeypatch.setattr(sp_fila_execucao, "parar_vigia", lambda v: vistos.append(v) or (True, "vigia parada (pid 55)"))
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Done")
+    st = _estado(tmp_path, sessoes={"a": {}}, vigia={"pid": 55, "ts": "2026-10-25T11:59:00"})
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0))
+    assert out["acao"] == "fim" and not st.exists()
+    assert vistos == [{"pid": 55, "ts": "2026-10-25T11:59:00"}] and "55" in out["vigia"]
+
+
+def test_parar_abandona_a_fila_e_para_a_vigia(tmp_path, monkeypatch, capsys):
+    vistos = []
+    monkeypatch.setattr(sp_fila, "parar_vigia", lambda v: vistos.append(v) or (True, "vigia parada (pid 55)"))
+    st = _estado(tmp_path, vigia={"pid": 55, "ts": "2026-10-25T11:59:00"})
+    assert sp_fila.main(["--parar", "--estado", str(st)]) == 0
+    assert not st.exists() and len(vistos) == 1
+    assert "vigia parada (pid 55)" in capsys.readouterr().out
+
+
+def test_seguinte_nunca_relanca_sp_ja_doing_nem_ja_lancado(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Doing")
+    make_sp(root, "b")
+    calls = []
+    st = _estado(tmp_path, feitos=["b"])
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0))
+    assert out["acao"] == "fim"
+    assert not any("sp-handoff.py" in " ".join(map(str, c)) for c in calls)
