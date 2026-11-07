@@ -132,3 +132,7 @@ Movido de `SKILL.md` (## Pitfalls); condensado em 2026-10-31 (regras todas manti
 ## 32. Comandos para o user correr com `!`: sintaxe bash (wt-clean-base-inexistente, 2026-11-04)
 
 - O `!` corre em bash: um `cd` com caminho Windows de barras invertidas perde as barras e falha. Dar sempre `cd /c/Users/... && cmd` com barras normais, nunca caminhos PowerShell.
+
+## 33. Endurecer um recurso: listar todos os pontos de entrada antes de corrigir (endurecer-todos-pontos-de-entrada, 2026-11-07)
+
+- Em `sp-fila.py` a 1.ª correção contra estado corrompido cobriu só `--seguinte`; `--estado-vivo`, `--gastos`, `--parar` e `--vigiar` leem o mesmo estado e só foram apanhados depois. Ao endurecer um recurso, `Grep` por todos os pontos de entrada que o leem e listá-los antes de corrigir o primeiro.
