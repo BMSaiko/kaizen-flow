@@ -61,3 +61,7 @@ What counts as a piece is defined once, in `bin/sync.js`. Project SPs stay in th
 | `bin/kaizen.js` | 268 | 37 |
 
 Lines grew because the monoliths became small modules and new tests went in; the gain is in module size and shared helpers, not total lines.
+
+## Branch protection (ação do maintainer)
+
+Em Settings → Branches → `main`, exigir como checks obrigatórios do PR: `test / test` (todas as combinações da matriz), `coverage / test` e `smoke`. A cobertura é só informativa (artefacto `coverage-*`), sem limiar.
