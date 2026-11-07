@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -77,11 +78,23 @@ def test_erro_de_leitura_propaga(tmp_path):
 
 
 def test_listar_ve_ficheiro_novo_sem_invalidar(tmp_path):
+    # O mtime de pasta é grosseiro em alguns runners Windows: avança-o à mão
+    # depois de cada alteração para o teste não depender do relógio do FS.
+    tick = [10**18]
+
+    def bump():
+        tick[0] += 10**9
+        for pasta, _subs, _nomes in os.walk(tmp_path):
+            os.utime(pasta, ns=(tick[0], tick[0]))
+
     sp_indice.invalidar()
     _sp(tmp_path / "a" / "sp" / "TODO" / "x.md")
+    bump()
     assert len(sp_indice.listar(tmp_path)) == 1
     _sp(tmp_path / "b" / "sp" / "TODO" / "y.md")
     _sp(tmp_path / "a" / "sp" / "TODO" / "z.md")
+    bump()
     assert [p.name for p in sp_indice.listar(tmp_path)] == ["x.md", "z.md", "y.md"]
     (tmp_path / "a" / "sp" / "TODO" / "x.md").unlink()
+    bump()
     assert [p.name for p in sp_indice.listar(tmp_path)] == ["z.md", "y.md"]
