@@ -62,6 +62,7 @@ def test_sem_prova_dispensa_regista_no_sp(root):
     assert rc == 0, out + err
     sp = next((root / "vault" / PROJECT / "sp" / "Done").glob("dispensa-*.md"))
     assert "## Dispensa de prova/reflect" in sp.read_text(encoding="utf-8")
+    assert "DISPENSADO" in out and "FALTA" not in out
 
 
 def test_sp_completo_fecha_sem_dispensa(root):

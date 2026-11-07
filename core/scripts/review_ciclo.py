@@ -57,6 +57,8 @@ def ler_achados(path):
     out = []
     for raw in Path(path).read_text(encoding="utf-8").splitlines():
         m = LINHA.match(raw.strip())
+        if not m and raw.strip().startswith(("[bloqueante]", "[menor]")):
+            raise ValueError(f"achado mal formado (esperado '[sev] ficheiro descrição'): {raw.strip()!r}")
         if m:
             desc = m.group(3)
             v = VERIFICAR.search(desc)
@@ -113,10 +115,19 @@ def main(argv=None):
         novos = hashes(a.raiz, a.ficheiros)
         rever = alterados(estado, novos)
         estado["hashes"] = novos
-    ver, bloq = decidir(estado, ler_achados(a.achados), a.max)
+    try:
+        achados = ler_achados(a.achados)
+    except (ValueError, OSError) as e:
+        print(f"erro: {e}; nada foi decidido", file=sys.stderr)
+        return 3
+    ver, bloq = decidir(estado, achados, a.max)
     if rever is not None:
         estado["historico"][-1]["rever"] = rever
-    ep.write_text(json.dumps(estado, ensure_ascii=False, indent=1), encoding="utf-8")
+    try:
+        ep.write_text(json.dumps(estado, ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError as e:
+        print(f"erro: não foi possível gravar {ep}: {e}; sem veredicto", file=sys.stderr)
+        return 3
     print(f"{ver} (iteração {estado['iteracao']}/{a.max}, {len(bloq)} bloqueantes)")
     for b in bloq:
         print(f"[bloqueante] {b['onde']} {b['desc']}" + (f" | verificar: {b['verificar']}" if b["verificar"] else ""))

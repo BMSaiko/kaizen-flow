@@ -72,6 +72,16 @@ class CicloTest(unittest.TestCase):
         with self.assertRaises(KeyError):
             rc.checklist("xyz")
 
+    def test_achado_mal_formado_nao_aprova(self):
+        est, ach = ficheiros("[bloqueante] sem-descricao\n")
+        self.assertEqual(self.run_(est, ach), 3)
+        self.assertFalse(est.exists())
+
+    def test_erro_de_escrita_do_estado_nao_aprova(self):
+        est, ach = ficheiros("[menor] x.py:1 ok\n")
+        est = est.parent / "nao-existe" / "estado.json"
+        self.assertEqual(self.run_(est, ach), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

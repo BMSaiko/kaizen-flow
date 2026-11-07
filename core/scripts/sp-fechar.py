@@ -238,7 +238,7 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
         return 1, lines + faltas + [f"{slug}: sem prova/reflect, SP continua em Doing (registar, ou --sem-prova \"motivo\")"]
     if faltas:
         registar_dispensa(sp.path, sem_prova)
-        lines += [f.replace("AVISO", "DISPENSADO") for f in faltas]
+        lines += [f.replace("FALTA", "DISPENSADO", 1) for f in faltas]
     if commit:
         bloqueio = kf_por_sincronizar(commit_dir)
         if bloqueio:

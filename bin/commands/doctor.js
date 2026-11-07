@@ -50,7 +50,16 @@ function doctor(target, harness = "claude", fix = false) {
       else if (e.name.endsWith(".md") && /\/sp\/(TODO|Doing|Done)\//.test(p.replace(/\\/g, "/")) && !e.name.startsWith("_")) sps.push(p);
     }
   })(root);
-  if (sps.length && pythonCmd()) rc = py(["scripts/sp-validate.py", ...sps], dir) || rc;
+  if (sps.length && pythonCmd()) {
+    // em lotes: uma só linha de comando com todos os SPs passa 8191 caracteres no Windows
+    for (let batch = [], len = 0, i = 0; i <= sps.length; i++) {
+      if (i === sps.length || (batch.length && len + sps[i].length + 1 > 6000)) {
+        if (batch.length) rc = py(["scripts/sp-validate.py", ...batch], dir) || rc;
+        batch = []; len = 0;
+      }
+      if (i < sps.length) { batch.push(sps[i]); len += sps[i].length + 1; }
+    }
+  }
   const m = detectMode();
   console.log(`handoff: ${m.mode} (${m.backend})`);
   if (harness !== "claude") console.log("context hook: none for this harness (degraded); run the handoff by hand when the context gets long, see the AGENTS.md block");

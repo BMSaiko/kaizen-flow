@@ -49,3 +49,20 @@ test("doctor falha numa instalação em falta e --fix repõe sem sobrescrever", 
   assert.strictEqual(run("doctor", d, "--harness", "codex", "--fix").status, 0);
   assert.strictEqual(fs.readFileSync(agents, "utf8"), before);
 });
+
+test("doctor valida muitos SPs em lotes (sem passar o limite da linha de comandos)", () => {
+  const d = tmp();
+  assert.strictEqual(run("init", d, "--harness", "claude").status, 0);
+  const dir = path.join(d, "knowledge", "projects", "kaizen", "proj", "sp", "TODO");
+  fs.mkdirSync(dir, { recursive: true });
+  const corpo = ["Role", "Context", "Objective (single sentence)", "Success criteria", "Constraints", "Seams", "Steps", "Done-when"]
+    .map((t, n) => `## ${n + 1}. ${t}\n\nx\n`).join("\n");
+  for (let i = 0; i < 400; i++) {
+    const slug = `sp-com-nome-bastante-longo-para-encher-a-linha-${i}`;
+    fs.writeFileSync(path.join(dir, `${slug}.md`),
+      `---\nstatus: TODO\ncreated: 2026-10-01T10:00:00Z\nupdated: 2026-10-01T10:00:00Z\nslug: ${slug}\nproject: proj\nphase: SP\ndate: 2026-10-01\npriority: P2\n---\n# ${slug}\n\n${corpo}`);
+  }
+  const r = run("doctor", d, "--harness", "claude");
+  assert.doesNotMatch(`${r.stdout}${r.stderr}`, /ENAMETOOLONG|too long|demasiado longa|ENOENT/i);
+  assert.strictEqual(r.status, 0, `${r.stdout}${r.stderr}`.slice(-600));
+});

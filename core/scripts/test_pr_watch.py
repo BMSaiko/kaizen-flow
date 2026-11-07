@@ -181,6 +181,13 @@ class Cli(unittest.TestCase):
         with self.assertRaises(ValueError):
             pr_watch.pr_ref("--web")
 
+    def test_timeout_e_oserror_viram_gherror(self):
+        import subprocess
+        for exc in (subprocess.TimeoutExpired("gh", 60), OSError("gh em falta")):
+            with mock.patch("subprocess.run", side_effect=exc):
+                with self.assertRaises(pr_watch.GhError):
+                    pr_watch.fetch("12")
+
 
 if __name__ == "__main__":
     unittest.main()

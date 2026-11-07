@@ -37,8 +37,11 @@ def pr_ref(valor):
 
 
 def fetch(pr, repo=None):
-    r = subprocess.run(["gh", "pr", "view", pr, "--json", CAMPOS],
-                       capture_output=True, text=True, cwd=repo, timeout=60)
+    try:
+        r = subprocess.run(["gh", "pr", "view", pr, "--json", CAMPOS],
+                           capture_output=True, text=True, cwd=repo, timeout=60)
+    except (subprocess.TimeoutExpired, OSError) as e:
+        raise GhError(f"gh não respondeu: {e}")
     if r.returncode != 0:
         raise GhError((r.stderr or "gh falhou").strip())
     try:
