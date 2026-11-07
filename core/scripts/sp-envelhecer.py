@@ -38,7 +38,10 @@ def age_days(path, sp, today):
 
 def plan(root, today):
     out = []
+    bloqueados = {(sp.project, sp.slug) for sp, _ in sp_list_mod.eligibility(sp_list_mod.collect(root, include_done=True))[1]}
     for sp in sp_list_mod.collect(root):
+        if (sp.project, sp.slug) in bloqueados:
+            continue
         age, fm = age_days(sp.path, sp, today)
         base = fm["priority_base"] if re.fullmatch(r"P[123]", fm.get("priority_base", "")) else sp.priority
         new = target(base, age)

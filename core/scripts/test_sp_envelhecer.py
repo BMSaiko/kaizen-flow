@@ -10,11 +10,11 @@ env = importlib.util.module_from_spec(_s)
 _s.loader.exec_module(env)
 
 
-def mk(root, name, prio, updated, status="TODO"):
+def mk(root, name, prio, updated, status="TODO", extra=""):
     d = Path(root) / "p" / "sp" / status
     d.mkdir(parents=True, exist_ok=True)
     f = d / f"{name}.md"
-    f.write_text(f"---\nstatus: {status}\nslug: {name}\npriority: {prio}\ncreated: {updated}\nupdated: {updated}\n---\n# x\n", encoding="utf-8")
+    f.write_text(f"---\nstatus: {status}\nslug: {name}\npriority: {prio}\ncreated: {updated}\nupdated: {updated}\n{extra}---\n# x\n", encoding="utf-8")
     return f
 
 
@@ -49,6 +49,21 @@ class T(unittest.TestCase):
             env.main(["--hook", "--root", r, "--stamp", str(st)])
             self.assertTrue(st.exists())
             self.assertIn("priority: P1", next(Path(r).rglob("c.md")).read_text(encoding="utf-8"))
+
+    def test_bloqueado_nao_sobe(self):
+        with tempfile.TemporaryDirectory() as r:
+            mk(r, "dep", "P3", "2026-10-30")
+            mk(r, "blq", "P3", "2026-10-01", extra="depends_on: [dep]\n")
+            mk(r, "livre", "P3", "2026-10-01")
+            slugs = [x[0].slug for x in env.plan(r, date(2026, 11, 1))]
+            self.assertEqual(slugs, ["livre"])
+
+    def test_dependencia_cumprida_sobe(self):
+        with tempfile.TemporaryDirectory() as r:
+            mk(r, "dep", "P3", "2026-10-30", status="Done")
+            mk(r, "ok", "P3", "2026-10-01", extra="depends_on: [dep]\n")
+            slugs = [x[0].slug for x in env.plan(r, date(2026, 11, 1))]
+            self.assertEqual(slugs, ["ok"])
 
 
 if __name__ == "__main__":
