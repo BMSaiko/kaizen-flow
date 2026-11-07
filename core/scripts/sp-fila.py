@@ -71,6 +71,15 @@ def armar_vigia(args, estado):
     return f"vigia destacado (pid {pid}); acompanhar com o Monitor: `tail -F {VIGIA_LOG}` (re-armar o tail aos 30 min); sem a fila a correr, sai sozinho"
 
 
+def _ler_ou_erro(path):
+    """Estado da fila ou None (com erro claro em stderr) se estiver ilegível."""
+    try:
+        return ler(path)
+    except ValueError as e:
+        print(f"erro: estado da fila ilegível ({path}): {e}; `--parar` abandona e apaga-o", file=sys.stderr)
+        return None
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Fila autónoma de SPs")
     ap.add_argument("--dry-run", action="store_true", help="mostra a ordem e as exclusões, sem lançar")
@@ -96,12 +105,18 @@ def main(argv=None):
     ap.add_argument("--relatorios", default=str(RELATORIOS), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     estado = Path(args.estado)
+    if args.concorrencia is not None and args.concorrencia < 1:
+        print(f"erro: --concorrencia exige N >= 1 (recebido {args.concorrencia}); sem a opção a fila corre em série", file=sys.stderr)
+        return 1
 
     if args.ajuda:
         print(AJUDA)
         return 0
     if args.parar:
-        vigia = ler(estado).get("vigia") if estado.exists() else None
+        try:
+            vigia = ler(estado).get("vigia") if estado.exists() else None
+        except ValueError:  # corrompido: abandonar na mesma
+            vigia = None
         estado.unlink(missing_ok=True)
         print("fila abandonada")
         if vigia:
@@ -115,7 +130,7 @@ def main(argv=None):
         return 0
     if args.vigiar:
         def lido():
-            return estado_vivo(ler(estado), load(args.root, args.projeto), run_hidden, datetime.now(), args.inatividade * 60) if estado.exists() else None
+            return estado_vivo(_ler_ou_erro(estado) or {"sessoes": {}}, load(args.root, args.projeto), run_hidden, datetime.now(), args.inatividade * 60) if estado.exists() else None
         fim = None
         if args.ate:
             h, m = map(int, args.ate.split(":"))
@@ -128,7 +143,9 @@ def main(argv=None):
         if not estado.exists():
             print("erro: sem fila em curso", file=sys.stderr)
             return 1
-        atual = ler(estado)
+        atual = _ler_ou_erro(estado)
+        if atual is None:
+            return 1
         for slug, est, motivo in estado_vivo(atual, load(args.root, args.projeto), run_hidden, datetime.now(), args.inatividade * 60):
             print(linha(slug, est, motivo))
         if aviso := aviso_vigia(atual, datetime.now()):
@@ -140,7 +157,10 @@ def main(argv=None):
         if not estado.exists():
             print("erro: sem fila em curso", file=sys.stderr)
             return 1
-        print(render_gastos(ler(estado), _custos()))
+        atual = _ler_ou_erro(estado)
+        if atual is None:
+            return 1
+        print(render_gastos(atual, _custos()))
         return 0
     items = load(args.root, args.projeto)
     mae = None
@@ -181,6 +201,9 @@ def main(argv=None):
         out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug)
     except IntegracaoPendente as e:
         print(f"erro: {e}", file=sys.stderr)
+        return 1
+    except ValueError as e:  # estado ilegível (JSON truncado/corrompido): não adivinhar, o user decide
+        print(f"erro: estado da fila ilegível ({estado}): {e}; `--parar` abandona e apaga-o", file=sys.stderr)
         return 1
     except TimeoutError as e:  # lock preso: o estado fica intacto (sem «fila vazia» nem falhados); repetir `--seguinte --slug`
         print(f"erro: {e}; o estado não foi alterado, repetir `--seguinte`", file=sys.stderr)

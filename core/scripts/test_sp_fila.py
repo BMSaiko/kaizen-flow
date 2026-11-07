@@ -1343,3 +1343,72 @@ def test_commit_md_lista_o_relatorio(tmp_path):
     t = p.read_text(encoding="utf-8")
     assert p.parent == tmp_path and p.name.startswith("COMMIT_")
     assert "git add knowledge/infra/reports/sp-fila/fila-x.md" in t and "vault:" in t
+
+
+# --- fc-robustez: cenários de falha do modo --concorrencia ---
+
+@pytest.mark.parametrize("n", ["0", "-1", "-3"])
+def test_concorrencia_invalida_e_recusada_com_mensagem(tmp_path, capsys, n):
+    rc = sp_fila.main(["--concorrencia", n, "--estado", str(tmp_path / "e.json"), "--root", str(tmp_path / "sps")])
+    assert rc == 1 and "N >= 1" in capsys.readouterr().err
+    assert not (tmp_path / "e.json").exists()
+
+
+def test_estado_corrompido_da_erro_claro_e_nao_apaga(tmp_path, capsys):
+    st = tmp_path / "e.json"
+    st.write_text('{"max": 3, "sessoes": {', encoding="utf-8")
+    rc = sp_fila.main(["--seguinte", "--estado", str(st), "--root", str(tmp_path / "sps")])
+    assert rc == 1 and "ilegível" in capsys.readouterr().err
+    assert st.read_text(encoding="utf-8").startswith('{"max"')  # intacto para diagnóstico
+
+
+def test_sessao_morta_sem_painel_vira_falhada_e_a_fila_lanca_a_seguinte(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Doing")
+    make_sp(root, "b")
+    st = _estado(tmp_path, concorrencia=2, max=9, sessoes={"a": {"painel": "99"}})
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0), slug="a")
+    estado = json.loads(st.read_text(encoding="utf-8"))
+    assert out["acao"] == "lancou" and out["slugs"] == ["b"]
+    assert estado["falhados"] == ["a"] and list(estado["sessoes"]) == ["b"]
+
+
+def test_spawn_falha_worktree_existente_marca_falhado_sem_bloquear_estado(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a")
+
+    def run(argv, **_):
+        class R:
+            returncode = 1 if "--spawn" in argv else 0
+            stdout = ""
+            stderr = "worktree sb-a já existe"
+        return R()
+    st = _estado(tmp_path, concorrencia=2, max=9)
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", run, datetime(2026, 10, 25, 12, 0))
+    assert out["acao"] == "fim" and "worktree sb-a já existe" in out["motivo"]
+
+
+def test_retoma_apos_crash_nao_relanca_sessoes_registadas(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Doing")
+    make_sp(root, "b")
+    (tmp_path / "estado.json.123.tmp").write_text("{lixo", encoding="utf-8")  # escrita atómica interrompida
+    st = _estado(tmp_path, concorrencia=1, max=9, sessoes={"a": {"painel": "7"}})
+    calls = []
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0), slug="zz")
+    assert out["acao"] == "espera" and calls == []
+    assert json.loads(st.read_text(encoding="utf-8"))["sessoes"] == {"a": {"painel": "7"}}
+
+
+@pytest.mark.parametrize("flag", ["--estado-vivo", "--gastos"])
+def test_leituras_com_estado_corrompido_dao_erro_claro(tmp_path, capsys, flag):
+    st = tmp_path / "e.json"
+    st.write_text("{lixo", encoding="utf-8")
+    assert sp_fila.main([flag, "--estado", str(st), "--root", str(tmp_path / "sps")]) == 1
+    assert "ilegível" in capsys.readouterr().err
+
+
+def test_parar_abandona_estado_corrompido(tmp_path, capsys):
+    st = tmp_path / "e.json"
+    st.write_text("{lixo", encoding="utf-8")
+    assert sp_fila.main(["--parar", "--estado", str(st)]) == 0 and not st.exists()
