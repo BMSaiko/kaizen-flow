@@ -37,7 +37,7 @@ def git_state():
     return run("rev-parse", "--abbrev-ref", "HEAD")[:1] + run("status", "--short")
 
 
-def estado(ref, root=None, project=None, git_lines=None):
+def estado(ref, root=None, project=None, git_lines=None, atras=None):
     sp_list = kaizen_engine.load("sp-list")
     sp_gates = kaizen_engine.load("sp-gates")
     root = Path(root) if root else sp_list.default_root()
@@ -78,6 +78,9 @@ def estado(ref, root=None, project=None, git_lines=None):
     if prog:
         out.append("progresso:")
         out += [f"  {l.strip()}" for l in prog]
+    n = atras if atras is not None else kf_git.atras_de(HERE.parent)
+    if n:
+        out.append(f"⚠ ramo {n} commits atrás de master: git merge master antes de criar SP")
     out.append(f"git: {ramo} · {len(ficheiros)} alterados")
     out += [f"  {l}" for l in ficheiros[:MAX_FILES]]
     if len(ficheiros) > MAX_FILES:

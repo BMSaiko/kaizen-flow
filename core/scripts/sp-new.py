@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import kf_git  # noqa: E402
 
 sp_list = kaizen_engine.load("sp-list")
 
@@ -109,6 +110,19 @@ def check(root, project, slug, priority, modo="manual"):
         raise SpNewError(f"projeto '{project}' não existe em {root}")
     if any(sp.slug == slug and sp.project == project for sp in sp_list.collect(root, include_done=True)):
         raise SpNewError(f"SP '{slug}' já existe no projeto '{project}'")
+
+
+def check_master(project, slug, master_paths):
+    """Recusa slug que já existe em master (worktree desatualizada não o vê)."""
+    pref = f"/{project}/sp/"
+    for p in master_paths:
+        if pref in "/" + p and Path(p).name.startswith(slug + "-") and re.fullmatch(r"\d{4}-\d{2}-\d{2}\.md", Path(p).name[len(slug) + 1:]):
+            raise SpNewError(f"SP '{slug}' já existe em master ({p}); git merge master")
+
+
+def git_master():
+    root = Path(__file__).resolve().parent.parent
+    return kf_git.atras_de(root), kf_git.ficheiros_em(root)
 
 
 def check_permitir(permitir):
@@ -289,6 +303,10 @@ def main(argv=None):
                 print("aviso: programa em modo: manual; sp-fila para a cada pergunta/commit. "
                       "Para uma fila sem paragens: --modo auto --commit auto", file=sys.stderr)
         elif args.slug:
+            atras, master_paths = git_master()
+            if atras:
+                print(f"aviso: ramo {atras} commits atrás de master; git merge master", file=sys.stderr)
+            check_master(args.project, args.slug, master_paths)
             check_links(args.root, args.project, args.parent, args.depends_on)
             path = create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao)
             if args.parent:

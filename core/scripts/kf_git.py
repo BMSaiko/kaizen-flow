@@ -51,3 +51,18 @@ def ficheiros_em_head(diretorio, run=_executar, cache=False):
 
 
 run_ = run
+
+
+def atras_de(repo, ref="master", run=_executar):
+    """Nº de commits de `ref` que o HEAD ainda não tem (0 se falhar)."""
+    r = run(["git", "-C", str(repo), "rev-list", "--count", f"HEAD..{ref}"], capture_output=True, text=True, encoding="utf-8")
+    try:
+        return int(r.stdout.strip()) if r.returncode == 0 else 0
+    except ValueError:
+        return 0
+
+
+def ficheiros_em(repo, ref="master", run=_executar):
+    """Caminhos versionados em `ref` (vazio se falhar)."""
+    r = run(["git", "-C", str(repo), "ls-tree", "-r", "--name-only", ref], capture_output=True, text=True, encoding="utf-8")
+    return r.stdout.splitlines() if r.returncode == 0 else []

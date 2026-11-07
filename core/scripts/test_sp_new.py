@@ -372,3 +372,23 @@ def test_link_parent_preserva_crlf(tmp_path):
     data = mother.read_bytes()
     assert b"\n" not in data.replace(b"\r\n", b"")
     assert b"  - slug: b\r\n    depends_on: []\r\n    state: TODO\r\n" in data
+
+
+def test_recusa_slug_existente_em_master(tmp_path):
+    root = project(tmp_path)
+    master = ["knowledge/projects/atlas/sp/TODO/dup-2026-11-07.md"]
+    with pytest.raises(sp_new.SpNewError, match="master"):
+        sp_new.check_master("atlas", "dup", master)
+    sp_new.check_master("atlas", "outro", master)
+    sp_new.check_master("demo", "dup", master)
+
+
+def test_cli_recusa_slug_em_master_e_avisa_atras(tmp_path, capsys, monkeypatch):
+    project(tmp_path)
+    monkeypatch.setattr(sp_new, "git_master", lambda: (2, ["x/atlas/sp/Done/dup-2026-11-07.md"]))
+    rc = sp_new.main(["--project", "atlas", "--slug", "dup", "--priority", "P2", "--root", str(tmp_path)])
+    err = capsys.readouterr().err
+    assert rc == 1 and "master" in err and "2 commits" in err
+    rc = sp_new.main(["--project", "atlas", "--slug", "novo", "--priority", "P2", "--root", str(tmp_path)])
+    err = capsys.readouterr().err
+    assert rc == 0 and "atrás de master" in err

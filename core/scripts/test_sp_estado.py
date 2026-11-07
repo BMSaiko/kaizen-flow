@@ -106,3 +106,14 @@ def test_spike_incerto_mostra_timebox(tmp_path):
 def test_sem_spike_nao_mostra_linha(tmp_path):
     make(tmp_path, "Doing", "alvo")
     assert "spike" not in sp_estado.estado("alvo", root=tmp_path, git_lines=["master"])
+
+
+def test_avisa_ramo_atras_de_master(tmp_path):
+    make(tmp_path, "Doing", "alvo")
+    out = sp_estado.estado("alvo", root=tmp_path, git_lines=["agent/x"], atras=3)
+    assert "atrás de master" in out and "3 commits" in out and "git merge master" in out
+
+
+def test_sem_aviso_quando_em_dia(tmp_path):
+    make(tmp_path, "Doing", "alvo")
+    assert "atrás" not in sp_estado.estado("alvo", root=tmp_path, git_lines=["master"], atras=0)
