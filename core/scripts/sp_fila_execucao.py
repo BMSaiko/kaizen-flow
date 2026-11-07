@@ -7,10 +7,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
-from sp_fila_estado import REQ_POR_SP, SCRIPTS, bloqueio, guardar, ler, run_hidden
+from sp_fila_estado import RELATORIOS, REPO, REQ_POR_SP, SCRIPTS, bloqueio, guardar, ler, run_hidden
 from sp_fila_paralelo import parar_vigia
 from sp_fila_plano import descendentes, falhas, limite, load, plan, sem_commit
-from sp_fila_relatorio import progresso, relatorio
+from sp_fila_relatorio import destino_relatorio, escrever_commit_md, progresso, relatorio
 
 
 def seguinte(root, estado_path, rel_dir, run=run_hidden, agora=None, custo_fn=None, slug=None):
@@ -114,7 +114,10 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
         motivo = motivo or (falhas(estado) if paralelo else limite(estado, agora, custo)) or "fila vazia"
         sps = {sp.slug: (sp.status, _ler_sp(sp)) for sp, _ in items
                if sp.slug in estado["feitos"] + estado["falhados"]}
+        rel_dir, wt_slug = destino_relatorio(rel_dir, agora, run)
         path = relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora, _custos_seguros(custo_fn), sps)
+        if wt_slug:
+            escrever_commit_md(path.parents[len(RELATORIOS.relative_to(REPO).parts)], path, agora)
         if estado.get("programa"):
             mae = next((sp for sp, _ in items if sp.slug == estado["programa"]), None)
             if mae is not None:

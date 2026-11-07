@@ -84,3 +84,33 @@ def progresso(mae_path, estado, fila, motivo, agora):
               *listar(porcorrer), ""]
     with Path(mae_path).open("a", encoding="utf-8") as f:
         f.write("\n".join(linhas))
+
+
+def destino_relatorio(rel_dir, agora, run):
+    """(rel_dir, slug da worktree): se `rel_dir` está no checkout principal, devolve o equivalente numa worktree nova.
+
+    Assim o relatório nunca fica untracked em master. Fora do repo (testes, --relatorios) fica igual."""
+    rel_dir = Path(rel_dir)
+    try:
+        rel = rel_dir.resolve().relative_to(REPO.resolve())
+    except ValueError:
+        return rel_dir, None
+    slug = f"fila-relatorio-{agora:%Y-%m-%d-%H%M}"
+    r = run([sys.executable, "-I", str(Path(__file__).resolve().parent / "sb-worktree.py"), "ensure", slug],
+            capture_output=True, text=True, encoding="utf-8")
+    linhas = [l.strip() for l in (r.stdout or "").splitlines() if l.strip()]
+    if r.returncode != 0 or not linhas:
+        raise RuntimeError(f"worktree do relatório: {(r.stderr or r.stdout or '').strip()}")
+    return Path(linhas[-1]) / rel, slug
+
+
+def escrever_commit_md(wt, relatorio_path, agora):
+    """COMMIT_*.md na raiz da worktree para o relatório (sem commit; a confirmação é humana)."""
+    rel = Path(relatorio_path).resolve().relative_to(Path(wt).resolve()).as_posix()
+    path = Path(wt) / f"COMMIT_{agora:%Y%m%d_%H%M%S}.md"
+    texto = ["## Mensagem", "", "```", "vault: relatório da fila sp-fila", "",
+             f"Relatório {Path(rel).name}, escrito já na worktree.", "```", "", "## Stage", "", "```",
+             f"git add {rel}", "```", "", "## Fora do commit", "",
+             "Nada além do relatório; rever antes de confirmar.", ""]
+    path.write_text(chr(10).join(texto), encoding="utf-8")
+    return path

@@ -1288,3 +1288,44 @@ def test_vigia_estado_so_com_sessoes_e_vigia_tolera_feitos_ausentes(tmp_path):
     estado = sp_fila.ler(st)
     assert estado["feitos"] == [] and estado["falhados"] == []
     assert estado["vigia"] == {"pid": 1}
+
+
+# --- relatório na worktree (fila-relatorio-integrado) ---
+
+def test_destino_fora_do_repo_fica_igual(tmp_path):
+    from sp_fila_relatorio import destino_relatorio
+    chamadas = []
+    assert destino_relatorio(tmp_path / "rel", datetime(2026, 11, 7, 12, 0), lambda *a, **k: chamadas.append(a)) == (tmp_path / "rel", None)
+    assert chamadas == []
+
+
+def test_destino_dentro_do_repo_usa_worktree(tmp_path):
+    from sp_fila_relatorio import destino_relatorio
+    import sp_fila_estado as ee
+    wt = tmp_path / "wt"
+
+    class R:
+        returncode = 0
+        stdout = f"ok{chr(10)}{wt}{chr(10)}"
+        stderr = ""
+    chamadas = []
+
+    def run(argv, **k):
+        chamadas.append(argv)
+        return R()
+    rel = ee.REPO / "knowledge" / "infra" / "reports" / "sp-fila"
+    novo, slug = destino_relatorio(rel, datetime(2026, 11, 7, 12, 0), run)
+    assert novo == wt / "knowledge" / "infra" / "reports" / "sp-fila"
+    assert slug == "fila-relatorio-2026-11-07-1200"
+    assert "ensure" in chamadas[0] and slug in chamadas[0]
+
+
+def test_commit_md_lista_o_relatorio(tmp_path):
+    from sp_fila_relatorio import escrever_commit_md
+    rel = tmp_path / "knowledge" / "infra" / "reports" / "sp-fila" / "fila-x.md"
+    rel.parent.mkdir(parents=True)
+    rel.write_text("x", encoding="utf-8")
+    p = escrever_commit_md(tmp_path, rel, datetime(2026, 11, 7, 12, 0))
+    t = p.read_text(encoding="utf-8")
+    assert p.parent == tmp_path and p.name.startswith("COMMIT_")
+    assert "git add knowledge/infra/reports/sp-fila/fila-x.md" in t and "vault:" in t
