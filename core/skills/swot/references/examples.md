@@ -28,7 +28,7 @@ Movido de `SKILL.md` (encolher skills, 2026-10-18).
 2. <target> — score X/5 — why this is #2
 
 **Verdict:** The biggest leverage point is <X> because <Y> (score <Z>/5).
-**Next step:** Feed top 2 targets into `eisenhower-matrix` or `/dp` for execution planning.
+**Next step:** Feed top 2 targets into `/dp` for execution planning.
 ```
 
 ### Execution checklist

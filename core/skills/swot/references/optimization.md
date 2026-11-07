@@ -8,7 +8,7 @@ Pergunta: «como melhorar isto?». Saída com pontuação, análise cruzada e al
 4. **Pontuar** cada item: Impact (1-5) e Effort (1 trivial … 5 refactor grande). Prioridade = Impact / Effort.
 5. **Cruzar:** SO (Atacar), WO (Corrigir: a fraqueza que bloqueia a maior oportunidade), ST (Proteger), WT (Sobreviver: corrigir já).
 6. **Priorizar** as células cruzadas; os 2 primeiros são os alvos.
-7. **Veredito** — «O maior ponto de alavanca é X porque Y (score Z/5).» Próximo passo: `eisenhower-matrix` ou `/dp`.
+7. **Veredito** — «O maior ponto de alavanca é X porque Y (score Z/5).» Próximo passo: `/dp`.
 
 Saída: `# SWOT Optimization: <âmbito>`, 2x2 pontuado (`S1: <item> (Impact: 4, Effort: 2)`), `## Cross-Analysis` (4 células), `## Prioritized Targets`, `**Verdict:**`.
 

@@ -62,6 +62,6 @@ Parar nos 4 quadrantes: é um quadro de decisão, não um tratado.
 A Recomendação, numa frase, serve de `--decisao "<recomendação>"` do `sp-new.py`.
 
 ## Quando não usar
-- Faltam ideias → `brainstorm`. Causa raiz → `five-whys`. Ambiente muda mais depressa que a análise → `ooda-loop`.
+- Faltam ideias → `brainstorm`.
 
 Exemplos: `references/examples.md`.

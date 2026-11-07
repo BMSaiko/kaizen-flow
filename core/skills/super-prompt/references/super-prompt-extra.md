@@ -4,10 +4,7 @@
 
 Opcionais, antes ou durante o pipeline (o funil funciona sem elas):
 
-- **`five-whys`** — objetivo vago ou problema pouco claro: causa raiz antes do brainstorm.
 - **`swot`** — sistema/processo a melhorar: mapear a situação antes do grill.
-- **`ooda-loop`** — ambiente volátil: manter o SP alinhado com a realidade.
-- **`eisenhower-matrix`** — com o SP guardado, priorizar os Steps (§7) num kanban.
 
 ## Templates do grill-me
 

@@ -29,18 +29,9 @@ and resume with another `/michi …`. See `## Quick reference` below.
 The following skills complement the michi flow and can be invoked at
 specific phases:
 
-- **`five-whys`** — In Phase 1 (Grill) or Phase 2 (DR), before committing
-to a problem definition. If the symptom is unclear, run Five Whys to find
-the root cause before the grill even starts.
 - **`swot`** — In Phase 1 (Grill), to map the current
 situation when the project involves a system, process, or capability
 that needs improvement.
-- **`ooda-loop`** — During any phase when the environment is changing
-faster than the plan can hold. The OODA loop keeps you aligned with
-reality — use it alongside michi when the situation is volatile.
-- **`eisenhower-matrix`** — After Phase 6 (Report) and before commit,
-to prioritize the actions from Reflect into a concrete execution order.
-  Or during Phase 3 (DP) to scope the phase breakdown.
 
 These are optional enhancements — michi works without them, but they
 sharpen the output when the situation warrants it.
