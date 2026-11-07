@@ -1280,3 +1280,11 @@ def test_vigiar_regista_incidente_de_sessao_morta():
     passos = iter([[("a", "morto", "sem processo")]])
     sp_fila.vigiar(lambda: next(passos), 1, lambda s: None, lambda m: None, incidente=achados.append)
     assert achados == ["a: morto"]
+
+
+def test_vigia_estado_so_com_sessoes_e_vigia_tolera_feitos_ausentes(tmp_path):
+    st = tmp_path / "estado.json"
+    st.write_text(json.dumps({"sessoes": {}, "vigia": {"pid": 1}}), encoding="utf-8")
+    estado = sp_fila.ler(st)
+    assert estado["feitos"] == [] and estado["falhados"] == []
+    assert estado["vigia"] == {"pid": 1}

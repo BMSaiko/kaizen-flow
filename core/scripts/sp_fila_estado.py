@@ -112,6 +112,8 @@ def migrar(estado):
     """Formato antigo (`lancado`: um slug) → `sessoes`: {slug: {inicio, ...}} (uma entrada por SP em curso)."""
     antigo = estado.pop("lancado", None)
     estado.setdefault("sessoes", {})
+    estado.setdefault("feitos", [])  # estado só com sessoes+vigia (sem chaves de fila): tolerar a ausência
+    estado.setdefault("falhados", [])
     if antigo:
         estado["sessoes"].setdefault(antigo, {})
     return estado
