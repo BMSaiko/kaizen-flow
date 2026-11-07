@@ -16,6 +16,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
 
 MAX_LINES = 30
@@ -31,7 +32,7 @@ def section(text, prefix):
 
 def git_state():
     def run(*a):
-        r = subprocess.run(["git", *a], capture_output=True, text=True, cwd=HERE.parent)
+        r = kf_git.run(HERE.parent, *a, run=subprocess.run)
         return r.stdout.splitlines()
     return run("rev-parse", "--abbrev-ref", "HEAD")[:1] + run("status", "--short")
 

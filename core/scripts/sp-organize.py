@@ -17,6 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import sp_indice  # noqa: E402
 
 sp_list = kaizen_engine.load("sp-list")
 
@@ -40,14 +41,14 @@ def set_field(text, key, value):
 def plan(root, project=None):
     root = Path(root)
     actions = []
-    for path in sorted(root.rglob("*.md")):
+    for path in sp_indice.listar(root):
         parts = path.relative_to(root).parts
         if (SKIP_DIRS & set(parts) or path.name == "MOC.md" or ATTACHMENT_RE.search(path.stem)
                 or "sp" not in parts[:-1]):
             continue
         idx = parts.index("sp")
         try:
-            fm = sp_list.parse_frontmatter(path.read_text(encoding="utf-8"))
+            fm = sp_indice.frontmatter(path)
         except (OSError, UnicodeDecodeError):
             continue
         if fm.get("phase") != "SP":
@@ -99,9 +100,11 @@ def apply(action):
     action.target.parent.mkdir(parents=True, exist_ok=True)
     if action.target == action.source:
         action.source.write_text(text, encoding="utf-8")
+        sp_indice.invalidar()
         return
     action.target.write_text(text, encoding="utf-8")
     action.source.unlink()
+    sp_indice.invalidar()
 
 
 def main(argv=None):

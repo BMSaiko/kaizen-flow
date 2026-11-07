@@ -223,3 +223,16 @@ def test_changed_paths_ignora_apagamento_em_stage(tmp_path):
     (tmp_path / "TODO" / "x.md").rename(tmp_path / "Done" / "x.md")
     g("rm", "--cached", "-q", "TODO/x.md")
     assert mod.changed_paths(tmp_path) == ["Done/x.md"]
+
+
+def test_em_fila_so_com_sessao_registada(tmp_path):
+    f = tmp_path / "estado.json"
+    f.write_text('{"sessoes": {"a": {}}}', encoding="utf-8")
+    assert _mod().em_fila("a", f) and not _mod().em_fila("b", f)
+    assert not _mod().em_fila("a", tmp_path / "nao-existe.json")
+
+
+def test_seguinte_em_fila_so_reporta_sem_proximo_filho(tmp_path):
+    _prog(tmp_path, {"mae": "TODO", "a": "Done", "b": "TODO"})
+    out = _mod().seguinte(tmp_path, "a", PROJECT, fila=True)
+    assert out.startswith("FILA:") and "PRÓXIMO FILHO" not in out and "sp-handoff" not in out

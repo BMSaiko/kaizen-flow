@@ -20,6 +20,8 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import kf_git  # noqa: E402
 SEM_PATCH = re.compile(r"^(?:[-*]\s*)?Reflect\s+[^:]*:\s*sem patch\.?\s*$", re.I)
 LINHA = re.compile(r"^(?:[-*]\s*)?Reflect\b[^:\n]*:\s*\S", re.I)
 
@@ -62,7 +64,7 @@ def aviso_atraso(atras: int, base: str = "master") -> str:
 
 
 def _atras(base: str, cwd) -> int:
-    r = subprocess.run(["git", "rev-list", "--count", f"HEAD..{base}"], capture_output=True, text=True, cwd=cwd, encoding="utf-8")
+    r = kf_git.run(cwd or ".", "rev-list", "--count", f"HEAD..{base}", run=subprocess.run)
     return int(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip().isdigit() else 0
 
 
@@ -89,7 +91,7 @@ def gerar(text: str, slug: str, diff_stat: list[str] | None = None, gates: list[
 
 
 def _git_stat(base: str, cwd=None) -> list[str]:
-    r = subprocess.run(["git", "diff", "--stat", base], capture_output=True, text=True, cwd=cwd or HERE.parent, encoding="utf-8")
+    r = kf_git.run(cwd or HERE.parent, "diff", "--stat", base, run=subprocess.run)
     return r.stdout.splitlines() if r.returncode == 0 else []
 
 

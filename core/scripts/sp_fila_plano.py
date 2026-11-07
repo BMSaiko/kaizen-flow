@@ -1,11 +1,12 @@
 """Sp-fila: elegibilidade, ordem da fila (plan), limites e orçamento."""
-import subprocess
 from datetime import datetime
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import kf_git  # noqa: E402
+import sp_indice  # noqa: E402
 from sp_fila_estado import REQ_POR_SP, USER, run_hidden
 
 sp_list = kaizen_engine.load("sp-list")
@@ -17,7 +18,7 @@ def load(root, project=None):
     for sp in sp_list.collect(root, include_done=True):
         if project and sp.project != project:
             continue
-        fm = sp_list.parse_frontmatter(sp.path.read_text(encoding="utf-8"))
+        fm = sp_indice.frontmatter(sp.path)
         items.append((sp, fm))
     return items
 
@@ -137,13 +138,14 @@ def render_plan(fila, excluidos):
 def sem_commit(items, run=run_hidden):
     """Slugs dos SPs cujo ficheiro não está no HEAD do repo (só leitura). Sem git ou fora de um repo: nenhum."""
     fora = set()
+    por_dir = {}  # uma chamada git por diretório, não por SP
     for sp, _ in items:
         if sp.status == "Done":
             continue
-        try:
-            r = run(["git", "-C", str(sp.path.parent), "ls-tree", "--name-only", "HEAD", sp.path.name], capture_output=True, text=True, encoding="utf-8")
-        except (OSError, subprocess.SubprocessError):
-            continue
-        if r.returncode == 0 and not r.stdout.strip():
+        d = sp.path.parent
+        if d not in por_dir:
+            por_dir[d] = kf_git.ficheiros_em_head(d, run=run)
+        em_head = por_dir[d]
+        if em_head is not None and sp.path.name not in em_head:
             fora.add(sp.slug)
     return fora

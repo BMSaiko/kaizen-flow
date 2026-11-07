@@ -16,6 +16,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import sp_indice  # noqa: E402
 import sp_list_mod  # noqa: E402  (carrega sp-list.py)
 
 REPO = Path(__file__).resolve().parent.parent
@@ -29,19 +30,17 @@ def target(base, age):
 
 
 def age_days(path, sp, today):
-    raw = path.read_text(encoding="utf-8")
-    m = re.search(r"^updated:\s*(.+)$", raw, re.M)
-    d = sp_list_mod.parse_date(m.group(1)) if m else None
+    fm = sp_indice.frontmatter(path)
+    d = sp_list_mod.parse_date(fm["updated"]) if fm.get("updated") else None
     d = d or sp.created
-    return (today - d).days if d else 0, raw
+    return (today - d).days if d else 0, fm
 
 
 def plan(root, today):
     out = []
     for sp in sp_list_mod.collect(root):
-        age, raw = age_days(sp.path, sp, today)
-        m = re.search(r"^priority_base:\s*(P[123])\s*$", raw, re.M)
-        base = m.group(1) if m else sp.priority
+        age, fm = age_days(sp.path, sp, today)
+        base = fm["priority_base"] if re.fullmatch(r"P[123]", fm.get("priority_base", "")) else sp.priority
         new = target(base, age)
         if ORDER.index(new) > ORDER.index(sp.priority):
             out.append((sp, sp.priority, new, base, age))
@@ -54,6 +53,7 @@ def apply(sp, new, base):
     if not re.search(r"^priority_base:", raw, re.M):
         raw = re.sub(r"^(priority: .*)$", rf"\1\npriority_base: {base}", raw, count=1, flags=re.M)
     sp.path.write_bytes(raw.encode("utf-8"))
+    sp_indice.invalidar()
 
 
 def main(argv=None):

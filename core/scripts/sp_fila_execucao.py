@@ -5,8 +5,10 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
 from sp_fila_estado import REQ_POR_SP, SCRIPTS, bloqueio, guardar, ler, run_hidden
+from sp_fila_paralelo import parar_vigia
 from sp_fila_plano import descendentes, falhas, limite, load, plan, sem_commit
 from sp_fila_relatorio import progresso, relatorio
 
@@ -27,7 +29,7 @@ class IntegracaoPendente(RuntimeError):
 def _done_so_na_worktree(root, slug, run):
     """Caminho da worktree `agent/<nome>` do SP se aí o SP está em Done; None se não houver worktree ou o SP não estiver em Done lá."""
     nome = re.sub(r"[^a-z0-9-]+", "-", slug.lower()).strip("-")[:31].rstrip("-")  # igual a sb-worktree.name_of (o pacote kf não o inclui)
-    r = run(["git", "-C", str(root), "worktree", "list", "--porcelain"], capture_output=True, text=True, encoding="utf-8")
+    r = kf_git.run(root, "worktree", "list", "--porcelain", run=run)
     atual = None
     for linha in (r.stdout or "").splitlines():
         if linha.startswith("worktree "):
@@ -49,7 +51,7 @@ def _ler_sp(sp):
 
 def _cwd_neutro(root):
     """Checkout principal (master): `sp-move doing` aí não reclama o SP para o agente do worktree que orquestra; quem reclama é o `sb-worktree ensure` do spawn."""
-    r = run_hidden(["git", "-C", str(root), "rev-parse", "--path-format=absolute", "--git-common-dir"], capture_output=True, text=True)
+    r = kf_git.run(root, "rev-parse", "--path-format=absolute", "--git-common-dir", run=run_hidden)
     return Path(r.stdout.strip()).parent if r.returncode == 0 and r.stdout.strip() else None
 
 
@@ -85,7 +87,9 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
         custos = (custo_fn or _custos)()
         custo = sum(custos.get(s, 0.0) for s in so) - estado.get("custo_inicio", 0.0)
     lancados, motivo = [], None
-    for alvo in (sp for sp in fila if all(d in done for d in sp.depends_on)):
+    # Único decisor: nunca lançar SP já iniciado (Doing), nem um que a fila já lançou/fechou (a sessão e a vigia podem chamar este passo a seguir).
+    vistos = set(estado["sessoes"]) | set(estado["feitos"]) | set(estado["falhados"])
+    for alvo in (sp for sp in fila if sp.status == "TODO" and sp.slug not in vistos and all(d in done for d in sp.depends_on)):
         motivo = falhas(estado) if paralelo else limite(estado, agora, custo)
         if motivo or len(estado["sessoes"]) >= teto:
             break
@@ -116,7 +120,8 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug):
             if mae is not None:
                 progresso(mae.path, estado, fila, motivo, agora)
         Path(estado_path).unlink()
-        return {"acao": "fim", "motivo": motivo, "relatorio": str(path)}
+        _, aviso = parar_vigia(estado.get("vigia"))
+        return {"acao": "fim", "motivo": motivo, "relatorio": str(path), "vigia": aviso}
     guardar(estado_path, estado)
     if not lancados:
         return {"acao": "espera", "sessoes": list(estado["sessoes"])}

@@ -721,7 +721,9 @@ def test_sem_commit_so_marca_sps_fora_do_head(tmp_path):
                 stderr = ""
             return R()
         return run
-    assert sp_fila.sem_commit(items, git(lambda a: a[-1] if a[-1].startswith("a") else "")) == {"b"}
+    chamadas = []
+    assert sp_fila.sem_commit(items, git(lambda a: chamadas.append(a) or "a.md\n")) == {"b"}
+    assert len(chamadas) == 1  # uma chamada por diretório, não por SP
     assert sp_fila.sem_commit(items, git(lambda a: "", rc=128)) == set()
 
 
@@ -995,6 +997,41 @@ def test_vigia_destacado_nao_arma_segunda_vigia(tmp_path, capsys, monkeypatch):
     assert chamadas == [] and "vigia já ativo (pid 77)" in capsys.readouterr().out
 
 
+class _Proc:
+    def __init__(self, pid):
+        self.pid = pid
+
+
+def test_garantir_vigia_ausente_arma():
+    armadas = []
+    res = sp_fila.garantir_vigia({"sessoes": {"a": {}}}, lambda: armadas.append(1) or _Proc(5), AGORA)
+    assert res == ("armada", 5) and armadas == [1]
+
+
+def test_garantir_vigia_parada_rearma():
+    velha = {"sessoes": {"a": {}}, "vigia": {"pid": 9, "ts": (AGORA - timedelta(minutes=10)).isoformat(timespec="seconds")}}
+    assert sp_fila.garantir_vigia(velha, lambda: _Proc(6), AGORA) == ("armada", 6)
+
+
+def test_garantir_vigia_viva_nao_arma():
+    nova = {"sessoes": {"a": {}}, "vigia": {"pid": 9, "ts": AGORA.isoformat(timespec="seconds")}}
+    armadas = []
+    assert sp_fila.garantir_vigia(nova, lambda: armadas.append(1) or _Proc(1), AGORA) == ("viva", 9)
+    assert armadas == []
+
+
+def test_armar_vigia_do_handoff_chama_sp_fila_destacado(capsys):
+    handoff = __import__("importlib").util.spec_from_file_location("sp_handoff_t", Path(__file__).parent / "sp-handoff.py")
+    mod = __import__("importlib").util.module_from_spec(handoff)
+    handoff.loader.exec_module(mod)
+    chamadas = []
+
+    class R:
+        returncode, stdout, stderr = 0, "vigia destacado (pid 3)\n", ""
+    assert mod.armar_vigia(run=lambda argv, **kw: chamadas.append(argv) or R()) == 0
+    assert chamadas[0][-2:] == ["--vigiar", "--destacado"] and "vigia destacado (pid 3)" in capsys.readouterr().out
+
+
 def test_ajuda_descreve_arranque_automatico_e_monitor_unico(capsys):
     sp_fila.main(["--ajuda"])
     out = capsys.readouterr().out
@@ -1116,3 +1153,130 @@ def test_seguinte_sp_ja_integrado_continua_a_avancar(tmp_path):
     st = _estado(tmp_path, sessoes={"a": {}})
     out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner_worktree([], wt), datetime(2026, 10, 25, 12, 0), slug="a")
     assert out["acao"] == "lancou" and out["slug"] == "b"
+
+
+def _ps(saida):
+    class R:
+        stdout = saida
+    return lambda *a, **k: R()
+
+
+def test_parar_vigia_viva_mata_so_o_pid_registado_e_avisa_do_tail():
+    mortos = []
+    parou, msg = sp_fila.parar_vigia({"pid": 4242}, run=_ps("python -I scripts/sp-fila.py --vigiar --intervalo 20"),
+                                     matar=lambda pid, sig: mortos.append(pid), eu=lambda: 1)
+    assert parou and mortos == [4242] and "4242" in msg and "tail" in msg
+
+
+def test_parar_vigia_pid_morto_nao_mata_nada():
+    mortos = []
+    parou, msg = sp_fila.parar_vigia({"pid": 4242}, run=_ps(""), matar=lambda pid, sig: mortos.append(pid), eu=lambda: 1)
+    assert not parou and mortos == [] and "4242" in msg
+
+
+def test_parar_vigia_pid_reutilizado_por_processo_alheio_nao_mata_nada():
+    mortos = []
+    parou, _ = sp_fila.parar_vigia({"pid": 4242}, run=_ps("notepad.exe leiame.txt"), matar=lambda pid, sig: mortos.append(pid), eu=lambda: 1)
+    assert not parou and mortos == []
+
+
+def test_parar_vigia_sem_registo_ou_pid_invalido_e_nao_se_mata_a_si_propria():
+    mortos = []
+    for v in (None, {}, {"pid": "x"}, {"pid": 7}):
+        assert not sp_fila.parar_vigia(v, run=_ps("sp-fila --vigiar"), matar=lambda pid, sig: mortos.append(pid), eu=lambda: 7)[0]
+    assert mortos == []
+
+
+def test_parar_vigia_erro_ao_matar_nao_levanta():
+    def falha(pid, sig):
+        raise PermissionError("negado")
+    parou, msg = sp_fila.parar_vigia({"pid": 9}, run=_ps("sp-fila.py --vigiar"), matar=falha, eu=lambda: 1)
+    assert not parou and "negado" in msg
+
+
+def test_fim_da_fila_para_a_vigia_registada(tmp_path, monkeypatch):
+    import sp_fila_execucao
+    vistos = []
+    monkeypatch.setattr(sp_fila_execucao, "parar_vigia", lambda v: vistos.append(v) or (True, "vigia parada (pid 55)"))
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Done")
+    st = _estado(tmp_path, sessoes={"a": {}}, vigia={"pid": 55, "ts": "2026-10-25T11:59:00"})
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0))
+    assert out["acao"] == "fim" and not st.exists()
+    assert vistos == [{"pid": 55, "ts": "2026-10-25T11:59:00"}] and "55" in out["vigia"]
+
+
+def test_parar_abandona_a_fila_e_para_a_vigia(tmp_path, monkeypatch, capsys):
+    vistos = []
+    monkeypatch.setattr(sp_fila, "parar_vigia", lambda v: vistos.append(v) or (True, "vigia parada (pid 55)"))
+    st = _estado(tmp_path, vigia={"pid": 55, "ts": "2026-10-25T11:59:00"})
+    assert sp_fila.main(["--parar", "--estado", str(st)]) == 0
+    assert not st.exists() and len(vistos) == 1
+    assert "vigia parada (pid 55)" in capsys.readouterr().out
+
+
+def test_seguinte_nunca_relanca_sp_ja_doing_nem_ja_lancado(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Doing")
+    make_sp(root, "b")
+    calls = []
+    st = _estado(tmp_path, feitos=["b"])
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0))
+    assert out["acao"] == "fim"
+    assert not any("sp-handoff.py" in " ".join(map(str, c)) for c in calls)
+
+
+# --- relatório integrado com a vigia (fila-relatorio-integrado) ---
+
+def _secao_vigia(texto):
+    return texto.split("## Vigia")[1].split(chr(10) + "## ")[0]
+
+
+def _relatorio_com(tmp_path, **estado_over):
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Done")
+    st = _estado(tmp_path, sessoes={"a": {}}, feitos=["a"], **estado_over)
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 11, 6, 12, 0))
+    return Path(out["relatorio"]).read_text(encoding="utf-8")
+
+
+def test_relatorio_vigia_sem_incidentes_diz_nenhum(tmp_path):
+    texto = _relatorio_com(tmp_path, vigia={"pid": 1, "ts": "2026-11-06T11:59:00", "incidentes": []})
+    assert "- nenhum" in _secao_vigia(texto)
+
+
+def test_relatorio_vigia_ausente_com_sessoes_avisa(tmp_path):
+    assert "sem vigia" in _secao_vigia(_relatorio_com(tmp_path)).lower()
+
+
+def test_relatorio_vigia_lista_incidentes_gravados(tmp_path):
+    inc = ["vigia parou 5 min", "a: PARADA SEM FECHAR"]
+    sec = _secao_vigia(_relatorio_com(tmp_path, vigia={"pid": 1, "ts": "2026-11-06T11:59:00", "incidentes": inc}))
+    assert "vigia parou 5 min" in sec and "a: PARADA SEM FECHAR" in sec
+
+
+def test_relatorio_com_vigia_respeita_max_linhas(tmp_path):
+    inc = [f"s{i}: morto" for i in range(60)]
+    texto = _relatorio_com(tmp_path, vigia={"pid": 1, "ts": "2026-11-06T11:59:00", "incidentes": inc})
+    assert len(texto.splitlines()) <= 30 and "mais" in _secao_vigia(texto)
+
+
+def test_batida_vigia_preserva_incidentes_e_regista_paragem(tmp_path):
+    st = _estado(tmp_path, sessoes={"a": {}}, vigia={"pid": 1, "ts": "2026-11-06T11:50:00", "incidentes": ["x"]})
+    sp_fila.batida_vigia(st, agora=lambda: datetime(2026, 11, 6, 12, 0, 0))
+    v = json.loads(st.read_text(encoding="utf-8"))["vigia"]
+    assert v["incidentes"][0] == "x" and any("vigia parou 10 min" in i for i in v["incidentes"])
+
+
+def test_registar_incidente_acrescenta_sem_duplicar(tmp_path):
+    st = _estado(tmp_path)
+    sp_fila.registar_incidente(st, "a: morto")
+    sp_fila.registar_incidente(st, "a: morto")
+    assert json.loads(st.read_text(encoding="utf-8"))["vigia"]["incidentes"] == ["a: morto"]
+
+
+def test_vigiar_regista_incidente_de_sessao_morta():
+    achados = []
+    passos = iter([[("a", "morto", "sem processo")]])
+    sp_fila.vigiar(lambda: next(passos), 1, lambda s: None, lambda m: None, incidente=achados.append)
+    assert achados == ["a: morto"]

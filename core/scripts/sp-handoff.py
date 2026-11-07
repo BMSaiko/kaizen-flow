@@ -41,6 +41,16 @@ from sp_progresso import (MAX_BODY_LINES, SP_SECTION_RE, _agent_claims, check_de
 sp_list = kaizen_engine.load("sp-list")
 
 BACKENDS = ("wezterm", "tmux", "clipboard")
+
+
+def armar_vigia(run=subprocess.run):
+    """Após o spawn: `sp-fila.py --vigiar --destacado` (idempotente: não duplica se a vigia está viva)."""
+    fila = Path(__file__).resolve().parent / "sp-fila.py"
+    res = run([sys.executable, "-I", str(fila), "--vigiar", "--destacado"], capture_output=True, text=True, encoding="utf-8")
+    print((res.stdout or res.stderr).strip())
+    return res.returncode
+
+
 HARNESSES = {
     "claude": ("/clear ", "/michi {sp}"),  # espaço final fecha o menu de sugestões
     "codex": ("/new", "Follow .agents/skills/michi/SKILL.md on {sp}"),
@@ -132,6 +142,8 @@ def main(argv=None):
                     continue
                 print(f"{r['slug']}: " + (f"painel {r['painel'] or '-'} em {r['worktree']}" if r["ok"] else f"FALHOU ({r['erro']})"))
                 falhou = falhou or not r["ok"]
+            if not args.sem_registo and not args.dry_run:
+                armar_vigia()
             return 1 if falhou else 0
         elif args.send:
             backend = args.backend or "wezterm"
