@@ -9,6 +9,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 - CI: workflow reutilizável `test.yml` (matriz Node x Python 3.10/3.13, cache npm/pip) usado por `ci`, `publish` e `release`.
 
 ### Added
+- `kaizen init` deteta o comando de testes do projeto-alvo (`npm test`, `pytest`, `cargo test`, `go test ./...`) e grava `test.cmd` em `kaizen.config.json`, sem sobrescrever valores manuais.
+- Fase de testes do michi: `sp-gates --testes <repo> [--sp SP]` corre o `test.cmd` como gate, regista tentativas em `## Testes` e respeita `max_tentativas` (rc 3 sem `test.cmd`, rc 4 no limite); o sync inclui `da-stop.py`.
+- Docs: `docs/testes.md` cobre deteção, fase de testes, CI e execução local; `docs/config.md` e `docs/commands.md` atualizados.
 - CI: job `smoke` (`npm pack` + `kaizen init` + `kaizen audit` num diretório temporário) e artefacto de cobertura (JS nativo, Python `pytest-cov`; `KAIZEN_COVERAGE=1 npm test`), sem limiar bloqueante.
 
 ## [0.1.1] - 2026-11-05
