@@ -108,3 +108,23 @@ test("owns() reconhece caminhos do vault que entram no sync", () => {
   assert.ok(!owns("scripts/outro-guard.py"));
   assert.ok(!owns("knowledge/projects/p/sp/TODO/x.md"));
 });
+
+test("sync --check imprime a fonte e sai 1 quando o sync apagaria ficheiros rastreados de core/", () => {
+  const pkg = tmp();
+  const root = path.join(__dirname, "..");
+  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true });
+  const kz = path.join(pkg, "bin", "kaizen.js");
+  const git = (...a) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...a], { cwd: pkg, encoding: "utf8" });
+  git("init", "-q");
+  put(pkg, "core/scripts/rastreado.py", "x");
+  git("add", "core");
+  git("commit", "-q", "-m", "base");
+  const v = fakeVault();
+  const env = { ...process.env, KAIZEN_SOURCE: v };
+  assert.strictEqual(spawnSync("node", [kz, "sync"], { encoding: "utf8", env }).status, 0);
+  assert.ok(!fs.existsSync(path.join(pkg, "core", "scripts", "rastreado.py")));
+  const r = spawnSync("node", [kz, "sync", "--check"], { encoding: "utf8", env });
+  assert.strictEqual(r.status, 1, r.stdout + r.stderr);
+  assert.ok(r.stdout.includes(`fonte ${v}`), r.stdout);
+  assert.match(r.stdout, /removeria rastreado: core\/scripts\/rastreado\.py/);
+});

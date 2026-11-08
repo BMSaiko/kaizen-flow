@@ -1,5 +1,6 @@
 "use strict";
 const fs = require("fs");
+const { spawnSync } = require("child_process");
 const path = require("path");
 const { plan, overlay, files, sha } = require("../sync.js");
 
@@ -56,8 +57,16 @@ function sync(argv) {
   console.log(`sync: ${parts.length} peças de ${VAULT}`);
 }
 
+// ficheiros de core/ rastreados pelo git (o sync apaga os que a fonte já não gera)
+function trackedCore() {
+  const r = spawnSync("git", ["ls-files", "-z", "--", "core"], { cwd: PKG, encoding: "utf8" });
+  return r.status === 0 ? r.stdout.split("\0").filter(Boolean).map((f) => f.replace(/^core\//, "")) : [];
+}
+
 // compara o que o sync geraria com core/ sem lhe tocar; sai 1 se estiver desatualizado
+// ou se o sync apagaria ficheiros rastreados de core/
 function syncCheck() {
+  console.log(`sync --check: fonte ${VAULT}`);
   const tmp = fs.mkdtempSync(path.join(require("os").tmpdir(), "kaizen-check-"));
   try {
     const tdir = path.join(tmp, "translations");
@@ -68,8 +77,10 @@ function syncCheck() {
     const b = files(CORE_DIR);
     const diff = [...new Set([...a, ...b])].filter((f) => !/__pycache__\/|\.pyc$/.test(f)).filter((f) => !a.includes(f) || !b.includes(f) || sha(fs.readFileSync(path.join(fresh, f))) !== sha(fs.readFileSync(path.join(CORE_DIR, f))));
     for (const f of diff) console.log(`desatualizado: core/${f}`);
-    console.log(`sync --check: ${diff.length} diferenças`);
-    process.exit(diff.length ? 1 : 0);
+    const removed = trackedCore().filter((f) => !a.includes(f) && !/__pycache__\/|\.pyc$/.test(f));
+    for (const f of removed) console.log(`removeria rastreado: core/${f}`);
+    console.log(`sync --check: ${diff.length} diferenças, ${removed.length} remoções de ficheiros rastreados`);
+    process.exit(diff.length || removed.length ? 1 : 0);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
