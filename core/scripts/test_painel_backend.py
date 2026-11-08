@@ -181,3 +181,12 @@ def test_config_painel_backend(tmp_path):
     assert kaizen_config.painel_backend(tmp_path) == "tmux"
     (tmp_path / "kaizen.config.json").write_text(json.dumps({"painelBackend": "zellij"}), encoding="utf-8")
     assert kaizen_config.painel_backend(tmp_path) == "auto"  # valor inválido: defeito
+
+
+def test_background_falha_a_lancar_da_backend_error_e_nao_deixa_log(tmp_path):
+    def popen(*a, **kw):
+        raise FileNotFoundError("sem claude")
+    b = pb.BackgroundBackend(estado_dir=tmp_path / "e", popen=popen)
+    with pytest.raises(pb.BackendError):
+        b.abrir(["claude", "-p", "x"], str(tmp_path))
+    assert list((tmp_path / "e").iterdir()) == []

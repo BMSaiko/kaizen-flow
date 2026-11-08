@@ -166,13 +166,16 @@ class BackgroundBackend(Backend):
         provisorio = self.dir / f"novo-{os.getpid()}-{time.time_ns()}.log"
         flags = (getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | NO_WINDOW) if os.name == "nt" else 0
         extra = {} if os.name == "nt" else {"start_new_session": True}
+        erro = None
         with open(provisorio, "ab") as log:
             try:
                 proc = self.popen([str(c) for c in cmd], cwd=str(cwd), stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
                                   creationflags=flags, close_fds=True, **extra)
             except OSError as e:
-                provisorio.unlink(missing_ok=True)
-                raise BackendError(f"não consegui lançar {cmd[0]!r}: {e}") from e
+                erro = e
+        if erro is not None:  # fora do `with`: no Windows o ficheiro só se apaga depois de fechado
+            provisorio.unlink(missing_ok=True)
+            raise BackendError(f"não consegui lançar {cmd[0]!r}: {erro}") from erro
         id_ = str(proc.pid)
         log_final = self.dir / f"{id_}.log"
         try:
