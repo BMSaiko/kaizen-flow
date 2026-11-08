@@ -1,0 +1,281 @@
+"""Backends de painéis do modo paralelo (sp-fila `--concorrencia`, `sp-handoff --spawn`).
+
+Interface única (`Backend`): `abrir(cmd, cwd) -> id`, `estado(id)`, `fechar(id)`; a fila e o handoff só falam com ela.
+Três backends: `wezterm`, `tmux` (painéis interativos) e `background` (processo com log em ficheiro, sem terminal gráfico).
+`escolher` decide por `painelBackend` do `kaizen.config.json` ou por deteção; sem backend utilizável devolve None e
+`falta` explica o que falta (a fila cai para o modo sequencial).
+"""
+import abc
+import json
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+ESTADO_DIR = Path.home() / ".claude" / "sp-fila-paineis"
+NOMES = ("wezterm", "tmux", "background")
+LOG_LINHAS = 80  # `ecra` do backend background: cauda do log
+
+
+class BackendError(Exception):
+    pass
+
+
+def run_hidden(*args, **kwargs):
+    """subprocess.run sem abrir janela de consola no Windows."""
+    kwargs.setdefault("creationflags", NO_WINDOW)
+    return subprocess.run(*args, **kwargs)
+
+
+class Backend(abc.ABC):
+    """Contrato: abrir um comando num painel, saber se continua vivo e fechá-lo.
+
+    `interativo`: o painel mostra um terminal onde se pode escrever (wezterm, tmux); o background corre o comando direto.
+    """
+    nome = ""
+    interativo = True
+
+    @abc.abstractmethod
+    def abrir(self, cmd, cwd):
+        """Corre `cmd` (lista de argumentos) em `cwd` num painel novo e devolve o id (str)."""
+
+    @abc.abstractmethod
+    def listar(self):
+        """{id: cwd ou None} dos painéis vivos."""
+
+    @abc.abstractmethod
+    def fechar(self, id):
+        """Fecha o painel; True se existia, False se já não existia (nunca é erro)."""
+
+    @abc.abstractmethod
+    def ecra(self, id):
+        """Texto visível do painel (ou a cauda do log); '' se não existe."""
+
+    def estado(self, id):
+        """'vivo' ou 'morto'."""
+        return "vivo" if str(id) in self.listar() else "morto"
+
+
+class _Multiplexer(Backend):
+    def __init__(self, run=run_hidden):
+        self.run = run
+
+    def _out(self, argv):
+        return self.run(argv, check=True, capture_output=True, text=True, encoding="utf-8").stdout
+
+
+class WeztermBackend(_Multiplexer):
+    nome = "wezterm"
+
+    def abrir(self, cmd, cwd):
+        pane = self._out(["wezterm", "cli", "spawn", "--cwd", str(cwd), "--", *cmd]).strip()
+        origem = os.environ.get("WEZTERM_PANE")
+        if origem:  # o spawn foca o painel novo; devolver o foco ao painel que lançou a fila
+            self.run(["wezterm", "cli", "activate-pane", "--pane-id", origem], capture_output=True, text=True, encoding="utf-8")
+        return pane
+
+    def listar(self):
+        try:
+            lista = json.loads(self.run(["wezterm", "cli", "list", "--format", "json"], capture_output=True, text=True, encoding="utf-8").stdout)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return {}
+        return {str(p["pane_id"]): p.get("cwd") for p in lista}
+
+    def fechar(self, id):
+        if str(id) not in self.listar():
+            return False
+        self.run(["wezterm", "cli", "kill-pane", "--pane-id", str(id)], capture_output=True, text=True)
+        return True
+
+    def ecra(self, id):
+        return self.run(["wezterm", "cli", "get-text", "--pane-id", str(id)], capture_output=True, text=True, encoding="utf-8").stdout
+
+
+class TmuxBackend(_Multiplexer):
+    nome = "tmux"
+
+    def abrir(self, cmd, cwd):
+        return self._out(["tmux", "split-window", "-d", "-P", "-F", "#{pane_id}", "-c", str(cwd), *cmd]).strip()
+
+    def listar(self):
+        try:
+            saida = self.run(["tmux", "list-panes", "-a", "-F", "#{pane_id}\t#{pane_current_path}"], capture_output=True, text=True, encoding="utf-8").stdout
+        except (OSError, subprocess.SubprocessError):
+            return {}
+        painéis = {}
+        for linha in (saida or "").splitlines():
+            id_, _, cwd = linha.partition("\t")
+            if id_:
+                painéis[id_] = cwd or None
+        return painéis
+
+    def fechar(self, id):
+        if str(id) not in self.listar():
+            return False
+        self.run(["tmux", "kill-pane", "-t", str(id)], capture_output=True, text=True)
+        return True
+
+    def ecra(self, id):
+        try:
+            return self.run(["tmux", "capture-pane", "-p", "-t", str(id)], capture_output=True, text=True, encoding="utf-8").stdout
+        except (OSError, subprocess.SubprocessError):
+            return ""
+
+
+def _pid_vivo(pid):
+    """True se o processo `pid` existe e não terminou."""
+    if os.name == "nt":
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        k32.OpenProcess.restype = ctypes.c_void_p
+        handle = k32.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        try:
+            codigo = ctypes.c_ulong()
+            return bool(k32.GetExitCodeProcess(ctypes.c_void_p(handle), ctypes.byref(codigo))) and codigo.value == 259  # STILL_ACTIVE
+        finally:
+            k32.CloseHandle(ctypes.c_void_p(handle))
+    try:
+        os.kill(int(pid), 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+class BackgroundBackend(Backend):
+    """Processo destacado com saída em `<dir>/<pid>.log` e registo `<dir>/<pid>.json` {pid, cwd, log}; o id é o PID."""
+    nome = "background"
+    interativo = False
+
+    def __init__(self, estado_dir=None, popen=subprocess.Popen):
+        self.dir = Path(estado_dir or ESTADO_DIR)
+        self.popen = popen
+        self._filhos = {}
+
+    def abrir(self, cmd, cwd):
+        if not Path(cwd).is_dir():
+            raise BackendError(f"cwd inexistente: {cwd}")
+        self.dir.mkdir(parents=True, exist_ok=True)
+        provisorio = self.dir / f"novo-{os.getpid()}-{time.time_ns()}.log"
+        flags = (getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | NO_WINDOW) if os.name == "nt" else 0
+        extra = {} if os.name == "nt" else {"start_new_session": True}
+        with open(provisorio, "ab") as log:
+            try:
+                proc = self.popen([str(c) for c in cmd], cwd=str(cwd), stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                                  creationflags=flags, close_fds=True, **extra)
+            except OSError as e:
+                provisorio.unlink(missing_ok=True)
+                raise BackendError(f"não consegui lançar {cmd[0]!r}: {e}") from e
+        id_ = str(proc.pid)
+        log_final = self.dir / f"{id_}.log"
+        try:
+            os.replace(provisorio, log_final)  # no Windows o `with` já fechou o ficheiro; o filho mantém o seu handle
+        except OSError:
+            log_final = provisorio
+        (self.dir / f"{id_}.json").write_text(json.dumps({"pid": proc.pid, "cwd": str(cwd), "log": str(log_final)}), encoding="utf-8")
+        self._filhos[id_] = proc
+        return id_
+
+    def _registo(self, id):
+        try:
+            return json.loads((self.dir / f"{int(id)}.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+
+    def _vivo(self, id):
+        filho = self._filhos.get(str(id))
+        if filho is not None:
+            return filho.poll() is None  # também recolhe o zombie
+        return _pid_vivo(id)
+
+    def listar(self):
+        vivos = {}
+        for f in self.dir.glob("*.json") if self.dir.is_dir() else []:
+            reg = self._registo(f.stem)
+            if reg and self._vivo(reg["pid"]):
+                vivos[str(reg["pid"])] = reg.get("cwd")
+        return vivos
+
+    def estado(self, id):
+        return "vivo" if self._registo(id) and self._vivo(id) else "morto"
+
+    def fechar(self, id):
+        if self.estado(id) != "vivo":
+            return False
+        pid = int(id)
+        if os.name == "nt":
+            run_hidden(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, text=True)
+        else:
+            try:
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
+            except OSError:
+                os.kill(pid, signal.SIGTERM)
+        filho = self._filhos.get(str(id))
+        if filho is not None:
+            try:
+                filho.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+        return True
+
+    def ecra(self, id):
+        reg = self._registo(id)
+        if not reg:
+            return ""
+        try:
+            texto = Path(reg["log"]).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ""
+        return "\n".join(texto.splitlines()[-LOG_LINHAS:])
+
+
+def _disponivel(nome, env, which, fixo=False):
+    """True se o backend `nome` pode ser usado: o executável existe e, na deteção automática, o agente corre nele.
+
+    Com `fixo` (nome pedido na config) basta o executável; o background não precisa de nenhum."""
+    if nome == "background":
+        return True
+    variavel = {"wezterm": "WEZTERM_PANE", "tmux": "TMUX_PANE"}[nome]
+    return which(nome) is not None and (fixo or bool(env.get(variavel)))
+
+
+def por_nome(nome, run=run_hidden, estado_dir=None):
+    """Instancia o backend `nome` (sem verificar o ambiente)."""
+    if nome == "wezterm":
+        return WeztermBackend(run)
+    if nome == "tmux":
+        return TmuxBackend(run)
+    if nome == "background":
+        return BackgroundBackend(estado_dir)
+    raise BackendError(f"backend desconhecido: {nome!r} (válidos: {', '.join(NOMES)})")
+
+
+def escolher(config="auto", env=None, which=shutil.which, run=run_hidden, estado_dir=None):
+    """Backend a usar ou None.
+
+    `config` vem de `painelBackend`: um nome fixo manda (None se estiver indisponível); `auto` deteta o multiplexer
+    onde o agente corre (WezTerm, depois tmux). O background nunca é automático: tem de ser pedido na config.
+    """
+    env = os.environ if env is None else env
+    if config in NOMES:
+        return por_nome(config, run, estado_dir) if _disponivel(config, env, which, fixo=True) else None
+    for nome in ("wezterm", "tmux"):
+        if _disponivel(nome, env, which):
+            return por_nome(nome, run, estado_dir)
+    return None
+
+
+def falta(config="auto", env=None, which=shutil.which):
+    """Mensagem de uma linha: o que falta para haver backend (para o aviso do fallback sequencial)."""
+    env = os.environ if env is None else env
+    if config in ("wezterm", "tmux"):
+        return f"painelBackend={config} mas o executável `{config}` não está no PATH"
+    return ("sem backend de painéis: correr dentro do WezTerm ou de uma sessão tmux, ou pôr "
+            '`"painelBackend": "background"` no kaizen.config.json (processos sem terminal gráfico)')

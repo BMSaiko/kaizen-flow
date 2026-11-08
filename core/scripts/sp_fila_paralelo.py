@@ -12,6 +12,7 @@ from urllib.parse import unquote
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kf_git  # noqa: E402
+import painel_backend  # noqa: E402
 from sp_fila_estado import USER, atualizar, ler
 
 
@@ -90,14 +91,12 @@ def _norm_caminho(caminho):
     return c.rstrip("/").lower()
 
 
-def estado_vivo(estado, items, run, agora, inatividade_s=INATIVIDADE_S):
-    """[(slug, estado, motivo)] por sessão da corrida; só lê `wezterm cli list|get-text`, os SPs e o `git log` da worktree."""
-    try:
-        lista = json.loads(run(["wezterm", "cli", "list", "--format", "json"], capture_output=True, text=True, encoding="utf-8").stdout)
-    except (OSError, ValueError, subprocess.SubprocessError):
-        lista = []
-    paineis = {str(p["pane_id"]) for p in lista}
-    por_cwd = {_norm_caminho(p.get("cwd")): str(p["pane_id"]) for p in lista if p.get("cwd")}
+def estado_vivo(estado, items, run, agora, inatividade_s=INATIVIDADE_S, backend=None):
+    """[(slug, estado, motivo)] por sessão da corrida; só lê o backend de painéis (defeito wezterm), os SPs e o `git log` da worktree."""
+    backend = backend or painel_backend.WeztermBackend(run)
+    lista = backend.listar()
+    paineis = set(lista)
+    por_cwd = {_norm_caminho(cwd): id_ for id_, cwd in lista.items() if cwd}
     status = {sp.slug: sp.status for sp, _ in items}
     linhas = []
     for slug, sessao in estado["sessoes"].items():
@@ -107,7 +106,7 @@ def estado_vivo(estado, items, run, agora, inatividade_s=INATIVIDADE_S):
                 sessao = {**sessao, "painel": achado}
         ecra = ""
         if str(sessao.get("painel")) in paineis:
-            ecra = run(["wezterm", "cli", "get-text", "--pane-id", str(sessao["painel"])], capture_output=True, text=True, encoding="utf-8").stdout
+            ecra = backend.ecra(sessao["painel"])
         est, motivo = classificar(sessao, status.get(slug), paineis, ecra, _atividade(sessao, run, estado.get("inicio")), agora, inatividade_s)
         linhas.append((slug, est, motivo))
     return linhas
@@ -258,21 +257,15 @@ def vigiar(ler_estado, intervalo_s, espera, saida, passou_o_fim=lambda: False, b
 
 
 
-def fechar_painel_sessao(estado, slug, run):
-    """Fecha o painel wezterm da sessão `slug` (registo no estado); o painel vivo é achado pela worktree se o id estiver velho."""
+def fechar_painel_sessao(estado, slug, run, backend=None):
+    """Fecha o painel da sessão `slug` (registo no estado) pelo backend (defeito wezterm); o painel vivo é achado pela worktree se o id estiver velho."""
+    backend = backend or painel_backend.WeztermBackend(run)
     sessao = ler(estado).get("sessoes", {}).get(slug) or {}
-    try:
-        lista = json.loads(run(["wezterm", "cli", "list", "--format", "json"], capture_output=True, text=True, encoding="utf-8").stdout)
-    except (OSError, ValueError, subprocess.SubprocessError):
-        return False
-    ids = {str(p["pane_id"]) for p in lista}
+    lista = backend.listar()
     painel = str(sessao.get("painel"))
-    if painel not in ids and sessao.get("worktree"):
-        painel = next((str(p["pane_id"]) for p in lista if p.get("cwd") and _norm_caminho(p["cwd"]) == _norm_caminho(sessao["worktree"])), painel)
-    if painel not in ids:
-        return False
-    run(["wezterm", "cli", "kill-pane", "--pane-id", painel], capture_output=True, text=True)
-    return True
+    if painel not in lista and sessao.get("worktree"):
+        painel = next((id_ for id_, cwd in lista.items() if cwd and _norm_caminho(cwd) == _norm_caminho(sessao["worktree"])), painel)
+    return backend.fechar(painel) if painel in lista else False
 
 
 def contar_tails(run=subprocess.run):

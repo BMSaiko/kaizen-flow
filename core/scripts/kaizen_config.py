@@ -33,7 +33,16 @@ def docs_root(repo):
     return Path(repo) / _read(repo).get("docsRoot", DEFAULT_DOCS_ROOT)
 
 
-HOOKS_NAME = "kaizen-hooks.json"
+PAINEL_BACKENDS = ("auto", "wezterm", "tmux", "background")
+
+
+def painel_backend(repo):
+    """Backend dos painéis do modo paralelo (`painelBackend`): auto, wezterm, tmux ou background; inválido = auto."""
+    v = _read(repo).get("painelBackend", "auto")
+    return v if v in PAINEL_BACKENDS else "auto"
+
+
+HOOKS_NAME ="kaizen-hooks.json"
 EVENTS = ("sp.created", "sp.moved", "michi.phase.start", "michi.phase.end",
           "michi.gate.failed", "michi.commit", "michi.closed")
 
