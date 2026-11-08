@@ -79,6 +79,9 @@ def registar(root, sp_path, project=None, custos=None):
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     if len(argv) != 1:
         print(__doc__)
         return 2

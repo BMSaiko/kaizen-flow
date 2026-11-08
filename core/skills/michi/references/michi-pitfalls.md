@@ -136,3 +136,7 @@ Movido de `SKILL.md` (## Pitfalls); condensado em 2026-10-31 (regras todas manti
 ## 33. Endurecer um recurso: listar todos os pontos de entrada antes de corrigir (endurecer-todos-pontos-de-entrada, 2026-11-07)
 
 - Em `sp-fila.py` a 1.ª correção contra estado corrompido cobriu só `--seguinte`; `--estado-vivo`, `--gastos`, `--parar` e `--vigiar` leem o mesmo estado e só foram apanhados depois. Ao endurecer um recurso, `Grep` por todos os pontos de entrada que o leem e listá-los antes de corrigir o primeiro.
+
+## 34. Peça nova no pacote K: listar em `SCRIPT_NAMES` e validar com `git status` (sync-apaga-peca-nao-listada, 2026-11-08)
+
+- O `kaizen sync` gera `core/` só das peças listadas em `bin/sync.js` (`SCRIPT_NAMES`) e apaga o resto; `sync --check` dá rc 0 depois dessa remoção e lê o vault principal, não a worktree. Ao trazer uma peça nova para o pacote: acrescentá-la a `SCRIPT_NAMES` e ao vault de fixture de `tests/sync.test.js`, e confirmar com `git status` do K limpo, não só com o `--check`.

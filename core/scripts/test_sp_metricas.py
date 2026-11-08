@@ -43,3 +43,14 @@ def test_sp_move_done_acrescenta_linha_uma_so_vez(tmp_path, monkeypatch):
 def test_sem_pasta_de_relatorios_e_noop(tmp_path):
     sp = make_sp(tmp_path, "abc")
     assert sp_metricas.registar(tmp_path, sp, custos={}) is None
+
+
+def test_uso_imprime_em_consola_cp1252(tmp_path):
+    import os
+    import subprocess
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252"}
+    env.pop("PYTHONUTF8", None)
+    script = Path(__file__).resolve().parent / "sp-metricas.py"
+    r = subprocess.run([sys.executable, "-I", str(script), "--reflect", "x"], capture_output=True, env=env)
+    assert r.returncode == 2, r.stderr
+    assert b"UnicodeEncodeError" not in r.stderr

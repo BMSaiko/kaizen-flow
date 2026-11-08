@@ -32,3 +32,4 @@ Texto integral em `references/michi-pitfalls.md` (30 entradas, numeradas como ab
 31. Código com escapes: `Edit`, nunca Python por heredoc no Bash (usage-todas-diarias, 2026-11-02)
 32. Comandos `!`: sintaxe bash, barras normais (wt-clean-base-inexistente, 2026-11-04)
 33. Endurecer um recurso: listar todos os pontos de entrada antes de corrigir (endurecer-todos-pontos-de-entrada, 2026-11-07)
+34. Peça nova no pacote K: listar em `SCRIPT_NAMES` e validar com `git status` (sync-apaga-peca-nao-listada, 2026-11-08)
