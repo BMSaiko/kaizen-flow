@@ -71,6 +71,8 @@ More detail in [Install](#install) and the [documentation](#documentation).
   <img src="docs/assets/sp-fila-parallel.svg" alt="sp-fila parallel: up to N panes, one worktree each, a watcher that brings blocked panes to you" width="100%">
 </p>
 
+Parallel sessions open in WezTerm, tmux or, with `"painelBackend": "background"`, as detached processes with a log each (no graphical terminal needed); see [config](docs/config.md#painelbackend). With no backend available the queue runs sequentially.
+
 ## Why it uses fewer tokens and ships more
 
 An analysis of one author's own usage reports (Claude Code, 2026-10-15 to 2026-11-02, 19 days, one repo, API-equivalent cost):

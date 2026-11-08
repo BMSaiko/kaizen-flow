@@ -33,6 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import painel_backend  # noqa: E402
 # Módulos irmãos (a CLI e os testes continuam a ver tudo aqui): estado, plano, relatório, execução, paralelo.
 from sp_fila_estado import (MAX_DEFEITO, MAX_FALHAS_DEFEITO, NO_WINDOW, ORCAMENTO, REQ_POR_SP, RELATORIOS, ESTADO, USER,  # noqa: E402,F401
                             atualizar, bloqueio, guardar, ler, migrar, run_hidden)
@@ -42,6 +43,13 @@ from sp_fila_execucao import (_custos, _ler_sp, _painel_lancado,  # noqa: E402,F
                               lancar_seguinte_auto, seguinte, IntegracaoPendente, SlugObrigatorio)
 from sp_fila_paralelo import (INATIVIDADE_S, VIGIA_LOG, aviso_vigia, batida_vigia, classificar,
                               contar_tails, estado_vivo, fechar_painel_sessao, garantir_vigia, linha, parar_vigia, registar_incidente, vigiar)
+
+def backend_paineis(repo=None, env=None, which=None, run=None):
+    """(backend ou None, config) segundo `painelBackend` do kaizen.config.json; None = sem painéis utilizáveis."""
+    cfg = kaizen_engine.load("kaizen_config").painel_backend(Path(repo or Path.cwd()))
+    kw = {k: v for k, v in (("env", env), ("which", which), ("run", run)) if v is not None}
+    return painel_backend.escolher(cfg, **kw), cfg
+
 
 def destacar(args, log, popen=subprocess.Popen):
     """Arranca `sp-fila.py <args>` num processo próprio (fora do prazo do Monitor), com a saída em `log`."""
@@ -132,13 +140,13 @@ def main(argv=None):
         return 0
     if args.vigiar:
         def lido():
-            return estado_vivo(_ler_ou_erro(estado) or {"sessoes": {}}, load(args.root, args.projeto), run_hidden, datetime.now(), args.inatividade * 60) if estado.exists() else None
+            return estado_vivo(_ler_ou_erro(estado) or {"sessoes": {}}, load(args.root, args.projeto), run_hidden, datetime.now(), args.inatividade * 60, backend=backend_paineis()[0]) if estado.exists() else None
         fim = None
         if args.ate:
             h, m = map(int, args.ate.split(":"))
             fim = datetime.now().replace(hour=h, minute=m, second=0, microsecond=0)
         return vigiar(lido, args.intervalo, time.sleep, lambda m: print(m, flush=True), lambda: fim is not None and datetime.now() >= fim,
-                      lambda: batida_vigia(estado), lambda slug: fechar_painel_sessao(estado, slug, run_hidden),
+                      lambda: batida_vigia(estado), lambda slug: fechar_painel_sessao(estado, slug, run_hidden, backend=backend_paineis()[0]),
                       lancar_seguinte=lambda slug: lancar_seguinte_auto(args.root, estado, Path(args.relatorios), slug),
                       incidente=lambda texto: registar_incidente(estado, texto))
     if args.estado_vivo:
@@ -148,7 +156,7 @@ def main(argv=None):
         atual = _ler_ou_erro(estado)
         if atual is None:
             return 1
-        for slug, est, motivo in estado_vivo(atual, load(args.root, args.projeto), run_hidden, datetime.now(), args.inatividade * 60):
+        for slug, est, motivo in estado_vivo(atual, load(args.root, args.projeto), run_hidden, datetime.now(), args.inatividade * 60, backend=backend_paineis()[0]):
             print(linha(slug, est, motivo))
         if aviso := aviso_vigia(atual, datetime.now()):
             print(aviso)
@@ -164,6 +172,11 @@ def main(argv=None):
             return 1
         print(render_gastos(atual, _custos()))
         return 0
+    if args.concorrencia and not args.dry_run and not args.seguinte and (esc := backend_paineis())[0] is None:
+        print(f"AVISO: {painel_backend.falta(esc[1])}; a fila corre em série (sem --concorrencia)", file=sys.stderr)
+        args.concorrencia = None
+        if args.max is None:
+            args.max = MAX_DEFEITO
     items = load(args.root, args.projeto)
     mae = None
     if args.programa:

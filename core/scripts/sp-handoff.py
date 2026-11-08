@@ -7,7 +7,7 @@ Uso:
   python -I scripts/sp-handoff.py --resolve [slug]        # slug de um programa (SP-mãe): devolve o filho em Doing
   python -I scripts/sp-handoff.py --write <caminho> --file <progresso.md>
   python -I scripts/sp-handoff.py --launch <caminho> [--dry-run] [--auto]
-  python -I scripts/sp-handoff.py --spawn <slug>... [--max N] [--backend wezterm|tmux|clipboard]
+  python -I scripts/sp-handoff.py --spawn <slug>... [--max N] [--backend wezterm|tmux|background|clipboard]
 
 `--launch` não abre janelas: em segundo plano, passados ~5 s (para o turno atual acabar), escreve
 `/clear` e depois `/michi <caminho>` no painel do WezTerm onde o Claude Code já corre ($WEZTERM_PANE),
@@ -32,6 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import painel_backend  # noqa: E402
 from handoff_pane import (ENTER_GAP, NO_WINDOW, SEND_DELAY, SEND_GAP, HandoffError, _argvs, _copy, check_prompt,  # noqa: E402,F401
                           detect_backend, enter_argv, launch_detached, pane_exists, pane_id, prompt_has_text, read_screen, run_hidden,
                           send_argv, send_lines, tmux_enter_argv, tmux_send_argv)
@@ -41,7 +42,7 @@ from sp_progresso import (MAX_BODY_LINES, SP_SECTION_RE, _agent_claims, check_de
 
 sp_list = kaizen_engine.load("sp-list")
 
-BACKENDS = ("wezterm", "tmux", "clipboard")
+BACKENDS = ("wezterm", "tmux", "clipboard", "background")
 
 
 def armar_vigia(run=subprocess.run):
@@ -137,7 +138,11 @@ def main(argv=None):
                 print(nxt)
         elif args.spawn:
             falhou = False
-            resultados = spawn(args.spawn, args.backend, args.max, registar=not args.sem_registo, dry_run=args.dry_run)
+            nome = args.backend
+            if nome is None:  # sem --backend: `painelBackend` da config manda; sem backend utilizável, a deteção antiga
+                esc = painel_backend.escolher(kaizen_engine.load("kaizen_config").painel_backend(Path.cwd()))
+                nome = esc.nome if esc else None
+            resultados = spawn(args.spawn, nome, args.max, registar=not args.sem_registo, dry_run=args.dry_run)
             if args.json:
                 print(json.dumps(resultados, ensure_ascii=False))
                 return 1 if any(not r["ok"] for r in resultados) else 0

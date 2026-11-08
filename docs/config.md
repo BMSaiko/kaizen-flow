@@ -22,6 +22,7 @@ Optional, in the project root. Without it the defaults below apply. `init` only 
 | `sources` | `["claude", "codex"]` | `kaizen usage`, `kaizen report` |
 | `prices` | bundled `usage/prices.json` | cost calculation |
 | `test.cmd` | detected by `init` | command that runs the target project's tests (see below) |
+| `painelBackend` | `auto` | `sp-fila --concorrencia`, `sp-handoff --spawn`: where parallel sessions run (see below) |
 | `userName` | `user` | name the scripts' warnings use for you; empty or non-string falls back to `user` |
 
 `sources` must be a list; malformed values stop with a one-line message.
@@ -71,3 +72,15 @@ Optional, in the project root. Runs your own commands on workflow events. `pytho
 mkdir -p knowledge/projects/kaizen/app/sp/TODO
 python scripts/sp-new.py --project app --slug login --priority P2
 ```
+
+### `painelBackend`
+
+Where the parallel mode (`sp-fila --concorrencia N`, `sp-handoff --spawn`) opens each session:
+
+| Value | Behaviour |
+|---|---|
+| `auto` (default) | detects the multiplexer the agent runs in: WezTerm, then tmux |
+| `wezterm`, `tmux` | forces that multiplexer (the executable must be on `PATH`) |
+| `background` | no terminal: each session is a detached `claude -p "/michi --auto <slug>"` process with its log in `~/.claude/sp-fila-paineis/<pid>.log`; the state is the PID |
+
+`background` is never picked by `auto`; set it explicitly. With no usable backend, `sp-fila --concorrencia` prints a one-line warning saying what is missing and runs the queue sequentially. Any other value falls back to `auto`.

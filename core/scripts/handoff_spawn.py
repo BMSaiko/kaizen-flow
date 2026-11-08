@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import painel_backend  # noqa: E402
 from handoff_pane import (ENTER_SETTLE, ENTER_TRIES, HandoffError, _argvs, _copy, detect_backend, read_screen,  # noqa: E402
                           run_hidden, send_confirmed)
 
@@ -18,18 +19,9 @@ SPAWN_ENTER_TRIES = ENTER_TRIES
 SPAWN_SETTLE = ENTER_SETTLE
 
 
-def _spawn_pane(backend, wt, run):
-    """Abre um painel novo em `wt` a correr o Claude Code; devolve o id do painel."""
-    if backend == "wezterm":
-        argv = ["wezterm", "cli", "spawn", "--cwd", wt, "--", "claude"]
-        pane = run(argv, check=True, capture_output=True, text=True, encoding="utf-8").stdout.strip()
-        origem = os.environ.get("WEZTERM_PANE")
-        if origem:  # o spawn foca o painel novo; devolver o foco ao painel que lançou a fila
-            run(["wezterm", "cli", "activate-pane", "--pane-id", origem], capture_output=True, text=True, encoding="utf-8")
-        return pane
-    else:
-        argv = ["tmux", "split-window", "-P", "-F", "#{pane_id}", "-c", wt, "claude"]
-    return run(argv, check=True, capture_output=True, text=True, encoding="utf-8").stdout.strip()
+def _spawn_pane(backend, wt, run, cmd=("claude",)):
+    """Abre um painel novo em `wt` a correr `cmd` pela interface de backends; devolve o id do painel."""
+    return painel_backend.por_nome(backend, run).abrir(list(cmd), wt)
 
 
 _KEYS = {"wezterm": {"Down": chr(27) + "[B", "Space": " ", "Enter": chr(13)}}
@@ -103,12 +95,14 @@ def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.slee
             cmd = f"/michi --auto {slug}"
             if backend == "clipboard":
                 print(f"{slug}: cd {wt} && claude  →  {cmd}")
+            elif backend == "background":  # sem terminal: não há prompt a esperar, o comando corre direto em `claude -p`
+                res["painel"] = _spawn_pane(backend, wt, run, ("claude", "-p", cmd))
             else:
                 res["painel"] = _spawn_pane(backend, wt, run)
                 _wait_prompt(backend, res["painel"], run, sleep)
                 _send_line(backend, res["painel"], cmd, run, sleep)
             res["ok"] = True
-        except (subprocess.CalledProcessError, OSError, HandoffError, IndexError) as exc:
+        except (subprocess.CalledProcessError, OSError, HandoffError, IndexError, painel_backend.BackendError) as exc:
             res["erro"] = (getattr(exc, "stderr", None) or str(exc)).strip() or type(exc).__name__
             continue
         if not registar:

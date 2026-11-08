@@ -5,6 +5,10 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 
 ## [Unreleased]
 
+### Added
+- Painéis por backend: interface única (`painel_backend.py`) com `wezterm`, `tmux` e `background` (processo com log, estado por PID), escolhida por `painelBackend` no `kaizen.config.json`; `sp-fila`, a vigia e `sp-handoff --spawn` só falam com ela.
+- Sem backend utilizável, `sp-fila --concorrencia` avisa o que falta e corre em série.
+
 ## [0.2.0] - 2026-11-08
 
 ### Changed
