@@ -20,6 +20,21 @@ Ordem fixa: **gates → harden → pentest → review**. Cada passo só corre se
 - Sem `|| true`, sem `--force`, sem segredos: o script recusa (rc 2) antes de correr.
 - **Retry:** falha = corrigir a causa e repetir todos com `--full`; o limite vem de `max_tentativas` do perfil (`michi-perfis.md`).
 
+## Fase de testes (`test.cmd` da config)
+
+`python -I scripts/sp-gates.py --testes <repo-alvo> --sp <SP> [--timeout N]` corre o `test.cmd` de `<repo-alvo>/kaizen.config.json` (gravado por `kaizen init`, editável) como gate, em `<repo-alvo>`, e regista cada tentativa na secção `## Testes` do SP (`- tentativa N: comando rc=… estado`), que o Report lê.
+
+| RC | Significado | Ação |
+|---|---|---|
+| 0 | verde | seguir para harden |
+| 1 | vermelho ou `TIMEOUT` | bloqueia o avanço; corrigir a causa e repetir |
+| 2 | `test.cmd` proibido (`--force`, `git reset --hard`, segredos, …) | nada corre; corrigir a config |
+| 3 | sem `test.cmd` | nada corre, fica um aviso no SP; **perguntar ao user** (`AskUserQuestion`) o comando, nunca saltar em silêncio |
+| 4 | limite atingido | `max_tentativas` falhas seguidas e `gate-falha` em `parar_se` (mesma regra do DA): parar e escalar |
+
+- Só corre comandos vindos da config do projeto, nunca de argumentos nem do corpo do SP.
+- As falhas seguidas contam-se desde o último verde; um verde zera o contador.
+
 ## Passos seguintes
 
 `/harden` (só leitura, FAIL bloqueia) → `/pentest` (achados viram SPs) → `/review-ciclo` (3 iterações, depois escalada). Detalhe: `michi-fases-detalhe.md` §Fase 5.

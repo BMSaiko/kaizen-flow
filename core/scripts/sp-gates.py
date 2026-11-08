@@ -13,6 +13,9 @@ Uso:
   python -I scripts/sp-gates.py <caminho.md>          # incremental: salta gates verdes com inputs iguais
   python -I scripts/sp-gates.py <caminho.md> --full   # corre todos (o fecho, sp-fechar.py, usa sempre isto)
   python -I scripts/sp-gates.py --sugerir <repo>      # gates por tipo de repo (Node, Python, Tauri, vault), bloco `gates:` pronto
+  python -I scripts/sp-gates.py --testes <repo> --sp <SP>  # fase de testes: corre `test.cmd` de <repo>/kaizen.config.json,
+                                                       # regista `## Testes` no SP; rc 0 verde, 1 vermelho, 2 proibido,
+                                                       # 3 sem test.cmd (perguntar ao user), 4 limite de tentativas
 Ordem da fase 5: gates -> harden -> pentest -> review (michi/references/michi-gates.md).
 """
 import argparse
@@ -28,6 +31,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 
 DEFAULT_TIMEOUT = 300
+RC_SEM_COMANDO = 3  # fase de testes sem `test.cmd` na config
+RC_LIMITE = 4  # fase de testes: max_tentativas atingido com `gate-falha` em parar_se
+TESTES_HEADING = "## Testes"
 HERE_REPO = Path(__file__).resolve().parent.parent
 CACHE_PATH = Path(__file__).resolve().parent.parent / ".sp-gates-cache.json"
 FORBIDDEN = (
@@ -228,12 +234,117 @@ def table(results, total):
     return "\n".join(rows)
 
 
+def test_cmd(repo):
+    """`test.cmd` de `<repo>/kaizen.config.json`; None se falta, é ilegível ou está vazio."""
+    try:
+        cfg = json.loads((Path(repo) / "kaizen.config.json").read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return None
+    sec = cfg.get("test") if isinstance(cfg, dict) else None
+    cmd = sec.get("cmd") if isinstance(sec, dict) else None
+    return cmd.strip() if isinstance(cmd, str) and cmd.strip() else None
+
+
+def fase_testes(repo, timeout=DEFAULT_TIMEOUT):
+    """Fase de testes: corre o `test.cmd` da config do projeto-alvo, em `repo`, como gate.
+
+    Devolve (rc, resultados): 0 verde; 1 vermelho/timeout; 2 comando proibido (nada corre);
+    RC_SEM_COMANDO sem `test.cmd` (nada corre). Só corre comandos vindos da config, nunca de argumentos.
+    """
+    cmd = test_cmd(repo)
+    if cmd is None:
+        return RC_SEM_COMANDO, []
+    if forbidden(cmd):
+        return 2, []
+    results = run([{"cmd": cmd, "cwd": str(repo), "timeout": timeout, "inputs": []}])
+    return (0 if results[0]["rc"] == 0 else 1), results
+
+
+def tentativas(text):
+    """Falhas seguidas registadas na secção `## Testes` desde o último verde."""
+    n = 0
+    for m in re.finditer(r"^- tentativa \d+: .*? rc=(\d+)", text, re.M):
+        n = 0 if m.group(1) == "0" else n + 1
+    return n
+
+
+def registar(sp_path, results, aviso=None):
+    """Acrescenta uma linha à secção `## Testes` do SP (cria-a se falta; preserva CRLF) e devolve o nº da tentativa.
+
+    Sem resultados, `aviso` fica como linha própria e não conta como tentativa.
+    """
+    path = Path(sp_path)
+    raw = path.read_text(encoding="utf-8", newline="")
+    crlf = "\r\n" in raw
+    lines = raw.replace("\r\n", "\n").rstrip("\n").split("\n")
+    total = sum(1 for ln in lines if ln.startswith("- tentativa "))
+    stamp = time.strftime("%Y-%m-%d %H:%M")
+    if results:
+        r = results[0]
+        state = "TIMEOUT" if r["timeout"] else ("verde" if r["rc"] == 0 else "VERMELHO")
+        total += 1
+        new = f"- tentativa {total}: `{r['cmd']}` rc={r['rc']} {state} ({r['secs']} s) — {stamp}"
+    else:
+        new = f"- aviso: {aviso or 'testes não correram'} — {stamp}"
+    if TESTES_HEADING in lines:
+        i = lines.index(TESTES_HEADING) + 1
+        while i < len(lines) and not lines[i].startswith("## "):
+            i += 1
+        while lines[i - 1].strip() == "":
+            i -= 1
+        lines.insert(i, new)
+    else:
+        lines += ["", TESTES_HEADING, new]
+    path.write_text("\n".join(lines).replace("\n", "\r\n" if crlf else "\n") + ("\r\n" if crlf else "\n"),
+                    encoding="utf-8", newline="")
+    return total
+
+
+def deve_parar(sp_path):
+    """True se as falhas seguidas atingiram `max_tentativas` e o `parar_se` do SP inclui `gate-falha` (como o DA)."""
+    text = Path(sp_path).read_text(encoding="utf-8")
+    return kaizen_engine.load("da-stop").decide(sp_path, tentativas(text)) == "parar"
+
+
+def _main_testes(repo, sp_arg, timeout):
+    sp_path = None
+    if sp_arg:
+        sp_path, _ = resolve_sp(sp_arg)
+        if sp_path is None:
+            print(f"{sp_arg}: SP não encontrado", file=sys.stderr)
+            return 2
+        if deve_parar(sp_path):
+            print("limite de tentativas atingido (max_tentativas + parar_se: gate-falha): parar e escalar ao user, "
+                  "sem correr os testes de novo", file=sys.stderr)
+            return RC_LIMITE
+    rc, results = fase_testes(repo, timeout)
+    if rc == RC_SEM_COMANDO:
+        print(f"sem test.cmd em {Path(repo) / 'kaizen.config.json'}: nada correu. Perguntar ao user (AskUserQuestion) "
+              "qual o comando de testes e gravá-lo na config, ou correr `kaizen init`", file=sys.stderr)
+        if sp_path:
+            registar(sp_path, [], aviso="sem test.cmd na config, testes não correram")
+        return rc
+    if rc == 2:
+        print(f"test.cmd proibido ({forbidden(test_cmd(repo))}): nada correu", file=sys.stderr)
+        return rc
+    print(summary(results))
+    print(table(results, 1))
+    if sp_path:
+        registar(sp_path, results)
+    return rc
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Corre os gates do frontmatter de um SP")
     ap.add_argument("path", nargs="?")
     ap.add_argument("--sugerir", metavar="REPO", help="imprime o bloco gates: sugerido para o tipo de repo")
     ap.add_argument("--full", action="store_true", help="ignora a cache: corre todos os gates")
+    ap.add_argument("--testes", metavar="REPO", help="fase de testes: corre o test.cmd da config do REPO")
+    ap.add_argument("--sp", help="com --testes: SP (caminho ou slug) onde registar a tentativa e ler os limites")
+    ap.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT, help="com --testes: segundos (defeito 300)")
     args = ap.parse_args(argv)
+    if args.testes:
+        return _main_testes(args.testes, args.sp, args.timeout)
     if args.sugerir:
         block = suggestion(args.sugerir)
         print(block or "tipo de repo desconhecido: declarar os gates à mão", file=None if block else sys.stderr)

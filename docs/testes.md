@@ -7,6 +7,20 @@
 
 Os testes usam `tmp_path`; nenhum escreve no repo (a cache de `sp-gates` é redirecionada em `test_sp_gates.py`).
 
+## Fase de testes do michi (projeto-alvo)
+
+`python -I core/scripts/sp-gates.py --testes <repo-alvo> --sp <SP>` corre o `test.cmd` de `<repo-alvo>/kaizen.config.json` (detetado por `kaizen init`, ver `docs/config.md`) como gate e regista cada tentativa na secção `## Testes` do SP.
+
+| RC | Significado |
+|---|---|
+| 0 | verde |
+| 1 | vermelho ou timeout (`--timeout`, defeito 300 s): bloqueia o avanço |
+| 2 | `test.cmd` proibido (`--force`, `git reset --hard`, segredos): nada corre |
+| 3 | sem `test.cmd`: nada corre, fica um aviso no SP e o michi pergunta ao utilizador |
+| 4 | `max_tentativas` falhas seguidas com `gate-falha` em `parar_se`: parar e escalar |
+
+Só corre comandos vindos da config. Coberto por `core/scripts/test_sp_gates.py` (sucesso, falha, comando em falta, timeout, comando proibido, registo no SP com CRLF, limites).
+
 ## Cobertura de `core/scripts`
 
 Todo o script tem teste dedicado, exceto os da tabela, que têm justificação.

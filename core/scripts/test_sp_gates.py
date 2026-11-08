@@ -219,3 +219,135 @@ def test_resolve_sp_caminho_e_inexistente(tmp_path):
     assert sp_gates.resolve_sp(str(f)) == (f, None)
     assert sp_gates.resolve_sp("nao-existe", roots=[tmp_path]) == (None, None)
     assert sp_gates.resolve_sp(str(tmp_path / "b.md")) == (None, None)
+
+
+# ---- fase de testes: corre `test.cmd` da config do projeto-alvo como gate ----
+
+import json  # noqa: E402
+
+
+def _repo(tmp_path, cmd=None, raw=None):
+    repo = tmp_path / "alvo"
+    repo.mkdir()
+    if raw is not None:
+        (repo / "kaizen.config.json").write_text(raw, encoding="utf-8")
+    elif cmd is not None:
+        (repo / "kaizen.config.json").write_text(json.dumps({"test": {"cmd": cmd}}), encoding="utf-8")
+    return repo
+
+
+def _sp_testes(tmp_path, extra=""):
+    f = tmp_path / "sp.md"
+    f.write_text(f"---\nstatus: Doing\nslug: x\n{extra}---\n# corpo\n", encoding="utf-8")
+    return f
+
+
+def test_test_cmd_le_a_config(tmp_path):
+    assert sp_gates.test_cmd(_repo(tmp_path, "npm test")) == "npm test"
+
+
+@pytest.mark.parametrize("raw", [None, "{", "[]", '{"test": "npm test"}', '{"test": {"cmd": "  "}}', '{"test": {}}'])
+def test_test_cmd_em_falta_ou_invalido(tmp_path, raw):
+    assert sp_gates.test_cmd(_repo(tmp_path, raw=raw)) is None
+
+
+def test_fase_testes_sucesso(tmp_path):
+    rc, results = sp_gates.fase_testes(_repo(tmp_path, f"{PY} -c \"print('ok')\""))
+    assert rc == 0 and results[0]["rc"] == 0 and "ok" in results[0]["tail"]
+
+
+def test_fase_testes_falha_bloqueia(tmp_path):
+    rc, results = sp_gates.fase_testes(_repo(tmp_path, f"{PY} -c \"import sys; sys.exit(3)\""))
+    assert rc == 1 and results[0]["rc"] == 3
+
+
+def test_fase_testes_timeout(tmp_path):
+    rc, results = sp_gates.fase_testes(_repo(tmp_path, f"{PY} -c \"import time; time.sleep(5)\""), timeout=1)
+    assert rc == 1 and results[0]["timeout"] is True
+
+
+def test_fase_testes_sem_comando_nao_corre_e_avisa(tmp_path):
+    rc, results = sp_gates.fase_testes(_repo(tmp_path))
+    assert rc == sp_gates.RC_SEM_COMANDO and results == []
+
+
+def test_fase_testes_recusa_irreversivel(tmp_path):
+    rc, results = sp_gates.fase_testes(_repo(tmp_path, "git reset --hard"))
+    assert rc == 2 and results == []
+
+
+def test_fase_testes_corre_no_cwd_do_repo(tmp_path):
+    repo = _repo(tmp_path, f"{PY} -c \"import os; print(os.path.basename(os.getcwd()))\"")
+    rc, results = sp_gates.fase_testes(repo)
+    assert rc == 0 and "alvo" in results[0]["tail"]
+
+
+def test_registar_acrescenta_tentativas_sem_tocar_no_resto(tmp_path):
+    sp = _sp_testes(tmp_path)
+    red = [{"cmd": "npm test", "rc": 1, "timeout": False, "secs": 2.0, "tail": "boom"}]
+    green = [{"cmd": "npm test", "rc": 0, "timeout": False, "secs": 1.0, "tail": ""}]
+    assert sp_gates.registar(sp, red) == 1
+    assert sp_gates.registar(sp, green) == 2
+    text = sp.read_text(encoding="utf-8")
+    assert text.startswith("---\nstatus: Doing") and "# corpo" in text
+    assert text.count("## Testes") == 1
+    assert "- tentativa 1: `npm test` rc=1 VERMELHO" in text and "- tentativa 2: `npm test` rc=0 verde" in text
+    assert sp_gates.tentativas(text) == 0  # o verde zera as falhas seguidas
+
+
+def test_registar_preserva_crlf(tmp_path):
+    sp = tmp_path / "sp.md"
+    sp.write_bytes(b"---\r\nslug: x\r\n---\r\n# corpo\r\n")
+    sp_gates.registar(sp, [{"cmd": "c", "rc": 0, "timeout": False, "secs": 0.1, "tail": ""}])
+    raw = sp.read_bytes()
+    assert b"\r\n" in raw and b"\n" not in raw.replace(b"\r\n", b"")
+
+
+def test_registar_timeout_e_sem_comando(tmp_path):
+    sp = _sp_testes(tmp_path)
+    sp_gates.registar(sp, [{"cmd": "c", "rc": 124, "timeout": True, "secs": 1.0, "tail": ""}])
+    sp_gates.registar(sp, [], aviso="sem test.cmd")
+    text = sp.read_text(encoding="utf-8")
+    assert "TIMEOUT" in text and "sem test.cmd" in text
+    assert sp_gates.tentativas(text) == 1  # o aviso não conta como tentativa
+
+
+def test_limite_de_tentativas_para(tmp_path):
+    sp = _sp_testes(tmp_path, "max_tentativas: 1\nparar_se: [gate-falha]\n")
+    sp_gates.registar(sp, [{"cmd": "c", "rc": 1, "timeout": False, "secs": 0.1, "tail": ""}])
+    assert sp_gates.deve_parar(sp) is True
+
+
+def test_limite_nao_atingido_ou_sem_parar_se(tmp_path):
+    sp = _sp_testes(tmp_path, "max_tentativas: 3\nparar_se: [gate-falha]\n")
+    sp_gates.registar(sp, [{"cmd": "c", "rc": 1, "timeout": False, "secs": 0.1, "tail": ""}])
+    assert sp_gates.deve_parar(sp) is False
+    sem_parar = tmp_path / "sem-parar.md"
+    sem_parar.write_text("---\nslug: y\nmax_tentativas: 1\nparar_se: [custo]\n---\n", encoding="utf-8")
+    sp_gates.registar(sem_parar, [{"cmd": "c", "rc": 1, "timeout": False, "secs": 0.1, "tail": ""}])
+    assert sp_gates.deve_parar(sem_parar) is False
+
+
+def test_main_testes_ponta_a_ponta(tmp_path, capsys):
+    repo = _repo(tmp_path, f"{PY} -c \"print('verde')\"")
+    sp = _sp_testes(tmp_path)
+    assert sp_gates.main(["--testes", str(repo), "--sp", str(sp)]) == 0
+    assert "verde" in capsys.readouterr().out
+    assert "tentativa 1" in sp.read_text(encoding="utf-8")
+
+
+def test_main_testes_sem_comando_rc3_e_pergunta(tmp_path, capsys):
+    repo = _repo(tmp_path)
+    sp = _sp_testes(tmp_path)
+    assert sp_gates.main(["--testes", str(repo), "--sp", str(sp)]) == sp_gates.RC_SEM_COMANDO
+    err = capsys.readouterr().err
+    assert "test.cmd" in err and "AskUserQuestion" in err
+    assert "sem test.cmd" in sp.read_text(encoding="utf-8")
+
+
+def test_main_testes_para_ao_atingir_limite(tmp_path, capsys):
+    repo = _repo(tmp_path, f"{PY} -c \"import sys; sys.exit(1)\"")
+    sp = _sp_testes(tmp_path, "max_tentativas: 1\nparar_se: [gate-falha]\n")
+    assert sp_gates.main(["--testes", str(repo), "--sp", str(sp)]) == 1
+    assert sp_gates.main(["--testes", str(repo), "--sp", str(sp)]) == sp_gates.RC_LIMITE
+    assert sp.read_text(encoding="utf-8").count("- tentativa") == 1
