@@ -42,7 +42,7 @@ def painel_backend(repo):
     return v if v in PAINEL_BACKENDS else "auto"
 
 
-HOOKS_NAME ="kaizen-hooks.json"
+HOOKS_NAME = "kaizen-hooks.json"
 EVENTS = ("sp.created", "sp.moved", "michi.phase.start", "michi.phase.end",
           "michi.gate.failed", "michi.commit", "michi.closed")
 

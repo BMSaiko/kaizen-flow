@@ -1,5 +1,6 @@
 """Testes de painel_backend: contrato (abrir/estado/fechar), os três backends e a escolha/fallback."""
 import json
+import os
 import subprocess
 import sys
 import time
@@ -190,3 +191,20 @@ def test_background_falha_a_lancar_da_backend_error_e_nao_deixa_log(tmp_path):
     with pytest.raises(pb.BackendError):
         b.abrir(["claude", "-p", "x"], str(tmp_path))
     assert list((tmp_path / "e").iterdir()) == []
+
+
+def test_background_registo_anterior_ao_arranque_nao_e_vivo(tmp_path, monkeypatch):
+    b = pb.BackgroundBackend(estado_dir=tmp_path)
+    (tmp_path / f"{os.getpid()}.json").write_text(json.dumps({"pid": os.getpid(), "cwd": str(tmp_path), "log": "x", "inicio": 1.0}), encoding="utf-8")
+    assert b.estado(os.getpid()) == "morto"
+    assert b.fechar(os.getpid()) is False
+
+
+def test_background_limpa_registos_mortos_antigos(tmp_path):
+    b = pb.BackgroundBackend(estado_dir=tmp_path)
+    velho = tmp_path / "999999.json"
+    velho.write_text(json.dumps({"pid": 999999, "cwd": "x", "log": str(tmp_path / "999999.log"), "inicio": 1.0}), encoding="utf-8")
+    (tmp_path / "999999.log").write_text("x", encoding="utf-8")
+    os.utime(velho, (1.0, 1.0))
+    b._limpar()
+    assert not velho.exists() and not (tmp_path / "999999.log").exists()

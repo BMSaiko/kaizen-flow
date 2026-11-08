@@ -126,6 +126,19 @@ class TmuxBackend(_Multiplexer):
             return ""
 
 
+def _arranque_sistema():
+    """Instante (epoch) em que o sistema arrancou, ou None se não der para saber."""
+    try:
+        if os.name == "nt":
+            import ctypes
+            k32 = ctypes.windll.kernel32
+            k32.GetTickCount64.restype = ctypes.c_ulonglong
+            return time.time() - k32.GetTickCount64() / 1000
+        return time.time() - float(Path("/proc/uptime").read_text().split()[0])
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 def _pid_vivo(pid):
     """True se o processo `pid` existe e não terminou."""
     if os.name == "nt":
@@ -163,6 +176,7 @@ class BackgroundBackend(Backend):
         if not Path(cwd).is_dir():
             raise BackendError(f"cwd inexistente: {cwd}")
         self.dir.mkdir(parents=True, exist_ok=True)
+        self._limpar()
         provisorio = self.dir / f"novo-{os.getpid()}-{time.time_ns()}.log"
         flags = (getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | NO_WINDOW) if os.name == "nt" else 0
         extra = {} if os.name == "nt" else {"start_new_session": True}
@@ -182,7 +196,7 @@ class BackgroundBackend(Backend):
             os.replace(provisorio, log_final)  # no Windows o `with` já fechou o ficheiro; o filho mantém o seu handle
         except OSError:
             log_final = provisorio
-        (self.dir / f"{id_}.json").write_text(json.dumps({"pid": proc.pid, "cwd": str(cwd), "log": str(log_final)}), encoding="utf-8")
+        (self.dir / f"{id_}.json").write_text(json.dumps({"pid": proc.pid, "cwd": str(cwd), "log": str(log_final), "inicio": time.time()}), encoding="utf-8")
         self._filhos[id_] = proc
         return id_
 
@@ -192,10 +206,26 @@ class BackgroundBackend(Backend):
         except (OSError, ValueError):
             return None
 
+    def _limpar(self, dias=2):
+        """Apaga registos e logs de processos mortos há mais de `dias` dias."""
+        limite = time.time() - dias * 86400
+        for f in self.dir.glob("*.json"):
+            try:
+                if f.stat().st_mtime < limite and not self._vivo(f.stem):
+                    reg = self._registo(f.stem) or {}
+                    Path(reg.get("log", f.with_suffix(".log"))).unlink(missing_ok=True)
+                    f.unlink(missing_ok=True)
+            except (OSError, ValueError):
+                continue
+
     def _vivo(self, id):
         filho = self._filhos.get(str(id))
         if filho is not None:
             return filho.poll() is None  # também recolhe o zombie
+        reg = self._registo(id)
+        arranque = _arranque_sistema()
+        if reg and arranque and reg.get("inicio", 0) < arranque:
+            return False  # registo anterior ao arranque: o PID pode ser de outro processo
         return _pid_vivo(id)
 
     def listar(self):
