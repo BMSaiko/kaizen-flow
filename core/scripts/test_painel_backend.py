@@ -194,6 +194,7 @@ def test_background_falha_a_lancar_da_backend_error_e_nao_deixa_log(tmp_path):
 
 
 def test_background_registo_anterior_ao_arranque_nao_e_vivo(tmp_path, monkeypatch):
+    monkeypatch.setattr(pb, "_arranque_sistema", lambda: time.time() - 3600)
     b = pb.BackgroundBackend(estado_dir=tmp_path)
     (tmp_path / f"{os.getpid()}.json").write_text(json.dumps({"pid": os.getpid(), "cwd": str(tmp_path), "log": "x", "inicio": 1.0}), encoding="utf-8")
     assert b.estado(os.getpid()) == "morto"

@@ -134,8 +134,11 @@ def _arranque_sistema():
             k32 = ctypes.windll.kernel32
             k32.GetTickCount64.restype = ctypes.c_ulonglong
             return time.time() - k32.GetTickCount64() / 1000
+        if sys.platform == "darwin":
+            saida = run_hidden(["sysctl", "-n", "kern.boottime"], capture_output=True, text=True, timeout=5).stdout
+            return float(saida.split("sec =")[1].split(",")[0])  # "{ sec = 1699999999, usec = 0 } ..."
         return time.time() - float(Path("/proc/uptime").read_text().split()[0])
-    except (OSError, ValueError, AttributeError):
+    except (OSError, ValueError, IndexError, AttributeError, subprocess.SubprocessError):
         return None
 
 
