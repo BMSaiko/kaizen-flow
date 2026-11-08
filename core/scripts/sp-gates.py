@@ -274,7 +274,7 @@ def registar(sp_path, results, aviso=None):
     Sem resultados, `aviso` fica como linha própria e não conta como tentativa.
     """
     path = Path(sp_path)
-    raw = path.read_text(encoding="utf-8", newline="")
+    raw = path.read_bytes().decode("utf-8")
     crlf = "\r\n" in raw
     lines = raw.replace("\r\n", "\n").rstrip("\n").split("\n")
     total = sum(1 for ln in lines if ln.startswith("- tentativa "))
