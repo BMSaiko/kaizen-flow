@@ -51,6 +51,22 @@ def test_uso_imprime_em_consola_cp1252(tmp_path):
     env = {**os.environ, "PYTHONIOENCODING": "cp1252"}
     env.pop("PYTHONUTF8", None)
     script = Path(__file__).resolve().parent / "sp-metricas.py"
-    r = subprocess.run([sys.executable, "-I", str(script), "--reflect", "x"], capture_output=True, env=env)
+    r = subprocess.run([sys.executable, "-I", str(script)], capture_output=True, env=env)
     assert r.returncode == 2, r.stderr
     assert b"UnicodeEncodeError" not in r.stderr
+
+
+TABELA = "| d | p | a | 1 | 1.00 | 1 | n/d |\n| d | p | b | 1 | 3.00 | 1 | n/d |\n| d | p | c | 1 | 0.00 | 1 | n/d |\n"
+
+
+def test_reflect_mostra_custo_mediana_sem_aviso(tmp_path):
+    out = sp_metricas.reflect("novo", {"novo": 2.0}, TABELA)
+    assert out[0].startswith("custo novo: 2.00 USD")
+    assert "mediana dos anteriores: 2.00 USD (n=2)" in out[1]
+    assert len(out) == 2
+
+
+def test_reflect_avisa_a_2x_e_custo_sem_transcripts_e_traco(tmp_path):
+    assert any(l.startswith("AVISO") for l in sp_metricas.reflect("novo", {"novo": 4.0}, TABELA))
+    out = sp_metricas.reflect("novo", {}, TABELA)
+    assert out[0].startswith("custo novo: -") and len(out) == 2

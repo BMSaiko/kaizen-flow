@@ -7,9 +7,11 @@ Reflects: linhas «reflect» do SP. Gates à 1ª: `gates_tentativas: 1` no front
 Chamado por sp-move.py ao fechar; sem a pasta de relatórios é no-op.
 
 Uso: python -I scripts/sp-metricas.py <ficheiro-sp-em-Done>
+     python -I scripts/sp-metricas.py --reflect <ficheiro-sp|slug>  (custo do SP, mediana dos anteriores, aviso a 2x)
 """
 import importlib.util
 import re
+import statistics
 import sys
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -77,11 +79,51 @@ def registar(root, sp_path, project=None, custos=None):
     return dest
 
 
+def custos_anteriores(table_text, slug):
+    """Custos USD (>0) das linhas registadas, exceto a do próprio slug."""
+    out = []
+    for row in table_text.splitlines():
+        cells = [c.strip() for c in row.strip().strip("|").split("|")]
+        if len(cells) < 7 or cells[2] == slug:
+            continue
+        try:
+            v = float(cells[4])
+        except ValueError:
+            continue
+        if v > 0:
+            out.append(v)
+    return out
+
+
+def reflect(sp_arg, custos, table_text):
+    """Linhas para o /reflect: custo do SP, mediana dos anteriores e aviso se >= 2x a mediana."""
+    p = Path(sp_arg)
+    if p.is_file():
+        fm = sp_indice.frontmatter(p)
+        slug = fm.get("slug") or re.sub(r"-\d{4}-\d{2}-\d{2}$", "", p.stem)
+    else:
+        slug = re.sub(r"-\d{4}-\d{2}-\d{2}$", "", p.stem)
+    cost = custos.get(slug)
+    prev = sorted(custos_anteriores(table_text, slug))
+    mediana = statistics.median(prev) if prev else None
+    out = [f"custo {slug}: " + (f"{cost:.2f} USD" if cost else "-") + " (- = sem transcripts, não é zero)",
+           "mediana dos anteriores: " + (f"{mediana:.2f} USD (n={len(prev)})" if mediana is not None else "-")]
+    if cost and mediana and cost >= 2 * mediana:
+        out.append(f"AVISO: custo {cost:.2f} >= 2x a mediana {mediana:.2f}; registar como fricção")
+    return out
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
+    if len(argv) == 2 and argv[0] == "--reflect":
+        root = Path(__file__).resolve().parent.parent
+        table = root / REL
+        text = table.read_text(encoding="utf-8") if table.exists() else ""
+        print("\n".join(reflect(argv[1], custo_por_slug(), text)))
+        return 0
     if len(argv) != 1:
         print(__doc__)
         return 2
