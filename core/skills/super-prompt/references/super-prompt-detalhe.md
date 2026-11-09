@@ -68,4 +68,4 @@ Colar o corpo (ou passar como objetivo do `/michi`). A sessão nova salta grill 
 
 ## Onde guardar
 
-`sp-new.py` devolve `knowledge/projects/kaizen/<projeto>/sp/TODO/<slug>-<YYYY-MM-DD>.md`. `<slug>`: minúsculas ascii, hífens, ≤48 caracteres. SPs fora do padrão: `python -I scripts/sp-organize.py` (dry-run; `--apply` só com aprovação).
+`sp-new.py` devolve `knowledge/projects/kaizen/<projeto>/sp/TODO/<projeto>-<nome>-<YYYY-MM-DD>.md` (o slug é o nome do ficheiro sem `.md`; o nome curto recebe projeto e data). `<nome>`: minúsculas ascii, hífens, ≤48 caracteres. Done antigos (`<nome>-<data>.md`) continuam resolúveis. SPs fora do padrão: `python -I scripts/sp-organize.py` (dry-run; `--apply` só com aprovação).

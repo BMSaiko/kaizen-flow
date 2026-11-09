@@ -8,7 +8,7 @@ const COMMAND_RE = /^(sp(-[a-z]+)*|handoff)\.md$/;
 const SCRIPT_RE = /^(sp|doc)[-_][a-z_-]+\.py$/;
 const SCRIPT_NAMES = ["context-guard.py", "da-stop.py", "context-budget.py", "handoff.py", "handoff_pane.py", "handoff_spawn.py", "painel_backend.py","sp_progresso.py", "skill-cut.py", "kaizen_config.py", "kaizen_engine.py", "kaizen_hooks.py", "wt_redirect.py", "kf_ligados.py", "kf_errlog.py", "test_kf_errlog.py", "kf_git.py", "test_kf_git.py", "pentest.py", "test_pentest.py", "review_ciclo.py", "test_review_ciclo.py", "pr_corpo.py", "test_pr_corpo.py", "pr_watch.py", "test_pr_watch.py", "test_kaizen_engine.py", "test_kaizen_hooks.py", "test_michi_tree_close.py"];
 // testes que ficam no vault: afirmam textos em português ou dependem do vault inteiro
-const SKIP = new Set(["test_michi_nucleo.py", "test_context_guard.py", "test_e2e_kaizen_pacote.py", "test_e2e_kaizen_sp.py", "michi-checkpoint.py", "test_michi_checkpoint.py", "michi-escopo.py", "test_michi_escopo.py", "test_guard_escopo.py", "test_wt_redirect.py", "test_michi_metodologias.py"]);
+const SKIP = new Set(["test_michi_nucleo.py", "test_context_guard.py", "test_e2e_kaizen_pacote.py", "test_e2e_kaizen_sp.py", "michi-checkpoint.py", "test_michi_checkpoint.py", "michi-escopo.py", "test_michi_escopo.py", "test_guard_escopo.py", "test_wt_redirect.py", "test_michi_metodologias.py", "sp-migrar-slug.py", "test_sp_migrar_slug.py"]);
 // ficheiros do vault com nomes de kaizen que ainda assim não entram no pacote vão para SKIP; o resto avisa
 const RELATED_RE = /^(test_)?(sp|doc|handoff|kaizen|michi)[-_.]/;
 
@@ -30,7 +30,7 @@ function plan(vault) {
   for (const need of ["sp.md", "sp-list.md", "sp-handoff.md"]) if (!commands.includes(need)) missing.push(`.claude/commands/${need}`);
 
   const scripts = ls(path.join(vault, "scripts"));
-  const chosen = new Set(scripts.filter((n) => SCRIPT_RE.test(n)));
+  const chosen = new Set(scripts.filter((n) => SCRIPT_RE.test(n) && !SKIP.has(n)));
   for (const n of SCRIPT_NAMES) {
     if (scripts.includes(n)) chosen.add(n);
     else missing.push(`scripts/${n}`);

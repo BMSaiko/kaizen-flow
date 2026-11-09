@@ -12,6 +12,11 @@ PROJECT = "demo"
 FILL = "conteúdo de teste"
 
 
+def fs(nome):
+    """Slug completo `<projeto>-<nome>-<data>` (sp-new não o altera)."""
+    return f"{PROJECT}-{nome}-2026-11-01"
+
+
 def run(script, *args, cwd=None):
     r = subprocess.run([sys.executable, "-I", str(SCRIPTS / script), *args],
                        capture_output=True, text=True, encoding="utf-8",
@@ -35,7 +40,7 @@ def novo(root, slug, *extra):
 def novo_doing(root, slug, gate_cmd):
     vault = root / "vault"
     assert novo(root, slug, "--gate", gate_cmd)[0] == 0
-    f = next((vault / PROJECT / "sp" / "TODO").glob(f"{slug}-*.md"))
+    f = next((vault / PROJECT / "sp" / "TODO").glob(f"{slug}.md"))
     text = re.sub(r"(## \d\. [^\n]*\n)\n+", rf"\1\n{FILL}\n\n", f.read_text(encoding="utf-8"))
     f.write_text(text, encoding="utf-8")
     assert run("sp-move.py", "--root", str(vault), "--project", PROJECT, slug, "doing")[0] == 0
@@ -48,58 +53,58 @@ def fechar(root, slug, *extra, dispensa=True):
 
 
 def test_sem_prova_nem_reflect_bloqueia(root):
-    novo_doing(root, "semprova", f'"{sys.executable}" -c "import sys; sys.exit(0)"')
-    rc, out, err = fechar(root, "semprova", dispensa=False)
+    novo_doing(root, fs("semprova"), f'"{sys.executable}" -c "import sys; sys.exit(0)"')
+    rc, out, err = fechar(root, fs("semprova"), dispensa=False)
     assert rc == 1, out + err
-    assert list((root / "vault" / PROJECT / "sp" / "Doing").glob("semprova-*.md"))
-    assert not list((root / "vault" / PROJECT / "sp" / "Done").glob("semprova-*.md"))
+    assert list((root / "vault" / PROJECT / "sp" / "Doing").glob(f"{fs('semprova')}.md"))
+    assert not list((root / "vault" / PROJECT / "sp" / "Done").glob(f"{fs('semprova')}.md"))
     assert not list((root / "repo").glob("COMMIT_*.md"))
 
 
 def test_sem_prova_dispensa_regista_no_sp(root):
-    novo_doing(root, "dispensa", f'"{sys.executable}" -c "import sys; sys.exit(0)"')
-    rc, out, err = fechar(root, "dispensa")
+    novo_doing(root, fs("dispensa"), f'"{sys.executable}" -c "import sys; sys.exit(0)"')
+    rc, out, err = fechar(root, fs("dispensa"))
     assert rc == 0, out + err
-    sp = next((root / "vault" / PROJECT / "sp" / "Done").glob("dispensa-*.md"))
+    sp = next((root / "vault" / PROJECT / "sp" / "Done").glob(f"{fs('dispensa')}.md"))
     assert "## Dispensa de prova/reflect" in sp.read_text(encoding="utf-8")
 
 
 def test_sp_completo_fecha_sem_dispensa(root):
-    novo_doing(root, "completo", f'"{sys.executable}" -c "import sys; sys.exit(0)"')
-    f = next((root / "vault" / PROJECT / "sp" / "Doing").glob("completo-*.md"))
+    novo_doing(root, fs("completo"), f'"{sys.executable}" -c "import sys; sys.exit(0)"')
+    f = next((root / "vault" / PROJECT / "sp" / "Doing").glob(f"{fs('completo')}.md"))
     txt = f.read_text(encoding="utf-8")
     for sec in ("Prova de done", "Reflect"):
         txt = re.sub(rf"^## {sec}[^\n]*\n.*?(?=^## |\Z)", "", txt, flags=re.S | re.M)
     txt += "\n## Prova de done\n\nfast 2 s\n\n## Reflect\n\nReflect final: sem patch\n"
     f.write_text(txt, encoding="utf-8")
-    rc, out, err = fechar(root, "completo", dispensa=False)
+    rc, out, err = fechar(root, fs("completo"), dispensa=False)
     assert rc == 0, out + err
-    done = next((root / "vault" / PROJECT / "sp" / "Done").glob("completo-*.md"))
+    done = next((root / "vault" / PROJECT / "sp" / "Done").glob(f"{fs('completo')}.md"))
     assert "## Dispensa" not in done.read_text(encoding="utf-8")
 
 
 def test_gate_verde_fecha_e_gera_commit(root):
-    novo_doing(root, "verde", f'"{sys.executable}" -c "import sys; sys.exit(0)"')
-    rc, out, err = fechar(root, "verde")
+    novo_doing(root, fs("verde"), f'"{sys.executable}" -c "import sys; sys.exit(0)"')
+    rc, out, err = fechar(root, fs("verde"))
     assert rc == 0, out + err
-    assert list((root / "vault" / PROJECT / "sp" / "Done").glob("verde-*.md"))
+    assert list((root / "vault" / PROJECT / "sp" / "Done").glob(f"{fs('verde')}.md"))
     commit = list((root / "repo").glob("COMMIT_*.md"))
     assert len(commit) == 1
     assert "git add a.txt" in commit[0].read_text(encoding="utf-8")
 
 
 def test_gate_vermelho_nao_move(root):
-    novo_doing(root, "vermelho", f'"{sys.executable}" -c "import sys; sys.exit(1)"')
-    rc, out, err = fechar(root, "vermelho")
+    novo_doing(root, fs("vermelho"), f'"{sys.executable}" -c "import sys; sys.exit(1)"')
+    rc, out, err = fechar(root, fs("vermelho"))
     assert rc == 1
-    assert list((root / "vault" / PROJECT / "sp" / "Doing").glob("vermelho-*.md"))
-    assert not list((root / "vault" / PROJECT / "sp" / "Done").glob("vermelho-*.md"))
+    assert list((root / "vault" / PROJECT / "sp" / "Doing").glob(f"{fs('vermelho')}.md"))
+    assert not list((root / "vault" / PROJECT / "sp" / "Done").glob(f"{fs('vermelho')}.md"))
     assert not list((root / "repo").glob("COMMIT_*.md"))
 
 
 def test_sp_fora_de_doing_erro(root):
-    assert novo(root, "todo")[0] == 0
-    rc, _, err = fechar(root, "todo")
+    assert novo(root, fs("todo"))[0] == 0
+    rc, _, err = fechar(root, fs("todo"))
     assert rc == 2 and "não em Doing" in err
 
 
@@ -144,9 +149,9 @@ def test_erro_nao_encontrado_sugere_sp_list(root):
 
 
 def test_erro_fora_de_doing_sugere_sp_move(root):
-    assert novo(root, "todo2")[0] == 0
-    rc, _, err = fechar(root, "todo2")
-    assert rc == 2 and "sp-move.py todo2 doing" in err
+    assert novo(root, fs("todo2"))[0] == 0
+    rc, _, err = fechar(root, fs("todo2"))
+    assert rc == 2 and f"sp-move.py {fs('todo2')} doing" in err
 
 
 def test_alias_slug_flag(root):

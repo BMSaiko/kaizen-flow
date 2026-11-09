@@ -25,7 +25,7 @@ def project(tmp_path, name="atlas"):
 def test_cria_em_todo_com_frontmatter_e_oito_seccoes(tmp_path):
     root = project(tmp_path)
     path = sp_new.create(root, "atlas", "abc", "P2", TODAY)
-    assert path == root / "atlas/sp/TODO/abc-2026-10-18.md"
+    assert path == root / "atlas/sp/TODO/abc.md"
     text = path.read_text(encoding="utf-8")
     assert text.startswith(
         "---\nstatus: TODO\ncreated: 2026-10-18T00:00:00Z\nupdated: 2026-10-18T00:00:00Z\n"
@@ -101,7 +101,7 @@ def test_parse_children_com_dependencias():
 def test_program_cria_mae_e_filhos_em_todo(tmp_path):
     root = project(tmp_path)
     paths = sp_new.create_program(root, "atlas", "prog", "P2", TODAY, [("a", []), ("b", ["a"])])
-    assert [p.name for p in paths] == ["prog-2026-10-18.md", "a-2026-10-18.md", "b-2026-10-18.md"]
+    assert [p.name for p in paths] == ["prog.md", "a.md", "b.md"]
     mae = paths[0].read_text(encoding="utf-8")
     assert mae.split("---\n")[1].endswith(
         "priority: P2\nmodo: manual\nkind: program\nchildren:\n"
@@ -125,7 +125,7 @@ def test_program_recusa_slug_existente_sem_criar_nada(tmp_path):
     sp_new.create(root, "atlas", "b", "P2", TODAY)
     with pytest.raises(sp_new.SpNewError, match="já existe"):
         sp_new.create_program(root, "atlas", "prog", "P2", TODAY, [("a", []), ("b", [])])
-    assert [p.name for p in (root / "atlas/sp/TODO").glob("*.md")] == ["b-2026-10-18.md"]
+    assert [p.name for p in (root / "atlas/sp/TODO").glob("*.md")] == ["b.md"]
 
 
 def test_program_recusa_filhos_repetidos_ou_vazios(tmp_path):
@@ -160,7 +160,7 @@ def test_cli_modo(tmp_path, capsys):
     root = project(tmp_path)
     base = ["--project", "atlas", "--priority", "P2", "--root", str(root)]
     assert sp_new.main([*base, "--slug", "a", "--modo", "auto"]) == 0
-    assert "modo: auto" in (root / "atlas/sp/TODO/a-" f"{date.today().isoformat()}.md").read_text(encoding="utf-8")
+    assert "modo: auto" in (root / f"atlas/sp/TODO/atlas-a-{date.today().isoformat()}.md").read_text(encoding="utf-8")
     assert sp_new.main([*base, "--slug", "b", "--modo", "semi"]) == 1
     assert "modo inválido" in capsys.readouterr().err
 
@@ -286,7 +286,7 @@ def test_cli_perfil(tmp_path, capsys):
     rc = sp_new.main(["--project", "atlas", "--slug", "abc", "--priority", "P2", "--root", str(root),
                       "--perfil", "cauteloso", "--max-tentativas", "1", "--parar-se", "ambiguidade,custo"])
     assert rc == 0
-    text = next((root / "atlas/sp/TODO").glob("abc-*.md")).read_text(encoding="utf-8")
+    text = next((root / "atlas/sp/TODO").glob("atlas-abc-*.md")).read_text(encoding="utf-8")
     assert "perfil: cauteloso" in text and "parar_se: [ambiguidade, custo]" in text
 
 
@@ -327,51 +327,54 @@ def test_permitir_proibido_ou_com_quebra_de_linha_e_recusado(tmp_path):
     assert list((root / "atlas/sp/TODO").glob("*.md")) == []
 
 
+PROG, A, B = "atlas-prog-2026-10-18", "atlas-a-2026-10-18", "atlas-b-2026-10-18"
+
+
 def program(tmp_path):
     root = project(tmp_path)
-    sp_new.create_program(root, "atlas", "prog", "P2", TODAY, [("a", [])])
+    sp_new.create_program(root, "atlas", PROG, "P2", TODAY, [(A, [])])
     return root
 
 
 def mother_children(root):
-    text = (root / "atlas/sp/TODO/prog-2026-10-18.md").read_text(encoding="utf-8")
+    text = (root / f"atlas/sp/TODO/{PROG}.md").read_text(encoding="utf-8")
     return text.split("---\n")[1].split("children:\n")[1]
 
 
 def test_parent_acrescenta_filho_a_children_da_mae(tmp_path):
     root = program(tmp_path)
-    sp_new.main(["--root", str(root), "--project", "atlas", "--slug", "b", "--priority", "P2",
-                 "--parent", "prog", "--depends-on", "a"])
+    sp_new.main(["--root", str(root), "--project", "atlas", "--slug", B, "--priority", "P2",
+                 "--parent", PROG, "--depends-on", A])
     assert mother_children(root) == (
-        "  - slug: a\n    depends_on: []\n    state: TODO\n"
-        "  - slug: b\n    depends_on: [a]\n    state: TODO\n"
+        f"  - slug: {A}\n    depends_on: []\n    state: TODO\n"
+        f"  - slug: {B}\n    depends_on: [{A}]\n    state: TODO\n"
     )
 
 
 def test_parent_repetido_nao_duplica_entrada(tmp_path):
     root = program(tmp_path)
-    sp_new.link_parent(root, "atlas", "prog", "b", ["a"])
-    sp_new.link_parent(root, "atlas", "prog", "b", ["a"])
-    assert mother_children(root).count("slug: b") == 1
+    sp_new.link_parent(root, "atlas", PROG, B, [A])
+    sp_new.link_parent(root, "atlas", PROG, B, [A])
+    assert mother_children(root).count(f"slug: {B}") == 1
 
 
 def test_parent_inexistente_ou_nao_programa_falha_sem_criar_filho(tmp_path):
     root = program(tmp_path)
-    sp_new.create(root, "atlas", "plain", "P2", TODAY)
-    for parent, msg in (("nada", "não existe"), ("plain", "kind: program")):
+    sp_new.create(root, "atlas", "atlas-plain-2026-10-18", "P2", TODAY)
+    for parent, msg in (("nada", "não existe"), ("atlas-plain-2026-10-18", "kind: program")):
         argv = ["--root", str(root), "--project", "atlas", "--slug", "x", "--priority", "P2", "--parent", parent]
         assert sp_new.main(argv) == 1
-        assert not list((root / "atlas/sp/TODO").glob("x-*.md"))
+        assert not list((root / "atlas/sp/TODO").glob("atlas-x-*.md"))
 
 
 def test_link_parent_preserva_crlf(tmp_path):
     root = program(tmp_path)
-    mother = root / "atlas/sp/TODO/prog-2026-10-18.md"
+    mother = root / f"atlas/sp/TODO/{PROG}.md"
     mother.write_bytes(mother.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
-    sp_new.link_parent(root, "atlas", "prog", "b", [])
+    sp_new.link_parent(root, "atlas", PROG, B, [])
     data = mother.read_bytes()
     assert b"\n" not in data.replace(b"\r\n", b"")
-    assert b"  - slug: b\r\n    depends_on: []\r\n    state: TODO\r\n" in data
+    assert f"  - slug: {B}\r\n    depends_on: []\r\n    state: TODO\r\n".encode() in data
 
 
 def test_recusa_slug_existente_em_master(tmp_path):
@@ -385,7 +388,7 @@ def test_recusa_slug_existente_em_master(tmp_path):
 
 def test_cli_recusa_slug_em_master_e_avisa_atras(tmp_path, capsys, monkeypatch):
     project(tmp_path)
-    monkeypatch.setattr(sp_new, "git_master", lambda: (2, ["x/atlas/sp/Done/dup-2026-11-07.md"]))
+    monkeypatch.setattr(sp_new, "git_master", lambda: (2, ["x/atlas/sp/Done/atlas-dup-" + date.today().isoformat() + ".md"]))
     rc = sp_new.main(["--project", "atlas", "--slug", "dup", "--priority", "P2", "--root", str(tmp_path)])
     err = capsys.readouterr().err
     assert rc == 1 and "master" in err and "2 commits" in err
@@ -399,7 +402,7 @@ def test_main_sem_priority_usa_escalao_e_fica_p2(tmp_path, capsys):
     rc = sp_new.main(["--project", "atlas", "--slug", "abc", "--ficheiros", "2", "--horas", "1", "--root", str(root)])
     assert rc == 0
     assert "escalão proposto: pequena" in capsys.readouterr().err
-    assert "priority: P2" in next((root / "atlas/sp/TODO").glob("abc-*.md")).read_text(encoding="utf-8")
+    assert "priority: P2" in next((root / "atlas/sp/TODO").glob("atlas-abc-*.md")).read_text(encoding="utf-8")
 
 
 def test_main_sem_priority_nem_tamanho_falha(tmp_path, capsys):
@@ -412,3 +415,38 @@ def test_main_escalao_grande_sugere_programa(tmp_path, capsys):
     sp_new.main(["--project", "atlas", "--slug", "abc", "--ficheiros", "20", "--horas", "10", "--root", str(root)])
     err = capsys.readouterr().err
     assert "escalão proposto: grande" in err and "--program" in err
+
+
+def test_full_slug_junta_projeto_e_data_e_e_idempotente():
+    assert sp_new.full_slug("atlas", "agentes-claude", date(2026, 10, 21)) == "atlas-agentes-claude-2026-10-21"
+    assert sp_new.full_slug("atlas", "atlas-agentes-claude-2026-10-21", date(2026, 11, 1)) == "atlas-agentes-claude-2026-10-21"
+    assert sp_new.full_slug("atlas", "atlas-x", date(2026, 10, 21)) == "atlas-x-2026-10-21"
+    assert sp_new.full_slug("atlas", "x-2026-10-21", date(2026, 11, 1)) == "atlas-x-2026-10-21"
+
+
+def test_check_master_reconhece_formato_novo_e_antigo():
+    with pytest.raises(sp_new.SpNewError):
+        sp_new.check_master("atlas", "atlas-dup-2026-11-07", ["knowledge/projects/atlas/sp/Doing/atlas-dup-2026-11-07.md"])
+    with pytest.raises(sp_new.SpNewError):
+        sp_new.check_master("atlas", "dup", ["knowledge/projects/atlas/sp/Done/dup-2026-11-07.md"])
+    sp_new.check_master("atlas", "atlas-outro-2026-11-07", ["knowledge/projects/atlas/sp/Doing/atlas-dup-2026-11-07.md"])
+
+
+def test_cli_slug_curto_gera_slug_completo_e_ficheiro_sem_data_repetida(tmp_path, capsys, monkeypatch):
+    root = project(tmp_path)
+    monkeypatch.setattr(sp_new, "git_master", lambda: (0, []))
+    monkeypatch.setattr(sp_new, "date", type("D", (), {"today": staticmethod(lambda: TODAY)}))
+    assert sp_new.main(["--project", "atlas", "--slug", "agentes", "--priority", "P2", "--root", str(root)]) == 0
+    out = Path(capsys.readouterr().out.strip())
+    assert out == root / "atlas/sp/TODO/atlas-agentes-2026-10-18.md"
+    assert "slug: atlas-agentes-2026-10-18\n" in out.read_text(encoding="utf-8")
+
+
+def test_cli_program_expande_filhos_e_dependencias(tmp_path, capsys, monkeypatch):
+    root = project(tmp_path)
+    monkeypatch.setattr(sp_new, "date", type("D", (), {"today": staticmethod(lambda: TODAY)}))
+    assert sp_new.main(["--project", "atlas", "--program", "prog", "--children", "a,b:a", "--priority", "P2", "--root", str(root)]) == 0
+    names = sorted(p.name for p in (root / "atlas/sp/TODO").glob("*.md"))
+    assert names == ["atlas-a-2026-10-18.md", "atlas-b-2026-10-18.md", "atlas-prog-2026-10-18.md"]
+    b = (root / "atlas/sp/TODO/atlas-b-2026-10-18.md").read_text(encoding="utf-8")
+    assert "parent: atlas-prog-2026-10-18" in b and "depends_on: [atlas-a-2026-10-18]" in b

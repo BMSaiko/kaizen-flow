@@ -18,7 +18,7 @@ Lotes de 2-3 perguntas por domínio, com defaults no texto (padrão bake-default
 ## Helpers de persistência
 
 Sem código de referência; usar os scripts (`python -I scripts/...`):
-`sp-new.py --project P --slug S --priority P2 [--parent X] [--depends-on Y]` (cria `sp/TODO/<slug>-<data>.md`); `sp-validate.py <ficheiro>` (obrigatório antes de entregar); `sp-move.py [--project P] <slug> todo|doing|done`; `sp-list.py`; `sp-organize.py [--project P] [--apply]` (dry-run por defeito).
+`sp-new.py --project P --slug S --priority P2 [--parent X] [--depends-on Y]` (cria `sp/TODO/<projeto>-<slug>-<data>.md`; `--slug`/`--parent`/`--depends-on` aceitam o nome curto e completam projeto e data); `sp-validate.py <ficheiro>` (obrigatório antes de entregar); `sp-move.py [--project P] <slug> todo|doing|done`; `sp-list.py`; `sp-organize.py [--project P] [--apply]` (dry-run por defeito).
 
 ## Regras de estilo (desta skill)
 

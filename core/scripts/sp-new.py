@@ -35,6 +35,18 @@ SECTIONS = (
     "7. Steps (numbered, ordered)", "8. Done-when",
 )
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+DATE_TAIL = re.compile(r"-\d{4}-\d{2}-\d{2}$")
+
+
+def full_slug(project, name, today):
+    """Slug `<projeto>-<nome>-AAAA-MM-DD`; idempotente (não repete projeto nem data já presentes)."""
+    if not name:
+        return name
+    if not DATE_TAIL.search(name):
+        name = f"{name}-{today.isoformat()}"
+    if not name.startswith(project + "-"):
+        name = f"{project}-{name}"
+    return name
 
 
 AUTH_VALUES = ("auto", "pergunta", "nunca")
@@ -118,7 +130,8 @@ def check_master(project, slug, master_paths):
     """Recusa slug que já existe em master (worktree desatualizada não o vê)."""
     pref = f"/{project}/sp/"
     for p in master_paths:
-        if pref in "/" + p and Path(p).name.startswith(slug + "-") and re.fullmatch(r"\d{4}-\d{2}-\d{2}\.md", Path(p).name[len(slug) + 1:]):
+        name = Path(p).name
+        if pref in "/" + p and (name == slug + ".md" or (name.startswith(slug + "-") and re.fullmatch(r"\d{4}-\d{2}-\d{2}\.md", name[len(slug) + 1:]))):
             raise SpNewError(f"SP '{slug}' já existe em master ({p}); git merge master")
 
 
@@ -176,7 +189,7 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
         body += [f"## {title}", "", ""]
     if decisoes:
         body += ["## Decisões", ""] + [f"- {d.strip()}" for d in decisoes] + [""]
-    path = root / project / "sp" / "TODO" / f"{slug}-{today.isoformat()}.md"
+    path = root / project / "sp" / "TODO" / f"{slug}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(head + body), encoding="utf-8")
     sp_list.sp_indice.invalidar()  # mtime de pasta é grosseiro no Windows: sem isto o slug novo fica fora da cache
@@ -308,23 +321,27 @@ def main(argv=None):
     auth = {"commit": args.commit, "push": args.push, "pr": args.pr, "restricoes": args.restricoes}
     perfil = {"perfil": args.perfil, "max_tentativas": args.max_tentativas, "max_requests": args.max_requests,
               "parar_se": [x.strip() for x in args.parar_se.split(",") if x.strip()] if args.parar_se else None}
+    today = date.today()
+    fs = lambda n: full_slug(args.project, n, today)  # noqa: E731
     try:
         if args.program:
             if not args.children:
                 raise SpNewError("--program exige --children")
-            paths = create_program(args.root, args.project, args.program, args.priority, date.today(),
-                                   parse_children(args.children), args.modo, auth)
+            children = [(fs(n), [fs(d) for d in deps]) for n, deps in parse_children(args.children)]
+            paths = create_program(args.root, args.project, fs(args.program), args.priority, today, children, args.modo, auth)
             print("\n".join(str(p) for p in paths))
             if args.modo != "auto":
                 print("aviso: programa em modo: manual; sp-fila para a cada pergunta/commit. "
                       "Para uma fila sem paragens: --modo auto --commit auto", file=sys.stderr)
         elif args.slug:
+            args.slug, args.parent = fs(args.slug), (fs(args.parent) if args.parent else None)
+            args.depends_on = [fs(d) for d in args.depends_on]
             atras, master_paths = git_master()
             if atras:
                 print(f"aviso: ramo {atras} commits atrás de master; git merge master", file=sys.stderr)
             check_master(args.project, args.slug, master_paths)
             check_links(args.root, args.project, args.parent, args.depends_on)
-            path = create(args.root, args.project, args.slug, args.priority, date.today(), args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao)
+            path = create(args.root, args.project, args.slug, args.priority, today, args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao)
             if args.parent:
                 link_parent(args.root, args.project, args.parent, args.slug, args.depends_on)
             print(path)

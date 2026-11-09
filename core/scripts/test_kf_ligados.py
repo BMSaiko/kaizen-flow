@@ -39,20 +39,20 @@ def cenario(tmp_path):
     gate = f'"{sys.executable}" -c "import sys; sys.exit(0)"'
     assert run("sp-new.py", "--root", str(vault), "--project", PROJECT, "--slug", "s1",
                "--priority", "P3", "--gate", gate)[0] == 0
-    f = next((vault / PROJECT / "sp" / "TODO").glob("s1-*.md"))
+    f = next((vault / PROJECT / "sp" / "TODO").glob("*s1-*.md"))
     f.write_text(re.sub(r"(## \d\. [^\n]*\n)\n+", rf"\1\n{FILL}\n\n", f.read_text(encoding="utf-8")), encoding="utf-8")
-    assert run("sp-move.py", "--root", str(vault), "--project", PROJECT, "s1", "doing")[0] == 0
+    assert run("sp-move.py", "--root", str(vault), "--project", PROJECT, f.stem, "doing")[0] == 0
     return tmp_path
 
 
 def fechar(base, env=None):
-    return run("sp-fechar.py", "--root", str(base / "vault"), "--project", PROJECT, "s1",
+    return run("sp-fechar.py", "--root", str(base / "vault"), "--project", PROJECT, next((base / "vault" / PROJECT / "sp" / "Doing").glob("*s1-*.md")).stem,
                "--sem-budget", "--sem-prova", "teste", "--commit-dir", str(base / "repo"),
                env={"KAIZEN_FLOW_HOME": str(base / "pkg"), **(env or {})})
 
 
 def done(base):
-    return list((base / "vault" / PROJECT / "sp" / "Done").glob("s1-*.md"))
+    return list((base / "vault" / PROJECT / "sp" / "Done").glob("*s1-*.md"))
 
 
 def test_sem_ficheiros_kf_fecha(cenario):
