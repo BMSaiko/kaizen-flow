@@ -1,10 +1,24 @@
-"""Fixtures partilhadas dos testes de core/scripts."""
+"""Fixtures partilhadas dos testes de scripts/.
+
+Uso: carregado pelo pytest (sem execução direta).
+rc: n/a
+"""
 import sys
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
+
+
+@pytest.fixture(autouse=True)
+def _sem_custos_reais(monkeypatch):
+    """`sp_fila_execucao._custos` lê os transcripts reais (~13 s); nos testes devolve {} (quem precisa passa `custo_fn`)."""
+    try:
+        import sp_fila_execucao
+    except ImportError:
+        return
+    monkeypatch.setattr(sp_fila_execucao, "_custos", lambda: {})
 
 
 @pytest.fixture(autouse=True)
