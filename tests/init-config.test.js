@@ -113,3 +113,15 @@ test("a deteção não executa nada nem lê .env", () => {
   assert.strictEqual(init(d).status, 0);
   assert.ok(!has(d, "pwned"));
 });
+
+test("doctor --harness codex: hook ligado, ausente e sem config", () => {
+  const d = tmp();
+  spawnSync("node", [KZ, "init", d, "--harness", "codex"], { encoding: "utf8" });
+  const cfg = path.join(d, "codex-config.toml");
+  const out = (extra) => spawnSync("node", [KZ, "doctor", d, "--harness", "codex", "--codex-config", cfg], { encoding: "utf8", ...extra }).stdout;
+  assert.match(out(), /context hook: none, degradado \(sem config/);
+  fs.writeFileSync(cfg, "model = \"x\"\n");
+  assert.match(out(), /context hook: none, degradado \(context-guard ausente/);
+  fs.writeFileSync(cfg, "[hooks]\ncommand = \"python -I scripts/context-guard.py\"\n");
+  assert.match(out(), /context hook: ligado/);
+});

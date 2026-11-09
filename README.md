@@ -92,7 +92,7 @@ Why the workflow behaves this way:
 
 ### Why the 100K context guardrail matters
 
-`context-guard.py` is a hook that reads the session transcript, warns at 85% of the limit (`CLAUDE_CONTEXT_LIMIT`, default 100000) and, at the limit, tells the agent to finish the current step and run the handoff. The reasons:
+`context-guard.py` is a hook that reads the session transcript, warns at 85% of the limit (`KAIZEN_CONTEXT_LIMIT`, alias `CLAUDE_CONTEXT_LIMIT`, default 100000) and, at the limit, tells the agent to finish the current step and run the handoff. The reasons:
 
 - **Cost grows with every request, not just with size.** Each request re-sends the whole context. A session at 200K pays about twice per request what one at 100K pays (the first-day average here was 205K), and it pays it on every remaining step, so cost per step climbs the longer a session runs.
 - **Quality drops in long contexts.** Old tool output, abandoned approaches and stale file reads compete with the current task. The agent contradicts earlier decisions or re-reads what it already knew. A fresh context with a clean SP is sharper.
@@ -100,7 +100,7 @@ Why the workflow behaves this way:
 - **The SP is the memory, not the transcript.** Because progress is written to the SP before the handoff, the new session starts from a few KB of state instead of 100K of history, and nothing important is lost.
 - **It makes cost predictable.** A fixed ceiling bounds the worst-case price of a request, so one forgotten long session cannot dominate the bill.
 
-The warning at 85% leaves room to finish the step cleanly. Raise or lower the limit with `CLAUDE_CONTEXT_LIMIT` to fit your model and budget. On harnesses without hooks (Codex, `agents-md`) the `AGENTS.md` block asks the agent to hand off by hand instead.
+The warning at 85% leaves room to finish the step cleanly. Raise or lower the limit with `KAIZEN_CONTEXT_LIMIT` to fit your model and budget. The guard also reads Codex rollouts (`event_msg` / `token_count`). On harnesses without hooks (`agents-md`, or Codex without the hook wired) the `AGENTS.md` block asks the agent to hand off by hand instead.
 
 Caveat: this is one user's data with no controlled baseline (same tasks without the workflow), so read it as evidence of where tokens go, not as a benchmark. Run `kaizen usage` on your own project to check.
 
@@ -149,7 +149,7 @@ If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the blo
 ## Known limits
 
 - The Codex transcript parser follows the rollout format (`event_msg` / `token_count`, `last_token_usage`) and is tested with synthetic fixtures; if your Codex version logs usage differently, open an issue with an anonymised sample.
-- Codex and `agents-md` run without the context-guard hook (degraded on purpose: `context-guard.py` only reads Claude transcripts and this repo does not wire Codex hooks it cannot verify on your version). The `AGENTS.md` block tells the agent to run the handoff by hand when the context gets long, and `kaizen doctor` prints that notice. If your Codex version has hooks, you can point one at a script that reads its rollout; contributions welcome.
+- `context-guard.py` measures Codex rollouts, but this repo does not wire Codex hooks it cannot verify on your version: point a Codex hook at `python -I scripts/context-guard.py` yourself (to verify on your version: the payload field with the rollout path; without it the guard uses the newest `rollout-*.jsonl` under `KAIZEN_CODEX_ROOT`, default `~/.codex/sessions`). `kaizen doctor --harness codex` reads `config.toml` (override with `--codex-config`) and says `ligado` or `degradado`; `agents-md` and unwired Codex fall back to the `AGENTS.md` block (handoff by hand).
 - Cursor, Gemini CLI, opencode and similar are supported only through the `agents-md` fallback.
 - The `new conversation` command used by the Codex handoff (`/new`) is an assumption to verify on your version.
 
