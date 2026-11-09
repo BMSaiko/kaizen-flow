@@ -12,5 +12,6 @@
   "files": ["bin", "core", "adapters", "usage", "README.md", "LICENSE"],
   "scripts": { "test": "node bin/run-tests.js" },
   "engines": { "node": ">=18" },
+  "coverageThreshold": { "js": { "lines": 70 }, "python": { "lines": 90 } },
   "publishConfig": { "access": "public", "provenance": true }
 }
