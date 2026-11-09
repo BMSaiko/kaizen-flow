@@ -3,7 +3,7 @@
 `[repo]` defaults to the current directory. `--harness` defaults to `claude`. Errors stop with one line and a non-zero exit.
 
 ```sh
-kaizen init [repo] [--harness claude|codex|agents-md]
+kaizen init [repo] [--harness claude|codex|agents-md|opencode|cursor|gemini]
 kaizen doctor [repo] [--harness h] [--fix]
 kaizen status [repo]                  # pending SPs
 kaizen usage [--days N | --since YYYY-MM-DD] [--source claude,codex] [--top N]
@@ -13,7 +13,7 @@ kaizen audit [dir]                    # fails if personal data leaks into the re
 
 | Command | Option | Meaning |
 |---|---|---|
-| `kaizen init [repo]` | `--harness claude\|codex\|agents-md` | Which adapter to install. `claude`: `.claude/` skills, commands, hooks. `codex`: `.agents/skills/`, `.kaizen/commands/`, `AGENTS.md` block. `agents-md`: `AGENTS.md` block + scripts only. Never overwrites; re-running is safe. Also creates the example project folder `knowledge/projects/kaizen/_default/{sp,dr,dp}/{TODO,Doing,Done}`. |
+| `kaizen init [repo]` | `--harness claude\|codex\|agents-md\|opencode\|cursor\|gemini` | Which adapter to install. `claude`: `.claude/` skills, commands, hooks. `codex`: `.agents/skills/`, `.kaizen/commands/`, `AGENTS.md` block. `opencode`: `.opencode/skills/`, `.opencode/commands/`, `AGENTS.md` block. `cursor`: `.cursor/skills/`, `.kaizen/commands/`, always-on rule `.cursor/rules/kaizen-flow.mdc`. `gemini`: `.gemini/skills/`, `.gemini/commands/*.toml`, `GEMINI.md` block. `agents-md`: `AGENTS.md` block + scripts only. Never overwrites; re-running is safe. Also creates the example project folder `knowledge/projects/kaizen/_default/{sp,dr,dp}/{TODO,Doing,Done}`. |
 | `kaizen doctor [repo]` | `--harness h` | Checks the install for that harness, that Python 3 runs the scripts, and that every SP has the 8 sections. Prints `handoff: cli\|app (backend)`. rc 0 = ok. |
 | | `--fix` | Restores what is missing (same as `init`, nothing overwritten), then re-checks. |
 | `kaizen status [repo]` | | Lists all SPs (TODO, Doing, Done) grouped by program. |

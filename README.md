@@ -35,7 +35,7 @@ Requirements: Node >= 18, Python 3.
 ```sh
 git clone https://github.com/BMSaiko/kaizen-flow && cd kaizen-flow && npm link
 cd your-project
-kaizen init --harness codex                                             # or: claude | agents-md
+kaizen init --harness codex                                             # or: claude | agents-md | opencode | cursor | gemini
 python scripts/sp-new.py --project _default --slug login --priority P2   # write a story
 kaizen usage --days 30                                                  # what it cost
 ```
@@ -100,7 +100,7 @@ Why the workflow behaves this way:
 - **The SP is the memory, not the transcript.** Because progress is written to the SP before the handoff, the new session starts from a few KB of state instead of 100K of history, and nothing important is lost.
 - **It makes cost predictable.** A fixed ceiling bounds the worst-case price of a request, so one forgotten long session cannot dominate the bill.
 
-The warning at 85% leaves room to finish the step cleanly. Raise or lower the limit with `KAIZEN_CONTEXT_LIMIT` to fit your model and budget. The guard also reads Codex rollouts (`event_msg` / `token_count`). On harnesses without hooks (`agents-md`, or Codex without the hook wired) the `AGENTS.md` block asks the agent to hand off by hand instead.
+The warning at 85% leaves room to finish the step cleanly. Raise or lower the limit with `KAIZEN_CONTEXT_LIMIT` to fit your model and budget. The guard also reads Codex rollouts (`event_msg` / `token_count`). On harnesses without hooks (`agents-md`, `opencode`, `cursor`, `gemini`, or Codex without the hook wired) the `AGENTS.md` block asks the agent to hand off by hand instead.
 
 Caveat: this is one user's data with no controlled baseline (same tasks without the workflow), so read it as evidence of where tokens go, not as a benchmark. Run `kaizen usage` on your own project to check.
 
@@ -111,7 +111,7 @@ Requirements: Node >= 18, Python 3.
 ```sh
 git clone <this repo> && cd kaizen-flow && npm link   # or: npx kaizen-flow ... once published
 cd your-project
-kaizen init --harness codex     # or: claude | agents-md
+kaizen init --harness codex     # or: claude | agents-md | opencode | cursor | gemini
 kaizen doctor --harness codex   # exits non-zero if something is missing
 ```
 
@@ -150,7 +150,7 @@ If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the blo
 
 - The Codex transcript parser follows the rollout format (`event_msg` / `token_count`, `last_token_usage`) and is tested with synthetic fixtures; if your Codex version logs usage differently, open an issue with an anonymised sample.
 - `context-guard.py` measures Codex rollouts, but this repo does not wire Codex hooks it cannot verify on your version: point a Codex hook at `python -I scripts/context-guard.py` yourself (to verify on your version: the payload field with the rollout path; without it the guard uses the newest `rollout-*.jsonl` under `KAIZEN_CODEX_ROOT`, default `~/.codex/sessions`). `kaizen doctor --harness codex` reads `config.toml` (override with `--codex-config`) and says `ligado` or `degradado`; `agents-md` and unwired Codex fall back to the `AGENTS.md` block (handoff by hand).
-- Cursor, Gemini CLI, opencode and similar are supported only through the `agents-md` fallback.
+- `opencode`, `cursor` and `gemini` have their own adapters (no context hook: handoff by hand). Cursor commands stay in `.kaizen/commands` because the Cursor commands path is not verified. Other harnesses use the `agents-md` fallback.
 - The `new conversation` command used by the Codex handoff (`/new`) is an assumption to verify on your version.
 
 ## Contributing and license
