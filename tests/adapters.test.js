@@ -128,3 +128,33 @@ test("gemini: o prompt TOML preserva o corpo do comando (aspas, quebras e unicod
   assert.strictEqual(get("description"), 'Olá "mundo"');
   assert.strictEqual(get("prompt"), 'Linha 1\nUsa \\ e "aspas" {{args}} ção');
 });
+
+test("render em processo: cursor, gemini e opencode mapeiam o núcleo", () => {
+  const core = loadCore();
+  const cur = require("../adapters/cursor").render(core);
+  assert.ok(cur.files.some((f) => f.path === ".cursor/rules/kaizen-flow.mdc"));
+  assert.ok(cur.files.some((f) => f.path.startsWith(".cursor/skills/")));
+  assert.ok(cur.files.some((f) => f.path.startsWith(".kaizen/commands/")));
+  const gem = require("../adapters/gemini").render(core);
+  assert.strictEqual(gem.agentsFile, "GEMINI.md");
+  assert.ok(gem.files.some((f) => /^\.gemini\/commands\/.+\.toml$/.test(f.path)));
+  assert.ok(!gem.files.some((f) => /^\.gemini\/commands\/.+\.md$/.test(f.path)));
+  const oc = require("../adapters/opencode").render(core);
+  assert.ok(oc.files.some((f) => f.path.startsWith(".opencode/skills/")));
+  assert.ok(oc.agents.includes("kaizen-flow"));
+});
+
+test("gemini: frontmatter com aspas, sem frontmatter e $ARGUMENTS", () => {
+  const mk = (text) => ({ rel: "commands/x.md", data: Buffer.from(text) });
+  const out = (text) => require("../adapters/gemini").render([mk(text)]).files[0];
+  const a = out('---\ndescription: "Faz x"\nname: x\n---\nCorre $ARGUMENTS agora\n');
+  assert.strictEqual(a.path, ".gemini/commands/x.toml");
+  const ta = a.data.toString("utf8");
+  assert.ok(ta.includes('description = "Faz x"'));
+  assert.ok(ta.includes("Corre {{args}} agora"));
+  const b = out("sem frontmatter $ARGUMENTS").data.toString("utf8");
+  assert.ok(!b.includes("description ="));
+  assert.ok(b.includes('prompt = "sem frontmatter {{args}}"'));
+  const c = out("---\ndescription: 'aspas simples'\nlinha solta\n---\ncorpo\n").data.toString("utf8");
+  assert.ok(c.includes('description = "aspas simples"'));
+});
