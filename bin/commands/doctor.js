@@ -13,8 +13,9 @@ function checkInstall(dir, harness) {
   const out = ADAPTERS[harness].render(loadCore());
   for (const f of out.files) if (!fs.existsSync(path.join(dir, f.path))) problems.push(`falta: ${f.path}`);
   if (out.agents) {
-    const a = path.join(dir, "AGENTS.md");
-    if (!fs.existsSync(a) || !fs.readFileSync(a, "utf8").includes(MARKER)) problems.push("falta: bloco kaizen em AGENTS.md");
+    const name = out.agentsFile || "AGENTS.md";
+    const a = path.join(dir, name);
+    if (!fs.existsSync(a) || !fs.readFileSync(a, "utf8").includes(MARKER)) problems.push(`falta: bloco kaizen em ${name}`);
   }
   if (out.settings) {
     let cfg = {};

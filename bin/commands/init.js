@@ -18,8 +18,8 @@ function writeFiles(dest, files) {
   return n;
 }
 
-function appendAgents(dest, block) {
-  const out = path.join(dest, "AGENTS.md");
+function appendAgents(dest, block, file = "AGENTS.md") {
+  const out = path.join(dest, file);
   const cur = fs.existsSync(out) ? fs.readFileSync(out, "utf8") : "";
   if (cur.includes(MARKER)) return;
   fs.writeFileSync(out, cur ? cur.replace(/\s*$/, "\n\n") + block : block);
@@ -97,14 +97,14 @@ function writeTestCmd(dest) {
 
 function init(target, harness = "claude") {
   const adapter = ADAPTERS[harness];
-  if (!adapter) throw new Error(`harness desconhecido: ${harness} (claude|codex|agents-md)`);
+  if (!adapter) throw new Error(`harness desconhecido: ${harness} (${Object.keys(ADAPTERS).join("|")})`);
   const dest = path.resolve(target || ".");
   if (fs.existsSync(dest) && !fs.statSync(dest).isDirectory()) throw new Error(`${dest} não é um diretório`);
   const out = adapter.render(loadCore());
   if (out.settings) readSettings(dest); // falha cedo, antes de escrever peças
   fs.mkdirSync(dest, { recursive: true });
   const n = writeFiles(dest, out.files);
-  if (out.agents) appendAgents(dest, out.agents);
+  if (out.agents) appendAgents(dest, out.agents, out.agentsFile);
   if (out.settings) mergeHooks(dest, out.settings.hooks);
   const spRoot = path.join(dest, configDir(dest, "spRoot", "knowledge/projects/kaizen"));
   // DR/DP seguem docsRoot só se a config o define; sem ele ficam ao lado dos SPs (comportamento anterior)

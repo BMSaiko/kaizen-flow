@@ -36,7 +36,7 @@ test("adaptador claude reproduz o layout .claude/ sem diferenças", () => {
   assert.ok(files.some((f) => f.path === "scripts/sp-list.py"));
 });
 
-for (const h of ["claude", "codex", "agents-md"]) {
+for (const h of ["claude", "codex", "agents-md", "opencode", "cursor", "gemini"]) {
   test(`init --harness ${h}: instala, doctor ok, segunda execução não altera`, () => {
     const d = tmp();
     assert.strictEqual(kz("init", d, "--harness", h).status, 0);
@@ -46,6 +46,8 @@ for (const h of ["claude", "codex", "agents-md"]) {
     assert.strictEqual(kz("init", d, "--harness", h).status, 0);
     assert.deepStrictEqual(tree(d), before);
     if (h === "claude") assert.ok(before[".claude/settings.json"]);
+    else if (h === "gemini") assert.ok(Buffer.from(before["GEMINI.md"], "base64").toString().includes("Kaizen flow") && !before["AGENTS.md"]);
+    else if (h === "cursor") assert.ok(Buffer.from(before[".cursor/rules/kaizen-flow.mdc"], "base64").toString().includes("alwaysApply: true"));
     else assert.ok(Buffer.from(before["AGENTS.md"], "base64").toString().includes("Kaizen flow"));
   });
 }
@@ -75,4 +77,54 @@ test("codex e agents-md avisam como fazer handoff sem hook de contexto", () => {
     const { agents } = require(`../adapters/${h}`).render(loadCore());
     assert.ok(agents.includes("sp-handoff.py --launch"));
   }
+});
+
+test("opencode: skills em .opencode/skills, comandos em .opencode/commands, bloco em AGENTS.md", () => {
+  const { files, agents } = require("../adapters/opencode").render(loadCore());
+  assert.ok(files.some((f) => f.path === ".opencode/skills/michi/SKILL.md"));
+  assert.ok(files.some((f) => f.path === ".opencode/commands/sp.md"));
+  assert.ok(files.some((f) => f.path === "scripts/sp-list.py"));
+  assert.ok(agents.includes(".opencode/skills/michi/SKILL.md"));
+  assert.ok(agents.includes("sp-handoff.py --launch"));
+});
+
+test("cursor: skills em .cursor/skills, regra .mdc sempre aplicada, sem AGENTS.md", () => {
+  const { files, agents } = require("../adapters/cursor").render(loadCore());
+  assert.ok(files.some((f) => f.path === ".cursor/skills/michi/SKILL.md"));
+  assert.ok(files.some((f) => f.path === ".kaizen/commands/sp.md"));
+  assert.ok(files.some((f) => f.path === "scripts/sp-list.py"));
+  const rule = files.find((f) => f.path === ".cursor/rules/kaizen-flow.mdc");
+  assert.ok(rule);
+  const t = rule.data.toString();
+  assert.ok(t.startsWith("---" + String.fromCharCode(10)));
+  assert.ok(t.includes("alwaysApply: true"));
+  assert.ok(t.includes(".cursor/skills/michi/SKILL.md"));
+  assert.ok(t.includes("sp-handoff.py --launch"));
+  assert.strictEqual(agents, undefined);
+});
+
+test("gemini: skills em .gemini/skills, comandos TOML em .gemini/commands, bloco em GEMINI.md", () => {
+  const core = loadCore();
+  const { files, agents, agentsFile } = require("../adapters/gemini").render(core);
+  assert.strictEqual(agentsFile, "GEMINI.md");
+  assert.ok(files.some((f) => f.path === ".gemini/skills/michi/SKILL.md"));
+  assert.ok(files.some((f) => f.path === "scripts/sp-list.py"));
+  assert.ok(!files.some((f) => f.path.startsWith(".gemini/commands/") && !f.path.endsWith(".toml")));
+  const cmd = files.find((f) => f.path === ".gemini/commands/sp.toml");
+  assert.ok(cmd);
+  const t = cmd.data.toString();
+  assert.match(t, /^description = "/m);
+  assert.match(t, /^prompt = "/m);
+  assert.ok(t.includes("{{args}}") && !t.includes("$ARGUMENTS"));
+  assert.ok(agents.includes(".gemini/skills/michi/SKILL.md"));
+});
+
+test("gemini: o prompt TOML preserva o corpo do comando (aspas, quebras e unicode)", () => {
+  const src = '---\ndescription: Olá "mundo"\nargument-hint: "[x]"\n---\nLinha 1\nUsa \\ e "aspas" $ARGUMENTS ção\n';
+  const core = [{ rel: "commands/x.md", data: Buffer.from(src) }];
+  const { files } = require("../adapters/gemini").render(core);
+  const t = files.find((f) => f.path === ".gemini/commands/x.toml").data.toString();
+  const get = (k) => JSON.parse(t.split("\n").find((l) => l.startsWith(k + " = ")).slice(k.length + 3));
+  assert.strictEqual(get("description"), 'Olá "mundo"');
+  assert.strictEqual(get("prompt"), 'Linha 1\nUsa \\ e "aspas" {{args}} ção');
 });
