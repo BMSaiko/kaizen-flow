@@ -27,7 +27,17 @@ Só corre comandos vindos da config. Coberto por `core/scripts/test_sp_gates.py`
 
 ## CI
 
-O workflow reutilizável `.github/workflows/test.yml` corre `kaizen audit .` e `npm test` numa matriz Node x Python 3.10/3.13 (cache npm/pip) e é usado por `ci`, `publish` e `release`. O `ci` acrescenta o job `smoke`: `npm pack`, `kaizen init` e `kaizen audit` num diretório temporário. O artefacto de cobertura (JS nativo, Python `pytest-cov`) é gerado com `KAIZEN_COVERAGE=1`, sem limiar bloqueante.
+O workflow reutilizável `.github/workflows/test.yml` corre `kaizen audit .` e `npm test` numa matriz Node x Python 3.10/3.13 (cache npm/pip) e é usado por `ci`, `publish` e `release`. O `ci` acrescenta o job `smoke`: `npm pack`, `kaizen init` e `kaizen audit` num diretório temporário. O artefacto de cobertura (JS nativo, Python `pytest-cov`) é gerado com `KAIZEN_COVERAGE=1`; o job `coverage` do `ci` falha abaixo do limiar (ver «Limiar de cobertura»).
+
+## Limiar de cobertura
+
+O limiar vive em `package.json` (`coverageThreshold`): `js.lines` (linhas, `--experimental-test-coverage`) e `python.lines` (`--cov-fail-under` do `pytest-cov`). Valores iniciais = cobertura medida em 2026-11-09, arredondada para baixo: JS 70 % (70,38), Python 90 % (90,74). `bin/run-tests.js` aplica-os só com `KAIZEN_COVERAGE=1`, por isso falha no job `coverage` e não nos testes locais normais.
+
+Regra de subida:
+
+- Só sobe: depois de um PR que aumente a cobertura, medir com `KAIZEN_COVERAGE=1 npm test` e subir o limiar para o novo valor inteiro, no mesmo PR.
+- Nunca desce sem justificação escrita no PR.
+- Verificar a falha: pôr um limiar acima do medido (p.ex. 99) e confirmar que `KAIZEN_COVERAGE=1 npm test` sai com erro.
 
 ## Correr localmente
 
