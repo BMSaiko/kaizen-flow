@@ -15,9 +15,14 @@ function fakeVault() {
   const v = tmp();
   for (const s of SKILLS) put(v, `.claude/skills/${s}/SKILL.md`);
   for (const c of ["sp", "sp-list", "sp-handoff", "handoff"]) put(v, `.claude/commands/${c}.md`);
-  for (const s of ["context-guard", "da-stop", "context-budget", "handoff", "handoff_pane", "handoff_spawn", "painel_backend", "sp_progresso", "skill-cut", "kaizen_config", "kaizen_engine", "kaizen_hooks", "wt_redirect", "kf_ligados", "kf_errlog", "test_kf_errlog", "kf_git", "test_kf_git", "pentest", "test_pentest", "review_ciclo", "test_review_ciclo", "pr_corpo", "test_pr_corpo", "pr_watch", "test_pr_watch", "test_kaizen_engine", "test_kaizen_hooks", "test_michi_tree_close", "sp-list", "sp-move"]) put(v, `scripts/${s}.py`);
+  for (const s of ["conftest", "context-guard", "da-stop", "context-budget", "handoff", "handoff_pane", "handoff_spawn", "painel_backend", "sp_progresso", "skill-cut", "kaizen_config", "kaizen_engine", "kaizen_hooks", "wt_redirect", "kf_ligados", "kf_errlog", "test_kf_errlog", "kf_git", "test_kf_git", "pentest", "test_pentest", "review_ciclo", "test_review_ciclo", "pr_corpo", "test_pr_corpo", "pr_watch", "test_pr_watch", "test_kaizen_engine", "test_kaizen_hooks", "test_michi_tree_close", "sp-list", "sp-move"]) put(v, `scripts/${s}.py`);
   return v;
 }
+
+test("plan inclui o conftest.py (isola o cwd dos testes) para o sync não o apagar", () => {
+  const { parts } = plan(fakeVault());
+  assert.ok(parts.map((p) => p[1]).includes("scripts/conftest.py"));
+});
 
 test("sync sem fonte falha com mensagem clara e nÃ£o toca em core/", () => {
   const before = fs.readdirSync(path.join(__dirname, "..", "core"));
