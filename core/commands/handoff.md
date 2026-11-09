@@ -2,7 +2,7 @@
 description: Passar uma conversa livre (sem SP) para uma sessão nova: escreve um handoff efémero no vault, faz /clear e a sessão nova lê-o e apaga-o
 version: 1.1.0
 ---
-Para conversas sem SP (para um SP, usar `/sp-handoff`). Passos, por esta ordem (português europeu). Núcleo comum (corpo, `--launch`, modo automático): `knowledge/infra/reference/handoff-launch.md`.
+Para conversas sem SP (qual usar: `handoff-launch.md` §Qual usar). Passos, por esta ordem (português europeu). Núcleo comum (corpo, `--launch`, modo automático): `knowledge/infra/reference/handoff-launch.md`.
 
 1. Escrever o corpo conforme o núcleo comum (campos: Estado, Último passo, Próximo passo, Ficheiros tocados, Gates por correr, Decisões). `$ARGUMENTS` = nome curto opcional da conversa (slug).
 2. `python -I scripts/sb.py ctx handoff --write --slug <slug> --file <corpo.md>`. Imprime o caminho `knowledge/projects/kaizen/handoffs/<data>-<HHMM>-<slug>.md` (limpa também `handoffs/*.md` com mais de 7 dias).

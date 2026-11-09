@@ -2,7 +2,7 @@
 description: Registar o progresso no SP atual (Doing), imprimir o /michi pronto a copiar e, se o user quiser, fazer /clear e continuar o michi neste painel do WezTerm
 version: 1.1.0
 ---
-Passos, por esta ordem (português europeu). Núcleo comum (corpo, `--launch`, modo automático): `knowledge/infra/reference/handoff-launch.md`.
+Para um SP (sem SP: `/handoff`; ver `handoff-launch.md` §Qual usar). Passos, por esta ordem (português europeu). Núcleo comum (corpo, `--launch`, modo automático): `knowledge/infra/reference/handoff-launch.md`.
 
 1. `python -I scripts/sp-handoff.py --resolve $ARGUMENTS` (`$ARGUMENTS` = slug opcional). Devolve o caminho absoluto do SP em Doing (se o slug for de um programa, o filho em Doing). Se falhar por haver vários Doing, usar AskUserQuestion com os slugs listados e repetir com o escolhido.
 2. `python -I scripts/sp-estado.py <caminho>` (passos, gates e ficheiros alterados numa só leitura: base de **Último passo/Gates por correr/Ficheiros tocados**, sem reler SP nem git). Escrever o corpo conforme o núcleo comum (campos: Estado, Último passo, Próximo passo, Ficheiros tocados, Gates por correr, Decisões).
