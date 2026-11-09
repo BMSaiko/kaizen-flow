@@ -1,4 +1,8 @@
-"""Carrega scripts/sp-list.py (nome com hífen) como módulo."""
+"""Carrega scripts/sp-list.py (nome com hífen) como módulo.
+
+Uso: módulo importado por os testes e scripts que usam sp-list.py; sem execução direta
+rc: n/a
+"""
 import importlib.util
 import sys
 from pathlib import Path

@@ -19,6 +19,7 @@ Chamadas de subagentes (payload com `agent_id`) são ignoradas: partilham o `ses
 `/michi <caminho>.md` num `UserPromptSubmit` grava o SP em `<session_id>.sp`.
 Os marcadores vivem em `%TEMP%/claude-context-guard/<session_id>.<nível>`. Qualquer erro no hook é
 silencioso (exit 0): o guard nunca pode estragar um prompt.
+rc: 0 ok (ou erro do hook engolido), 1 transcript sem usage
 """
 import json
 import os

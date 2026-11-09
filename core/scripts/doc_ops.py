@@ -2,6 +2,9 @@
 
 Chamado por `sp-list.py --tipo dr|dp` e `sp-move.py --tipo dr|dp`; `doc-list.py` e `doc-move.py`
 são aliases finos obsoletos que reexportam este módulo.
+
+Uso: módulo importado por sp-list.py e sp-move.py (`--tipo dr|dp`); sem execução direta
+rc: n/a (listar devolve 0; erros por exceção)
 """
 import sys
 import time

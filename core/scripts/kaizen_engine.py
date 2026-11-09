@@ -1,6 +1,9 @@
 """Motor único do SP: frontmatter (parse/rewrite) e carregamento dos scripts com hífen.
 
 Os scripts `sp-*` importam isto em vez de repetirem parsers e `importlib`.
+
+Uso: módulo importado pelos scripts sp-* (`kaizen_engine.load(nome)`); sem execução direta
+rc: n/a
 """
 import importlib.util
 import re

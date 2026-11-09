@@ -5,6 +5,7 @@ Só leitura. RC 0 se válido; RC 1 com a lista de problemas no stderr.
 
 Uso:
   python -I scripts/sp-validate.py <caminho.md> [<caminho.md> ...]
+rc: 0 válido, 1 problemas
 """
 import argparse
 import re

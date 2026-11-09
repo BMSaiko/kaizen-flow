@@ -9,6 +9,7 @@ Secções fixas: Alterado · Verificado · Provas · Dificuldades · Em aberto.
 - Em aberto: critérios `- [ ]` por cumprir.
 
 Uso: python -I scripts/sp-report.py <slug|caminho.md> [--base master] [--gates] [--project P]
+rc: 0 ok, 1 erro, 3 secção «Dificuldades» vazia
 """
 from __future__ import annotations
 

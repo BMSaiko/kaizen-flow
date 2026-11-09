@@ -6,6 +6,7 @@ Uso: python -I scripts/sp-prova.py <nome> --arquivo <origem> [--project P] [--ro
 O painel escreve o texto com a ferramenta Write (num ficheiro temporário) e chama
 este script; assim não há `$` nem crases numa linha de comando que peça aprovação.
 Copia bytes (preserva CRLF); recusa nomes com separadores e não sobrescreve sem --forcar.
+rc: 0 ok, 1 erro
 """
 import argparse
 import re

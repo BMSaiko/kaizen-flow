@@ -1,4 +1,8 @@
-"""Fixtures e auxiliares partilhados pelos test_sp_fila_*.py (carrega sp-fila.py como `sp_fila`)."""
+"""Fixtures e auxiliares partilhados pelos test_sp_fila_*.py (carrega sp-fila.py como `sp_fila`).
+
+Uso: importado pelos test_sp_fila_*.py; sem execução direta
+rc: n/a
+"""
 import importlib.util
 import json
 import os

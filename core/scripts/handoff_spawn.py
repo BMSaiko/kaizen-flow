@@ -1,4 +1,8 @@
-"""`sp-handoff.py --spawn`: um painel e uma worktree por SP, a correr `/michi --auto <slug>`."""
+"""`sp-handoff.py --spawn`: um painel e uma worktree por SP, a correr `/michi --auto <slug>`.
+
+Uso: módulo importado por sp-handoff.py (`--spawn`); sem execução direta
+rc: n/a
+"""
 import os
 import subprocess
 import sys

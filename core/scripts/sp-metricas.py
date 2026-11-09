@@ -8,6 +8,7 @@ Chamado por sp-move.py ao fechar; sem a pasta de relatórios é no-op.
 
 Uso: python -I scripts/sp-metricas.py <ficheiro-sp-em-Done>
      python -I scripts/sp-metricas.py --reflect <ficheiro-sp|slug>  (custo do SP, mediana dos anteriores, aviso a 2x)
+rc: 0 ok, 2 erro de uso
 """
 import importlib.util
 import re

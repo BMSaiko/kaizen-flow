@@ -8,6 +8,7 @@ Uso:
   python -I scripts/sp-envelhecer.py              # dry-run (lista as subidas)
   python -I scripts/sp-envelhecer.py --apply      # escreve
   python -I scripts/sp-envelhecer.py --hook       # SessionStart: --apply, no máximo 1x/dia (selo)
+rc: 0
 """
 import argparse
 import re

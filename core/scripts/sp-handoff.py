@@ -22,6 +22,7 @@ imprime o próximo filho elegível (TODO com todas as dependências em Done). De
 
 `--file` tem só o corpo do progresso; o título `## Progresso (sessão <data>)` é posto pelo script.
 Com a mesma data a secção é substituída; com data diferente é acrescentada ao fim.
+rc: 0 ok, 1 falha
 """
 import argparse
 import json

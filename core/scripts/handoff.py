@@ -13,6 +13,7 @@ Uso:
 `--launch` não abre janelas: em segundo plano, passados ~5 s, escreve `/clear` e depois o prompt de
 continuação no painel do WezTerm onde o Claude Code já corre ($WEZTERM_PANE). `--auto` (usado após o
 aviso do context-guard) recusa lançar se o ficheiro não existir em `handoffs/`.
+rc: 0 ok, 1 erro
 """
 import argparse
 import re

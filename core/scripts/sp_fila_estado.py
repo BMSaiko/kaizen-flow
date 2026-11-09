@@ -1,4 +1,8 @@
-"""Sp-fila: configuração, execução sem janela e estado partilhado (bloqueio, leitura e escrita atómica)."""
+"""Sp-fila: configuração, execução sem janela e estado partilhado (bloqueio, leitura e escrita atómica).
+
+Uso: módulo importado por sp-fila.py; sem execução direta
+rc: n/a
+"""
 import json
 import os
 import subprocess

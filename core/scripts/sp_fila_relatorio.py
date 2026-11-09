@@ -1,4 +1,8 @@
-"""Sp-fila: custo por sessão e relatório final / progresso da mãe."""
+"""Sp-fila: custo por sessão e relatório final / progresso da mãe.
+
+Uso: módulo importado por sp-fila.py; sem execução direta
+rc: n/a
+"""
 from pathlib import Path
 import sys
 from pathlib import Path

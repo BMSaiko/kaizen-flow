@@ -22,6 +22,7 @@ Orçamento por programa: o SP-mãe pode ter `orcamento_horas`, `orcamento_usd`, 
 frontmatter. Contam por corrida (retomar = nova corrida): tempo desde o arranque, custo USD das sessões
 `/michi` da árvore (sp-metricas.custo_por_slug) e requests. Ao parar acrescenta `## Progresso (sessão <data>)`
 à mãe (feitos, falhados, por correr) além do relatório.
+rc: 0 ok, 1 falha
 """
 import argparse
 import os

@@ -1,4 +1,8 @@
-"""Ficheiro do SP no /sp-handoff: resolver o SP em Doing, registar `## Progresso` e sincronizar o SP-mãe."""
+"""Ficheiro do SP no /sp-handoff: resolver o SP em Doing, registar `## Progresso` e sincronizar o SP-mãe.
+
+Uso: módulo importado por sp-handoff.py; sem execução direta
+rc: n/a
+"""
 import re
 import sys
 from datetime import date, datetime, timezone

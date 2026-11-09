@@ -4,6 +4,9 @@
 Um bloco começa numa linha '- ' sem indentação, numa linha '1. ' (--numbered) ou num cabeçalho '### '.
 Verifica que nº de blocos no original == nº de linhas de índice == nº de blocos na referência
 e que cada bloco existe literalmente na referência. Só escreve se tudo bater certo.
+
+Uso: python -I scripts/skill-cut.py SKILL "## Secção" REF --title TXT [--numbered]
+rc: 0 ok
 """
 import argparse
 import re

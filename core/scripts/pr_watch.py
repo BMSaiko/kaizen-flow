@@ -8,6 +8,7 @@ Consulta de 60 em 60 s e pára em pronto/merged (rc 0), closed (2), erro (5) ou 
 continua em pendente e aguarda-review. Outros rc: 3 limite de duração, 4 gh falhou seguidamente, 64 uso.
 Com --uma-vez consulta uma vez (rc 0 se o estado não for de paragem).
 Nunca faz merge, push nem escreve no GitHub.
+rc: 0 merged/pronto (ou --uma-vez), 2 fechado, 3 limite de duração, 4 gh falhou, 5 erro, 6 conflito, 64 PR inválido
 """
 import argparse
 import json

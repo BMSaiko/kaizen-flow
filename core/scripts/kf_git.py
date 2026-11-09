@@ -1,6 +1,9 @@
 """Helper único para chamadas git: lista de argumentos (sem shell), sem janela no Windows e cache opcional em processo.
 
 A cache nunca cobre estado que o script altera: quem muda branch/index/HEAD chama `invalidar()`.
+
+Uso: módulo importado pelos scripts do kf (`kf_git.git(...)`); sem execução direta
+rc: n/a
 """
 import subprocess
 

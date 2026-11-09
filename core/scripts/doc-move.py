@@ -3,6 +3,7 @@
 
 Uso:
   python -I scripts/doc-move.py <dr|dp> <slug> <todo|doing|done>   # = sp-move.py --tipo <dr|dp> <slug> <dest>
+rc: 0 movido, 1 erro
 """
 import argparse
 import sys

@@ -17,6 +17,7 @@ Uso:
                                                        # regista `## Testes` no SP; rc 0 verde, 1 vermelho, 2 proibido,
                                                        # 3 sem test.cmd (perguntar ao user), 4 limite de tentativas
 Ordem da fase 5: gates -> harden -> pentest -> review (michi/references/michi-gates.md).
+rc: 0 gates verdes, 1 gate falhou, 2 erro de uso ou gates inválidos
 """
 import argparse
 import hashlib

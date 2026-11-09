@@ -3,6 +3,9 @@
 
 Lê o JSON do hook no stdin. Fora de um SP, não faz nada (rc 0). Se o SP for inválido,
 escreve os problemas no stderr e devolve rc 2 para o Claude os ver.
+
+Uso: configurado como hook PostToolUse (`.claude/settings.json`), sem argumentos.
+rc: 0 sem problemas ou fora de um SP, 2 SP inválido
 """
 import importlib.util
 import json

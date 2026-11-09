@@ -1,4 +1,8 @@
-"""Sp-fila: passo seguinte (registar o SP fechado, respeitar limites, lançar o próximo)."""
+"""Sp-fila: passo seguinte (registar o SP fechado, respeitar limites, lançar o próximo).
+
+Uso: módulo importado por sp-fila.py; sem execução direta
+rc: n/a
+"""
 import json
 import re
 import sys

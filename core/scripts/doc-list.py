@@ -3,6 +3,7 @@
 
 Uso:
   python -I scripts/doc-list.py <dr|dp> [--all]   # = sp-list.py --tipo <dr|dp> [--all]
+rc: 0 ok
 """
 import argparse
 import sys

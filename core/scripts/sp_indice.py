@@ -1,4 +1,8 @@
-"""Índice de SPs: listagem e frontmatter com cache por processo (nunca em disco)."""
+"""Índice de SPs: listagem e frontmatter com cache por processo (nunca em disco).
+
+Uso: módulo importado por sp-list.py e sp-estado.py; sem execução direta
+rc: n/a
+"""
 import os
 import sys
 from pathlib import Path

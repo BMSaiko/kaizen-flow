@@ -1,6 +1,9 @@
 """Primitivas partilhadas pelos dois handoffs (`sp-handoff.py` e `handoff.py`): painel, teclas, envio e lançamento.
 
 Sem lógica de SP nem de ficheiros de handoff: só falar com o multiplexer (wezterm, tmux) ou a área de transferência.
+
+Uso: módulo importado por handoff.py e sp-handoff.py; sem execução direta
+rc: n/a
 """
 import json
 import os

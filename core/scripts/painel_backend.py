@@ -4,6 +4,9 @@ Interface única (`Backend`): `abrir(cmd, cwd) -> id`, `estado(id)`, `fechar(id)
 Três backends: `wezterm`, `tmux` (painéis interativos) e `background` (processo com log em ficheiro, sem terminal gráfico).
 `escolher` decide por `painelBackend` do `kaizen.config.json` ou por deteção; sem backend utilizável devolve None e
 `falta` explica o que falta (a fila cai para o modo sequencial).
+
+Uso: módulo importado por sp_fila_*.py e sp-handoff.py; sem execução direta
+rc: n/a
 """
 import abc
 import json

@@ -5,6 +5,7 @@ Junta o estado da fila (`~/.claude/sp-fila-estado.json`) com a pasta de cada SP 
 
 Uso:
   python -I scripts/sp-painel.py
+rc: 0
 """
 import argparse
 import json

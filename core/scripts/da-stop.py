@@ -2,7 +2,7 @@
 
 Perfis e overrides: `.claude/skills/michi/references/michi-perfis.md` (único sítio das regras).
 Uso: python -I scripts/da-stop.py <SP> --passo N.M --tentativas K --causa TXT [--proximo TXT]
-rc 0 = tentar de novo; rc 1 = parar (relatório no stdout).
+rc: 0 tentar de novo, 1 parar (relatório no stdout)
 """
 import argparse
 import re

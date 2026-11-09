@@ -12,6 +12,9 @@ mensagem, o stdout e o rc do script não mudam. Nunca grava valores de segredos.
 
 Local: $KF_ERRLOG, senão %LOCALAPPDATA%\\kaizen-flow\\errors.jsonl, senão
 ~/.kaizen-flow/errors.jsonl (fora do git). Rotação a 1 MiB (errors.jsonl.1).
+
+Uso: módulo; `sys.exit(kf_errlog.executar("script", main))` no fim de cada script
+rc: propaga o rc do script envolvido
 """
 import json
 import os

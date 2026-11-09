@@ -7,6 +7,7 @@ Sem --criar (ou com --dry-run) só imprime o corpo e a base detetada; nunca cria
 rc 0 ok, 2 review não aprovado, 3 pedir confirmação, 4 política `nunca`/em falta, 5 corpo incompleto,
 6 base ambígua (main/master/dev): pedir ao user ou passar --base.
 Nunca acrescenta atribuição a agentes.
+rc: 0 ok, 2 review não aprovado, 3 política `pergunta`, 4 política não é `auto`, 5 corpo sem feito/prova, 6 base ambígua
 """
 import argparse
 import json

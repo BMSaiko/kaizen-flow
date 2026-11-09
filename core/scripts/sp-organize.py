@@ -8,6 +8,7 @@ Ignora `arquivo/`, `_sessions/`, `MOC.md` e anexos `-DP`/`-REPORT`. Colisões fi
 Uso:
   python -I scripts/sp-organize.py [--project P] [--apply]
 rc=0 se nada a fazer (ou tudo aplicado); rc=1 se há desvios por aplicar ou bloqueados.
+rc: 0 ok, 1 há pendentes
 """
 import argparse
 import re

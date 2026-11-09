@@ -2,6 +2,9 @@
 
 Usado pelo teste de fonte do vault e por `sp-fechar.py`: um SP que altera um destes ficheiros só
 fecha com a cópia do pacote igual (`/kaizen-sync`). Sem o pacote no disco, nada é exigido.
+
+Uso: módulo importado por sp-fechar.py e pelo teste de fonte do vault; sem execução direta
+rc: n/a
 """
 import os
 from pathlib import Path

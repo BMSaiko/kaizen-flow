@@ -3,6 +3,7 @@
 Bloqueantes correm na fase `pre` (rc≠0 ou timeout aborta); informativos na `post` (falha só avisa).
 O comando vem só do ficheiro de config, nunca do SP. Contexto: env KAIZEN_* e JSON no stdin.
 Uso: python -I scripts/kaizen_hooks.py fire <evento> --slug S --project P [--de X --para Y]
+rc: 0 ok, 1 hook bloqueou o evento
 """
 import argparse
 import json

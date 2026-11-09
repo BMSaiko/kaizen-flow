@@ -1,4 +1,8 @@
-"""Sp-fila: modo paralelo (painéis wezterm): classificar sessões, vigia e fecho de painéis."""
+"""Sp-fila: modo paralelo (painéis wezterm): classificar sessões, vigia e fecho de painéis.
+
+Uso: módulo importado por sp-fila.py; sem execução direta
+rc: n/a
+"""
 import json
 import os
 import re

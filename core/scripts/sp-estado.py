@@ -7,6 +7,7 @@ ramo e ficheiros alterados no git.
 
 Uso:
   python -I scripts/sp-estado.py <slug|caminho.md> [--project P]
+rc: 0 ok, 1 SP não encontrado
 """
 import argparse
 import re

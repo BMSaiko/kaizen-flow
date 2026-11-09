@@ -9,6 +9,7 @@ Uso:
   python -I scripts/sp-fechar.py <slug> [--project P] [--next] [--msg "assunto"]
                                  [--sem-budget] [--sem-testes] [--sem-commit] [--commit-dir DIR] [--sem-prova "motivo"]
 RC 0 = fechado; 1 = gate/orçamento vermelho (SP fica em Doing); 2 = erro de uso.
+rc: 0 fechado, 1 verificação falhou (SP continua em Doing), 2 gates inválidos
 """
 import argparse
 import json

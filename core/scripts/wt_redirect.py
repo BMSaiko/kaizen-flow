@@ -3,6 +3,9 @@
 Os scripts `sp-move` e `sp-fechar` escrevem em `Path(__file__)/..`; chamados do checkout principal
 sujavam `master`. `redirect` volta a lançar a cópia da worktree (raiz, gates, orçamento e COMMIT_*.md
 ficam lá); sem worktree cria-a primeiro com `sb-worktree ensure`.
+
+Uso: módulo importado por sp-move.py e sp-fechar.py (`redirect`); sem execução direta
+rc: 2 se não for possível criar a worktree do SP
 """
 import subprocess
 import sys

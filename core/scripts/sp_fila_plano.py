@@ -1,4 +1,8 @@
-"""Sp-fila: elegibilidade, ordem da fila (plan), limites e orçamento."""
+"""Sp-fila: elegibilidade, ordem da fila (plan), limites e orçamento.
+
+Uso: módulo importado por sp-fila.py; sem execução direta
+rc: n/a
+"""
 from datetime import datetime
 import sys
 from pathlib import Path

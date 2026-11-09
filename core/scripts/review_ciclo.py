@@ -8,6 +8,7 @@ Com --ficheiros, o estado guarda o hash de cada um e a iteração seguinte só m
 Veredicto (stdout, primeira linha): APROVADO | CORRIGIR | ESCALAR.
 rc 0 aprovado, 1 corrigir (SPs gerados com --criar-sps; repetir o review depois), 2 escalar ao utilizador.
 Só lê o ficheiro de achados e escreve o estado; o review em si é só leitura.
+rc: 0 APROVADO, 2 não aprovado (escalar ao user)
 """
 import argparse
 import hashlib

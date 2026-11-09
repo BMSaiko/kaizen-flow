@@ -5,6 +5,7 @@ Fontes sempre carregadas: CLAUDE.md, AGENTS.md, MEMORY.md (memória do projeto),
 descrições das skills em .claude/skills/*/SKILL.md. Limites por ficheiro avisam cedo o
 crescimento silencioso de CLAUDE.md e AGENTS.md.
 Uso: python -I scripts/context-budget.py
+rc: 0 dentro do limite, 1 limite ultrapassado
 """
 import re
 import sys

@@ -5,6 +5,10 @@ Critérios (única fonte; playbook kaizen-flow §Escalões):
   média:  ficheiros > 3 ou horas > 2, ou risco alto
   pequena: o resto
 Override numa linha: --escalao pequena|media|grande.
+
+Uso:
+  python -I scripts/sp-escalao.py --project P --slug S --ficheiros N --horas H [--risco baixo|alto] [--priority P2] [--escalao pequena|media|grande]
+rc: 0
 """
 import argparse
 import sys

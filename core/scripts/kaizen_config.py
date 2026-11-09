@@ -1,6 +1,9 @@
 """Lê `kaizen.config.json` na raiz do repo; sem ficheiro ou chave, devolve o defeito.
 
 Chaves: `spRoot` (raiz dos SPs) e `docsRoot` (raiz dos DR/DP), relativas à raiz do repo.
+
+Uso: módulo importado pelos scripts sp-* e doc_ops; sem execução direta
+rc: n/a
 """
 import json
 from pathlib import Path

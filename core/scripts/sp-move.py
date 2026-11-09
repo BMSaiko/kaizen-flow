@@ -9,6 +9,7 @@ Uso:
   python -I scripts/sp-move.py <slug> --start        # arranque: SP e mães (cadeia `parent`) em TODO passam a Doing
   python -I scripts/sp-move.py <filho> done --next   # programa: abre o próximo filho elegível; a mãe nunca é movida
   python -I scripts/sp-move.py --tipo dr|dp <slug> <todo|doing|done>   # move um DR/DP (substitui doc-move.py)
+rc: 0 movido, 1 erro
 """
 import argparse
 import sys
