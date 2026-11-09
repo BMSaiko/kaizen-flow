@@ -320,3 +320,16 @@ def test_main_start_via_cli(tmp_path):
     make_child(tmp_path, "TODO", "a")
     assert sp_move.main(["--root", str(tmp_path), "a", "--start"]) == 0
     assert (tmp_path / "atlas/sp/Doing/mae.md").exists()
+
+
+def test_tipo_dr_move_doc_e_rejeita_opcoes_de_sp(tmp_path, capsys):
+    p = tmp_path / "atlas/dr/TODO/x.md"
+    p.parent.mkdir(parents=True)
+    p.write_text("---" + chr(10) + "status: TODO" + chr(10) + "---" + chr(10) + "corpo", encoding="utf-8")
+    assert sp_move.main(["--root", str(tmp_path), "--tipo", "dr", "x", "doing"]) == 0
+    dst = tmp_path / "atlas/dr/Doing/x.md"
+    assert dst.exists() and not p.exists() and "status: Doing" in dst.read_text(encoding="utf-8")
+    with pytest.raises(SystemExit):
+        sp_move.main(["--root", str(tmp_path), "--tipo", "dr", "x", "done", "--start"])
+    assert sp_move.main(["--root", str(tmp_path), "--tipo", "dr", "nao-existe", "done"]) == 1
+    assert "não encontrado" in capsys.readouterr().err

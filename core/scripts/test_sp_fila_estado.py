@@ -28,6 +28,63 @@ def test_paralelo_seguinte_sem_slug_da_erro_e_nao_fecha_nada(tmp_path):
     assert st.read_text(encoding="utf-8") == antes and calls == []
 
 
+def _arranca(tmp_path, root, *extra):
+    return sp_fila.main(["--root", str(root), "--estado", str(tmp_path / "estado.json"), "--relatorios", str(tmp_path / "rel"), *extra])
+
+
+def _obsoleta(tmp_path, root, **over):
+    make_sp(root, "velho", folder="Done")
+    make_sp(root, "novo")
+    base = {"inicio": "2020-01-01T10:00:00", "sessoes": {"velho": {}}, "vigia": {"pid": 0, "ts": "2020-01-01T10:05:00", "incidentes": []}}
+    base.update(over)
+    return _estado(tmp_path, **base)
+
+
+def test_fila_obsoleta_recusa_e_propoe_abandonar(tmp_path, capsys):
+    root = tmp_path / "sps"
+    st = _obsoleta(tmp_path, root)
+    assert _arranca(tmp_path, root) == 1
+    err = capsys.readouterr().err
+    assert "fila obsoleta" in err and "--abandonar-obsoleta" in err and "nenhum SP em Doing" in err
+    assert st.exists()
+
+
+def test_fila_obsoleta_abandonada_com_flag_e_arranca_nova(tmp_path, capsys):
+    root = tmp_path / "sps"
+    st = _obsoleta(tmp_path, root)
+    rc = _arranca(tmp_path, root, "--abandonar-obsoleta", "--dry-run")
+    assert rc == 0  # dry-run nem toca no estado
+    assert st.exists()
+    estado = sp_fila.ler(st)
+    assert sp_fila.abandonar_obsoleta(st, estado, "m", type("A", (), {"abandonar_obsoleta": True})(), tty=False)
+    assert not st.exists()
+
+
+def test_fila_viva_nunca_e_tocada(tmp_path, capsys):
+    root = tmp_path / "sps"
+    agora = datetime.now().isoformat(timespec="seconds")
+    make_sp(root, "em-curso", folder="Doing")
+    st = _estado(tmp_path, inicio="2020-01-01T10:00:00", sessoes={"em-curso": {}}, vigia={"pid": 0, "ts": "2020-01-01T10:05:00", "incidentes": []})
+    assert _arranca(tmp_path, root, "--abandonar-obsoleta") == 1
+    assert "fila já em curso" in capsys.readouterr().err and st.exists()
+    st.write_text(json.dumps({"inicio": agora, "sessoes": {}, "vigia": {"pid": 0, "ts": agora}}), encoding="utf-8")
+    assert _arranca(tmp_path, root, "--abandonar-obsoleta") == 1 and st.exists()
+
+
+def test_fila_vazia_antiga_e_obsoleta(tmp_path):
+    items = sp_fila.load(tmp_path / "sps", None)
+    antigo = {"inicio": "2020-01-01T10:00:00", "sessoes": {}}
+    assert "sem vigia desde o arranque" in sp_fila.fila_obsoleta(antigo, items, datetime(2026, 11, 9))
+    assert sp_fila.fila_obsoleta({"inicio": "2026-11-09T11:30:00", "sessoes": {}}, items, datetime(2026, 11, 9, 12)) is None
+
+
+def test_obsoleta_confirmada_no_terminal(tmp_path):
+    st = _estado(tmp_path)
+    args = type("A", (), {"abandonar_obsoleta": False})()
+    assert not sp_fila.abandonar_obsoleta(st, {}, "m", args, entrada=lambda _: "n", tty=True) and st.exists()
+    assert sp_fila.abandonar_obsoleta(st, {}, "m", args, entrada=lambda _: "s", tty=True) and not st.exists()
+
+
 def test_dois_escritores_simultaneos_nao_perdem_registos(tmp_path):
     import threading
     st = _estado(tmp_path)

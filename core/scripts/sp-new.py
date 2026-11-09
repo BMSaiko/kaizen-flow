@@ -26,6 +26,7 @@ import kf_git  # noqa: E402
 sp_list = kaizen_engine.load("sp-list")
 
 sp_gates = kaizen_engine.load("sp-gates")
+sp_escalao = kaizen_engine.load("sp-escalao")
 
 SECTIONS = (
     "1. Role", "2. Context", "3. Objective (single sentence)", "4. Success criteria (verifiable)",
@@ -269,7 +270,10 @@ def main(argv=None):
     ap.add_argument("--slug")
     ap.add_argument("--program", metavar="SLUG", help="cria um SP-mãe com os filhos de --children")
     ap.add_argument("--children", help="a,b:a,c:a+b (b depende de a; c de a e b)")
-    ap.add_argument("--priority", required=True)
+    ap.add_argument("--priority", help="P1|P2|P3; sem ele, --ficheiros e --horas propõem o escalão (sp-escalao) e a prioridade fica P2")
+    ap.add_argument("--ficheiros", type=int, help="tamanho estimado: ficheiros a tocar (sp-escalao)")
+    ap.add_argument("--horas", type=float, help="tamanho estimado: horas (sp-escalao)")
+    ap.add_argument("--risco", choices=("baixo", "medio", "alto"), default="baixo", help="risco para o escalão (defeito baixo)")
     ap.add_argument("--modo", default="manual", help="modo do michi: auto|manual (defeito manual)")
     ap.add_argument("--commit", help="commit: auto|pergunta|nunca")
     ap.add_argument("--push", help="push: auto|pergunta|nunca")
@@ -289,6 +293,17 @@ def main(argv=None):
     ap.add_argument("--depends-on", nargs="*", default=[])
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    sizing = args.ficheiros is not None and args.horas is not None
+    if not args.priority and not sizing:
+        print("erro: falta --priority (ou --ficheiros e --horas, que propõem o escalão e a prioridade P2)", file=sys.stderr)
+        return 1
+    if sizing:
+        escalao = sp_escalao.classificar(args.ficheiros, args.risco, args.horas)
+        print(f"escalão proposto: {escalao} (sp-escalao.py)", file=sys.stderr)
+        if escalao != "pequena" and not args.program:
+            print(f"aviso: escalão {escalao}; considera --program com --children: "
+                  f"{sp_escalao.comando(escalao, args.project, args.slug or 'slug', args.priority or 'P2')}", file=sys.stderr)
+    args.priority = args.priority or "P2"
     auth = {"commit": args.commit, "push": args.push, "pr": args.pr, "restricoes": args.restricoes}
     perfil = {"perfil": args.perfil, "max_tentativas": args.max_tentativas, "max_requests": args.max_requests,
               "parar_se": [x.strip() for x in args.parar_se.split(",") if x.strip()] if args.parar_se else None}

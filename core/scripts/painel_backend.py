@@ -55,6 +55,10 @@ class Backend(abc.ABC):
     def ecra(self, id):
         """Texto visível do painel (ou a cauda do log); '' se não existe."""
 
+    def enviar(self, id, texto):
+        """Escreve `texto` e Enter no painel; True se enviou. Defeito: False (backend sem terminal onde escrever)."""
+        return False
+
     def estado(self, id):
         """'vivo' ou 'morto'."""
         return "vivo" if str(id) in self.listar() else "morto"
@@ -94,6 +98,13 @@ class WeztermBackend(_Multiplexer):
     def ecra(self, id):
         return self.run(["wezterm", "cli", "get-text", "--pane-id", str(id)], capture_output=True, text=True, encoding="utf-8").stdout
 
+    def enviar(self, id, texto):
+        if str(id) not in self.listar():
+            return False
+        for parte in (texto, chr(13)):
+            self.run(["wezterm", "cli", "send-text", "--pane-id", str(id), "--no-paste", "--", parte], capture_output=True, text=True, encoding="utf-8")
+        return True
+
 
 class TmuxBackend(_Multiplexer):
     nome = "tmux"
@@ -117,6 +128,13 @@ class TmuxBackend(_Multiplexer):
         if str(id) not in self.listar():
             return False
         self.run(["tmux", "kill-pane", "-t", str(id)], capture_output=True, text=True)
+        return True
+
+    def enviar(self, id, texto):
+        if str(id) not in self.listar():
+            return False
+        self.run(["tmux", "send-keys", "-t", str(id), "-l", "--", texto], capture_output=True, text=True, encoding="utf-8")
+        self.run(["tmux", "send-keys", "-t", str(id), "Enter"], capture_output=True, text=True, encoding="utf-8")
         return True
 
     def ecra(self, id):

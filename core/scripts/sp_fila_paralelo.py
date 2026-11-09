@@ -167,7 +167,8 @@ def garantir_vigia(estado, armar, agora):
         return "viva", vivo["pid"]
     return "armada", armar().pid
 
-AVISO_TAIL = f"parar o Monitor `tail -F {VIGIA_LOG}` antigo (já não há vigia a escrever)"
+VIGIA_TAIL = f"tail -n 0 -F {VIGIA_LOG}"  # só linhas novas: nunca o histórico de filas anteriores
+AVISO_TAIL = f"parar o Monitor `{VIGIA_TAIL}` antigo (já não há vigia a escrever)"
 
 
 def _comando_pid(pid, run=subprocess.run):
@@ -257,15 +258,58 @@ def vigiar(ler_estado, intervalo_s, espera, saida, passou_o_fim=lambda: False, b
 
 
 
+def painel_da_sessao(sessao, lista):
+    """Id do painel vivo da sessão: o registado, ou (id velho) o que está na worktree; None se não há painel vivo. `lista` = {id: cwd} do backend."""
+    painel = str(sessao.get("painel"))
+    if painel not in lista and sessao.get("worktree"):
+        painel = next((id_ for id_, cwd in lista.items() if cwd and _norm_caminho(cwd) == _norm_caminho(sessao["worktree"])), painel)
+    return painel if painel in lista else None
+
+
+def nome_painel(estado, painel_id):
+    """Nome do painel `painel_id` para texto ao user: o título (ou slug) da sessão que o regista, com sufixo -2, -3 se outro id já usa o mesmo nome; «painel sem nome» se o id não está no mapa. Nunca devolve o id."""
+    antes = {}
+    for slug, sessao in (estado.get("sessoes") or {}).items():
+        base = sessao.get("titulo") or slug
+        if sessao.get("painel") is not None and str(sessao["painel"]) == str(painel_id):
+            n = antes.get(base, 0) + 1
+            return base if n == 1 else f"{base}-{n}"
+        antes[base] = antes.get(base, 0) + 1
+    return "painel sem nome"
+
+
 def fechar_painel_sessao(estado, slug, run, backend=None):
     """Fecha o painel da sessão `slug` (registo no estado) pelo backend (defeito wezterm); o painel vivo é achado pela worktree se o id estiver velho."""
     backend = backend or painel_backend.WeztermBackend(run)
     sessao = ler(estado).get("sessoes", {}).get(slug) or {}
-    lista = backend.listar()
-    painel = str(sessao.get("painel"))
-    if painel not in lista and sessao.get("worktree"):
-        painel = next((id_ for id_, cwd in lista.items() if cwd and _norm_caminho(cwd) == _norm_caminho(sessao["worktree"])), painel)
-    return backend.fechar(painel) if painel in lista else False
+    painel = painel_da_sessao(sessao, backend.listar())
+    return backend.fechar(painel) if painel is not None else False
+
+
+def ecra_sessao(estado, slug, run, backend=None):
+    """(ok, texto) com o ecrã do painel da sessão `slug`, sob o cabeçalho «Painel <slug>»; o user vê o nome, nunca o id."""
+    backend = backend or painel_backend.WeztermBackend(run)
+    sessao = ler(estado).get("sessoes", {}).get(slug)
+    if sessao is None:
+        return False, f"Painel {slug}: sem sessão registada na fila"
+    painel = painel_da_sessao(sessao, backend.listar())
+    if painel is None:
+        return False, f"Painel {slug}: sem painel vivo"
+    return True, f"Painel {slug}" + chr(10) + backend.ecra(painel)
+
+
+def enviar_sessao(estado, slug, texto, run, backend=None):
+    """(ok, texto) ao enviar `texto` + Enter ao painel da sessão `slug`; só envia a um painel vivo achado como em `ecra_sessao`; o user vê o nome, nunca o id."""
+    backend = backend or painel_backend.WeztermBackend(run)
+    sessao = ler(estado).get("sessoes", {}).get(slug)
+    if sessao is None:
+        return False, f"Painel {slug}: sem sessão registada na fila"
+    painel = painel_da_sessao(sessao, backend.listar())
+    if painel is None:
+        return False, f"Painel {slug}: sem painel vivo"
+    if not backend.enviar(painel, texto):
+        return False, f"Painel {slug}: não deu para enviar"
+    return True, f"Painel {slug}: enviado"
 
 
 def contar_tails(run=subprocess.run):
@@ -277,3 +321,22 @@ def contar_tails(run=subprocess.run):
     except (OSError, ValueError, subprocess.SubprocessError):
         return 0
     return sum(1 for l in saida.splitlines() if "sp-fila-vigia" in l and re.match(r'^\W*(?:.*[\\/])?tail(?:\.exe)?"?\s', l))
+
+
+def resumo_arranque(estado, agora, vivos=()):
+    """Linhas do estado antigo da fila (SP, painéis, aprovações pendentes, idade da vigia) para mostrar antes de aceitar `--parar` ou um arranque novo."""
+    sessoes = estado.get("sessoes") or {}
+    estados = {s: (e, m) for s, e, m in vivos}
+    linhas = [f"estado antigo: {len(sessoes)} sessão(ões), início {estado.get('inicio', '?')}"]
+    for slug, sess in sessoes.items():
+        est, motivo = estados.get(slug, ("?", ""))
+        linhas.append(f"  SP {slug} · painel {sess.get('painel', '-')} · {est}" + (f" · {motivo}" if motivo else ""))
+    pendentes = [s for s, (e, m) in estados.items() if m.startswith(("precisa de aprovação", "à espera"))]
+    linhas.append(f"  aprovações pendentes: {', '.join(pendentes) if pendentes else 'nenhuma'}")
+    vigia = estado.get("vigia")
+    if vigia:
+        idade = int((agora - datetime.fromisoformat(vigia["ts"])).total_seconds())
+        linhas.append(f"  vigia: última batida há {idade // 60} min {idade % 60} s" + (" (PARADA)" if idade > BATIDA_MAX_S else ""))
+    else:
+        linhas.append("  vigia: nunca armada")
+    return "\n".join(linhas)

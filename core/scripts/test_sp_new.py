@@ -392,3 +392,23 @@ def test_cli_recusa_slug_em_master_e_avisa_atras(tmp_path, capsys, monkeypatch):
     rc = sp_new.main(["--project", "atlas", "--slug", "novo", "--priority", "P2", "--root", str(tmp_path)])
     err = capsys.readouterr().err
     assert rc == 0 and "atrás de master" in err
+
+
+def test_main_sem_priority_usa_escalao_e_fica_p2(tmp_path, capsys):
+    root = project(tmp_path)
+    rc = sp_new.main(["--project", "atlas", "--slug", "abc", "--ficheiros", "2", "--horas", "1", "--root", str(root)])
+    assert rc == 0
+    assert "escalão proposto: pequena" in capsys.readouterr().err
+    assert "priority: P2" in next((root / "atlas/sp/TODO").glob("abc-*.md")).read_text(encoding="utf-8")
+
+
+def test_main_sem_priority_nem_tamanho_falha(tmp_path, capsys):
+    assert sp_new.main(["--project", "atlas", "--slug", "abc", "--root", str(project(tmp_path))]) == 1
+    assert "falta --priority" in capsys.readouterr().err
+
+
+def test_main_escalao_grande_sugere_programa(tmp_path, capsys):
+    root = project(tmp_path)
+    sp_new.main(["--project", "atlas", "--slug", "abc", "--ficheiros", "20", "--horas", "10", "--root", str(root)])
+    err = capsys.readouterr().err
+    assert "escalão proposto: grande" in err and "--program" in err

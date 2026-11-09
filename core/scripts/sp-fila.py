@@ -41,8 +41,8 @@ from sp_fila_plano import descendentes, limite, load, plan, render_plan, sem_com
 from sp_fila_relatorio import gastos, relatorio, render_gastos  # noqa: E402,F401
 from sp_fila_execucao import (_custos, _ler_sp, _painel_lancado,  # noqa: E402,F401
                               lancar_seguinte_auto, seguinte, IntegracaoPendente, SlugObrigatorio)
-from sp_fila_paralelo import (INATIVIDADE_S, VIGIA_LOG, aviso_vigia, batida_vigia, classificar,
-                              contar_tails, estado_vivo, fechar_painel_sessao, garantir_vigia, linha, parar_vigia, registar_incidente, vigiar)
+from sp_fila_paralelo import (AVISO_TAIL, INATIVIDADE_S, VIGIA_LOG, VIGIA_TAIL, aviso_vigia, resumo_arranque, batida_vigia, classificar,
+                              contar_tails, ecra_sessao, enviar_sessao, estado_vivo, fechar_painel_sessao, garantir_vigia, linha, parar_vigia, registar_incidente, vigiar)
 
 def backend_paineis(repo=None, env=None, which=None, run=None):
     """(backend ou None, config) segundo `painelBackend` do kaizen.config.json; None = sem painéis utilizáveis."""
@@ -61,11 +61,11 @@ def destacar(args, log, popen=subprocess.Popen):
 
 
 AJUDA = """Orquestrador do sp-fila (regras):
-- Vigia: `sp-fila.py --vigiar --destacado` (processo próprio; se já houver uma ativa não arma outra) e UM só Monitor `tail -F ~/.claude/sp-fila-vigia.log`; aos 30 min o novo substitui o anterior (parar o antigo primeiro).
+- Vigia: `sp-fila.py --vigiar --destacado` (processo próprio; se já houver uma ativa não arma outra) e UM só Monitor `tail -n 0 -F ~/.claude/sp-fila-vigia.log` (só linhas novas); aos 30 min o novo substitui o anterior (parar o antigo primeiro).
 - Ao ver um SP «fechado» a vigia fecha o painel e lança o seguinte sozinha (como `--seguinte --slug`), respeitando max, concorrência, ate, orçamento e dependências; se não lança, a razão fica no log (`slug · fila · razão`).
 - Cada linha do log = `slug · estado · ação`; só mudanças (bloqueado repete-se a cada 15 min como «AINDA»).
 - Relato por linha: ≤3 linhas + TLDR; não narrar avisos repetidos nem reler ecrãs.
-- Pergunta/aprovação de painel: `wezterm cli get-text --pane-id N`, um AskUserQuestion («Painel N»), só depois `send-text --no-paste`; nunca aprovar sozinho.
+- Pergunta/aprovação de painel: `sp-fila.py --ecra <slug>`, um AskUserQuestion («Painel <slug>»), só depois `sp-fila.py --enviar <slug> <texto>`; nunca aprovar sozinho; o user vê o slug, nunca o id.
 - `--estado-vivo` avisa «SEM VIGIA»/«VIGIA PAROU» (rearmar) e «N Monitores» (deixar só um)."""
 
 
@@ -76,7 +76,17 @@ def armar_vigia(args, estado):
     res, pid = garantir_vigia(ler(estado), lambda: destacar(["--vigiar", *extra], VIGIA_LOG), datetime.now())
     if res == "viva":
         return f"vigia já ativo (pid {pid}); log: {VIGIA_LOG}"
-    return f"vigia destacado (pid {pid}); acompanhar com o Monitor: `tail -F {VIGIA_LOG}` (re-armar o tail aos 30 min); sem a fila a correr, sai sozinho"
+    return f"vigia destacado (pid {pid}); acompanhar com o Monitor: `{VIGIA_TAIL}` (re-armar o tail aos 30 min); sem a fila a correr, sai sozinho"
+
+
+def _resumo_antigo(estado, args):
+    """Resumo do estado antigo (best-effort: se não der para classificar os painéis, mostra só o que o estado diz)."""
+    atual = ler(estado)
+    try:
+        vivos = estado_vivo(atual, load(args.root, args.projeto), run_hidden, datetime.now(), args.inatividade * 60, backend=backend_paineis()[0])
+    except Exception:  # noqa: BLE001 - o resumo nunca pode impedir o --parar
+        vivos = []
+    return resumo_arranque(atual, datetime.now(), vivos)
 
 
 def _ler_ou_erro(path):
@@ -88,13 +98,55 @@ def _ler_ou_erro(path):
         return None
 
 
+OBSOLETA_MIN = 60  # vigia sem batida (ou fila sem vigia desde o arranque) há mais disto, sem SP em Doing = fila obsoleta
+
+
+def fila_obsoleta(atual, items, agora, limite_min=OBSOLETA_MIN):
+    """Motivo (str) se o estado é de uma fila obsoleta, None se está viva.
+
+    Viva = algum SP da corrida em Doing ou vigia a bater há menos de `limite_min` (sem vigia conta o arranque).
+    Obsoleta = nenhuma das duas. Nunca devolve motivo para uma fila viva."""
+    sessoes = atual.get("sessoes") or {}
+    status = {sp.slug: sp.status for sp, _ in items}
+    if any(status.get(s) == "Doing" for s in sessoes):
+        return None
+    ref = (atual.get("vigia") or {}).get("ts") or atual.get("inicio")
+    try:
+        idade = (agora - datetime.fromisoformat(ref)).total_seconds() / 60
+    except (TypeError, ValueError):
+        return "estado sem data legível e sem SP em Doing"
+    if idade <= limite_min:
+        return None
+    onde = "sem batida da vigia" if atual.get("vigia") else "sem vigia desde o arranque"
+    return f"{onde} há {int(idade)} min (limite {limite_min}) e nenhum SP em Doing ({len(sessoes)} sessão(ões) registada(s))"
+
+
+def abandonar_obsoleta(estado, atual, motivo, args, entrada=input, tty=None):
+    """Propõe abandonar a fila obsoleta e, confirmado, apaga o estado (e pára a vigia). True = abandonada."""
+    print(f"fila obsoleta ({estado}): {motivo}", file=sys.stderr)
+    tty = sys.stdin.isatty() if tty is None else tty
+    ok = args.abandonar_obsoleta or (tty and entrada("abandonar e arrancar uma nova? [s/N] ").strip().lower() in ("s", "sim", "y", "yes"))
+    if not ok:
+        print("erro: fila obsoleta por abandonar; repetir com `--abandonar-obsoleta` (ou `--parar`)", file=sys.stderr)
+        return False
+    vigia = atual.get("vigia")
+    estado.unlink(missing_ok=True)
+    print("fila obsoleta abandonada")
+    if vigia:
+        print(parar_vigia(vigia)[1])
+    return True
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Fila autónoma de SPs")
+    ap.add_argument("--abandonar-obsoleta", action="store_true", help="ao arrancar: abandona sem perguntar uma fila obsoleta (vigia parada e nenhum SP em Doing); fila viva nunca é tocada")
     ap.add_argument("--dry-run", action="store_true", help="mostra a ordem e as exclusões, sem lançar")
     ap.add_argument("--seguinte", action="store_true", help="no fecho de um SP da fila: regista e lança o seguinte")
     ap.add_argument("--slug", help="com --seguinte: o SP que fechou (só essa sessão; sem ele fecham todas)")
     ap.add_argument("--gastos", action="store_true", help="mostra o custo (USD) de cada sessão da corrida; só mede, não limita")
     ap.add_argument("--estado-vivo", action="store_true", help="classifica cada sessão da corrida (a correr, fechado, bloqueado, morto); só lê")
+    ap.add_argument("--ecra", metavar="SLUG", help="imprime o ecrã do painel do SP `slug` (sem ids, só «Painel <slug>»); só lê")
+    ap.add_argument("--enviar", nargs=2, metavar=("SLUG", "TEXTO"), help="escreve TEXTO e Enter no painel do SP `slug` (sem ids; é o que aprova um pedido, só depois de o user responder)")
     ap.add_argument("--vigiar", action="store_true", help="repete o --estado-vivo e imprime só as mudanças (arrancou, à espera de resposta, terminou); sai quando todas acabam; só lê")
     ap.add_argument("--destacado", action="store_true", help="com --vigiar: corre o vigia num processo próprio (sobrevive ao Monitor) e escreve em ~/.claude/sp-fila-vigia.log")
     ap.add_argument("--intervalo", type=int, default=20, metavar="S", help="com --vigiar: segundos entre leituras")
@@ -125,6 +177,8 @@ def main(argv=None):
     if args.parar:
         try:
             vigia = ler(estado).get("vigia") if estado.exists() else None
+            if estado.exists():
+                print(_resumo_antigo(estado, args))
         except ValueError:  # corrompido: abandonar na mesma
             vigia = None
         estado.unlink(missing_ok=True)
@@ -149,6 +203,20 @@ def main(argv=None):
                       lambda: batida_vigia(estado), lambda slug: fechar_painel_sessao(estado, slug, run_hidden, backend=backend_paineis()[0]),
                       lancar_seguinte=lambda slug: lancar_seguinte_auto(args.root, estado, Path(args.relatorios), slug),
                       incidente=lambda texto: registar_incidente(estado, texto))
+    if args.ecra:
+        if not estado.exists():
+            print("erro: sem fila em curso", file=sys.stderr)
+            return 1
+        ok, texto = ecra_sessao(estado, args.ecra, run_hidden, backend=backend_paineis()[0])
+        print(texto, file=sys.stdout if ok else sys.stderr)
+        return 0 if ok else 1
+    if args.enviar:
+        if not estado.exists():
+            print("erro: sem fila em curso", file=sys.stderr)
+            return 1
+        ok, texto = enviar_sessao(estado, args.enviar[0], args.enviar[1], run_hidden, backend=backend_paineis()[0])
+        print(texto, file=sys.stdout if ok else sys.stderr)
+        return 0 if ok else 1
     if args.estado_vivo:
         if not estado.exists():
             print("erro: sem fila em curso", file=sys.stderr)
@@ -199,6 +267,20 @@ def main(argv=None):
             return 1
     else:
         if estado.exists():
+            try:
+                atual, motivo = ler(estado), None
+                motivo = fila_obsoleta(atual, load(args.root, None), datetime.now())
+            except ValueError:  # ilegível: o user decide com `--parar`
+                atual = motivo = None
+            if motivo and abandonar_obsoleta(estado, atual, motivo, args):
+                pass
+            elif motivo:
+                return 1
+        if estado.exists():
+            try:
+                print(_resumo_antigo(estado, args), file=sys.stderr)
+            except ValueError:
+                pass
             print(f"erro: fila já em curso ({estado}); `--seguinte` continua, `--parar` abandona", file=sys.stderr)
             return 1
         estado.parent.mkdir(parents=True, exist_ok=True)
@@ -229,7 +311,7 @@ def main(argv=None):
         print(f"lançado · {', '.join(out['slugs'])} · terminar o turno")
         if ler(estado).get("concorrencia"):
             print(armar_vigia(args, estado))
-            print(f"VIGIAR · um só Monitor `tail -F {VIGIA_LOG}` · regras: `sp-fila.py --ajuda`")
+            print(f"VIGIAR · um só Monitor `{VIGIA_TAIL}` · regras: `sp-fila.py --ajuda`")
     else:
         print(f"fila terminada: {out['motivo']}\nrelatório: {out['relatorio']}")
         if out.get("vigia") and "sem vigia" not in out["vigia"]:

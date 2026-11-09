@@ -3,6 +3,7 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
+from sp_fila_paralelo import nome_painel
 from sp_fila_testlib import (
     sp_fila,
     make_sp,
@@ -182,3 +183,24 @@ def test_retoma_apos_crash_nao_relanca_sessoes_registadas(tmp_path):
     out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0), slug="zz")
     assert out["acao"] == "espera" and calls == []
     assert json.loads(st.read_text(encoding="utf-8"))["sessoes"] == {"a": {"painel": "7"}}
+
+
+def _est(**sessoes):
+    return {"sessoes": {s: dict(v) for s, v in sessoes.items()}}
+
+
+def test_nome_painel_normal_usa_o_slug_e_nunca_o_id():
+    est = _est(a={"painel": "7"}, b={"painel": "9"})
+    assert nome_painel(est, "9") == "b"
+    assert "9" not in nome_painel(est, "9")
+
+
+def test_nome_painel_duplicado_leva_sufixo():
+    est = _est(a={"painel": "7", "titulo": "x"}, b={"painel": "9", "titulo": "x"})
+    assert nome_painel(est, "7") == "x" and nome_painel(est, "9") == "x-2"
+
+
+def test_nome_painel_fora_do_mapa_ou_estado_antigo_sem_sessoes():
+    assert nome_painel(_est(a={"painel": "7"}), "42") == "painel sem nome"
+    assert nome_painel({}, "7") == "painel sem nome"
+    assert nome_painel(_est(a={}), "7") == "painel sem nome"

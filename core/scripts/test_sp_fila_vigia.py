@@ -270,3 +270,23 @@ def test_parar_abandona_a_fila_e_para_a_vigia(tmp_path, monkeypatch, capsys):
     assert sp_fila.main(["--parar", "--estado", str(st)]) == 0
     assert not st.exists() and len(vistos) == 1
     assert "vigia parada (pid 55)" in capsys.readouterr().out
+
+
+def test_resumo_arranque_vigia_parada_avisa_com_idade_e_sp():
+    estado = {"inicio": "2026-10-29T09:00:00", "sessoes": {"meu-sp": {"painel": "7"}},
+              "vigia": {"pid": 1, "ts": (AGORA - timedelta(minutes=30)).isoformat()}}
+    out = sp_fila.resumo_arranque(estado, AGORA, [("meu-sp", "bloqueado", "precisa de aprovação do user: git commit")])
+    assert "SP meu-sp" in out and "painel 7" in out
+    assert "aprovações pendentes: meu-sp" in out
+    assert "há 30 min" in out and "PARADA" in out
+
+
+def test_resumo_arranque_sem_vigia_nem_pendentes():
+    out = sp_fila.resumo_arranque({"sessoes": {"a": {"painel": "3"}}}, AGORA, [("a", "a correr", "")])
+    assert "aprovações pendentes: nenhuma" in out and "nunca armada" in out
+
+
+def test_tail_da_vigia_so_le_linhas_novas():
+    assert sp_fila.VIGIA_TAIL.startswith("tail -n 0 -F ")
+    assert "tail -n 0 -F" in sp_fila.AJUDA and "tail -F" not in sp_fila.AJUDA.replace("tail -n 0 -F", "")
+    assert "tail -n 0 -F" in sp_fila.AVISO_TAIL

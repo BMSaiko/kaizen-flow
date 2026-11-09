@@ -367,3 +367,36 @@ def test_main_limite_nao_corta_listas_curtas(tmp_path, capsys):
     program(tmp_path)
     sp_list.main(["--root", str(tmp_path)])
     assert not any("--tudo" in line for line in capsys.readouterr().out.splitlines())
+
+
+def test_tipo_dr_lista_docs_como_doc_list(tmp_path, capsys):
+    for rel, slug in (("atlas/dr/TODO", "a"), ("atlas/dr/Doing", "b"), ("atlas/dr/Done", "c"), ("atlas/dp/TODO", "d")):
+        p = tmp_path / rel / f"{slug}.md"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("x", encoding="utf-8")
+    assert sp_list.main(["--root", str(tmp_path), "--tipo", "dr"]) == 0
+    out = capsys.readouterr().out
+    assert " b (" in out and " a (" in out and " c (" not in out and " d (" not in out
+    sp_list.main(["--root", str(tmp_path), "--tipo", "dr", "--all"])
+    assert " c (" in capsys.readouterr().out
+
+
+def test_envelhecer_aviso_mostra_subidas_e_nunca_escreve(tmp_path, capsys, monkeypatch):
+    sp = make_sp(tmp_path, "atlas/sp/TODO", "velho", priority="P3", project="atlas")
+    antes = sp.read_bytes()
+    fake = type("E", (), {"plan": staticmethod(lambda root, today: [(sp_list.collect(tmp_path)[0], "P3", "P2", "P3", 40)])})
+    monkeypatch.setattr(sp_list.kaizen_engine, "load", lambda name: fake)
+    args = type("A", (), {"sem_envelhecer": False, "tree_closed": None, "root": str(tmp_path)})()
+    assert sp_list.envelhecer_aviso(args, False) == 0
+    out = capsys.readouterr().out
+    assert "velho: P3 -> P2 (40d parado)" in out and "sp-envelhecer.py --apply" in out
+    assert sp.read_bytes() == antes
+
+
+def test_envelhecer_aviso_salta_com_flag_ou_root_explicito(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(sp_list.kaizen_engine, "load", lambda name: (_ for _ in ()).throw(AssertionError("não devia carregar")))
+    args = type("A", (), {"sem_envelhecer": True, "tree_closed": None, "root": str(tmp_path)})()
+    assert sp_list.envelhecer_aviso(args, False) == 0
+    args.sem_envelhecer = False
+    assert sp_list.envelhecer_aviso(args, True) == 0
+    assert capsys.readouterr().out == ""

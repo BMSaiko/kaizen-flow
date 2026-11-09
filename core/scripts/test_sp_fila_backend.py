@@ -73,3 +73,34 @@ def test_spawn_background_corre_claude_p_sem_esperar_prompt(tmp_path, monkeypatc
     res = hs.spawn(["x"], backend="background", run=run, sleep=lambda s: None, registar=False)
     assert res[0]["ok"] and res[0]["painel"] == "4242"
     assert abertos == [(["claude", "-p", "/michi --auto x"], "C:/wt/x")]
+
+
+def _run_falso(chamadas, lista):
+    def run(argv, **kw):
+        chamadas.append(argv)
+        return _Res(lista)
+    return run
+
+
+def test_wezterm_enviar_escreve_texto_e_enter_so_em_painel_vivo():
+    chamadas = []
+    be = pb.WeztermBackend(_run_falso(chamadas, json.dumps([{"pane_id": 7, "cwd": None}])))
+    assert be.enviar("7", "1") is True
+    envios = [c for c in chamadas if "send-text" in c]
+    assert envios == [["wezterm", "cli", "send-text", "--pane-id", "7", "--no-paste", "--", "1"],
+                      ["wezterm", "cli", "send-text", "--pane-id", "7", "--no-paste", "--", chr(13)]]
+    chamadas.clear()
+    assert be.enviar("9", "1") is False and not [c for c in chamadas if "send-text" in c]
+
+
+def test_tmux_enviar_escreve_texto_literal_e_enter():
+    chamadas = []
+    be = pb.TmuxBackend(_run_falso(chamadas, "%3" + chr(9) + "/x"))
+    assert be.enviar("%3", "1") is True
+    envios = [c for c in chamadas if "send-keys" in c]
+    assert envios == [["tmux", "send-keys", "-t", "%3", "-l", "--", "1"], ["tmux", "send-keys", "-t", "%3", "Enter"]]
+    assert be.enviar("%9", "1") is False
+
+
+def test_backend_background_nao_envia():
+    assert pb.BackgroundBackend.enviar(pb.BackgroundBackend.__new__(pb.BackgroundBackend), "1", "x") is False

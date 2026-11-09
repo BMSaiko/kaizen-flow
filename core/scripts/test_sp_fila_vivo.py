@@ -1,5 +1,6 @@
 """Testes de scripts/sp-fila.py: estado vivo e classificação das sessões (a correr, parada, bloqueada)."""
 import json
+from pathlib import Path
 from sp_fila_testlib import (
     sp_fila,
     make_sp,
@@ -10,6 +11,7 @@ from sp_fila_testlib import (
     VELHA,
     vivo,
     _arranque,
+    _estado,
     PARADA,
 )
 
@@ -294,3 +296,85 @@ def test_vigia_destacado_arranca_processo_proprio_com_log(tmp_path):
 
 
 # --- ecrãs gravados (par-orquestrador-limpo) ---
+
+
+class _BackendFalso:
+    def __init__(self, paineis, ecras=None):
+        self.paineis, self.ecras = paineis, ecras or {}
+
+    def listar(self):
+        return self.paineis
+
+    def ecra(self, id):
+        return self.ecras[id]
+
+    def enviar(self, id, texto):
+        self.enviados = getattr(self, "enviados", []) + [(id, texto)]
+        return True
+
+
+def test_ecra_por_slug_mostra_o_nome_e_nunca_o_id(tmp_path):
+    st = _estado(tmp_path, sessoes={"a": {"painel": "42"}})
+    ok, texto = sp_fila.ecra_sessao(st, "a", None, backend=_BackendFalso({"42": "C:/x"}, {"42": "Do you want to proceed?"}))
+    assert ok and texto.startswith("Painel a" + chr(10)) and "proceed" in texto
+    assert "42" not in texto
+
+
+def test_ecra_por_slug_acha_o_painel_pela_worktree_se_o_id_esta_velho(tmp_path):
+    st = _estado(tmp_path, sessoes={"a": {"painel": "1", "worktree": "C:/wt/a"}})
+    ok, texto = sp_fila.ecra_sessao(st, "a", None, backend=_BackendFalso({"9": "c:/wt/a"}, {"9": "ecrã certo"}))
+    assert ok and "ecrã certo" in texto and "9" not in texto.splitlines()[0]
+
+
+def test_ecra_por_slug_sem_painel_vivo_ou_sem_sessao_diz_o_nome_e_falha(tmp_path):
+    st = _estado(tmp_path, sessoes={"a": {"painel": "1"}})
+    ok, texto = sp_fila.ecra_sessao(st, "a", None, backend=_BackendFalso({}))
+    assert not ok and texto == "Painel a: sem painel vivo"
+    ok, texto = sp_fila.ecra_sessao(st, "x", None, backend=_BackendFalso({}))
+    assert not ok and "Painel x" in texto and "sem sessão" in texto
+
+
+def test_cli_ecra_devolve_rc_1_sem_painel_vivo(tmp_path, monkeypatch, capsys):
+    st = _estado(tmp_path, sessoes={"a": {"painel": "1"}})
+    monkeypatch.setattr(sp_fila, "backend_paineis", lambda *a, **k: (_BackendFalso({}), None))
+    assert sp_fila.main(["--ecra", "a", "--estado", str(st)]) == 1
+    assert "Painel a: sem painel vivo" in capsys.readouterr().err
+
+
+def test_enviar_por_slug_manda_ao_id_certo_e_diz_so_o_nome(tmp_path):
+    st = _estado(tmp_path, sessoes={"a": {"painel": "42"}})
+    be = _BackendFalso({"42": "C:/x"})
+    ok, texto = sp_fila.enviar_sessao(st, "a", "1", None, backend=be)
+    assert ok and be.enviados == [("42", "1")] and texto == "Painel a: enviado" and "42" not in texto
+
+
+def test_enviar_por_slug_acha_o_painel_pela_worktree_se_o_id_esta_velho(tmp_path):
+    st = _estado(tmp_path, sessoes={"a": {"painel": "1", "worktree": "C:/wt/a"}})
+    be = _BackendFalso({"9": "c:/wt/a"})
+    assert sp_fila.enviar_sessao(st, "a", "1", None, backend=be)[0] and be.enviados == [("9", "1")]
+
+
+def test_enviar_por_slug_sem_painel_vivo_ou_sem_sessao_nao_envia(tmp_path):
+    st = _estado(tmp_path, sessoes={"a": {"painel": "1"}})
+    be = _BackendFalso({})
+    assert sp_fila.enviar_sessao(st, "a", "1", None, backend=be) == (False, "Painel a: sem painel vivo")
+    ok, texto = sp_fila.enviar_sessao(st, "x", "1", None, backend=be)
+    assert not ok and "Painel x" in texto and not hasattr(be, "enviados")
+
+
+def test_cli_enviar_devolve_rc_0_e_rc_1(tmp_path, monkeypatch, capsys):
+    st = _estado(tmp_path, sessoes={"a": {"painel": "1"}})
+    be = _BackendFalso({"1": None})
+    monkeypatch.setattr(sp_fila, "backend_paineis", lambda *a, **k: (be, None))
+    assert sp_fila.main(["--enviar", "a", "1", "--estado", str(st)]) == 0
+    assert be.enviados == [("1", "1")] and "Painel a: enviado" in capsys.readouterr().out
+    assert sp_fila.main(["--enviar", "b", "1", "--estado", str(st)]) == 1
+
+
+def test_ajuda_e_comando_falam_por_slug_e_nunca_por_pane_id():
+    raiz = Path(sp_fila.__file__).resolve().parent.parent
+    caminho = next(p for p in (raiz / ".claude" / "commands" / "sp-fila.md", raiz / "commands" / "sp-fila.md") if p.exists())
+    comando = caminho.read_text(encoding="utf-8")
+    for texto in (sp_fila.AJUDA, comando):
+        assert "--pane-id" not in texto and "Painel N" not in texto
+        assert "--ecra <slug>" in texto and "--enviar <slug>" in texto

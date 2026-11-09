@@ -8,6 +8,7 @@ Uso:
   python -I scripts/sp-move.py <slug> <todo|doing|done> [--project <nome>]
   python -I scripts/sp-move.py <slug> --start        # arranque: SP e mães (cadeia `parent`) em TODO passam a Doing
   python -I scripts/sp-move.py <filho> done --next   # programa: abre o próximo filho elegível; a mãe nunca é movida
+  python -I scripts/sp-move.py --tipo dr|dp <slug> <todo|doing|done>   # move um DR/DP (substitui doc-move.py)
 """
 import argparse
 import sys
@@ -15,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import doc_ops  # noqa: E402
 import kaizen_engine  # noqa: E402
 import wt_redirect  # noqa: E402
 import kaizen_hooks  # noqa: E402
@@ -175,8 +177,19 @@ def main(argv=None):
     ap.add_argument("--project")
     ap.add_argument("--next", action="store_true", help="com done: abre o próximo filho elegível do programa")
     ap.add_argument("--start", action="store_true", help="arranque: move o SP e as mães em TODO para Doing")
-    ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
+    ap.add_argument("--tipo", choices=("sp",) + doc_ops.TYPES, default="sp", help="sp (predefinido) | dr | dp: move um DR/DP")
+    ap.add_argument("--root", default=None, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    if args.tipo != "sp":
+        if not args.slug or not args.dest or args.start or args.next or args.project:
+            ap.error("--tipo dr|dp exige <slug> <todo|doing|done> e não aceita --start, --next nem --project")
+        try:
+            print(doc_ops.move(args.root or doc_ops.DEFAULT_ROOT, args.tipo, args.slug, args.dest))
+        except doc_ops.DocMoveError as exc:
+            print(f"erro: {exc}", file=sys.stderr)
+            return 1
+        return 0
+    args.root = args.root or str(sp_list.DEFAULT_ROOT)
     if args.slug_opt:
         args.slug, args.dest = args.slug_opt, args.dest or args.slug
     if args.start and not args.dest:
