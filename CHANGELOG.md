@@ -6,6 +6,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 ## [Unreleased]
 
 ### Added
+- Adapters `opencode`, `cursor` e `gemini` em `kaizen init/doctor --harness` (o `gemini` converte os comandos para `.gemini/commands/*.toml` e anuncia-se em `GEMINI.md`).
 - `context-guard.py` mede rollouts do Codex (`event_msg/token_count`); `KAIZEN_CONTEXT_LIMIT` (alias `CLAUDE_CONTEXT_LIMIT`); sem `transcript_path` usa o rollout mais recente em `KAIZEN_CODEX_ROOT`. `kaizen doctor --harness codex` diz se o hook está ligado (`--codex-config`).
 - Painéis por backend: interface única (`painel_backend.py`) com `wezterm`, `tmux` e `background` (processo com log, estado por PID), escolhida por `painelBackend` no `kaizen.config.json`; `sp-fila`, a vigia e `sp-handoff --spawn` só falam com ela.
 - Sem backend utilizável, `sp-fila --concorrencia` avisa o que falta e corre em série.

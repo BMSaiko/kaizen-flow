@@ -11,7 +11,7 @@ const hi = argv.indexOf("--harness");
 let harness = "claude";
 if (hi >= 0) {
   harness = argv.splice(hi, 2)[1];
-  if (!ADAPTERS[harness]) { console.error(`erro: --harness requer um de claude|codex|agents-md (recebido: ${harness === undefined ? "nada" : harness})`); process.exit(1); }
+  if (!ADAPTERS[harness]) { console.error(`erro: --harness requer um de ${Object.keys(ADAPTERS).join("|")} (recebido: ${harness === undefined ? "nada" : harness})`); process.exit(1); }
 }
 const fi = argv.indexOf("--fix");
 const fix = fi >= 0 && !!argv.splice(fi, 1);
@@ -28,7 +28,7 @@ const cmds = {
   audit: () => require("./commands/audit.js").run(arg),
 };
 if (!Object.hasOwn(cmds, cmd)) {
-  console.log("kaizen <init [repo] [--harness claude|codex|agents-md] | doctor [repo] [--harness h] [--fix] | status [repo] | usage [flags] | report [--week YYYY-WNN] [flags] | audit [dir] | sync [--check|--stamp]>");
+  console.log(`kaizen <init [repo] [--harness ${Object.keys(ADAPTERS).join("|")}] | doctor [repo] [--harness h] [--fix] | status [repo] | usage [flags] | report [--week YYYY-WNN] [flags] | audit [dir] | sync [--check|--stamp]>`);
   process.exit(cmd ? 1 : 0);
 }
 try {
