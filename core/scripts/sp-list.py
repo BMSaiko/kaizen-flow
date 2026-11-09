@@ -13,6 +13,7 @@ Uso:
   python -I scripts/sp-list.py --all                # inclui Done
   python -I scripts/sp-list.py --flat               # tabela plana (sem agrupar programas)
   python -I scripts/sp-list.py --tudo               # sem limite de 40 linhas (predefinido)
+  python -I scripts/sp-list.py --tipo dr|dp [--all] # lista DRs/DPs por estado (substitui doc-list.py)
   # por omissão: programas agrupados (filhos sob o SP-mãe, com dependências por cumprir); --tree é sinónimo
 
 Um programa é um SP-mãe (`kind: program`) com filhos que têm `parent: <slug-mãe>` e, opcionalmente,
@@ -33,6 +34,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import doc_ops  # noqa: E402
 import kaizen_engine  # noqa: E402
 import sp_indice  # noqa: E402
 
@@ -359,6 +361,19 @@ def tree_closed(root, slug, repo, project=None):
     return (1 if falhas else 0), linhas
 
 
+def envelhecer_aviso(args, explicit_root):
+    """Arranque: mostra (dry-run) os SPs que sp-envelhecer subiria de prioridade. Nunca escreve nem desce."""
+    if args.sem_envelhecer or explicit_root or args.tree_closed:
+        return 0
+    envelhecer = kaizen_engine.load("sp-envelhecer")
+    rows = envelhecer.plan(args.root, date.today())
+    if rows:
+        print("A subir de prioridade (sp-envelhecer.py --apply):")
+        for sp, old, new, _base, age in rows:
+            print(f"  {sp.slug}: {old} -> {new} ({age}d parado)")
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Lista SPs pendentes (TODO e Doing)")
     ap.add_argument("--tree-closed", metavar="SLUG", help="checklist de fecho da árvore a que o SP pertence (rc 0 fechada, 1 falhas, 2 slug desconhecido)")
@@ -371,15 +386,22 @@ def main(argv=None):
     ap.add_argument("--flat", action="store_true", help="tabela plana (sem agrupar programas)")
     ap.add_argument("--tudo", action="store_true", help="sem limite de 40 linhas (nem de bloqueados)")
     ap.add_argument("--tree", action="store_true", help="(predefinido) agrupa os filhos sob o SP-mãe")
-    ap.add_argument("--root", default=str(DEFAULT_ROOT), help=argparse.SUPPRESS)
+    ap.add_argument("--tipo", choices=("sp",) + doc_ops.TYPES, default="sp", help="sp (predefinido) | dr | dp: lista DRs/DPs por estado")
+    ap.add_argument("--sem-envelhecer", action="store_true", help="não mostra as subidas de prioridade pendentes (sp-envelhecer em dry-run)")
+    ap.add_argument("--root", default=None, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    explicit_root = args.root is not None
+    if args.tipo != "sp":
+        return doc_ops.listar(args.root or doc_ops.DEFAULT_ROOT, args.tipo, args.all)
+    args.root = args.root or str(DEFAULT_ROOT)
 
     if args.tree_closed:
         rc, linhas = tree_closed(args.root, args.tree_closed, args.repo, args.project)
         print("\n".join(linhas))
         return rc
     if not args.flat:
-        return main_tree(args)
+        rc = main_tree(args)
+        return rc or envelhecer_aviso(args, explicit_root)
     sps = collect(args.root, include_done=args.all)
     if args.project:
         sps = [sp for sp in sps if sp.project == args.project]
@@ -388,7 +410,7 @@ def main(argv=None):
     sps = sort_sps(sps, args.sort, args.reverse)
     print(render(sps))
     print(summary(sps))
-    return 0
+    return envelhecer_aviso(args, explicit_root)
 
 
 if __name__ == "__main__":

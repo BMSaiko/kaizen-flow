@@ -8,6 +8,14 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 ### Added
 - Painéis por backend: interface única (`painel_backend.py`) com `wezterm`, `tmux` e `background` (processo com log, estado por PID), escolhida por `painelBackend` no `kaizen.config.json`; `sp-fila`, a vigia e `sp-handoff --spawn` só falam com ela.
 - Sem backend utilizável, `sp-fila --concorrencia` avisa o que falta e corre em série.
+- `sp-list --tipo dr|dp` e `sp-move --tipo dr|dp` (lógica em `doc_ops.py`); `sp-list` mostra no arranque, em dry-run, o que `sp-envelhecer` subiria (`--sem-envelhecer` desliga); `sp-new` aceita `--ficheiros/--horas/--risco` e usa `sp-escalao` quando falta `--priority`.
+- `test_orfaos.py`: falha e lista todo script de `core/scripts` sem chamador fora de `commands.md`, `agent-commands.md` e CHANGELOG.
+
+### Deprecated
+- `doc-list.py` e `doc-move.py` ficam como aliases finos obsoletos de `sp-list --tipo` e `sp-move --tipo`, durante pelo menos uma versão.
+
+### Decided
+- `sp-metricas` fica: é chamado por `sp-move` em `done` e por `sp-fila`. `skill-cut` fica: é ferramenta manual de refactor de skills, referida no `SKILL.md` do michi e coberta por testes; remover não reduz superfície útil.
 
 ## [0.2.0] - 2026-11-08
 

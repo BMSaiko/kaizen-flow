@@ -1,51 +1,26 @@
 #!/usr/bin/env python3
-"""Lista DRs ou DPs por estado (pasta TODO/Doing/Done), com idade da última modificação. Só leitura.
+"""OBSOLETO: alias fino de `sp-list.py --tipo dr|dp` (mantido para quem usa o nome antigo).
 
 Uso:
-  python -I scripts/doc-list.py <dr|dp> [--all]   # sem --all, omite Done
+  python -I scripts/doc-list.py <dr|dp> [--all]   # = sp-list.py --tipo <dr|dp> [--all]
 """
 import argparse
 import sys
-import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import kaizen_engine  # noqa: E402
+import doc_ops  # noqa: E402
 
-_kc = kaizen_engine.load("kaizen_config")
-REPO = Path(__file__).resolve().parent.parent
-
-
-def default_root(repo=REPO):
-    return _kc.docs_root(repo)
-
-
-DEFAULT_ROOT = default_root()
-ORDER = ("Doing", "TODO", "Done")
-
-
-def collect(root, kind, include_done=False):
-    folders = ORDER if include_done else ORDER[:2]
-    rows = []
-    for path in Path(root).rglob("*.md"):
-        parts = path.relative_to(root).parts
-        if len(parts) < 3 or parts[-3] != kind or parts[-2] not in folders or "arquivo" in parts:
-            continue
-        rows.append((ORDER.index(parts[-2]), path.stem, parts[-2], path))
-    return sorted(rows)
+collect, default_root, DEFAULT_ROOT, ORDER = doc_ops.collect, doc_ops.default_root, doc_ops.DEFAULT_ROOT, doc_ops.ORDER
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Lista DRs/DPs por estado")
-    ap.add_argument("kind", choices=("dr", "dp"))
+    ap = argparse.ArgumentParser(description="OBSOLETO: usa sp-list.py --tipo dr|dp")
+    ap.add_argument("kind", choices=doc_ops.TYPES)
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--root", default=str(DEFAULT_ROOT), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
-    print("# Estado Slug (idade)")
-    for i, (_, slug, status, path) in enumerate(collect(args.root, args.kind, args.all), 1):
-        days = int((time.time() - path.stat().st_mtime) // 86400)
-        print(f"{i} {status} {slug} ({days}d)")
-    return 0
+    return doc_ops.listar(args.root, args.kind, args.all)
 
 
 if __name__ == "__main__":

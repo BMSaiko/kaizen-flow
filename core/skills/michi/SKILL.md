@@ -23,7 +23,7 @@ license: MIT
 | 6 | Pentest | `/pentest` | sem achados abertos (ou decisão do user) | agente / user |
 | 7 | Review | `/review-ciclo` | APROVADO; ESCALAR após 3 iterações | agente / user |
 | 8 | PR | `/pr-fase` | corpo pela template, respeitando `pr:` | agente |
-| 9 | Report | `/report` | 5 secções, «Dificuldades» não vazia | agente |
+| 9 | Report | `/report` (`sp-report.py`) | 5 secções, «Dificuldades» não vazia | agente |
 | 10 | Reflect | `/reflect final` | A/B/C proposto; o user aplica | user |
 | 11 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | user |
 
@@ -44,7 +44,7 @@ Hooks (`michi.<phase.start|phase.end|gate.failed|commit|closed>`), sessão suja,
 
 ## Regras transversais
 
-- **Prova por fase** de entrega (código/UI) antes de fechar e do handoff, em `proofs/` com caminho absoluto na resposta: `references/michi-prova.md`.
+- **Prova por fase** de entrega (código/UI) antes de fechar e do handoff, em `proofs/` (`sp-prova.py`) com caminho absoluto na resposta: `references/michi-prova.md`.
 - **Reflect por fase** em `## Reflect` do SP; **final** antes de propor o commit (skill `reflect`).
 - **Pushback do user** («está errado», «wrong»…): recomeçar na fase a montante certa, por defeito Grill; ver `michi-orquestracao.md` §Review restart.
 - **Commit/push/merge**: só com confirmação do user (ou `commit|push|pr: auto` no SP); mais de um ramo longo = perguntar qual; worktree → dev em `michi-worktree-merge.md`.
