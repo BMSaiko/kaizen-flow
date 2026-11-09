@@ -26,9 +26,10 @@ const cmds = {
   doctor: () => process.exit(doctor(arg, harness, fix, codexConfig)),
   status: () => process.exit(py(["scripts/sp-list.py", "--all"], path.resolve(arg || "."))),
   audit: () => require("./commands/audit.js").run(arg),
+  demo: () => require("./commands/demo.js").demo(argv.slice(1)),
 };
 if (!Object.hasOwn(cmds, cmd)) {
-  console.log(`kaizen <init [repo] [--harness ${Object.keys(ADAPTERS).join("|")}] | doctor [repo] [--harness h] [--fix] | status [repo] | usage [flags] | report [--week YYYY-WNN] [flags] | audit [dir] | sync [--check|--stamp]>`);
+  console.log(`kaizen <init [repo] [--harness ${Object.keys(ADAPTERS).join("|")}] | doctor [repo] [--harness h] [--fix] | status [repo] | usage [flags] | report [--week YYYY-WNN] [flags] | audit [dir] | sync [--check|--stamp] | demo [--keep]>`);
   process.exit(cmd ? 1 : 0);
 }
 try {

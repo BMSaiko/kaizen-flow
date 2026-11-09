@@ -9,6 +9,7 @@ kaizen status [repo]                  # pending SPs
 kaizen usage [--days N | --since YYYY-MM-DD] [--source claude,codex] [--top N]
 kaizen report [--week YYYY-WNN] [--out DIR] [--print]
 kaizen audit [dir]                    # fails if personal data leaks into the repo
+kaizen demo [--keep]                  # runs the SP cycle in a temp repo
 ```
 
 | Command | Option | Meaning |
@@ -29,6 +30,7 @@ kaizen audit [dir]                    # fails if personal data leaks into the re
 | | `--print` | Print instead of writing a file. |
 | | `--source`, `--prices`, `--repo`, `--claude-root`, `--codex-root` | Same as `usage`. |
 | `kaizen audit [dir]` | | Scans for personal data (names, local paths, wikilinks). rc 1 on any hit. |
+| `kaizen demo` | `--keep` | Runs the whole cycle in a temp git repo: `init`, `sp-new` (gate `node --version`), `sp-move doing`, `sp-gates`, `sp-move done`, `sp-report`. The folder is deleted at the end unless `--keep`. Recording in `docs/assets/demo.cast`. |
 | `kaizen sync` | `--check`, `--stamp` | Maintainers only: refreshes `core/` from the author's vault. `--check` verifies without writing, `--stamp` stamps the build. Not needed by users. |
 
 ## Workflow scripts (installed in `scripts/`)
