@@ -40,6 +40,8 @@ python scripts/sp-new.py --project _default --slug login --priority P2   # write
 kaizen usage --days 30                                                  # what it cost
 ```
 
+Want to see the cycle first? `kaizen demo` runs it end to end in a throwaway folder (init, write an SP, gates, Done, report); `--keep` leaves the folder. Recording: [`docs/assets/demo.cast`](docs/assets/demo.cast) (play with `asciinema play`).
+
 More detail in [Install](#install) and the [documentation](#documentation).
 
 ## Contents
