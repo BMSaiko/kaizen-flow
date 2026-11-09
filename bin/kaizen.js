@@ -15,13 +15,15 @@ if (hi >= 0) {
 }
 const fi = argv.indexOf("--fix");
 const fix = fi >= 0 && !!argv.splice(fi, 1);
+const ci = argv.indexOf("--codex-config");
+const codexConfig = ci >= 0 ? argv.splice(ci, 2)[1] : undefined;
 const [cmd, arg] = argv;
 const cmds = {
   init: () => init(arg, harness),
   sync: () => require("./commands/sync.js").run(argv),
   usage: () => process.exit(usage("usage", argv.slice(1))),
   report: () => process.exit(usage("report", argv.slice(1))),
-  doctor: () => process.exit(doctor(arg, harness, fix)),
+  doctor: () => process.exit(doctor(arg, harness, fix, codexConfig)),
   status: () => process.exit(py(["scripts/sp-list.py", "--all"], path.resolve(arg || "."))),
   audit: () => require("./commands/audit.js").run(arg),
 };

@@ -27,7 +27,14 @@ function checkInstall(dir, harness) {
   return problems;
 }
 
-function doctor(target, harness = "claude", fix = false) {
+// Só lê: procura o nome do script do guard (a sintaxe de hooks do Codex não está verificada nesta versão).
+function codexHookState(configPath) {
+  const p = configPath || path.join(process.env.CODEX_HOME || path.join(require("os").homedir(), ".codex"), "config.toml");
+  if (!fs.existsSync(p)) return "sem-config";
+  try { return fs.readFileSync(p, "utf8").includes("context-guard") ? "ligado" : "ausente"; } catch (e) { return "sem-config"; }
+}
+
+function doctor(target, harness = "claude", fix = false, codexConfig) {
   const dir = path.resolve(target || ".");
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) { console.error(`erro: ${dir} não é um diretório`); return 1; }
   let problems = checkInstall(dir, harness);
@@ -53,7 +60,11 @@ function doctor(target, harness = "claude", fix = false) {
   if (sps.length && pythonCmd()) rc = py(["scripts/sp-validate.py", ...sps], dir) || rc;
   const m = detectMode();
   console.log(`handoff: ${m.mode} (${m.backend})`);
-  if (harness !== "claude") console.log("context hook: none for this harness (degraded); run the handoff by hand when the context gets long, see the AGENTS.md block");
+  if (harness === "codex") {
+    const st = codexHookState(codexConfig);
+    if (st === "ligado") console.log("context hook: ligado (context-guard em config.toml do Codex; a verificar na tua versão)");
+    else console.log(`context hook: none, degradado (${st === "sem-config" ? "sem config.toml do Codex" : "context-guard ausente de config.toml"}); liga scripts/context-guard.py como hook do Codex (ver docs/handoff.md) ou corre o handoff à mão, ver o bloco AGENTS.md`);
+  } else if (harness !== "claude") console.log("context hook: none for this harness (degraded); run the handoff by hand when the context gets long, see the AGENTS.md block");
   console.log(rc === 0 ? `doctor: ok (${sps.length} SPs)` : "doctor: problemas");
   return rc;
 }

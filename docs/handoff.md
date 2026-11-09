@@ -27,6 +27,8 @@ python scripts/handoff.py --consume PATH                     # print the handoff
 
 `--write` also deletes `handoffs/*.md` older than 7 days. Options: `--pane ID`, `--dry-run`, `--auto` (context-guard mode, no questions).
 
+Codex context guard: wire `python -I scripts/context-guard.py` as a hook in your Codex `config.toml` (syntax to verify on your version); `kaizen doctor --harness codex` reports `ligado` or `degradado`. Test it by hand with `--transcript <rollout.jsonl>`.
+
 Extra options: `--harness claude|codex`, `--backend wezterm|tmux|clipboard`, `--pane ID`, `--dry-run` (print the commands, execute nothing), `--auto` (no questions; needs a story in Doing).
 
 ## Backends

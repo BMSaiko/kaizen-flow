@@ -6,6 +6,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 ## [Unreleased]
 
 ### Added
+- `context-guard.py` mede rollouts do Codex (`event_msg/token_count`); `KAIZEN_CONTEXT_LIMIT` (alias `CLAUDE_CONTEXT_LIMIT`); sem `transcript_path` usa o rollout mais recente em `KAIZEN_CODEX_ROOT`. `kaizen doctor --harness codex` diz se o hook está ligado (`--codex-config`).
 - Painéis por backend: interface única (`painel_backend.py`) com `wezterm`, `tmux` e `background` (processo com log, estado por PID), escolhida por `painelBackend` no `kaizen.config.json`; `sp-fila`, a vigia e `sp-handoff --spawn` só falam com ela.
 - Sem backend utilizável, `sp-fila --concorrencia` avisa o que falta e corre em série.
 - `sp-list --tipo dr|dp` e `sp-move --tipo dr|dp` (lógica em `doc_ops.py`); `sp-list` mostra no arranque, em dry-run, o que `sp-envelhecer` subiria (`--sem-envelhecer` desliga); `sp-new` aceita `--ficheiros/--horas/--risco` e usa `sp-escalao` quando falta `--priority`.
