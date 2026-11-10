@@ -173,3 +173,18 @@ def test_permitir_proibido_ou_vazio_e_rejeitado():
     assert any("permitir" in e and "git reset --hard" in e for e in errs)
     assert any("permitir vazio" in e for e in sp_validate.validate(base.format("permitir:\n") + body))
     assert not any("permitir" in e for e in sp_validate.validate(base.format("permitir: npm test\n") + body))
+
+
+@pytest.mark.parametrize("extra,fragment", [
+    (["michi_modelo: xl"], "michi_modelo"),
+    (["kind: program", "execucao: aos-saltos"], "execucao"),
+    (["execucao: paralelo"], "só se aplica a SP-mãe"),
+])
+def test_michi_modelo_e_execucao_invalidos(extra, fragment):
+    assert any(fragment in e for e in sp_validate.validate(build(extra=extra), "TODO"))
+
+
+@pytest.mark.parametrize("extra", [[], ["michi_modelo: simples"], ["michi_modelo: complexo"],
+                                   ["kind: program", "execucao:"], ["kind: program", "execucao: sequencial"]])
+def test_michi_modelo_e_execucao_validos_ou_ausentes(extra):
+    assert sp_validate.validate(build(extra=extra), "TODO") == []

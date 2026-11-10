@@ -74,18 +74,6 @@ def test_limita_ficheiros_git(tmp_path):
     assert len(out.splitlines()) <= 30
 
 
-def test_mae_pergunta_concorrencia(tmp_path):
-    make(tmp_path, "Doing", "filho")  # parent: mae
-    d = tmp_path / "demo" / "sp" / "TODO"
-    d.mkdir(parents=True)
-    (d / "mae-2026-10-26.md").write_text(
-        SP.format(st="TODO", slug="mae").replace("parent: mae\n", "kind: program\n"), encoding="utf-8")
-    mae = sp_estado.estado("mae", root=tmp_path, git_lines=["master"])
-    filho = sp_estado.estado("filho", root=tmp_path, git_lines=["master"])
-    assert "perguntar concorrência" in mae and "1 filhos" in mae
-    assert "perguntar concorrência" not in filho
-
-
 def test_aceita_nome_do_ficheiro_com_data(tmp_path):
     make(tmp_path, "Doing", "alvo")  # ficheiro alvo-2026-10-26.md
     for ref in ("alvo-2026-10-26", "alvo-2026-10-26.md"):
@@ -117,3 +105,17 @@ def test_avisa_ramo_atras_de_master(tmp_path):
 def test_sem_aviso_quando_em_dia(tmp_path):
     make(tmp_path, "Doing", "alvo")
     assert "atrás" not in sp_estado.estado("alvo", root=tmp_path, git_lines=["master"], atras=0)
+
+
+def test_michi_e_execucao_na_mae(tmp_path):
+    make(tmp_path, "Doing", "filho")
+    d = tmp_path / "demo" / "sp" / "TODO"
+    d.mkdir(parents=True)
+    mae_txt = SP.format(st="TODO", slug="mae").replace("parent: mae\n", "kind: program\nmichi_modelo: complexo\n")
+    (d / "mae-2026-10-26.md").write_text(mae_txt, encoding="utf-8")
+    mae = sp_estado.estado("mae", root=tmp_path, git_lines=["master"])
+    filho = sp_estado.estado("filho", root=tmp_path, git_lines=["master"])
+    assert "michi: complexo" in mae and "execução: por escolher · perguntar sequencial/paralelo" in mae
+    assert "michi: default" in filho and "execução" not in filho
+    (d / "mae-2026-10-26.md").write_text(mae_txt.replace("kind: program\n", "kind: program\nexecucao: paralelo\n"), encoding="utf-8")
+    assert "execução: paralelo" in sp_estado.estado("mae", root=tmp_path, git_lines=["master"])

@@ -27,7 +27,7 @@ changelog:
 - '2.0.0: SKILL ≤5 KB; template, frontmatter e flags completas do sp-new.py movidos para references/super-prompt-detalhe.md.'
 - '1.2.0: encolhida (changelog antigo no git, texto repetido passado a ligações); regras mantidas.'
 - '1.1.0: validateSuperPrompt() no save, --quick, templates de grill por domínio.'
-model: claude-fable-5-2
+model: claude-opus-5-5
 effort: medium
 ---
 # Super Prompt
@@ -47,9 +47,11 @@ Constrói um **Super Prompt**: instruções autónomas, prontas a colar, para um
 4. **dr (mini)** — `Agent` papel `sub-agente` com a skill `dr`: o mínimo de caminhos/contexto/integração; ≤1 ecrã, cada afirmação ancorada em fonte primária, em `## DR (mini)`. Não-código: «DR skipped: non-code goal».
 
 ## Gerar o SP
-1. Só com `python -I scripts/sp-new.py --project <p> --slug <slug> --priority P1|P2|P3 --modo auto|manual [flags]` (nunca criar o ficheiro à mão). Projeto não inferível ou inexistente: `AskUserQuestion`; nunca inventar pasta.
-2. **Obrigatório, sem exceção** (todo o SP criado, por esta skill, `/sp`, `pentest` ou pedido direto): preencher as **8 secções** num `Agent` com `model` = `python -I scripts/modelos.py get sp-autor` (o `sp-new.py` imprime-o) e `effort: "medium"`; modelo indisponível → fallback pela ordem Opus 5.5 → Fable 5.1 → Fable 5.2, sempre medium; nunca escrever o SP no agente principal. Passar-lhe o grill e o DR (template: `super-prompt-detalhe.md`); §4 com critérios verificáveis, §7 com passos concretos, gates executáveis. Secção vazia = voltar ao grill-me; nunca publicar incompleto. SP que cria/publica repo (`gh repo create`): perguntar a visibilidade (`AskUserQuestion`: público/privado) no grill ou aqui e escrevê-la no passo; nunca fixar «private» por defeito.
-3. Validar: `python -I scripts/sp-validate.py <ficheiro>` sem avisos.
+1. **Obrigatório, sem exceção** (todo o SP criado ou revisto, por esta skill, `/sp`, `pentest` ou pedido direto): um `Agent` papel `sp-autor` faz tudo; o principal nunca escreve nem edita SPs. `model` = a cadeia de `python -I scripts/modelos.py get sp-autor --cadeia` (tentar pela ordem; indisponível → seguinte; todos → parar e avisar o user), sempre `effort: "medium"`.
+2. O `sp-autor` corre `python -I scripts/sp-new.py --project <p> --slug <slug> --priority P1|P2|P3 --modo auto|manual [flags]` (nunca criar o ficheiro à mão), preenche as **8 secções** a partir do grill e do DR, escolhe o `michi_modelo` de cada SP (`--michi` / `@nível`: simples, default, complexo) e valida com `sp-validate.py` sem avisos. Secção vazia = voltar ao grill-me. Projeto não inferível: o principal faz `AskUserQuestion` antes de lançar; nunca inventar pasta. Repo novo: perguntar a visibilidade no grill. Prompt do autor e formato do resumo: `super-prompt-detalhe.md` §Autor.
+3. O autor devolve um resumo fixo: caminhos, ordem e dependências, `michi_modelo` por SP, dúvidas em aberto.
+4. O principal imprime o «Super Prompt saved» e faz `AskUserQuestion`: «Iniciar com michi» (recomendada), «Rever/ajustar», resposta livre.
+5. «Rever/ajustar»: recolher o que mudar e lançar outro `Agent` `sp-autor` (instância nova, nunca `SendMessage` ao autor) com caminhos e ajustes (SP já commitado: numa worktree); no fim repetir a pergunta. «Iniciar com michi»: arranque do michi (skill `michi`).
 
 ## Reutilizar
 Colar o corpo no `/michi`: salta grill+DR, começa no DP e trata as secções 2/3/4/5 como contrato; re-perguntar esses factos = SP incompleto.
@@ -63,4 +65,4 @@ Super Prompt saved: <abs path>
 Sections: 1.Role 2.Context 3.Objective 4.Success 5.Constraints 6.Seams 7.Steps 8.Done-when
 Reuse:    /michi <paste body of this file> in a new session
 ```
-Sem commit, push nem DA: seguir numa sessão nova com `/michi`.
+Sem commit, push nem DA; depois, a pergunta de §Gerar 4.

@@ -69,13 +69,15 @@ def estado(ref, root=None, project=None, git_lines=None, atras=None):
     out = [
         f"{alvo.slug} · {alvo.status} · {alvo.priority} · {alvo.project} · modo {fm.get('modo', '-')}",
         f"parent: {alvo.parent or '-'} · dependências: " + (("por cumprir " + ", ".join(unmet)) if unmet else ("ok" if alvo.depends_on else "-")),
-        f"critérios: {feitos}/{len(crit)} · gates: {len(sp_gates.parse_gates(text))}",
+        f"critérios: {feitos}/{len(crit)} · gates: {len(sp_gates.parse_gates(text))} · michi: {fm.get('michi_modelo') or 'default'}",
         f"passos ({len(passos)}): " + " | ".join(s.rstrip(".") for s in passos[:6]),
     ]
     if str(fm.get("spike", "")).strip() == "incerto":
         out.append(f"spike: incerto · max_requests {fm.get('max_requests', 15)} · fase 2b antes do DP")
     if filhos:
-        out.append(f"filhos: {len(filhos)} filhos · perguntar concorrência (com/sem; defeito sem) antes de arrancar a fila")
+        out.append(f"filhos: {len(filhos)} filhos")
+    if fm.get("kind") == "program":
+        out.append(f"execução: {fm['execucao']}" if fm.get("execucao") else "execução: por escolher · perguntar sequencial/paralelo")
     if prog:
         out.append("progresso:")
         out += [f"  {l.strip()}" for l in prog]

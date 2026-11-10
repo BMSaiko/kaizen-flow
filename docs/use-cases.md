@@ -29,3 +29,4 @@
 | Hand off a conversation with no story | `/handoff` | ephemeral file; the fresh context reads and deletes it |
 | Run a command on workflow events | add [`kaizen-hooks.json`](config.md#kaizen-hooksjson) | `kaizen_hooks.py fire` runs it |
 | Move to a fresh context mid-story | `/sp-handoff` | resume command injected in the pane, or copied to the clipboard |
+| Choose how a program's children run | `sp-execucao.py <parent> sequencial|paralelo` | sets `execucao:` on the parent story; `/michi` and `/sp-fila` read it |

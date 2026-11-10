@@ -53,6 +53,13 @@ def validate(text, folder=None):
                 errors.append(f"frontmatter sem '{field}'")
         if fm.get("modo") and fm["modo"] not in ("auto", "manual"):
             errors.append(f"modo '{fm['modo']}' inválido (auto|manual)")
+        if fm.get("michi_modelo") and fm["michi_modelo"] not in ("simples", "default", "complexo"):
+            errors.append(f"michi_modelo '{fm['michi_modelo']}' inválido (simples|default|complexo)")
+        if fm.get("execucao"):
+            if fm["execucao"] not in ("sequencial", "paralelo"):
+                errors.append(f"execucao '{fm['execucao']}' inválido (sequencial|paralelo)")
+            if fm.get("kind") != "program":
+                errors.append("execucao só se aplica a SP-mãe (kind: program)")
         for key in ("commit", "push", "pr"):
             if fm.get(key) and fm[key] not in ("auto", "pergunta", "nunca"):
                 errors.append(f"{key} '{fm[key]}' inválido (auto|pergunta|nunca)")

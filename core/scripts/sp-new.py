@@ -6,12 +6,12 @@ Recusa slug já existente no projeto (em qualquer pasta) e projeto inexistente.
 Nunca faz commit.
 
 Uso:
-  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--parent <slug>] [--depends-on <slug> ...]
-  python -I scripts/sp-new.py --project <nome> --program <slug> --children a,b:a,c:a+b --priority P1|P2|P3
+  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--michi simples|default|complexo] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--parent <slug>] [--depends-on <slug> ...]
+  python -I scripts/sp-new.py --project <nome> --program <slug> --children a,b@complexo:a,c:a+b --priority P1|P2|P3
 
 `--parent <mãe>` exige que a mãe seja `kind: program` e acrescenta o filho a `children:` dela (depends_on, `state: TODO`, sem duplicar).
 `--program` cria o SP-mãe (`kind: program`, `children:`) e os filhos (`parent`, `depends_on`) em sp/TODO/.
-Em `--children`, `b:a` = b depende de a; `c:a+b` = c depende de a e b. Valida tudo antes de escrever.
+Em `--children`, `b@complexo` fixa o `michi_modelo` do filho (simples|default|complexo); `b:a` = b depende de a; `c:a+b` = c depende de a e b. Valida tudo antes de escrever.
 rc: 0 criado, 1 erro
 """
 import argparse
@@ -23,6 +23,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 import kf_git  # noqa: E402
+
+
+NIVEIS = ("simples", "default", "complexo")
 
 
 def _modelo_sp_autor():
@@ -158,9 +161,11 @@ def check_permitir(permitir):
             raise SpNewError(f"permitir proibido ({sp_gates.forbidden(cmd)}): {cmd}")
 
 
-def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None, perfil=None, escopo=(), fora_de_escopo=(), permitir=(), decisoes=()):
+def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None, perfil=None, escopo=(), fora_de_escopo=(), permitir=(), decisoes=(), michi="default", programa=False):
     root = Path(root)
     check(root, project, slug, priority, modo)
+    if michi not in NIVEIS:
+        raise SpNewError(f"michi '{michi}' inválido ({'|'.join(NIVEIS)})")
     auth = check_auth(auth)
     check_gates(list(gates), prova)
     check_permitir(list(permitir))
@@ -170,8 +175,10 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
     head = [
         "---", "status: TODO", f"created: {stamp}", f"updated: {stamp}", "phase: SP",
         f"slug: {slug}", f"date: {today.isoformat()}", f"project: {project}", f"priority: {priority}",
-        f"modo: {modo}",
+        f"modo: {modo}", f"michi_modelo: {michi}",
     ]
+    if programa:
+        head.append("execucao:")
     head += [f"{k}: {auth[k]}" for k in ("commit", "push", "pr", "restricoes") if k in auth]
     head += [f"{k}: {perfil[k]}" for k in ("perfil", "max_tentativas", "max_requests") if k in perfil]
     if "parar_se" in perfil:
@@ -244,11 +251,24 @@ def parse_children(text):
     children = []
     for item in text.split(","):
         slug, _, deps = item.strip().partition(":")
+        slug = slug.partition("@")[0].strip()
         children.append((slug, [d for d in deps.split("+") if d]))
     return children
 
 
-def create_program(root, project, slug, priority, today, children, modo="manual", auth=None):
+def parse_niveis(text):
+    """`a,b@complexo:a` -> {slug: nível} só dos filhos com `@nível`; valida o nível."""
+    niveis = {}
+    for item in text.split(","):
+        slug, sep, nivel = item.strip().partition(":")[0].partition("@")
+        if sep:
+            if nivel.strip() not in NIVEIS:
+                raise SpNewError(f"michi '{nivel.strip()}' inválido em --children ({'|'.join(NIVEIS)})")
+            niveis[slug.strip()] = nivel.strip()
+    return niveis
+
+
+def create_program(root, project, slug, priority, today, children, modo="manual", auth=None, niveis=None):
     root = Path(root)
     auth = check_auth(auth)
     names = [name for name, _ in children]
@@ -277,9 +297,9 @@ def create_program(root, project, slug, priority, today, children, modo="manual"
     extra = ["kind: program", "children:"]
     for name, deps in children:
         extra += [f"  - slug: {name}", f"    depends_on: [{', '.join(deps)}]", "    state: TODO"]
-    paths = [create(root, project, slug, priority, today, extra=extra, modo=modo, auth=auth)]
+    paths = [create(root, project, slug, priority, today, extra=extra, modo=modo, auth=auth, programa=True)]
     for name, deps in children:
-        paths.append(create(root, project, name, priority, today, parent=slug, depends_on=deps, modo=modo, auth=auth))
+        paths.append(create(root, project, name, priority, today, parent=slug, depends_on=deps, modo=modo, auth=auth, michi=(niveis or {}).get(name, "default")))
     return paths
 
 
@@ -298,6 +318,7 @@ def main(argv=None):
     ap.add_argument("--horas", type=float, help="tamanho estimado: horas (sp-escalao)")
     ap.add_argument("--risco", choices=("baixo", "medio", "alto"), default="baixo", help="risco para o escalão (defeito baixo)")
     ap.add_argument("--modo", default="manual", help="modo do michi: auto|manual (defeito manual)")
+    ap.add_argument("--michi", default="default", help="nível do modelo do michi: simples|default|complexo (defeito default)")
     ap.add_argument("--commit", help="commit: auto|pergunta|nunca")
     ap.add_argument("--push", help="push: auto|pergunta|nunca")
     ap.add_argument("--pr", help="pr: auto|pergunta|nunca")
@@ -337,7 +358,8 @@ def main(argv=None):
             if not args.children:
                 raise SpNewError("--program exige --children")
             children = [(fs(n), [fs(d) for d in deps]) for n, deps in parse_children(args.children)]
-            paths = create_program(args.root, args.project, fs(args.program), args.priority, today, children, args.modo, auth)
+            niveis = {fs(n): v for n, v in parse_niveis(args.children).items()}
+            paths = create_program(args.root, args.project, fs(args.program), args.priority, today, children, args.modo, auth, niveis)
             print("\n".join(str(p) for p in paths))
             if args.modo != "auto":
                 print("aviso: programa em modo: manual; sp-fila para a cada pergunta/commit. "
@@ -350,7 +372,7 @@ def main(argv=None):
                 print(f"aviso: ramo {atras} commits atrás de master; git merge master", file=sys.stderr)
             check_master(args.project, args.slug, master_paths)
             check_links(args.root, args.project, args.parent, args.depends_on)
-            path = create(args.root, args.project, args.slug, args.priority, today, args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao)
+            path = create(args.root, args.project, args.slug, args.priority, today, args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao, michi=args.michi)
             if args.parent:
                 link_parent(args.root, args.project, args.parent, args.slug, args.depends_on)
             print(path)

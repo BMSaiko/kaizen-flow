@@ -29,7 +29,7 @@ def test_cria_em_todo_com_frontmatter_e_oito_seccoes(tmp_path):
     text = path.read_text(encoding="utf-8")
     assert text.startswith(
         "---\nstatus: TODO\ncreated: 2026-10-18T00:00:00Z\nupdated: 2026-10-18T00:00:00Z\n"
-        "phase: SP\nslug: abc\ndate: 2026-10-18\nproject: atlas\npriority: P2\nmodo: manual\n---\n"
+        "phase: SP\nslug: abc\ndate: 2026-10-18\nproject: atlas\npriority: P2\nmodo: manual\nmichi_modelo: default\n---\n"
     )
     for n, title in enumerate(("Role", "Context", "Objective", "Success criteria",
                                "Constraints", "Seams", "Steps", "Done-when"), 1):
@@ -104,7 +104,7 @@ def test_program_cria_mae_e_filhos_em_todo(tmp_path):
     assert [p.name for p in paths] == ["prog.md", "a.md", "b.md"]
     mae = paths[0].read_text(encoding="utf-8")
     assert mae.split("---\n")[1].endswith(
-        "priority: P2\nmodo: manual\nkind: program\nchildren:\n"
+        "priority: P2\nmodo: manual\nmichi_modelo: default\nexecucao:\nkind: program\nchildren:\n"
         "  - slug: a\n    depends_on: []\n    state: TODO\n"
         "  - slug: b\n    depends_on: [a]\n    state: TODO\n"
     )
@@ -204,7 +204,7 @@ def test_autorizacoes_vao_para_o_frontmatter_e_validam(tmp_path):
     auth = {"commit": "auto", "push": "nunca", "pr": "nunca", "restricoes": "não tocar em AGENTS.md"}
     path = sp_new.create(project(tmp_path), "atlas", "abc", "P2", TODAY, auth=auth)
     text = path.read_text(encoding="utf-8")
-    assert "modo: manual\ncommit: auto\npush: nunca\npr: nunca\nrestricoes: não tocar em AGENTS.md\n---" in text
+    assert "modo: manual\nmichi_modelo: default\ncommit: auto\npush: nunca\npr: nunca\nrestricoes: não tocar em AGENTS.md\n---" in text
     assert not any(e.startswith(("commit", "push", "pr")) for e in sp_validate.validate(text, "TODO"))
 
 
@@ -450,3 +450,29 @@ def test_cli_program_expande_filhos_e_dependencias(tmp_path, capsys, monkeypatch
     assert names == ["atlas-a-2026-10-18.md", "atlas-b-2026-10-18.md", "atlas-prog-2026-10-18.md"]
     b = (root / "atlas/sp/TODO/atlas-b-2026-10-18.md").read_text(encoding="utf-8")
     assert "parent: atlas-prog-2026-10-18" in b and "depends_on: [atlas-a-2026-10-18]" in b
+
+
+def test_michi_modelo_default_e_nivel_explicito(tmp_path):
+    root = project(tmp_path)
+    assert "michi_modelo: complexo\n" in sp_new.create(root, "atlas", "a", "P2", TODAY, michi="complexo").read_text(encoding="utf-8")
+    assert "michi_modelo: default\n" in sp_new.create(root, "atlas", "b", "P2", TODAY).read_text(encoding="utf-8")
+    with pytest.raises(sp_new.SpNewError):
+        sp_new.create(root, "atlas", "c", "P2", TODAY, michi="xl")
+
+
+def test_cli_michi_invalido_rc1(tmp_path):
+    root = project(tmp_path)
+    assert sp_new.main(["--project", "atlas", "--slug", "s", "--priority", "P2", "--michi", "xl", "--root", str(root)]) == 1
+
+
+def test_children_com_nivel_e_execucao_vazio_na_mae(tmp_path):
+    root = project(tmp_path)
+    assert sp_new.parse_children("a,b@complexo:a,c@simples:a+b") == [("a", []), ("b", ["a"]), ("c", ["a", "b"])]
+    assert sp_new.parse_niveis("a,b@complexo:a,c@simples:a+b") == {"b": "complexo", "c": "simples"}
+    paths = sp_new.create_program(root, "atlas", "m", "P2", TODAY, sp_new.parse_children("a,b@complexo:a"), niveis=sp_new.parse_niveis("a,b@complexo:a"))
+    texts = [p.read_text(encoding="utf-8") for p in paths]
+    assert "\nexecucao:\n" in texts[0] and "kind: program" in texts[0]
+    assert "michi_modelo: default" in texts[1] and "michi_modelo: complexo" in texts[2]
+    assert "execucao" not in texts[1] + texts[2]
+    with pytest.raises(sp_new.SpNewError):
+        sp_new.parse_niveis("a@xl")
