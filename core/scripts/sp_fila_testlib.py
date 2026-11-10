@@ -5,11 +5,8 @@ rc: n/a
 """
 import importlib.util
 import json
-import os
 import sys
-import time
-import pytest
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 _spec = importlib.util.spec_from_file_location("sp_fila", Path(__file__).with_name("sp-fila.py"))
@@ -54,10 +51,11 @@ def reasons(result):
 def _runner(calls):
     def run(argv, **_):
         calls.append(argv)
+        saida = f"/wt/sb-{argv[-1]}\n" if "ensure" in argv else ""  # sb-worktree ensure imprime o caminho
 
         class R:
             returncode = 0
-            stdout = ""
+            stdout = saida
             stderr = ""
         return R()
     return run
@@ -86,42 +84,6 @@ def _pid_morto():
     return p.pid
 
 
-AGORA = datetime(2026, 10, 29, 12, 0, 0)
-
-
-RECENTE = datetime(2026, 10, 29, 11, 58, 0)
-
-
-VELHA = datetime(2026, 10, 29, 11, 30, 0)
-
-
-def vivo(sp_status="Doing", paineis=("7",), painel="7", ecra="working...", atividade=RECENTE, inatividade_s=600):
-    return sp_fila.classificar({"painel": painel}, sp_status, set(paineis), ecra, atividade, AGORA, inatividade_s)[0]
-
-
-def _arranque(**sessao):
-    return sp_fila.classificar(sessao, "Doing", {"7"}, sessao.pop("ecra", ""), RECENTE, AGORA)[0]
-
-
-PARADA = "trabalho feito\n\n✻ Worked for 36s · done 17:52\n❯ \n"
-
-
-FIXTURES = Path(__file__).with_name("fixtures") / "par-watch"
-
-
-def _fx(nome):
-    return (FIXTURES / f"{nome}.txt").read_text(encoding="utf-8")
-
-
-def _cls(nome, status="Doing"):
-    return sp_fila.classificar({"painel": "7"}, status, {"7"}, _fx(nome), RECENTE, AGORA, 600)
-
-
-class _Proc:
-    def __init__(self, pid):
-        self.pid = pid
-
-
 def _runner_worktree(calls, wt):
     """Runner cujo `git worktree list --porcelain` devolve uma worktree `agent/<nome>` em `wt`."""
     def run(argv, **_):
@@ -133,16 +95,6 @@ def _runner_worktree(calls, wt):
             stdout = f"worktree {wt}\nHEAD abc\nbranch refs/heads/agent/{wt.name}\n\n" if "worktree" in argv else ""
         return R()
     return run
-
-
-def _ps(saida):
-    class R:
-        stdout = saida
-    return lambda *a, **k: R()
-
-
-def _secao_vigia(texto):
-    return texto.split("## Vigia")[1].split(chr(10) + "## ")[0]
 
 
 def _relatorio_com(tmp_path, **estado_over):

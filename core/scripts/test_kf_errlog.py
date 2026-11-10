@@ -139,7 +139,7 @@ LIGADOS = sorted(p.name for p in Path(__file__).parent.glob("sp-*.py") if "kf_er
 
 
 def test_ha_scripts_ligados():
-    assert len(LIGADOS) >= 16
+    assert len(LIGADOS) >= 15  # o script da tabela de painéis saiu com o backend de painéis
 
 
 @pytest.mark.parametrize("nome", LIGADOS)

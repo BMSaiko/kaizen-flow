@@ -22,7 +22,7 @@ Optional, in the project root. Without it the defaults below apply. `init` only 
 | `sources` | `["claude", "codex"]` | `kaizen usage`, `kaizen report` |
 | `prices` | bundled `usage/prices.json` | cost calculation |
 | `test.cmd` | detected by `init` | command that runs the target project's tests (see below) |
-| `painelBackend` | `auto` | `sp-fila --concorrencia`, `sp-handoff --spawn`: where parallel sessions run (see below) |
+| `painelBackend` | `auto` | `sp-handoff --spawn`: where the new session runs (see below) |
 | `userName` | `user` | name the scripts' warnings use for you; empty or non-string falls back to `user` |
 
 `sources` must be a list; malformed values stop with a one-line message.
@@ -75,7 +75,7 @@ python scripts/sp-new.py --project app --slug login --priority P2
 
 ### `painelBackend`
 
-Where the parallel mode (`sp-fila --concorrencia N`, `sp-handoff --spawn`) opens each session:
+Where `sp-handoff --spawn` opens the new session (`sp-fila --concorrencia N` uses `Agent` subagents and ignores it):
 
 | Value | Behaviour |
 |---|---|

@@ -40,16 +40,6 @@ def reflect_lacunas(slug, texto):
 MAX_LINHAS = 30
 
 
-def vigia_linhas(estado, agora):
-    """Linhas da secção `## Vigia`: «sem vigia» se a corrida teve sessões e nunca houve batida, senão os incidentes gravados.
-
-    No fim da fila as sessões já saíram do estado: `feitos`/`falhados` dizem se houve trabalho."""
-    vigia = estado.get("vigia")
-    if not vigia:
-        return ["sem vigia durante a corrida"] if estado.get("feitos") or estado.get("falhados") else []
-    return list(vigia.get("incidentes", []))
-
-
 def relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora, custos=None, sps=None):
     """Relatório final em ≤ MAX_LINHAS linhas: feito, parado, porquê, próximo passo (listas longas cortam em «+N mais»)."""
     rel_dir.mkdir(parents=True, exist_ok=True)
@@ -62,7 +52,6 @@ def relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora, custos=None,
               ("Saltados", [f"{s}: {w}" for s, w in excluidos]),
               ("Gasto", [f"{s}: {c:.2f} USD" for s, c in gastos(estado, custos or {})[0]]), ("Commits", commits),
               ("Reflect (lacunas)", [l for s, (_, t) in (sps or {}).items() for l in reflect_lacunas(s, t)]),
-              ("Vigia", vigia_linhas(estado, agora)),
               ("Falhas", [f"{s}: não chegou a Done (fase {sps[s][0]})" if s in (sps or {}) else f"{s}: não chegou a Done"
                           for s in estado["falhados"]]),
               ("Próximos passos", passos)]

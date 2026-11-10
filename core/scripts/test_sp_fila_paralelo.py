@@ -1,9 +1,8 @@
-"""Testes de scripts/sp-fila.py: modo --concorrencia (teto, spawn, retoma, sessões mortas)."""
+"""Testes de scripts/sp-fila.py: modo --concorrencia (teto, lançamento por subagent, retoma, sessões mortas)."""
 import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from sp_fila_paralelo import nome_painel
 from sp_fila_testlib import (
     sp_fila,
     make_sp,
@@ -24,11 +23,22 @@ def test_concorrencia_so_lanca_ate_ao_teto(tmp_path):
     assert out["acao"] == "lancou" and out["slugs"] == ["a", "b"]
     assert list(estado["sessoes"]) == ["a", "b"] and estado["usados"] == 2 * sp_fila.REQ_POR_SP
     flat = [" ".join(map(str, c)) for c in calls]
-    assert sum("--spawn" in c and "--sem-registo" in c for c in flat) == 2
+    assert sum("ensure" in c for c in flat) == 2 and not any("--spawn" in c for c in flat)
     assert not any("--launch" in c or "push" in c for c in flat)
+    assert [i["slug"] for i in out["itens"]] == ["a", "b"] and out["itens"][0]["worktree"] == "/wt/sb-a"
+    assert estado["sessoes"]["a"]["subagent"] is True and estado["sessoes"]["b"]["worktree"] == "/wt/sb-b"
 
 
-def test_concorrencia_1_e_paralelo_spawn_e_cwd_neutro(tmp_path, monkeypatch):
+def test_main_imprime_o_plano_dos_subagents(tmp_path, monkeypatch, capsys):
+    st = _estado(tmp_path, concorrencia=2, max=None)
+    item = {"slug": "a", "worktree": "/wt/sb-a"}
+    monkeypatch.setattr(sp_fila, "seguinte", lambda *a, **k: {"acao": "lancou", "slugs": ["a"], "itens": [item]})
+    rc = sp_fila.main(["--seguinte", "--estado", str(st), "--root", str(tmp_path / "sps"), "--relatorios", str(tmp_path / "rel")])
+    out = capsys.readouterr().out
+    assert rc == 0 and "lançar como subagents · a" in out and "/wt/sb-a" in out
+
+
+def test_concorrencia_1_e_paralelo_subagent_e_cwd_neutro(tmp_path, monkeypatch):
     root = tmp_path / "sps"
     make_sp(root, "a")
     make_sp(root, "b")
@@ -43,7 +53,7 @@ def test_concorrencia_1_e_paralelo_spawn_e_cwd_neutro(tmp_path, monkeypatch):
     out = sp_fila.seguinte(root, st, tmp_path / "rel", run, datetime(2026, 10, 25, 12, 0))
     assert out["acao"] == "lancou" and out["slugs"] == ["a"]
     flat = [" ".join(map(str, c[0])) for c in calls]
-    assert sum("--spawn" in c and "--sem-registo" in c for c in flat) == 1 and not any("--launch" in c for c in flat)
+    assert sum("ensure" in c for c in flat) == 1 and not any("--launch" in c for c in flat)
     assert [c[1] for c in calls if "sp-move.py" in " ".join(map(str, c[0]))] == [neutro]
 
 
@@ -90,14 +100,14 @@ def test_paralelo_respeita_ate(tmp_path):
     assert not any("sp-move.py" in " ".join(map(str, c)) for c in calls)
 
 
-def test_lock_livre_durante_o_spawn(tmp_path):
+def test_lock_livre_durante_o_lancamento(tmp_path):
     root = tmp_path / "sps"
     make_sp(root, "a")
     st = _estado(tmp_path, concorrencia=1, max=None)
     obtido = []
 
     def run(argv, **_):
-        if "--spawn" in argv:
+        if "ensure" in argv:
             try:
                 with sp_fila.bloqueio(st, espera=0.3):
                     obtido.append(json.loads(st.read_text(encoding="utf-8"))["sessoes"])
@@ -110,7 +120,7 @@ def test_lock_livre_durante_o_spawn(tmp_path):
     assert not Path(f"{st}.lock").exists()
 
 
-def test_seguinte_durante_o_spawn_nao_relanca_o_mesmo_sp(tmp_path):
+def test_seguinte_durante_o_lancamento_nao_relanca_o_mesmo_sp(tmp_path):
     root = tmp_path / "sps"
     for s in ("a", "b"):
         make_sp(root, s)
@@ -119,11 +129,11 @@ def test_seguinte_durante_o_spawn_nao_relanca_o_mesmo_sp(tmp_path):
 
     def run(argv, **_):
         calls.append(argv)
-        if "--spawn" in argv and "a" in argv and not internas:
+        if "ensure" in argv and "a" in argv and not internas:
             internas.append(sp_fila.seguinte(root, st, tmp_path / "rel", run, datetime(2026, 10, 25, 12, 0), slug="zz"))
         return _runner([])(argv)
     out = sp_fila.seguinte(root, st, tmp_path / "rel", run, datetime(2026, 10, 25, 12, 0))
-    spawns = [c[c.index("--spawn") + 1] for c in calls if "--spawn" in c]
+    spawns = [c[-1] for c in calls if "ensure" in c]
     assert sorted(spawns) == ["a", "b"] and internas[0]["slugs"] == ["b"] and out["acao"] in ("lancou", "espera")
     assert sorted(json.loads(st.read_text(encoding="utf-8"))["sessoes"]) == ["a", "b"]
 
@@ -137,34 +147,34 @@ def test_paralelo_nao_lanca_dependente_de_sp_em_curso(tmp_path):
     assert out["slugs"] == ["a"]
 
 
-def test_concorrencia_1_lanca_por_spawn_como_qualquer_paralelo(tmp_path):
+def test_concorrencia_1_lanca_por_subagent_como_qualquer_paralelo(tmp_path):
     root = tmp_path / "sps"
     make_sp(root, "a")
     calls = []
     st = _estado(tmp_path, concorrencia=1, max=5)
     sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0))
     flat = [" ".join(map(str, c)) for c in calls]
-    assert any("--spawn" in c and "--json" in c for c in flat) and not any("--launch" in c for c in flat)
+    assert any("ensure" in c for c in flat) and not any("--launch" in c for c in flat)
 
 
-def test_sessao_morta_sem_painel_vira_falhada_e_a_fila_lanca_a_seguinte(tmp_path):
+def test_sessao_fechada_fora_de_done_vira_falhada_e_a_fila_lanca_a_seguinte(tmp_path):
     root = tmp_path / "sps"
     make_sp(root, "a", folder="Doing")
     make_sp(root, "b")
-    st = _estado(tmp_path, concorrencia=2, max=9, sessoes={"a": {"painel": "99"}})
+    st = _estado(tmp_path, concorrencia=2, max=9, sessoes={"a": {"subagent": True}})
     out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0), slug="a")
     estado = json.loads(st.read_text(encoding="utf-8"))
     assert out["acao"] == "lancou" and out["slugs"] == ["b"]
     assert estado["falhados"] == ["a"] and list(estado["sessoes"]) == ["b"]
 
 
-def test_spawn_falha_worktree_existente_marca_falhado_sem_bloquear_estado(tmp_path):
+def test_ensure_falha_worktree_existente_marca_falhado_sem_bloquear_estado(tmp_path):
     root = tmp_path / "sps"
     make_sp(root, "a")
 
     def run(argv, **_):
         class R:
-            returncode = 1 if "--spawn" in argv else 0
+            returncode = 1 if "ensure" in argv else 0
             stdout = ""
             stderr = "worktree sb-a já existe"
         return R()
@@ -178,29 +188,8 @@ def test_retoma_apos_crash_nao_relanca_sessoes_registadas(tmp_path):
     make_sp(root, "a", folder="Doing")
     make_sp(root, "b")
     (tmp_path / "estado.json.123.tmp").write_text("{lixo", encoding="utf-8")  # escrita atómica interrompida
-    st = _estado(tmp_path, concorrencia=1, max=9, sessoes={"a": {"painel": "7"}})
+    st = _estado(tmp_path, concorrencia=1, max=9, sessoes={"a": {"subagent": True}})
     calls = []
     out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0), slug="zz")
     assert out["acao"] == "espera" and calls == []
-    assert json.loads(st.read_text(encoding="utf-8"))["sessoes"] == {"a": {"painel": "7"}}
-
-
-def _est(**sessoes):
-    return {"sessoes": {s: dict(v) for s, v in sessoes.items()}}
-
-
-def test_nome_painel_normal_usa_o_slug_e_nunca_o_id():
-    est = _est(a={"painel": "7"}, b={"painel": "9"})
-    assert nome_painel(est, "9") == "b"
-    assert "9" not in nome_painel(est, "9")
-
-
-def test_nome_painel_duplicado_leva_sufixo():
-    est = _est(a={"painel": "7", "titulo": "x"}, b={"painel": "9", "titulo": "x"})
-    assert nome_painel(est, "7") == "x" and nome_painel(est, "9") == "x-2"
-
-
-def test_nome_painel_fora_do_mapa_ou_estado_antigo_sem_sessoes():
-    assert nome_painel(_est(a={"painel": "7"}), "42") == "painel sem nome"
-    assert nome_painel({}, "7") == "painel sem nome"
-    assert nome_painel(_est(a={}), "7") == "painel sem nome"
+    assert json.loads(st.read_text(encoding="utf-8"))["sessoes"] == {"a": {"subagent": True}}

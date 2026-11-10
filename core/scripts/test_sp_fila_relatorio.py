@@ -1,4 +1,4 @@
-"""Testes de scripts/sp-fila.py: relatório final, gastos e incidentes da vigia."""
+"""Testes de scripts/sp-fila.py: relatório final e gastos."""
 import json
 from datetime import datetime
 from pathlib import Path
@@ -7,10 +7,6 @@ from sp_fila_testlib import (
     make_sp,
     _runner,
     _estado,
-    vivo,
-    PARADA,
-    _secao_vigia,
-    _relatorio_com,
 )
 
 
@@ -59,9 +55,6 @@ def test_relatorio_agrega_gaps_de_reflect_e_falhas(tmp_path):
     assert "## Falhas" in texto and "mau: não chegou a Done (fase Doing)" in texto
 
 
-# --- estado vivo (par-monitor) ---
-
-
 def test_relatorio_tem_no_maximo_30_linhas(tmp_path):
     root = tmp_path / "sps"
     for i in range(25):
@@ -72,56 +65,6 @@ def test_relatorio_tem_no_maximo_30_linhas(tmp_path):
     texto = Path(out["relatorio"]).read_text(encoding="utf-8")
     assert len(texto.splitlines()) <= 30
     assert "mais" in texto and "## Próximos passos" in texto and "Fim:" in texto
-
-
-def test_relatorio_vigia_sem_incidentes_diz_nenhum(tmp_path):
-    texto = _relatorio_com(tmp_path, vigia={"pid": 1, "ts": "2026-11-06T11:59:00", "incidentes": []})
-    assert "- nenhum" in _secao_vigia(texto)
-
-
-def test_relatorio_vigia_ausente_com_sessoes_avisa(tmp_path):
-    assert "sem vigia" in _secao_vigia(_relatorio_com(tmp_path)).lower()
-
-
-def test_relatorio_vigia_lista_incidentes_gravados(tmp_path):
-    inc = ["vigia parou 5 min", "a: PARADA SEM FECHAR"]
-    sec = _secao_vigia(_relatorio_com(tmp_path, vigia={"pid": 1, "ts": "2026-11-06T11:59:00", "incidentes": inc}))
-    assert "vigia parou 5 min" in sec and "a: PARADA SEM FECHAR" in sec
-
-
-def test_relatorio_com_vigia_respeita_max_linhas(tmp_path):
-    inc = [f"s{i}: morto" for i in range(60)]
-    texto = _relatorio_com(tmp_path, vigia={"pid": 1, "ts": "2026-11-06T11:59:00", "incidentes": inc})
-    assert len(texto.splitlines()) <= 30 and "mais" in _secao_vigia(texto)
-
-
-def test_batida_vigia_preserva_incidentes_e_regista_paragem(tmp_path):
-    st = _estado(tmp_path, sessoes={"a": {}}, vigia={"pid": 1, "ts": "2026-11-06T11:50:00", "incidentes": ["x"]})
-    sp_fila.batida_vigia(st, agora=lambda: datetime(2026, 11, 6, 12, 0, 0))
-    v = json.loads(st.read_text(encoding="utf-8"))["vigia"]
-    assert v["incidentes"][0] == "x" and any("vigia parou 10 min" in i for i in v["incidentes"])
-
-
-def test_registar_incidente_acrescenta_sem_duplicar(tmp_path):
-    st = _estado(tmp_path)
-    sp_fila.registar_incidente(st, "a: morto")
-    sp_fila.registar_incidente(st, "a: morto")
-    assert json.loads(st.read_text(encoding="utf-8"))["vigia"]["incidentes"] == ["a: morto"]
-
-
-def test_vigiar_regista_incidente_de_sessao_morta():
-    achados = []
-    passos = iter([[("a", "morto", "sem processo")]])
-    sp_fila.vigiar(lambda: next(passos), 1, lambda s: None, lambda m: None, incidente=achados.append)
-    assert achados == ["a: morto"]
-
-
-def test_vigia_estado_so_com_sessoes_e_vigia_tolera_feitos_ausentes(tmp_path):
-    st = tmp_path / "estado.json"
-    st.write_text(json.dumps({"sessoes": {}, "vigia": {"pid": 1}}), encoding="utf-8")
-    estado = sp_fila.ler(st)
-    assert estado["feitos"] == [] and estado["falhados"] == []
-    assert estado["vigia"] == {"pid": 1}
 
 
 # --- relatório na worktree (fila-relatorio-integrado) ---

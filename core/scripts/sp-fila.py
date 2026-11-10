@@ -7,7 +7,8 @@ prioridade, depois idade, com `depends_on` a mandar. Nunca faz push/PR: isso é 
 Uso:
   python -I scripts/sp-fila.py --dry-run [--max N] [--ate HH:MM] [--projeto P]   # ordem e exclusões
   python -I scripts/sp-fila.py [--max N] [--max-falhas N] [--ate HH:MM] [--projeto P] [--orcamento N]   # arranca a fila (para ao fim de N falhas seguidas, defeito 2)
-  python -I scripts/sp-fila.py [--concorrencia N]   # modo paralelo: até N painéis via sp-handoff --spawn, sem orçamento nem máximo
+  python -I scripts/sp-fila.py [--concorrencia N]   # modo paralelo: plano JSON para até N subagents `Agent` (worktree própria), sem orçamento nem máximo
+  python -I scripts/sp-fila.py --ajuda      # regras do agente principal no modo paralelo
   python -I scripts/sp-fila.py --programa <slug-mãe> [--max N]   # só a árvore da mãe; orçamento lido dela
   python -I scripts/sp-fila.py --seguinte [--slug S]   # no fecho de cada SP da fila: regista e lança o seguinte
   python -I scripts/sp-fila.py --gastos     # custo USD por sessão da corrida (só medição)
@@ -25,69 +26,35 @@ frontmatter. Contam por corrida (retomar = nova corrida): tempo desde o arranque
 rc: 0 ok, 1 falha
 """
 import argparse
-import os
-import subprocess
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import kaizen_engine  # noqa: E402
-import painel_backend  # noqa: E402
-# Módulos irmãos (a CLI e os testes continuam a ver tudo aqui): estado, plano, relatório, execução, paralelo.
+# Módulos irmãos (a CLI e os testes continuam a ver tudo aqui): estado, plano, relatório, execução, subagents.
 from sp_fila_estado import (MAX_DEFEITO, MAX_FALHAS_DEFEITO, NO_WINDOW, ORCAMENTO, REQ_POR_SP, RELATORIOS, ESTADO, USER,  # noqa: E402,F401
                             atualizar, bloqueio, guardar, ler, migrar, run_hidden)
 from sp_fila_plano import descendentes, limite, load, plan, render_plan, sem_commit, sp_list  # noqa: E402,F401
 from sp_fila_relatorio import gastos, relatorio, render_gastos  # noqa: E402,F401
-from sp_fila_execucao import (_custos, _ler_sp, _painel_lancado,  # noqa: E402,F401
-                              lancar_seguinte_auto, seguinte, IntegracaoPendente, SlugObrigatorio)
-from sp_fila_paralelo import (AVISO_TAIL, INATIVIDADE_S, VIGIA_LOG, VIGIA_TAIL, aviso_vigia, resumo_arranque, batida_vigia, classificar,
-                              contar_tails, ecra_sessao, enviar_sessao, estado_vivo, fechar_painel_sessao, garantir_vigia, linha, parar_vigia, registar_incidente, vigiar)
+from sp_fila_execucao import (_custos, _ler_sp,  # noqa: E402,F401
+                              seguinte, IntegracaoPendente, SlugObrigatorio)
+import sp_fila_subagents  # noqa: E402
 
-def backend_paineis(repo=None, env=None, which=None, run=None):
-    """(backend ou None, config) segundo `painelBackend` do kaizen.config.json; None = sem painéis utilizáveis."""
-    cfg = kaizen_engine.load("kaizen_config").painel_backend(Path(repo or Path.cwd()))
-    kw = {k: v for k, v in (("env", env), ("which", which), ("run", run)) if v is not None}
-    return painel_backend.escolher(cfg, **kw), cfg
-
-
-def destacar(args, log, popen=subprocess.Popen):
-    """Arranca `sp-fila.py <args>` num processo próprio (fora do prazo do Monitor), com a saída em `log`."""
-    Path(log).parent.mkdir(parents=True, exist_ok=True)
-    flags = (subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW) if os.name == "nt" else 0
-    saida = open(log, "a", encoding="utf-8")
-    return popen([sys.executable, "-I", str(Path(__file__).resolve()), *args], stdin=subprocess.DEVNULL, stdout=saida,
-                 stderr=subprocess.STDOUT, creationflags=flags, **({} if os.name == "nt" else {"start_new_session": True}))
-
-
-AJUDA = """Orquestrador do sp-fila (regras):
-- Vigia: `sp-fila.py --vigiar --destacado` (processo próprio; se já houver uma ativa não arma outra) e UM só Monitor `tail -n 0 -F ~/.claude/sp-fila-vigia.log` (só linhas novas); aos 30 min o novo substitui o anterior (parar o antigo primeiro).
-- Ao ver um SP «fechado» a vigia fecha o painel e lança o seguinte sozinha (como `--seguinte --slug`), respeitando max, concorrência, ate, orçamento e dependências; se não lança, a razão fica no log (`slug · fila · razão`).
-- Cada linha do log = `slug · estado · ação`; só mudanças (bloqueado repete-se a cada 15 min como «AINDA»).
-- Relato por linha: ≤3 linhas + TLDR; não narrar avisos repetidos nem reler ecrãs.
-- Pergunta/aprovação de painel: `sp-fila.py --ecra <slug>`, um AskUserQuestion («Painel <slug>»), só depois `sp-fila.py --enviar <slug> <texto>`; nunca aprovar sozinho; o user vê o slug, nunca o id.
-- `--estado-vivo` avisa «SEM VIGIA»/«VIGIA PAROU» (rearmar) e «N Monitores» (deixar só um)."""
-
-
-def armar_vigia(args, estado):
-    """Único caminho para armar a vigia: destaca-a se não está viva (idempotente) e devolve a mensagem."""
-    extra = [a for flag, val in (("--intervalo", args.intervalo), ("--inatividade", args.inatividade), ("--estado", args.estado), ("--root", args.root)) for a in (flag, str(val))]
-    extra += (["--projeto", args.projeto] if args.projeto else []) + (["--ate", args.ate] if args.ate else [])
-    res, pid = garantir_vigia(ler(estado), lambda: destacar(["--vigiar", *extra], VIGIA_LOG), datetime.now())
-    if res == "viva":
-        return f"vigia já ativo (pid {pid}); log: {VIGIA_LOG}"
-    return f"vigia destacado (pid {pid}); acompanhar com o Monitor: `{VIGIA_TAIL}` (re-armar o tail aos 30 min); sem a fila a correr, sai sozinho"
+AJUDA = """Orquestrador do sp-fila em paralelo (subagents):
+- O lançamento imprime um JSON `{"acao": "lancar", "itens": [...]}`: por item, um `Agent` com `prompt` e `description`, `run_in_background: true`, sem `isolation` (a worktree já existe em `worktree`); até N em simultâneo.
+- Terminar o turno depois de lançar; cada subagent avisa ao acabar (notificação), sem vigia nem Monitor.
+- Fim de cada subagent: ler a última linha `ESTADO:`. `pergunta` → AskUserQuestion ao user com o slug, depois SendMessage ao subagent com a resposta; `done` → `sb-worktree.py merge <slug>` com confirmação do user, depois `sp-fila.py --seguinte --slug <slug>`; `bloqueado`/`falhou` → avisar o user e `--seguinte --slug <slug>`.
+- O `--seguinte` imprime o JSON dos próximos a lançar (se houver); repetir até «fila terminada».
+- Relato por subagent: ≤3 linhas + TLDR."""
 
 
 def _resumo_antigo(estado, args):
-    """Resumo do estado antigo (best-effort: se não der para classificar os painéis, mostra só o que o estado diz)."""
+    """Resumo do estado antigo da fila (sessões e início) para mostrar antes de `--parar` ou de um arranque novo."""
     atual = ler(estado)
-    try:
-        vivos = estado_vivo(atual, load(args.root, args.projeto), run_hidden, datetime.now(), args.inatividade * 60, backend=backend_paineis()[0])
-    except Exception:  # noqa: BLE001 - o resumo nunca pode impedir o --parar
-        vivos = []
-    return resumo_arranque(atual, datetime.now(), vivos)
+    sessoes = atual.get("sessoes") or {}
+    linhas = [f"estado antigo: {len(sessoes)} sessão(ões), início {atual.get('inicio', '?')}"]
+    linhas += [f"  SP {slug} · worktree {sess.get('worktree', '-')}" for slug, sess in sessoes.items()]
+    return "\n".join(linhas)
 
 
 def _ler_ou_erro(path):
@@ -99,64 +66,57 @@ def _ler_ou_erro(path):
         return None
 
 
-OBSOLETA_MIN = 60  # vigia sem batida (ou fila sem vigia desde o arranque) há mais disto, sem SP em Doing = fila obsoleta
+OBSOLETA_MIN = 60  # fila arrancada há mais disto, sem SP da corrida em Doing = fila obsoleta
 
 
 def fila_obsoleta(atual, items, agora, limite_min=OBSOLETA_MIN):
     """Motivo (str) se o estado é de uma fila obsoleta, None se está viva.
 
-    Viva = algum SP da corrida em Doing ou vigia a bater há menos de `limite_min` (sem vigia conta o arranque).
-    Obsoleta = nenhuma das duas. Nunca devolve motivo para uma fila viva."""
+    Viva = algum SP da corrida em Doing ou arranque há menos de `limite_min`. Obsoleta = nenhuma das duas.
+    Nunca devolve motivo para uma fila viva."""
     sessoes = atual.get("sessoes") or {}
     status = {sp.slug: sp.status for sp, _ in items}
     if any(status.get(s) == "Doing" for s in sessoes):
         return None
-    ref = (atual.get("vigia") or {}).get("ts") or atual.get("inicio")
     try:
-        idade = (agora - datetime.fromisoformat(ref)).total_seconds() / 60
+        idade = (agora - datetime.fromisoformat(atual.get("inicio"))).total_seconds() / 60
     except (TypeError, ValueError):
         return "estado sem data legível e sem SP em Doing"
     if idade <= limite_min:
         return None
-    onde = "sem batida da vigia" if atual.get("vigia") else "sem vigia desde o arranque"
-    return f"{onde} há {int(idade)} min (limite {limite_min}) e nenhum SP em Doing ({len(sessoes)} sessão(ões) registada(s))"
+    return f"arrancada há {int(idade)} min (limite {limite_min}) e nenhum SP em Doing ({len(sessoes)} sessão(ões) registada(s))"
 
 
 def abandonar_obsoleta(estado, atual, motivo, args, entrada=input, tty=None):
-    """Propõe abandonar a fila obsoleta e, confirmado, apaga o estado (e pára a vigia). True = abandonada."""
+    """Propõe abandonar a fila obsoleta e, confirmado, apaga o estado. True = abandonada."""
     print(f"fila obsoleta ({estado}): {motivo}", file=sys.stderr)
     tty = sys.stdin.isatty() if tty is None else tty
-    ok = args.abandonar_obsoleta or (tty and entrada("abandonar e arrancar uma nova? [s/N] ").strip().lower() in ("s", "sim", "y", "yes"))
+    ok = args.abandonar_obsoleta
+    if not ok and tty:
+        try:  # no Windows, stdin em NUL diz isatty() True e o input() dá EOF: vale como «não»
+            ok = entrada("abandonar e arrancar uma nova? [s/N] ").strip().lower() in ("s", "sim", "y", "yes")
+        except EOFError:
+            ok = False
     if not ok:
         print("erro: fila obsoleta por abandonar; repetir com `--abandonar-obsoleta` (ou `--parar`)", file=sys.stderr)
         return False
-    vigia = atual.get("vigia")
     estado.unlink(missing_ok=True)
     print("fila obsoleta abandonada")
-    if vigia:
-        print(parar_vigia(vigia)[1])
     return True
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Fila autónoma de SPs")
-    ap.add_argument("--abandonar-obsoleta", action="store_true", help="ao arrancar: abandona sem perguntar uma fila obsoleta (vigia parada e nenhum SP em Doing); fila viva nunca é tocada")
+    ap.add_argument("--abandonar-obsoleta", action="store_true", help="ao arrancar: abandona sem perguntar uma fila obsoleta (arrancada há mais de 60 min e nenhum SP em Doing); fila viva nunca é tocada")
     ap.add_argument("--dry-run", action="store_true", help="mostra a ordem e as exclusões, sem lançar")
     ap.add_argument("--seguinte", action="store_true", help="no fecho de um SP da fila: regista e lança o seguinte")
     ap.add_argument("--slug", help="com --seguinte: o SP que fechou (só essa sessão; sem ele fecham todas)")
     ap.add_argument("--gastos", action="store_true", help="mostra o custo (USD) de cada sessão da corrida; só mede, não limita")
-    ap.add_argument("--estado-vivo", action="store_true", help="classifica cada sessão da corrida (a correr, fechado, bloqueado, morto); só lê")
-    ap.add_argument("--ecra", metavar="SLUG", help="imprime o ecrã do painel do SP `slug` (sem ids, só «Painel <slug>»); só lê")
-    ap.add_argument("--enviar", nargs=2, metavar=("SLUG", "TEXTO"), help="escreve TEXTO e Enter no painel do SP `slug` (sem ids; é o que aprova um pedido, só depois de o user responder)")
-    ap.add_argument("--vigiar", action="store_true", help="repete o --estado-vivo e imprime só as mudanças (arrancou, à espera de resposta, terminou); sai quando todas acabam; só lê")
-    ap.add_argument("--destacado", action="store_true", help="com --vigiar: corre o vigia num processo próprio (sobrevive ao Monitor) e escreve em ~/.claude/sp-fila-vigia.log")
-    ap.add_argument("--intervalo", type=int, default=20, metavar="S", help="com --vigiar: segundos entre leituras")
-    ap.add_argument("--inatividade", type=int, default=INATIVIDADE_S // 60, metavar="MIN", help="com --estado-vivo: minutos sem atividade até «bloqueado»")
-    ap.add_argument("--ajuda", action="store_true", help="regras do orquestrador (vigia, Monitor, perguntas dos painéis, relato)")
+    ap.add_argument("--ajuda", action="store_true", help="regras do orquestrador (subagents, perguntas, fecho de cada SP, relato)")
     ap.add_argument("--parar", action="store_true", help="abandona a fila")
     ap.add_argument("--max", type=int, default=None, help=f"nº máximo de SPs (defeito {MAX_DEFEITO}; em --concorrencia só conta se passado)")
     ap.add_argument("--ate", metavar="HH:MM", help="hora limite")
-    ap.add_argument("--concorrencia", type=int, metavar="N", help="modo paralelo (N=1 também: um painel próprio): até N sessões em painéis próprios, sem limite de quota (só o guard de contexto, via handoff)")
+    ap.add_argument("--concorrencia", type=int, metavar="N", help="modo paralelo (N=1 também): até N subagents `Agent` em background, cada um com a sua worktree; imprime o plano em JSON, sem limite de quota")
     ap.add_argument("--orcamento", type=int, default=ORCAMENTO, help=f"teto opcional de requests totais; cada SP gasta {REQ_POR_SP} (sem ele, sem limite)")
     ap.add_argument("--max-falhas", type=int, default=MAX_FALHAS_DEFEITO, metavar="N", help=f"para a fila após N SPs falhados seguidos (defeito {MAX_FALHAS_DEFEITO}; 0 = sem este limite)")
     ap.add_argument("--projeto")
@@ -177,60 +137,12 @@ def main(argv=None):
         return 0
     if args.parar:
         try:
-            vigia = ler(estado).get("vigia") if estado.exists() else None
             if estado.exists():
                 print(_resumo_antigo(estado, args))
         except ValueError:  # corrompido: abandonar na mesma
-            vigia = None
+            pass
         estado.unlink(missing_ok=True)
         print("fila abandonada")
-        if vigia:
-            print(parar_vigia(vigia)[1])
-        return 0
-    if args.vigiar and args.destacado:
-        if not estado.exists():
-            print("erro: sem fila em curso", file=sys.stderr)
-            return 1
-        print(armar_vigia(args, estado))
-        return 0
-    if args.vigiar:
-        def lido():
-            return estado_vivo(_ler_ou_erro(estado) or {"sessoes": {}}, load(args.root, args.projeto), run_hidden, datetime.now(), args.inatividade * 60, backend=backend_paineis()[0]) if estado.exists() else None
-        fim = None
-        if args.ate:
-            h, m = map(int, args.ate.split(":"))
-            fim = datetime.now().replace(hour=h, minute=m, second=0, microsecond=0)
-        return vigiar(lido, args.intervalo, time.sleep, lambda m: print(m, flush=True), lambda: fim is not None and datetime.now() >= fim,
-                      lambda: batida_vigia(estado), lambda slug: fechar_painel_sessao(estado, slug, run_hidden, backend=backend_paineis()[0]),
-                      lancar_seguinte=lambda slug: lancar_seguinte_auto(args.root, estado, Path(args.relatorios), slug),
-                      incidente=lambda texto: registar_incidente(estado, texto))
-    if args.ecra:
-        if not estado.exists():
-            print("erro: sem fila em curso", file=sys.stderr)
-            return 1
-        ok, texto = ecra_sessao(estado, args.ecra, run_hidden, backend=backend_paineis()[0])
-        print(texto, file=sys.stdout if ok else sys.stderr)
-        return 0 if ok else 1
-    if args.enviar:
-        if not estado.exists():
-            print("erro: sem fila em curso", file=sys.stderr)
-            return 1
-        ok, texto = enviar_sessao(estado, args.enviar[0], args.enviar[1], run_hidden, backend=backend_paineis()[0])
-        print(texto, file=sys.stdout if ok else sys.stderr)
-        return 0 if ok else 1
-    if args.estado_vivo:
-        if not estado.exists():
-            print("erro: sem fila em curso", file=sys.stderr)
-            return 1
-        atual = _ler_ou_erro(estado)
-        if atual is None:
-            return 1
-        for slug, est, motivo in estado_vivo(atual, load(args.root, args.projeto), run_hidden, datetime.now(), args.inatividade * 60, backend=backend_paineis()[0]):
-            print(linha(slug, est, motivo))
-        if aviso := aviso_vigia(atual, datetime.now()):
-            print(aviso)
-        if (n := contar_tails()) > 1:
-            print(f"AVISO: {n} Monitores `tail` sobre o log da vigia (linhas duplicadas); parar os antigos e deixar só um")
         return 0
     if args.gastos:
         if not estado.exists():
@@ -241,11 +153,6 @@ def main(argv=None):
             return 1
         print(render_gastos(atual, _custos()))
         return 0
-    if args.concorrencia and not args.dry_run and not args.seguinte and (esc := backend_paineis())[0] is None:
-        print(f"AVISO: {painel_backend.falta(esc[1])}; a fila corre em série (sem --concorrencia)", file=sys.stderr)
-        args.concorrencia = None
-        if args.max is None:
-            args.max = MAX_DEFEITO
     items = load(args.root, args.projeto)
     mae = None
     if args.programa:
@@ -309,14 +216,13 @@ def main(argv=None):
     if out["acao"] == "espera":
         print(f"a aguardar · {', '.join(out['sessoes'])}")
     elif out["acao"] == "lancou":
-        print(f"lançado · {', '.join(out['slugs'])} · terminar o turno")
-        if ler(estado).get("concorrencia"):
-            print(armar_vigia(args, estado))
-            print(f"VIGIAR · um só Monitor `{VIGIA_TAIL}` · regras: `sp-fila.py --ajuda`")
+        if out.get("itens"):  # paralelo: o agente principal lança um `Agent` por item (regras: `--ajuda`)
+            print(f"lançar como subagents · {', '.join(out['slugs'])} · regras: `sp-fila.py --ajuda`")
+            print(sp_fila_subagents.plano(out["itens"]))
+        else:
+            print(f"lançado · {', '.join(out['slugs'])} · terminar o turno")
     else:
         print(f"fila terminada: {out['motivo']}\nrelatório: {out['relatorio']}")
-        if out.get("vigia") and "sem vigia" not in out["vigia"]:
-            print(out["vigia"])
     return 0
 
 

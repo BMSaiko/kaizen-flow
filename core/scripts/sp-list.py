@@ -22,7 +22,7 @@ Um programa é um SP-mãe (`kind: program`) com filhos que têm `parent: <slug-m
 Cabeçalho `Próximo:`/`Bloqueados` (`eligibility`) e limite de 40 linhas (`--tudo` levanta-o).
 
 Fronteira com os vizinhos (não duplicar): `sp-list` = visão do conjunto de SPs (todos os projetos, árvore,
-próximo elegível); `sp-estado.py` = um SP (passos, gates, git); `sp-painel.py` = sessões paralelas do sp-fila; `sp-organize.py` =
+próximo elegível); `sp-estado.py` = um SP (passos, gates, git); `sp-organize.py` =
 detetar/corrigir SPs fora do padrão; `sp-metricas.py` = linha de métricas por SP fechado. Aqui só leitura.
 rc: 0 ok, 2 slug desconhecido
 """

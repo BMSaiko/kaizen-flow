@@ -3,6 +3,7 @@ import json
 import os
 import time
 import pytest
+import sp_fila_estado
 from datetime import datetime
 from pathlib import Path
 from sp_fila_testlib import (
@@ -11,7 +12,6 @@ from sp_fila_testlib import (
     _runner,
     _estado,
     _pid_morto,
-    vivo,
 )
 
 
@@ -74,7 +74,7 @@ def test_fila_viva_nunca_e_tocada(tmp_path, capsys):
 def test_fila_vazia_antiga_e_obsoleta(tmp_path):
     items = sp_fila.load(tmp_path / "sps", None)
     antigo = {"inicio": "2020-01-01T10:00:00", "sessoes": {}}
-    assert "sem vigia desde o arranque" in sp_fila.fila_obsoleta(antigo, items, datetime(2026, 11, 9))
+    assert "nenhum SP em Doing" in sp_fila.fila_obsoleta(antigo, items, datetime(2026, 11, 9))
     assert sp_fila.fila_obsoleta({"inicio": "2026-11-09T11:30:00", "sessoes": {}}, items, datetime(2026, 11, 9, 12)) is None
 
 
@@ -83,6 +83,28 @@ def test_obsoleta_confirmada_no_terminal(tmp_path):
     args = type("A", (), {"abandonar_obsoleta": False})()
     assert not sp_fila.abandonar_obsoleta(st, {}, "m", args, entrada=lambda _: "n", tty=True) and st.exists()
     assert sp_fila.abandonar_obsoleta(st, {}, "m", args, entrada=lambda _: "s", tty=True) and not st.exists()
+
+
+def test_obsoleta_eof_no_terminal_vale_como_nao(tmp_path, capsys):
+    st = _estado(tmp_path)
+    args = type("A", (), {"abandonar_obsoleta": False})()
+
+    def eof(_):
+        raise EOFError
+    assert not sp_fila.abandonar_obsoleta(st, {}, "m", args, entrada=eof, tty=True) and st.exists()
+    assert "--abandonar-obsoleta" in capsys.readouterr().err
+
+
+def test_obsoleta_com_stdin_em_eof_nao_rebenta(tmp_path, capsys):
+    # Windows: stdin em NUL diz isatty() True e o input() dá EOFError
+    st = _estado(tmp_path)
+    args = type("A", (), {"abandonar_obsoleta": False})()
+
+    def eof(_):
+        raise EOFError
+
+    assert not sp_fila.abandonar_obsoleta(st, {}, "m", args, entrada=eof, tty=True) and st.exists()
+    assert "--abandonar-obsoleta" in capsys.readouterr().err
 
 
 def test_dois_escritores_simultaneos_nao_perdem_registos(tmp_path):
@@ -118,7 +140,7 @@ def test_permission_error_ao_libertar_bloqueio_e_tentado_de_novo(tmp_path, monke
 def test_permission_error_ao_criar_bloqueio_e_tentado_de_novo(tmp_path, monkeypatch):
     # Windows devolve PermissionError (não FileExistsError) enquanto o dono apaga o .lock
     st = _estado(tmp_path)
-    real, falhas = sp_fila.os.open, []
+    real, falhas = sp_fila_estado.os.open, []
 
     def open_instavel(p, *a, **k):
         if str(p).endswith(".lock") and len(falhas) < 3:
@@ -126,7 +148,7 @@ def test_permission_error_ao_criar_bloqueio_e_tentado_de_novo(tmp_path, monkeypa
             raise PermissionError(13, "Acesso negado")
         return real(p, *a, **k)
 
-    monkeypatch.setattr(sp_fila.os, "open", open_instavel)
+    monkeypatch.setattr(sp_fila_estado.os, "open", open_instavel)
     sp_fila.atualizar(st, lambda e: e["sessoes"].update({"w": {}}))
     assert len(falhas) == 3 and "w" in json.loads(st.read_text(encoding="utf-8"))["sessoes"]
 
@@ -134,7 +156,7 @@ def test_permission_error_ao_criar_bloqueio_e_tentado_de_novo(tmp_path, monkeypa
 def test_permission_error_no_replace_e_tentado_de_novo(tmp_path, monkeypatch):
     # Windows: os.replace falha enquanto um leitor sem bloqueio tem o estado aberto
     st = _estado(tmp_path)
-    real, falhas = sp_fila.os.replace, []
+    real, falhas = sp_fila_estado.os.replace, []
 
     def replace_instavel(a, b):
         if len(falhas) < 3:
@@ -142,7 +164,7 @@ def test_permission_error_no_replace_e_tentado_de_novo(tmp_path, monkeypatch):
             raise PermissionError(13, "Acesso negado")
         return real(a, b)
 
-    monkeypatch.setattr(sp_fila.os, "replace", replace_instavel)
+    monkeypatch.setattr(sp_fila_estado.os, "replace", replace_instavel)
     sp_fila.atualizar(st, lambda e: e["sessoes"].update({"w": {}}))
     assert len(falhas) == 3 and "w" in json.loads(st.read_text(encoding="utf-8"))["sessoes"]
 
@@ -200,14 +222,6 @@ def test_seguinte_com_estado_bloqueado_sai_rc1_sem_tocar_no_estado(tmp_path, mon
     assert not (tmp_path / "rel").exists()
 
 
-def test_vigia_sobrevive_a_estado_bloqueado_e_avisa(tmp_path):
-    def bloqueado(*a, **k):
-        raise TimeoutError("estado bloqueado há demasiado tempo")
-
-    ok, razao = sp_fila.lancar_seguinte_auto("r", "e", "rel", "a", seguinte_fn=bloqueado)
-    assert ok is False and "bloqueado" in razao
-
-
 @pytest.mark.parametrize("n", ["0", "-1", "-3"])
 def test_concorrencia_invalida_e_recusada_com_mensagem(tmp_path, capsys, n):
     rc = sp_fila.main(["--concorrencia", n, "--estado", str(tmp_path / "e.json"), "--root", str(tmp_path / "sps")])
@@ -223,7 +237,7 @@ def test_estado_corrompido_da_erro_claro_e_nao_apaga(tmp_path, capsys):
     assert st.read_text(encoding="utf-8").startswith('{"max"')  # intacto para diagnóstico
 
 
-@pytest.mark.parametrize("flag", ["--estado-vivo", "--gastos"])
+@pytest.mark.parametrize("flag", ["--gastos"])
 def test_leituras_com_estado_corrompido_dao_erro_claro(tmp_path, capsys, flag):
     st = tmp_path / "e.json"
     st.write_text("{lixo", encoding="utf-8")

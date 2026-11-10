@@ -73,7 +73,7 @@ More detail in [Install](#install) and the [documentation](#documentation).
   <img src="docs/assets/sp-fila-parallel.svg" alt="sp-fila parallel: up to N panes, one worktree each, a watcher that brings blocked panes to you" width="100%">
 </p>
 
-Parallel sessions open in WezTerm, tmux or, with `"painelBackend": "background"`, as detached processes with a log each (no graphical terminal needed); see [config](docs/config.md#painelbackend). With no backend available the queue runs sequentially.
+In parallel mode each story runs as a background `Agent` subagent with its own worktree; the main session merges, brings questions and permission requests to you, and launches the next. No terminal multiplexer is needed.
 
 ## Why it uses fewer tokens and ships more
 
