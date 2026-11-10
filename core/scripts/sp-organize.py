@@ -35,7 +35,7 @@ class Action:
 
 
 def set_field(text, key, value):
-    return re.sub(rf"^{key}:.*$", f"{key}: {value}", text, count=1, flags=re.M)
+    return re.sub(rf"^{key}:[^\r\n]*", f"{key}: {value}", text, count=1, flags=re.M)
 
 
 def plan(root, project=None):
@@ -94,16 +94,13 @@ def plan(root, project=None):
 def apply(action):
     if action.blocked:
         return
-    text = action.source.read_text(encoding="utf-8")
+    text = action.source.read_bytes().decode("utf-8")  # bytes: o fim de linha (CRLF) fica como está
     for key, value in action.fixes.items():
         text = set_field(text, key, value)
-    action.target.parent.mkdir(parents=True, exist_ok=True)
-    if action.target == action.source:
-        action.source.write_text(text, encoding="utf-8")
-        sp_indice.invalidar()
-        return
-    action.target.write_text(text, encoding="utf-8")
-    action.source.unlink()
+    action.source.write_bytes(text.encode("utf-8"))
+    if action.target != action.source:
+        kaizen_engine.relocate(action.source, action.target)  # git mv: mantém o histórico
+
     sp_indice.invalidar()
 
 

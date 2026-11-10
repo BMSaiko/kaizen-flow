@@ -1,5 +1,6 @@
 """Testes de scripts/sp-fila.py: modo --concorrencia (teto, spawn, retoma, sessões mortas)."""
 import json
+import pytest
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -182,3 +183,15 @@ def test_retoma_apos_crash_nao_relanca_sessoes_registadas(tmp_path):
     out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0), slug="zz")
     assert out["acao"] == "espera" and calls == []
     assert json.loads(st.read_text(encoding="utf-8"))["sessoes"] == {"a": {"painel": "7"}}
+
+
+def test_ate_mal_formado_e_rejeitado_no_argparse(capsys):
+    for mau in ("25:00", "10:99", "abc", "9"):
+        with pytest.raises(SystemExit) as exc:
+            sp_fila.main(["--dry-run", "--ate", mau])
+        assert exc.value.code == 2
+    assert "hora inválida" in capsys.readouterr().err
+
+
+def test_ate_valido_normaliza_zero_a_esquerda():
+    assert sp_fila._hora("9:05") == "09:05"

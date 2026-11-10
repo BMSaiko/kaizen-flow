@@ -117,3 +117,12 @@ def test_avisa_ramo_atras_de_master(tmp_path):
 def test_sem_aviso_quando_em_dia(tmp_path):
     make(tmp_path, "Doing", "alvo")
     assert "atrás" not in sp_estado.estado("alvo", root=tmp_path, git_lines=["master"], atras=0)
+
+
+def test_dep_done_noutro_projeto_nao_conta(tmp_path):
+    make(tmp_path, "Doing", "alvo")
+    outro = tmp_path / "outro" / "sp" / "Done"
+    outro.mkdir(parents=True)
+    (outro / "dep-a-2026-10-26.md").write_text(SP.format(st="Done", slug="dep-a").replace("project: demo", "project: outro"), encoding="utf-8")
+    out = sp_estado.estado("alvo", root=tmp_path, git_lines=["master"])
+    assert "dep-a" in out and "dep-b" in out  # ambas por cumprir: o Done de dep-a é de outro projeto

@@ -66,3 +66,8 @@ test("doctor valida muitos SPs em lotes (sem passar o limite da linha de comando
   assert.doesNotMatch(`${r.stdout}${r.stderr}`, /ENAMETOOLONG|too long|demasiado longa|ENOENT/i);
   assert.strictEqual(r.status, 0, `${r.stdout}${r.stderr}`.slice(-600));
 });
+
+test("--help, -h e help saem com rc 0; comando desconhecido com rc 1", () => {
+  for (const h of ["--help", "-h", "help"]) assert.strictEqual(run(h).status, 0, h);
+  assert.strictEqual(run("nao-existe").status, 1);
+});

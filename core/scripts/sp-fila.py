@@ -25,6 +25,7 @@ frontmatter. Contam por corrida (retomar = nova corrida): tempo desde o arranque
 """
 import argparse
 import os
+import re
 import subprocess
 import sys
 import time
@@ -80,6 +81,14 @@ def _ler_ou_erro(path):
         return None
 
 
+def _hora(valor):
+    """Valida `--ate HH:MM` no argparse (um valor mau já não rebenta a fila a meio)."""
+    m = re.fullmatch(r"(\d{1,2}):(\d{2})", valor.strip())
+    if not m or int(m.group(1)) > 23 or int(m.group(2)) > 59:
+        raise argparse.ArgumentTypeError(f"hora inválida {valor!r} (esperado HH:MM, 00:00 a 23:59)")
+    return f"{int(m.group(1)):02d}:{m.group(2)}"
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Fila autónoma de SPs")
     ap.add_argument("--dry-run", action="store_true", help="mostra a ordem e as exclusões, sem lançar")
@@ -94,7 +103,7 @@ def main(argv=None):
     ap.add_argument("--ajuda", action="store_true", help="regras do orquestrador (vigia, Monitor, perguntas dos painéis, relato)")
     ap.add_argument("--parar", action="store_true", help="abandona a fila")
     ap.add_argument("--max", type=int, default=None, help=f"nº máximo de SPs (defeito {MAX_DEFEITO}; em --concorrencia só conta se passado)")
-    ap.add_argument("--ate", metavar="HH:MM", help="hora limite")
+    ap.add_argument("--ate", metavar="HH:MM", type=_hora, help="hora limite")
     ap.add_argument("--concorrencia", type=int, metavar="N", help="modo paralelo (N=1 também: um painel próprio): até N sessões em painéis próprios, sem limite de quota (só o guard de contexto, via handoff)")
     ap.add_argument("--orcamento", type=int, default=ORCAMENTO, help=f"teto opcional de requests totais; cada SP gasta {REQ_POR_SP} (sem ele, sem limite)")
     ap.add_argument("--max-falhas", type=int, default=MAX_FALHAS_DEFEITO, metavar="N", help=f"para a fila após N SPs falhados seguidos (defeito {MAX_FALHAS_DEFEITO}; 0 = sem este limite)")

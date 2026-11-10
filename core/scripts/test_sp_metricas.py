@@ -43,3 +43,17 @@ def test_sp_move_done_acrescenta_linha_uma_so_vez(tmp_path, monkeypatch):
 def test_sem_pasta_de_relatorios_e_noop(tmp_path):
     sp = make_sp(tmp_path, "abc")
     assert sp_metricas.registar(tmp_path, sp, custos={}) is None
+
+
+def test_mesmo_slug_em_dois_projetos_regista_as_duas_linhas(tmp_path):
+    (tmp_path / "knowledge/infra/reports").mkdir(parents=True)
+    a = make_sp(tmp_path, "abc")
+    b = make_sp(tmp_path, "abc").read_text(encoding="utf-8").replace("project: atlas", "project: outro")
+    pb = tmp_path / "outro/sp/Doing/abc.md"
+    pb.parent.mkdir(parents=True)
+    pb.write_text(b, encoding="utf-8")
+    sp_metricas.registar(tmp_path, a, custos={})
+    sp_metricas.registar(tmp_path, pb, custos={})
+    sp_metricas.registar(tmp_path, pb, custos={})  # repetido: dedup por (projeto, slug)
+    out = (tmp_path / sp_metricas.REL).read_text(encoding="utf-8")
+    assert "| atlas | abc |" in out and out.count("| outro | abc |") == 1

@@ -93,3 +93,28 @@ def test_idempotente_e_dry_run_por_defeito(tmp_path, capsys):
     assert sp_organize.main(["--root", str(tmp_path), "--apply"]) == 0
     assert sp_organize.main(["--root", str(tmp_path)]) == 0
     assert "nada a fazer" in capsys.readouterr().out
+
+
+def test_apply_preserva_crlf(tmp_path):
+    path = sp(tmp_path, "atlas/sp/Doing/abc-2026-10-18.md", status="TODO")
+    path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+    (action,) = sp_organize.plan(tmp_path)
+    sp_organize.apply(action)
+    out = path.read_bytes()
+    assert b"status: Doing\r\n" in out and b"\n" not in out.replace(b"\r\n", b"")
+
+
+def test_apply_move_com_git_mv_mantem_historico(tmp_path):
+    import subprocess
+    git = lambda *a: subprocess.run(["git", "-C", str(tmp_path), *a], check=True, capture_output=True)
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    path = sp(tmp_path, "atlas/sp/TODO/abc-2026-10-18-2026-10-18.md")
+    git("add", "-A")
+    git("commit", "-qm", "x")
+    (action,) = sp_organize.plan(tmp_path)
+    assert action.target != path
+    sp_organize.apply(action)  # sem `git add`: só um `git mv` deixa o renome já em stage
+    status = subprocess.run(["git", "-C", str(tmp_path), "status", "--short"], capture_output=True, text=True).stdout
+    assert status.startswith("R"), status

@@ -54,7 +54,7 @@ def estado(ref, root=None, project=None, git_lines=None, atras=None):
         return f"SP não encontrado: {ref}"
     text = alvo.path.read_text(encoding="utf-8")
     fm = kaizen_engine.parse_frontmatter(text)
-    done = {s.slug for s in sps if s.status == "Done"}
+    done = {s.slug for s in sps if s.status == "Done" and s.project == alvo.project}
     unmet = [d for d in alvo.depends_on if d not in done]
 
     crit = re.findall(r"^- \[([ xX])\]", section(text, "4."), re.M)

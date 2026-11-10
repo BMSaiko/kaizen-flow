@@ -71,7 +71,7 @@ def registar(root, sp_path, project=None, custos=None):
     dest = base / REL
     row = linha(sp_path, custo_por_slug() if custos is None else custos, project)
     existing = dest.read_text(encoding="utf-8") if dest.exists() else HEADER
-    if f"| {row.split('|')[3].strip()} |" in existing:
+    if f"| {row.split('|')[2].strip()} | {row.split('|')[3].strip()} |" in existing:  # chave (projeto, slug)
         return dest
     dest.write_text(existing + row, encoding="utf-8")
     return dest

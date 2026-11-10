@@ -27,7 +27,7 @@ const cmds = {
 };
 if (!Object.hasOwn(cmds, cmd)) {
   console.log("kaizen <init [repo] [--harness claude|codex|agents-md] | doctor [repo] [--harness h] [--fix] | status [repo] | usage [flags] | report [--week YYYY-WNN] [flags] | audit [dir] | sync [--check|--stamp]>");
-  process.exit(cmd ? 1 : 0);
+  process.exit(!cmd || ["--help", "-h", "help"].includes(cmd) ? 0 : 1);
 }
 try {
   cmds[cmd]();
