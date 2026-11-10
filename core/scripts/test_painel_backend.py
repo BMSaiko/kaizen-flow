@@ -81,6 +81,22 @@ def test_wezterm_devolve_foco_ao_painel_de_origem(monkeypatch):
     assert ["wezterm", "cli", "activate-pane", "--pane-id", "3"] in chamadas
 
 
+def test_wezterm_spawn_sem_no_color_no_ambiente(monkeypatch):
+    monkeypatch.setenv("NO_COLOR", "1")
+    monkeypatch.setenv("FORCE_COLOR", "0")
+    monkeypatch.setenv("PATH_MARCA", "fica")
+    envs = []
+
+    def run(argv, **kw):
+        if argv[:3] == ["wezterm", "cli", "spawn"]:
+            envs.append(kw.get("env"))
+        return SimpleNamespace(stdout="7\n", returncode=0)
+    pb.WeztermBackend(run).abrir(["claude"], "C:/wt")
+    assert envs[0] is not None
+    assert "NO_COLOR" not in envs[0] and "FORCE_COLOR" not in envs[0]
+    assert envs[0]["PATH_MARCA"] == "fica"
+
+
 def test_wezterm_sem_executavel_lista_vazia():
     def run(argv, **kw):
         raise FileNotFoundError("wezterm")

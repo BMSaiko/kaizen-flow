@@ -21,7 +21,8 @@ from pathlib import Path
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 ESTADO_DIR = Path.home() / ".claude" / "sp-fila-paineis"
 NOMES = ("wezterm", "tmux", "background")
-LOG_LINHAS = 80  # `ecra` do backend background: cauda do log
+SEM_COR = ("NO_COLOR", "FORCE_COLOR")  # variáveis que os painéis do --spawn não devem herdar
+LOG_LINHAS = 80 # `ecra` do backend background: cauda do log
 
 
 class BackendError(Exception):
@@ -79,7 +80,10 @@ class WeztermBackend(_Multiplexer):
     nome = "wezterm"
 
     def abrir(self, cmd, cwd):
-        pane = self._out(["wezterm", "cli", "spawn", "--cwd", str(cwd), "--", *cmd]).strip()
+        # o painel herda o ambiente do cli: tirar o NO_COLOR/FORCE_COLOR das ferramentas do Claude Code, senão abre sem cor
+        env = {k: v for k, v in os.environ.items() if k not in SEM_COR}
+        pane = self.run(["wezterm", "cli", "spawn", "--cwd", str(cwd), "--", *cmd], check=True, capture_output=True,
+                        text=True, encoding="utf-8", env=env).stdout.strip()
         origem = os.environ.get("WEZTERM_PANE")
         if origem:  # o spawn foca o painel novo; devolver o foco ao painel que lançou a fila
             self.run(["wezterm", "cli", "activate-pane", "--pane-id", origem], capture_output=True, text=True, encoding="utf-8")
