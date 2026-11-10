@@ -59,3 +59,24 @@ def test_cli_rc0_mesmo_com_lixo(tmp_path):
     r = subprocess.run([sys.executable, "-I", str(SCRIPT), str(tmp_path / "nao-existe")], input="{}",
                        capture_output=True, text=True, encoding="utf-8")
     assert r.returncode == 0 and r.stdout == ""
+
+
+def test_build_context_lista_outros_pendentes(tmp_path):
+    a, b = _mk(tmp_path, "a.md"), _mk(tmp_path, "b.md")
+    ctx = hr.build_context([a, b])
+    assert "Outros pendentes: b.md." in ctx and a.as_posix() in ctx
+
+
+def test_main_em_processo_imprime_o_hook_do_handoff_pendente(tmp_path, monkeypatch, capsys):
+    _mk(tmp_path, "h.md")
+    monkeypatch.setattr(sys, "argv", ["handoff_resume.py", str(tmp_path)])
+    monkeypatch.setattr(sys, "stdin", __import__("io").StringIO("{}"))
+    assert hr.main() == 0
+    assert "additionalContext" in capsys.readouterr().out
+
+
+def test_main_em_processo_nunca_falha_o_arranque(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["handoff_resume.py"])
+    monkeypatch.setattr(hr, "_default_dir", lambda: (_ for _ in ()).throw(RuntimeError("sem config")))
+    assert hr.main() == 0
+    assert capsys.readouterr().out == ""

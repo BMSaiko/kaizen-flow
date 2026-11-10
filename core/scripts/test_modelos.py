@@ -1,4 +1,7 @@
 """Testes de scripts/modelos.py (config de modelo/effort por papel)."""
+import contextlib
+import importlib.util
+import io
 import json
 import subprocess
 import sys
@@ -27,9 +30,20 @@ def cfg(tmp_path):
 
 
 def run(cfg, *args):
-    r = subprocess.run([sys.executable, "-I", str(SCRIPT), "--config", str(cfg), *args],
-                       capture_output=True, text=True, encoding="utf-8")
-    return r.returncode, r.stdout.strip(), r.stderr.strip()
+    """Corre modelos.main em-processo (a cobertura do pacote kf so mede o que corre aqui)."""
+    spec = importlib.util.spec_from_file_location("modelos_sob_teste", SCRIPT)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    out = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+    err = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        try:
+            rc = mod.main(["--config", str(cfg), *args])
+        except SystemExit as exc:
+            rc = exc.code if isinstance(exc.code, int) else 1
+    out.flush()
+    err.flush()
+    return rc or 0, out.buffer.getvalue().decode("utf-8").strip(), err.buffer.getvalue().decode("utf-8").strip()
 
 
 def test_list(cfg):
