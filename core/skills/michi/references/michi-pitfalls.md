@@ -144,3 +144,7 @@ Movido de `SKILL.md` (## Pitfalls); condensado em 2026-10-31 (regras todas manti
 ## 35. Correr `kaizen audit .` em cada fase que toca testes ou docs (audit-so-no-fim, 2026-11-09)
 
 - Uma fixture TOML com uma array de tabelas `hooks` (colchetes duplos) só apareceu como achado de wikilink no audit final, depois de testes verdes. Em SPs do repo kaizen-flow, correr `node bin/kaizen.js audit .` no gate de cada fase que altera testes ou docs, não só no fim.
+
+## 36. Testes do pacote K: correr o script em-processo, não por subprocesso (kf-cobertura-subprocesso, 2026-11-10)
+
+- A cobertura Python do kaizen-flow (`--cov=core/scripts`, mínimo 90%) só mede código importado no processo do pytest; um teste que corre o script com `subprocess` e `python -I` conta 0%. Ao trazer uma peça nova para o pacote, escrever os testes a chamar `main(argv)` em-processo (`capsys`/`redirect_stdout`) e confirmar com `pytest --cov=core/scripts --cov-fail-under=90`. O `fakeVault()` de `tests/sync.test.js` também tem de listar a peça e o teste (ver 34).

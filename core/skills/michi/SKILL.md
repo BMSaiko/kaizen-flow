@@ -9,25 +9,25 @@ license: MIT
 
 **Fluxo:** dr → grill → dp → da → gates → pentest → review → pr → report → reflect → commit. **Regras duras:** sem auto-commit/push; prova e reflect por fase. O detalhe vive nas skills de fase e em `references/` (índice: `michi-orquestracao.md`).
 
-**Help:** `/michi help|--help|-h|?` responde só com a Usage e pára. Uso: `/michi [--auto] [<idea>|<SP>]`, `skip <fase>`, `go to DA`. Suplementar: `references/michi-help.md`.
+**Help:** `/michi help|-h|?` responde só com a Usage e pára. Uso: `/michi [--auto] [<idea>|<SP>]`, `skip <fase>`, `go to DA`. Suplementar: `references/michi-help.md`.
 
 ## Fases
 
 | # | Fase | Skill / comando | Gate de saída | Decide |
 |---|---|---|---|---|
 | 1 | Grill (DR antes, por defeito) | `/grill-me` | decisões alinhadas; SP de 8 secções salta 1-2 | user |
-| 2 | Deep Research | `/dr` | síntese de 1 ecrã | agente |
+| 2 | Deep Research | `/dr` em subagente² | síntese de 1 ecrã | agente |
 | 3 | Deep Planning (TDD) | `/dp` | auditoria por fase + pattern-fit; sign-off | user |
 | 4 | Deep Acting | `/da` | prova por fase + `/reflect fase` | agente |
-| 5 | Gates | `sp-gates.py` · `/harden` | cada comando com RC; falha = corrigir e repetir tudo | agente |
+| 5 | Gates | `sp-gates.py`¹ · `/harden`² | cada comando com RC; falha = corrigir e repetir tudo | agente |
 | 6 | Pentest | `/pentest` | sem achados abertos (ou decisão do user) | agente / user |
-| 7 | Review | `/review-ciclo` | APROVADO; ESCALAR após 3 iterações | agente / user |
+| 7 | Review | `/review-ciclo` (revisor²) | APROVADO; ESCALAR após 3 iterações | agente / user |
 | 8 | PR | `/pr-fase` | corpo pela template, respeitando `pr:` | agente |
 | 9 | Report | `/report` (`sp-report.py`) em subagente leve¹ | 5 secções, «Dificuldades» não vazia | agente |
 | 10 | Reflect | `/reflect final` em subagente leve¹ | A/B/C proposto; o user aplica | user |
 | 11 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | user |
 
-¹ `Agent` com o modelo do papel `michi-leve` (`python -I scripts/modelos.py get michi-leve`); devolve o texto e o agente principal escreve no SP e pergunta ao user. O modelo no frontmatter não vale para skills chamadas pela ferramenta Skill. `/reflect fase` também, se o patch for só texto.
+¹ `Agent` com o modelo do papel `michi-leve`; ² idem com `sub-agente` (`python -I scripts/modelos.py get <papel>`). Resumo curto de volta; o principal escreve no SP e pergunta ao user. `/reflect fase` também, se o patch for só texto. Detalhe: `michi-orquestracao.md` §Sub-agentes.
 
 Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_requests`, go/no-go em Decisões; `references/michi-spike.md`.
 
@@ -42,7 +42,7 @@ Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_reque
    Se o `sp-estado` diz «perguntar concorrência» (SP com filhos), mesmo em `modo: manual`, `AskUserQuestion` «com ou sem concorrência?» (defeito: sem; com → N): sem = fila em série; com = `/sp-fila --programa <slug> --concorrencia N`.
 5. Checkpoint: `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate.
 
-Hooks (`michi.<phase.start|phase.end|gate.failed|commit|closed>`), sessão suja, handoff por fase e `[context-guard]`: `references/michi-orquestracao.md`.
+Hooks (`michi.<phase.start|phase.end|gate.failed|commit|closed>`), sessão suja, handoff, `[context-guard]`, sub-agentes: `references/michi-orquestracao.md`.
 
 ## Regras transversais
 
@@ -54,7 +54,7 @@ Hooks (`michi.<phase.start|phase.end|gate.failed|commit|closed>`), sessão suja,
 
 ## Style e Pitfalls
 
-- 16 entradas em `references/michi-style.md` (pergunta em texto livre por defeito, honrar «skip fase X», respostas curtas). Ler só a relevante.
+- 16 entradas em `references/michi-style.md` (pergunta em texto livre, honrar «skip fase X»). Ler só a relevante.
 - 30 entradas em `references/michi-pitfalls.md` (índice `michi-pitfalls-index.md`). Ler só a relevante.
 
 ## See also

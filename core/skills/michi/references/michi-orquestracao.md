@@ -36,6 +36,18 @@ Regras que saíram do `SKILL.md` sem alteração de contrato. Prova, reflect por
 
 Build/tests/lint/typecheck/e2e aplicáveis; cada comando e RC vão para o report; falha = corrigir a causa e repetir todos, sem `|| true`. Ordem: gates → `/harden` → `/pentest` → `/review-ciclo` (`michi-gates.md`). SP com `gates:`: `python -I scripts/sp-gates.py <SP>` (rc≠0 = não fecha). **Fecho num só passo:** `python -I scripts/sp-fechar.py <slug> [--next]` = gates + context-budget + `done` + `COMMIT_*.md` (pára sem mover se falhar). Antes de `sp-move.py ... done` e do `COMMIT_*.md`: prova de done como cliente final, em `## Prova de done` (se falhar, o SP não passa a Done); E2E de fecho de árvore só quando este SP fecha mãe+filhos+netos (`sp-list.py --tree-closed <slug>`). Detalhe: `michi-fases-detalhe.md` §Fase 5.
 
+## Sub-agentes
+
+Papéis via `python -I scripts/modelos.py get <papel>` (nunca IDs no texto). Prompt mínimo: slug ou caminho + skill + limite de linhas; o resultado completo vai para ficheiro (Brief, achados) e só o resumo volta. Vazio ou falha = fazer a fase no principal, sem bloquear. Grill, DP, DA, pentest, PR e commit ficam no principal.
+
+| Fase | Papel | Devolve |
+|---|---|---|
+| 2 DR | `sub-agente` | caminho do Brief + síntese ≤20 linhas |
+| 5 Gates | `michi-leve` | tabela `cmd\|RC` + ≤10 linhas do 1.º falhado; corrige o principal |
+| 5 harden | `sub-agente` | achados ≤10 linhas |
+| 7 Review | `sub-agente` | ficheiro de achados (formato do `review-ciclo`); no chat ≤20 linhas |
+| 9 Report, 10 Reflect | `michi-leve` | texto para o SP |
+
 ## Contexto (context-guard)
 
 Se aparecer `[context-guard] Contexto … >= limite`: acabar o passo em curso (nunca a meio de uma edição ou teste) e correr em modo automático (`--launch --auto`, sem perguntar) o handoff que o aviso nomear: `/sp-handoff` se a sessão correu `/michi <SP>`, `/handoff` se é conversa livre.
