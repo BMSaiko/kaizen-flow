@@ -1,6 +1,6 @@
 """Modelo/effort por papel (sp-autor, michi-exec, michi-leve): única fonte em .claude/modelos.json.
 
-Uso: python -I scripts/modelos.py [--config F] list | get <papel> [--json] | args <papel>
+Uso: python -I scripts/modelos.py [--config F] list | get <papel> [--json|--cadeia] | michi <nivel> [--json] | args <papel>
                                   | set <papel> <modelo|alias> [--effort low|medium|high|xhigh|max]
                                   | sync [--check]
 `sync` escreve model:/effort: no frontmatter dos ficheiros em "alvos" (por papel); `set` corre-o no fim.
@@ -36,6 +36,31 @@ def papel(data, nome):
     if not isinstance(p, dict) or not p.get("model"):
         raise ModelosError(f"papel desconhecido: {nome} (há: {', '.join(data['papeis'])})")
     return p
+
+
+MICHI_DEFAULT = {"simples": "michi-leve", "default": "michi-exec", "complexo": "michi-complexo"}
+
+
+def cadeia(data, nome):
+    """Modelo principal do papel seguido do `fallback` (ordem de tentativa)."""
+    p = papel(data, nome)
+    fb = p.get("fallback") or []
+    return [p["model"], *[m for m in fb if m != p["model"]]]
+
+
+def michi(data, nivel):
+    """Resolve o nível do michi (simples|default|complexo) para {model, effort}; effort sempre low.
+    Nível desconhecido ou vazio -> default; devolve (dict, aviso|None)."""
+    mapa = {**MICHI_DEFAULT, **(data.get("michi_modelo") or {})}
+    aviso = None
+    if nivel not in mapa:
+        aviso = f"aviso: nível michi '{nivel}' desconhecido ({', '.join(mapa)}); a usar default"
+        nivel = "default"
+    nome = mapa[nivel]
+    if nome not in data["papeis"]:
+        aviso = f"aviso: papel '{nome}' em falta em modelos.json; a usar michi-exec"
+        nome = "michi-exec"
+    return {"model": papel(data, nome)["model"], "effort": "low"}, aviso
 
 
 def cli_args(nome, path=DEFAULT):
@@ -127,6 +152,10 @@ def main(argv=None):
     g = sub.add_parser("get")
     g.add_argument("papel")
     g.add_argument("--json", action="store_true")
+    g.add_argument("--cadeia", action="store_true")
+    m = sub.add_parser("michi")
+    m.add_argument("nivel", nargs="?", default="")
+    m.add_argument("--json", action="store_true")
     a = sub.add_parser("args")
     a.add_argument("papel")
     s = sub.add_parser("set")
@@ -144,7 +173,15 @@ def main(argv=None):
                 print(f"{nome:<12} {p.get('model', ''):<22} {p.get('effort', '')}")
         elif ns.cmd == "get":
             p = papel(data, ns.papel)
-            print(json.dumps(p) if ns.json else p["model"])
+            if ns.cadeia:
+                print(chr(10).join(cadeia(data, ns.papel)))
+            else:
+                print(json.dumps(p) if ns.json else p["model"])
+        elif ns.cmd == "michi":
+            r, aviso = michi(data, ns.nivel)
+            if aviso:
+                print(aviso, file=sys.stderr)
+            print(json.dumps(r) if ns.json else r["model"])
         elif ns.cmd == "args":
             print(" ".join(cli_args(ns.papel, ns.config)))
         elif ns.cmd == "set":

@@ -156,3 +156,90 @@ def test_sb_models_encaminha(cfg):
     r = subprocess.run([sys.executable, "-I", str(sb), "models", "--config", str(cfg), "get", "sp-autor"],
                        capture_output=True, text=True)
     assert r.returncode == 0 and r.stdout.strip() == "claude-opus-5-5"
+
+
+# --- cadeia do sp-autor e níveis do michi ---
+
+NOVO = {
+    "papeis": {
+        "sp-autor": {"model": "claude-fable-5-2", "effort": "medium",
+                     "fallback": ["claude-fable-5-1", "claude-opus-5-5"]},
+        "michi-exec": {"model": "claude-sonnet-5-5", "effort": "low"},
+        "michi-leve": {"model": "claude-haiku-5-5", "effort": "low"},
+        "michi-complexo": {"model": "claude-opus-5-5", "effort": "low"},
+    },
+    "michi_modelo": {"simples": "michi-leve", "default": "michi-exec", "complexo": "michi-complexo"},
+    "aliases": {},
+}
+
+
+@pytest.fixture
+def cfg_novo(tmp_path):
+    p = tmp_path / "modelos.json"
+    p.write_bytes(json.dumps(NOVO, indent=2).encode() + b"\n")
+    return p
+
+
+def test_cadeia_sp_autor(cfg_novo):
+    rc, out, _ = run(cfg_novo, "get", "sp-autor", "--cadeia")
+    assert rc == 0
+    assert out.splitlines() == ["claude-fable-5-2", "claude-fable-5-1", "claude-opus-5-5"]
+
+
+def test_cadeia_sem_fallback(cfg):
+    rc, out, _ = run(cfg, "get", "michi-leve", "--cadeia")
+    assert (rc, out) == (0, "claude-haiku-5-5")
+
+
+def test_get_json_traz_fallback(cfg_novo):
+    rc, out, _ = run(cfg_novo, "get", "sp-autor", "--json")
+    d = json.loads(out)
+    assert rc == 0 and d["effort"] == "medium"
+    assert d["fallback"] == ["claude-fable-5-1", "claude-opus-5-5"]
+
+
+@pytest.mark.parametrize("nivel,modelo", [("simples", "claude-haiku-5-5"),
+                                          ("default", "claude-sonnet-5-5"),
+                                          ("complexo", "claude-opus-5-5")])
+def test_michi_niveis(cfg_novo, nivel, modelo):
+    rc, out, _ = run(cfg_novo, "michi", nivel)
+    assert (rc, out) == (0, modelo)
+    rc, out, _ = run(cfg_novo, "michi", nivel, "--json")
+    d = json.loads(out)
+    assert d["model"] == modelo and d["effort"] == "low"
+
+
+@pytest.mark.parametrize("nivel", ["xpto", ""])
+def test_michi_nivel_invalido_resolve_default(cfg_novo, nivel):
+    rc, out, err = run(cfg_novo, "michi", nivel)
+    assert rc == 0 and out == "claude-sonnet-5-5"
+    assert "aviso" in err
+
+
+def test_michi_effort_sempre_low(tmp_path):
+    d = json.loads(json.dumps(NOVO))
+    for p in ("michi-exec", "michi-leve", "michi-complexo"):
+        d["papeis"][p]["effort"] = "high"
+    f = tmp_path / "m.json"
+    f.write_bytes(json.dumps(d).encode())
+    for nivel in ("simples", "default", "complexo"):
+        rc, out, _ = run(f, "michi", nivel, "--json")
+        assert json.loads(out)["effort"] == "low"
+
+
+def test_json_antigo_sem_campos_novos(cfg):
+    rc, out, _ = run(cfg, "michi", "default")
+    assert (rc, out) == (0, "claude-sonnet-5-5")
+    rc, out, err = run(cfg, "michi", "complexo")
+    assert rc == 0 and out == "claude-sonnet-5-5" and "aviso" in err
+
+
+def test_json_real_do_repo():
+    real = Path(__file__).resolve().parent.parent / ".claude" / "modelos.json"
+    if not real.exists():
+        pytest.skip("sem .claude/modelos.json (pacote kf)")
+    d = json.loads(real.read_bytes())
+    assert d["papeis"]["michi-exec"]["effort"] == "low"
+    assert d["papeis"]["michi-complexo"] == {"model": "claude-opus-5-5", "effort": "low"}
+    assert d["michi_modelo"] == NOVO["michi_modelo"]
+    assert d["papeis"]["sp-autor"]["effort"] == "medium"

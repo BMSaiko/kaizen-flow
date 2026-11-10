@@ -30,12 +30,27 @@ def pane_id(env=None):
 
 
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+CLI_TIMEOUT = 10
 
 
 def run_hidden(*args, **kwargs):
     """subprocess.run sem abrir janela de consola no Windows (wezterm/clip são apps de consola)."""
     kwargs.setdefault("creationflags", NO_WINDOW)
-    return subprocess.run(*args, **kwargs)
+    argv = list(args[0]) if args else list(kwargs.pop("args"))
+    if argv[:2] == ["wezterm", "cli"] and "--no-auto-start" not in argv:
+        # Sem GUI acessível, o wezterm cli arranca um mux-server que herda o pipe e deixa o run pendurado.
+        argv.insert(2, "--no-auto-start")
+    if argv[:1] in (["wezterm"], ["tmux"]):
+        kwargs.setdefault("timeout", CLI_TIMEOUT)
+    try:
+        return subprocess.run(argv, *args[1:], **kwargs)
+    except subprocess.TimeoutExpired as exc:
+        raise HandoffError(f"{' '.join(argv[:3])} não respondeu em {exc.timeout:.0f}s") from exc
+    except subprocess.CalledProcessError as exc:
+        if argv[:1] not in (["wezterm"], ["tmux"]):
+            raise
+        raise HandoffError(f"{argv[0]} inacessível ({' '.join(argv[:4])}, rc={exc.returncode}): "
+                           "abre a sessão nova à mão com o /michi impresso") from exc
 
 
 def send_argv(pane, text):

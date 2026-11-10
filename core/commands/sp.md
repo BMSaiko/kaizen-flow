@@ -1,7 +1,7 @@
 ---
 description: Atalho de /super-prompt (constrói um Super Prompt: brainstorm + swot + grill-me + dr)
 argument-hint: "[tema do Super Prompt]"
-model: claude-opus-5-5
+model: claude-fable-5-2
 effort: medium
 ---
 Invoca a skill `super-prompt` (via Skill) com os argumentos: `$ARGUMENTS`, e segue-a tal como se o user tivesse escrito `/super-prompt $ARGUMENTS`.

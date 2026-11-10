@@ -119,3 +119,33 @@ def test_pane_exists_e_check_prompt_com_run_falso():
     with pytest.raises(hp.HandoffError, match="texto por enviar"):
         hp.check_prompt(4, run=lambda *a, **k: _Res("❯ rascunho"))
     hp.check_prompt(4, run=lambda *a, **k: _Res("❯ "))
+
+
+def test_run_hidden_wezterm_sem_auto_start_e_timeout(monkeypatch):
+    import subprocess as sp
+    import handoff_pane as hp
+    vistos = {}
+
+    def fake_run(argv, **kw):
+        vistos.update(argv=argv, kw=kw)
+        raise sp.TimeoutExpired(argv, kw["timeout"])
+
+    monkeypatch.setattr(hp.subprocess, "run", fake_run)
+    import pytest
+    with pytest.raises(hp.HandoffError, match="não respondeu"):
+        hp.run_hidden(["wezterm", "cli", "list"], capture_output=True)
+    assert vistos["argv"][:3] == ["wezterm", "cli", "--no-auto-start"]
+    assert vistos["kw"]["timeout"] == hp.CLI_TIMEOUT
+
+
+def test_run_hidden_wezterm_rc_erro_vira_handoff_error(monkeypatch):
+    import subprocess as sp
+    import handoff_pane as hp
+    import pytest
+
+    def fake_run(argv, **kw):
+        raise sp.CalledProcessError(1, argv)
+
+    monkeypatch.setattr(hp.subprocess, "run", fake_run)
+    with pytest.raises(hp.HandoffError, match="inacessível"):
+        hp.run_hidden(["wezterm", "cli", "list"], check=True)
