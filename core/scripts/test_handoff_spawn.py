@@ -84,6 +84,44 @@ def test_clipboard_imprime_cd_e_copia_o_ultimo(capsys):
     assert copiado == ["/michi --auto b"]
 
 
+def _cfg(tmp_path, conteudo):
+    p = tmp_path / "modelos.json"
+    p.write_bytes(conteudo.encode("utf-8"))
+    return p
+
+
+_CFG = '{"papeis": {"michi-exec": {"model": "claude-haiku-5-5", "effort": "low"}}}'
+_FLAGS = ["claude", "--model", "claude-haiku-5-5", "--effort", "low"]
+
+
+def test_claude_cmd_junta_modelo_e_effort_do_papel(tmp_path, monkeypatch):
+    monkeypatch.setattr(hs, "MODELOS", _cfg(tmp_path, _CFG))
+    assert hs._claude_cmd() == _FLAGS
+
+
+@pytest.mark.parametrize("conteudo", [None, "{nao json", '{"papeis": {}}'])
+def test_claude_cmd_sem_config_valida_avisa_e_lanca_so_claude(tmp_path, monkeypatch, capsys, conteudo):
+    path = tmp_path / "falta.json" if conteudo is None else _cfg(tmp_path, conteudo)
+    monkeypatch.setattr(hs, "MODELOS", path)
+    assert hs._claude_cmd() == ["claude"]
+    assert "aviso" in capsys.readouterr().err
+
+
+def test_painel_background_e_dry_run_levam_o_modelo(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(hs, "MODELOS", _cfg(tmp_path, _CFG))
+    run = FakeRun()
+    _spawn(["x"], backend="tmux", run=run)
+    assert any(c[-5:] == _FLAGS or all(f in c for f in _FLAGS[1:]) for c in run.calls if "split-window" in c)
+    abertos = []
+    monkeypatch.setattr(hs, "_spawn_pane", lambda b, wt, r, cmd=("claude",): abertos.append(list(cmd)) or "bg1")
+    _spawn(["y"], backend="background", run=FakeRun())
+    assert abertos == [_FLAGS + ["-p", "/michi --auto y"]]
+    res = _spawn(["z"], backend="tmux", run=FakeRun(), dry_run=True)
+    assert res[0]["cmd"] == " ".join(_FLAGS)
+    _spawn(["w"], backend="clipboard", run=FakeRun(), copy=lambda s: None)
+    assert "cd C:/wt/w && " + " ".join(_FLAGS) in capsys.readouterr().out
+
+
 def test_wait_prompt_aprova_aviso_mcp_e_depois_segue():
     ecras = iter(["new MCP servers found", "❯ "])
     chamadas = []

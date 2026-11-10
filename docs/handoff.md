@@ -11,6 +11,8 @@ python scripts/sp-handoff.py --spawn SLUG [SLUG...]      # new pane + worktree p
 
 `--spawn` is what `sp-fila.py --concorrencia N` uses: one pane per story (at most `--max` at once), with `--dry-run` to preview and `--sem-registo` to skip writing the queue state, and `--json` to print the result as data for `sp-fila.py`.
 
+Each spawned session starts as `claude --model <id> --effort <level>` for the `michi-exec` role when a `modelos.py` and its config are present (the `--dry-run` output shows the command); without them it warns on stderr and starts plain `claude`.
+
 ![sp-fila parallel: up to N panes, one worktree each, a watcher that brings blocked panes to you](assets/sp-fila-parallel.svg)
 
 `--write` only accepts the delta: at most 25 lines and no copied story sections (Role, Context, Objective…); longer bodies are rejected. The same limit applies to `handoff.py --write`.

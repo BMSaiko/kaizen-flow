@@ -140,3 +140,7 @@ Movido de `SKILL.md` (## Pitfalls); condensado em 2026-10-31 (regras todas manti
 ## 34. Peça nova no pacote K: listar em `SCRIPT_NAMES` e validar com `git status` (sync-apaga-peca-nao-listada, 2026-11-08)
 
 - O `kaizen sync` gera `core/` só das peças listadas em `bin/sync.js` (`SCRIPT_NAMES`) e apaga o resto; `sync --check` dá rc 0 depois dessa remoção e lê o vault principal, não a worktree. Ao trazer uma peça nova para o pacote: acrescentá-la a `SCRIPT_NAMES` e ao vault de fixture de `tests/sync.test.js`, e confirmar com `git status` do K limpo, não só com o `--check`.
+
+## 35. Correr `kaizen audit .` em cada fase que toca testes ou docs (audit-so-no-fim, 2026-11-09)
+
+- Uma fixture TOML com uma array de tabelas `hooks` (colchetes duplos) só apareceu como achado de wikilink no audit final, depois de testes verdes. Em SPs do repo kaizen-flow, correr `node bin/kaizen.js audit .` no gate de cada fase que altera testes ou docs, não só no fim.

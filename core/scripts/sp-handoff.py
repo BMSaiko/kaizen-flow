@@ -149,7 +149,7 @@ def main(argv=None):
                 return 1 if any(not r["ok"] for r in resultados) else 0
             for r in resultados:
                 if r.get("dry_run"):
-                    print(f"{r['slug']}: dry-run (sem worktree nem painel)")
+                    print(f"{r['slug']}: dry-run (sem worktree nem painel) · {r['cmd']}  →  /michi --auto {r['slug']}")
                     continue
                 print(f"{r['slug']}: " + (f"painel {r['painel'] or '-'} em {r['worktree']}" if r["ok"] else f"FALHOU ({r['erro']})"))
                 falhou = falhou or not r["ok"]

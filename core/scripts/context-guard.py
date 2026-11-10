@@ -8,8 +8,7 @@ Uso:
   python -I scripts/context-guard.py                                      # modo hook: JSON no stdin
 
 Modo hook (eventos UserPromptSubmit e PostToolUse): recebe `session_id`, `transcript_path` e
-`hook_event_name`. Limiar em `KAIZEN_CONTEXT_LIMIT` (alias `CLAUDE_CONTEXT_LIMIT`, omissão 100000); aviso a 85%.
-Sem `transcript_path` (Codex, campo por verificar) usa o rollout mais recente em `KAIZEN_CODEX_ROOT` (omissão `~/.codex/sessions`).
+`hook_event_name`. Limiar em `CLAUDE_CONTEXT_LIMIT` (omissão 100000); aviso a 85%.
 - `aviso`: uma `systemMessage` ao utilizador, uma vez por sessão.
 - `limite`: `additionalContext` curto a mandar correr, em modo automático e uma vez por sessão,
   `/sp-handoff` se a sessão trabalha num SP (correu `/michi <SP>` nela e o SP está em Doing) ou
@@ -53,38 +52,13 @@ def _last_usage(lines):
             d = json.loads(raw)
         except ValueError:
             continue
-        if not isinstance(d, dict):
-            continue
-        if d.get("type") == "event_msg":
-            tokens = _codex_usage(d.get("payload"))
-            if tokens is not None:
-                return tokens
-            continue
-        if d.get("type") != "assistant" or d.get("isSidechain"):
+        if not isinstance(d, dict) or d.get("type") != "assistant" or d.get("isSidechain"):
             continue
         msg = d.get("message")
         usage = msg.get("usage") if isinstance(msg, dict) else None
         if isinstance(usage, dict):
             return sum(int(usage.get(f) or 0) for f in USAGE_FIELDS)
     return None
-
-
-def _codex_usage(payload):
-    """Contexto do último pedido num rollout do Codex (`event_msg/token_count`); None se não houver usage.
-
-    `last_token_usage.input_tokens` já inclui a parte em cache, por isso não se somam caches.
-    O Codex emite `token_count` com `info` nulo antes do primeiro pedido.
-    """
-    if not isinstance(payload, dict) or payload.get("type") != "token_count":
-        return None
-    info = payload.get("info")
-    last = info.get("last_token_usage") if isinstance(info, dict) else None
-    if not isinstance(last, dict):
-        return None
-    try:
-        return int(last.get("input_tokens") or 0)
-    except (TypeError, ValueError):
-        return None
 
 
 def context_tokens(path):
@@ -109,36 +83,12 @@ def state(tokens, limit):
 
 
 def limit_from_env(env=None):
-    """Limiar: `KAIZEN_CONTEXT_LIMIT`, com `CLAUDE_CONTEXT_LIMIT` como alias; valor inválido passa ao seguinte."""
-    source = os.environ if env is None else env
-    for name in ("KAIZEN_CONTEXT_LIMIT", "CLAUDE_CONTEXT_LIMIT"):
-        try:
-            value = int(source.get(name, ""))
-        except ValueError:
-            continue
-        if value > 0:
-            return value
-    return DEFAULT_LIMIT
-
-
-def latest_rollout(root):
-    """Rollout do Codex mais recente (`rollout-*.jsonl`) sob `root`; None se não existir."""
-    best, best_mtime = None, -1.0
+    raw = (os.environ if env is None else env).get("CLAUDE_CONTEXT_LIMIT", "")
     try:
-        for path in Path(root).rglob("rollout-*.jsonl"):
-            mtime = path.stat().st_mtime
-            if mtime > best_mtime:
-                best, best_mtime = path, mtime
-    except OSError:
-        return None
-    return str(best) if best else None
-
-
-def _codex_root(env=None):
-    """Raiz dos rollouts: `KAIZEN_CODEX_ROOT`; no hook real (env None) omissão `~/.codex/sessions`."""
-    if env is None:
-        return os.environ.get("KAIZEN_CODEX_ROOT") or str(Path.home() / ".codex" / "sessions")
-    return env.get("KAIZEN_CODEX_ROOT")
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_LIMIT
+    return value if value > 0 else DEFAULT_LIMIT
 
 
 def marker_path(marker_dir, session_id, level):
@@ -233,10 +183,6 @@ def michi_start(marker_dir, session_id, payload, tokens, env=None):
 def hook(payload, env=None, marker_dir=None):
     session_id = payload.get("session_id")
     transcript = payload.get("transcript_path")
-    if session_id and not transcript and not payload.get("agent_id"):
-        # Codex: o campo do payload com o rollout não está verificado; procura o rollout mais recente.
-        root = _codex_root(env)
-        transcript = latest_rollout(root) if root else None
     if not session_id or not transcript or payload.get("agent_id"):
         return None  # subagente: o aviso gastaria o marcador da sessão e não chegaria ao modelo principal
     if marker_dir is None:
@@ -282,7 +228,7 @@ def main(argv=None):
 
         ap = argparse.ArgumentParser(description="Guarda de contexto do Claude Code")
         ap.add_argument("--transcript", help="transcript (.jsonl) a medir")
-        ap.add_argument("--limit", type=int, help="limiar em tokens (omissão: KAIZEN_CONTEXT_LIMIT, CLAUDE_CONTEXT_LIMIT ou 100000)")
+        ap.add_argument("--limit", type=int, help="limiar em tokens (omissão: CLAUDE_CONTEXT_LIMIT ou 100000)")
         args = ap.parse_args(argv)
     if args and args.transcript:
         tokens = context_tokens(args.transcript)

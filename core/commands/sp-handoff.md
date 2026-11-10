@@ -15,4 +15,4 @@ Para um SP (sem SP: `/handoff`; ver `handoff-launch.md` §Qual usar). Passos, po
 
 5. Lançar: núcleo comum com `<script>` = `python -I scripts/sp-handoff.py` e `<alvo>` = o caminho; `--auto` aceita SP em TODO (não o move; o michi da sessão nova faz `sp-move doing`) ou Doing e recusa Done. O script escreve `/clear` e depois `/michi <caminho>`.
 
-A sessão nova arranca com `/michi`, que renomeia a tab (`scripts/tab-title.py`). Nunca mover o SP de pasta nem mudar o `status` (para isso, `scripts/sp-move.py`), nunca editar as secções 1-8 do SP.
+`--launch` reutiliza a sessão (mantém o modelo; o michi avisa se ≠ `michi-exec`); `--spawn` abre `claude --model … --effort …` do papel `michi-exec` (`modelos.py`; o `--dry-run` mostra o comando). A sessão nova arranca com `/michi`, que renomeia a tab (`scripts/tab-title.py`). Nunca mover o SP de pasta nem mudar o `status` (para isso, `scripts/sp-move.py`), nunca editar as secções 1-8 do SP.
