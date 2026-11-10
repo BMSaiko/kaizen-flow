@@ -19,24 +19,48 @@ MAX_BODY_LINES = 25
 SP_SECTION_RE = re.compile(r"^#{1,6}\s*(?:\d+\.\s*)?(role|context|objective|success criteria|constraints|seams|steps|done-when)", re.I)
 
 
-def _agent_claims():
-    """Slugs reclamados pelo agente deste worktree; None fora de worktrees (comportamento original)."""
+def worktree_agent():
+    """Nome do agente (branch `agent/<nome>`) se o cwd é uma worktree; None no checkout principal."""
     if not Path(__file__).with_name("sb-agent.py").is_file():
         return None
     mod = kaizen_engine.load("sb-agent")
     try:
-        agent = mod.current_agent(Path.cwd())
-        return set(mod.claims_of(Path.cwd(), agent)) if agent else None
-    except mod.SbAgentError:
+        return mod.current_agent(Path.cwd())
+    except (mod.SbAgentError, OSError):
         return None
 
 
-def resolve(root, slug=None, mine=None):
+def _agent_claims(agent=None):
+    """Slugs reclamados pelo agente deste worktree; None fora de worktrees (comportamento original)."""
+    agent = agent or worktree_agent()
+    if not agent:
+        return None
+    mod = kaizen_engine.load("sb-agent")
+    try:
+        return set(mod.claims_of(Path.cwd(), agent))
+    except (mod.SbAgentError, OSError):
+        return set()
+
+
+def _of_agent(sps, agent):
+    """SPs em Doing/TODO da worktree: o slug do `sb-worktree` é o do SP, truncado (≤31 caracteres)."""
+    if not agent:
+        return []
+    return [sp for sp in sps if sp.status in ("Doing", "TODO") and sp.slug.startswith(agent)]
+
+
+def _unique(cands, what):
+    if len(cands) > 1:
+        raise HandoffError(f"vários SPs {what}, indicar o slug:\n" + "\n".join(f"  {sp.slug} ({sp.project})" for sp in cands))
+    return cands[0].path.resolve()
+
+
+def resolve(root, slug=None, mine=None, agent=None):
     sps = sp_list.collect(root, include_done=True)
     if slug:
         kids = [sp for sp in sps if sp.parent == slug]
         if kids and not any(sp.slug == slug and sp.status == "Doing" for sp in sps):
-            doing = [sp for sp in kids if sp.status == "Doing"]
+            doing = [sp for sp in kids if sp.status == "Doing"] or _of_agent(kids, agent)
             if not doing:
                 raise HandoffError(f"programa '{slug}': nenhum filho em Doing")
             if len(doing) > 1:
@@ -52,12 +76,13 @@ def resolve(root, slug=None, mine=None):
             raise HandoffError("slug em vários projetos: " + ", ".join(f"{sp.slug} ({sp.project})" for sp in doing))
         return doing[0].path.resolve()
     doing = [sp for sp in sps if sp.status == "Doing" and (mine is None or sp.slug in mine)]
-    if not doing:
-        raise HandoffError("nenhum SP em Doing" + (" reclamado por este agente" if mine is not None else ""))
-    if len(doing) > 1:
-        opts = "\n".join(f"  {sp.slug} ({sp.project})" for sp in doing)
-        raise HandoffError(f"vários SPs em Doing, indicar o slug:\n{opts}")
-    return doing[0].path.resolve()
+    if doing:
+        return _unique(doing, "em Doing")
+    own = _of_agent(sps, agent)  # worktree do sb-worktree: sem claims, o SP vem do nome da branch
+    if own:
+        return _unique([sp for sp in own if sp.status == "Doing"] or own, f"da worktree '{agent}'")
+    raise HandoffError("nenhum SP em Doing" + (f" reclamado por este agente nem com slug '{agent}*'" if agent
+                                              else " reclamado por este agente" if mine is not None else ""))
 
 
 def check_delta(body):

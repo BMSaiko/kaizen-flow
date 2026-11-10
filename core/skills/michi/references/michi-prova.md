@@ -14,6 +14,7 @@ Fim de cada fase de entrega (DA que muda código/UI): mostrar ao user uma prova 
 | Performance (se houver requisito) | benchmark com número vs requisito | comando + output |
 | Docs / vault | ler como leitor: links resolvem, instruções reproduzem | caminho + resultado |
 | Regras de agente | um cenário que a regra deve mudar | cenário + output |
+| Sessão real (hooks, skills, handoff, comportamento do agente) | sessão nova a correr o cenário | WezTerm CLI: `wez pane open <nome> -- <cmd>`, `wez send <nome> --enter "..."`, `wez read <nome> --lines N` para o output, `wez pane kill <nome>` no fim; output em `proofs/` |
 
 ## Regras
 - Artefactos em `proofs/` ao lado do SP (`<pasta do SP>/proofs/<slug>-faseN.<png|txt>`); screenshots nunca no contexto, só o caminho (ver ficheiro só se preciso).

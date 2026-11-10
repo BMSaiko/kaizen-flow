@@ -39,11 +39,21 @@ from handoff_pane import (ENTER_GAP, NO_WINDOW, SEND_DELAY, SEND_GAP, HandoffErr
                           send_argv, send_lines, tmux_enter_argv, tmux_send_argv)
 from handoff_spawn import MAX_SPAWN, spawn  # noqa: E402,F401
 from sp_progresso import (MAX_BODY_LINES, SP_SECTION_RE, _agent_claims, check_delta, require_doing, resolve,  # noqa: E402,F401
-                          sync_program, sync_program_ready, write)
+                          sync_program, sync_program_ready, worktree_agent, write)
 
 sp_list = kaizen_engine.load("sp-list")
 
 BACKENDS = ("wezterm", "tmux", "clipboard", "background")
+
+
+def sp_root_for(agent, cwd=None, run=subprocess.run):
+    """Raiz dos SPs: numa worktree (`agent`), a da worktree do cwd, mesmo com o script do checkout principal."""
+    if agent:
+        res = run(["git", "rev-parse", "--show-toplevel"], cwd=cwd or Path.cwd(), capture_output=True, text=True)
+        top = res.stdout.strip() if res.returncode == 0 else ""
+        if top:
+            return sp_list.default_root(Path(top))
+    return sp_list.DEFAULT_ROOT
 
 
 def armar_vigia(run=subprocess.run):
@@ -120,15 +130,17 @@ def main(argv=None):
     ap.add_argument("--harness", choices=tuple(HARNESSES), default="claude", help="comando de retoma (default: claude)")
     ap.add_argument("--dry-run", action="store_true", help="com --launch ou --spawn: só mostra, sem efeitos")
     ap.add_argument("--auto", action="store_true", help="com --launch: modo do context-guard, exige SP em TODO ou Doing")
-    ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
+    ap.add_argument("--root", help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     try:
+        args.root = args.root or str(sp_root_for(worktree_agent()))
         if args.auto:
             if not args.launch:
                 raise HandoffError("--auto só com --launch")
             require_doing(args.launch)
         if args.resolve is not None:
-            print(resolve(args.root, args.resolve or None, _agent_claims()))
+            agent = worktree_agent()
+            print(resolve(args.root, args.resolve or None, _agent_claims(agent), agent))
         elif args.write:
             if not args.file:
                 raise HandoffError("--write exige --file")

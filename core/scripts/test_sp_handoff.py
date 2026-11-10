@@ -316,6 +316,21 @@ def test_resolve_sem_slug_filtra_pelos_claims_do_agente(tmp_path):
         sp_handoff.resolve(tmp_path, mine={"zzz"})
 
 
+def test_sp_root_for_segue_a_worktree_do_cwd(tmp_path):
+    class R:
+        returncode, stdout = 0, str(tmp_path) + "\n"
+    assert sp_handoff.sp_root_for("x", run=lambda *a, **k: R()) == sp_handoff.sp_list.default_root(tmp_path)
+    assert sp_handoff.sp_root_for(None) == sp_handoff.sp_list.DEFAULT_ROOT
+
+
+def test_resolve_worktree_sem_claims_usa_slug_da_branch(tmp_path):
+    make_sp(tmp_path, "infra/sp/Doing", "outro-doing")
+    alvo = make_sp(tmp_path, "infra/sp/TODO", "infra-house-cleaning-antes-depois-2026-11-09")
+    assert sp_handoff.resolve(tmp_path, mine=set(), agent="infra-house-cleaning-antes-depo") == alvo
+    with pytest.raises(sp_handoff.HandoffError, match="zzz"):
+        sp_handoff.resolve(tmp_path, mine=set(), agent="zzz")
+
+
 # --- backends e harnesses (kaizen-flow público) ---
 
 def test_detect_backend_prefere_wezterm_depois_tmux_depois_clipboard():

@@ -23,9 +23,11 @@ license: MIT
 | 6 | Pentest | `/pentest` | sem achados abertos (ou decisão do user) | agente / user |
 | 7 | Review | `/review-ciclo` | APROVADO; ESCALAR após 3 iterações | agente / user |
 | 8 | PR | `/pr-fase` | corpo pela template, respeitando `pr:` | agente |
-| 9 | Report | `/report` (`sp-report.py`) | 5 secções, «Dificuldades» não vazia | agente |
-| 10 | Reflect | `/reflect final` | A/B/C proposto; o user aplica | user |
+| 9 | Report | `/report` (`sp-report.py`) em subagente leve¹ | 5 secções, «Dificuldades» não vazia | agente |
+| 10 | Reflect | `/reflect final` em subagente leve¹ | A/B/C proposto; o user aplica | user |
 | 11 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | user |
+
+¹ `Agent` com o modelo do papel `michi-leve` (`python -I scripts/modelos.py get michi-leve`); devolve o texto e o agente principal escreve no SP e pergunta ao user. O modelo no frontmatter não vale para skills chamadas pela ferramenta Skill. `/reflect fase` também, se o patch for só texto.
 
 Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_requests`, go/no-go em Decisões; `references/michi-spike.md`.
 

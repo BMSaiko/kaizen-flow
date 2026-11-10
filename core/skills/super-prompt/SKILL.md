@@ -27,6 +27,8 @@ changelog:
 - '2.0.0: SKILL ≤5 KB; template, frontmatter e flags completas do sp-new.py movidos para references/super-prompt-detalhe.md.'
 - '1.2.0: encolhida (changelog antigo no git, texto repetido passado a ligações); regras mantidas.'
 - '1.1.0: validateSuperPrompt() no save, --quick, templates de grill por domínio.'
+model: claude-opus-5-5
+effort: medium
 ---
 # Super Prompt
 
