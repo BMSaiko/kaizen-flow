@@ -52,6 +52,8 @@ Run with `python scripts/<name>.py`. Roots come from [`kaizen.config.json`](conf
 | `sp-organize.py` | tidy stories into program folders | `--project P`, `--apply` (default is a dry run) |
 | `sp-handoff.py` | move the story to a fresh context | `--resolve`, `--write`, `--launch`, `--spawn SLUG...` (one pane + worktree per story); see [handoff](handoff.md) |
 | `handoff.py` | same for a free conversation | `--write`, `--launch`, `--consume`; see [handoff](handoff.md) |
+| `handoff_resume.py` | SessionStart hook: after a manual `/clear`, resumes the pending handoff | run by the hook, no flags |
+| `modelos.py` | model and effort per role (`michi-exec`, `michi-leve`, `sp-autor`...) | `get ROLE`; used by `sp-handoff --spawn` and the light subagents of michi phases 9-10 |
 | `context-guard.py` | hook: measures the session context | `--transcript PATH [--limit N]` prints `<tokens> <ok\|aviso\|limite>`; without arguments it runs as a hook (JSON on stdin). Limit from `CLAUDE_CONTEXT_LIMIT` (default 100000), warning at 85% |
 | `sp-prova.py` | `<name> --arquivo FILE` | saves a proof file to `<project>/sp/proofs/<name>.md` (bytes copied); `--project P`, `--forcar` to overwrite. Rejects names with separators |
 | `sp-painel.py` | | read-only table of the parallel `sp-fila` sessions: story, worktree, pane, phase, requests, result |
