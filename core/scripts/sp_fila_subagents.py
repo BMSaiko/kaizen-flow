@@ -10,6 +10,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:
+    import modelos
+except ImportError:  # kaizen-flow sem modelos.py
+    modelos = None
+
 SCRIPTS = Path(__file__).resolve().parent
 ESTADOS = ("done", "pergunta", "bloqueado", "falhou")
 
@@ -41,11 +46,23 @@ def lancar(slug, run=subprocess.run):
     return {"slug": slug, "worktree": worktree, "prompt": prompt(slug, worktree)}
 
 
+def modelo_agent(papel="michi-exec"):
+    """ID do modelo do papel para o campo `model` do `Agent`; None sem modelos.py ou config válida (o Agent herda)."""
+    if modelos is None:
+        return None
+    try:
+        return modelos.papel(modelos.load(), papel)["model"]
+    except (modelos.ModelosError, OSError, KeyError, TypeError):
+        return None
+
+
 def plano(itens):
     """Plano de lançamento em JSON (uma linha) para o agente principal: um `Agent` em background por item."""
+    model = modelo_agent()
+    extra = {"model": model} if model else {}
     return json.dumps({
         "acao": "lancar",
-        "itens": [{**i, "description": f"sp-fila {i['slug']}"[:60], "run_in_background": True} for i in itens],
+        "itens": [{**i, "description": f"sp-fila {i['slug']}"[:60], "run_in_background": True, **extra} for i in itens],
         "no_fim": "por cada notificação de fim: ler a última linha `ESTADO:`; `pergunta` → AskUserQuestion ao user e SendMessage ao subagent; "
                   "`done` → `sb-worktree.py merge <slug>` com confirmação e depois `sp-fila.py --seguinte --slug <slug>`; "
                   "`bloqueado`/`falhou` → avisar o user e `sp-fila.py --seguinte --slug <slug>`",

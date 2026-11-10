@@ -79,3 +79,17 @@ def test_estado_final_le_ultima_linha_estado():
     assert sfs.estado_final("ESTADO: pergunta\nqual a cor?") == "pergunta"
     assert sfs.estado_final("sem marcador") == "desconhecido"
     assert sfs.estado_final("ESTADO: inventado") == "desconhecido"
+
+
+def test_plano_inclui_model_michi_exec_em_cada_item(monkeypatch):
+    monkeypatch.setattr(sfs, "modelo_agent", lambda papel="michi-exec": "claude-sonnet-5-5")
+    itens = json.loads(sfs.plano([{"slug": "a", "worktree": "w", "prompt": "p"}]))["itens"]
+    assert itens[0]["model"] == "claude-sonnet-5-5"
+
+
+def test_modelo_agent_le_o_papel_michi_exec():
+    import modelos
+    if not modelos.DEFAULT.exists():  # pacote kaizen-flow sem .claude/modelos.json
+        assert sfs.modelo_agent() is None
+        return
+    assert sfs.modelo_agent() == modelos.papel(modelos.load(), "michi-exec")["model"]

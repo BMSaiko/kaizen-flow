@@ -49,7 +49,7 @@ Constrói um **Super Prompt**: instruções autónomas, prontas a colar, para um
 
 ## Gerar o SP
 1. Só com `python -I scripts/sp-new.py --project <p> --slug <slug> --priority P1|P2|P3 --modo auto|manual [flags]` (nunca criar o ficheiro à mão). Projeto não inferível ou inexistente: `AskUserQuestion`; nunca inventar pasta.
-2. Preencher as **8 secções** (template: `super-prompt-detalhe.md`); §4 com critérios verificáveis, §7 com passos concretos, gates executáveis. Secção vazia = voltar ao grill-me; nunca publicar incompleto. SP que cria/publica repo (`gh repo create`): perguntar a visibilidade (`AskUserQuestion`: público/privado) no grill ou aqui e escrevê-la no passo; nunca fixar «private» por defeito.
+2. Preencher as **8 secções** num `Agent` com `model` = `python -I scripts/modelos.py get sp-autor` (o `sp-new.py` imprime-o), passando-lhe o grill e o DR (template: `super-prompt-detalhe.md`); §4 com critérios verificáveis, §7 com passos concretos, gates executáveis. Secção vazia = voltar ao grill-me; nunca publicar incompleto. SP que cria/publica repo (`gh repo create`): perguntar a visibilidade (`AskUserQuestion`: público/privado) no grill ou aqui e escrevê-la no passo; nunca fixar «private» por defeito.
 3. Validar: `python -I scripts/sp-validate.py <ficheiro>` sem avisos.
 
 ## Reutilizar

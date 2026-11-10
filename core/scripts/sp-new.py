@@ -24,6 +24,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 import kf_git  # noqa: E402
 
+
+def _modelo_sp_autor():
+    """ID do modelo do papel `sp-autor`, ou aviso se modelos.py/config faltar."""
+    try:
+        import modelos
+        return modelos.papel(modelos.load(), "sp-autor")["model"]
+    except Exception as exc:  # noqa: BLE001
+        return f"desconhecido ({type(exc).__name__})"
+
 sp_list = kaizen_engine.load("sp-list")
 
 sp_gates = kaizen_engine.load("sp-gates")
@@ -345,6 +354,7 @@ def main(argv=None):
             if args.parent:
                 link_parent(args.root, args.project, args.parent, args.slug, args.depends_on)
             print(path)
+            print(f"modelo sp-autor (Agent que preenche o SP): {_modelo_sp_autor()}", file=sys.stderr)
         else:
             raise SpNewError("indicar --slug (ou --program com --children)")
     except SpNewError as exc:
