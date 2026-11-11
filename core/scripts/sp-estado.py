@@ -1,15 +1,23 @@
 #!/usr/bin/env python3
-"""Estado de um SP numa só leitura (≤30 linhas). Só leitura.
+"""Estado de um SP numa só leitura (≤30 linhas) e estado de painel na fila (gravar, listar, migrar).
 
-Junta o que o arranque de `/michi <SP>` ou de um handoff lê em chamadas separadas:
-pasta/fase, critérios e passos, gates, dependências, últimas linhas de `## Progresso`,
-ramo e ficheiros alterados no git.
+Só com o slug: junta o que o arranque de `/michi <SP>` ou de um handoff lê em chamadas separadas
+(pasta/fase, critérios e passos, gates, dependências, últimas linhas de `## Progresso`, ramo e
+ficheiros alterados no git), sem escrever nada.
+
+Com slug e estado: grava o estado do SP na fila que o regista (`scripts/sp_painel_estado.py`,
+`~/.claude/sp-fila/<fila-id>/<slug>.json`); é o comando que um painel corre. `--listar` mostra
+todas as filas e SPs pelo nome; `--migrar` converte o `~/.claude/sp-fila-estado.json` antigo.
 
 Uso:
   python -I scripts/sp-estado.py <slug|caminho.md> [--project P]
-rc: 0 ok, 1 SP não encontrado
+  python -I scripts/sp-estado.py <slug> <pendente|a-correr|pergunta|done|bloqueado|falhou> [--msg "<texto>"] [--fila ID] [--root DIR]
+  python -I scripts/sp-estado.py --listar [--json] [--root DIR]
+  python -I scripts/sp-estado.py --migrar [--antigo FICHEIRO] [--root DIR]
+rc: 0 ok, 1 SP não encontrado, transição inválida, sem vaga, slug desconhecido ou estado ilegível
 """
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -19,6 +27,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
+import sp_painel_estado  # noqa: E402
 
 MAX_LINES = 30
 MAX_FILES = 8
@@ -91,13 +100,61 @@ def estado(ref, root=None, project=None, git_lines=None, atras=None):
     return "\n".join(out[:MAX_LINES])
 
 
+def _uma_linha(texto):
+    """Texto vindo de um painel numa só linha, sem caracteres de controlo (não inventa linhas nem mexe no terminal)."""
+    return " ".join("".join(c if c.isprintable() else " " for c in str(texto)).split())
+
+
+def listar(root=None, em_json=False):
+    """Filas e SPs pelo nome, com as vagas livres do teto global. O pane nunca sai: o user vê o slug."""
+    filas = sp_painel_estado.filas(root)
+    livres, teto = sp_painel_estado.vagas_livres(root), sp_painel_estado.MAX_PARALELO
+    if em_json:
+        limpas = [{**f, "sps": [{k: v for k, v in sp.items() if k != "pane"} for sp in f["sps"]]} for f in filas]
+        return json.dumps({"vagas_livres": livres, "max": teto, "filas": limpas}, ensure_ascii=False, indent=1)
+    if not filas:
+        return f"sem filas · vagas livres {livres}/{teto}"
+    out = [f"vagas livres {livres}/{teto}"]
+    for f in filas:
+        out.append(f"{f['fila']} · {f.get('modo') or '-'} · {len(f['sps'])} SPs" + (f" · {f['erro']}" if f.get("erro") else ""))
+        for sp in f["sps"]:
+            partes = [sp["slug"], sp["estado"]] + [_uma_linha(sp[k]) for k in ("modelo", "msg") if sp.get(k)]
+            out.append("  " + " · ".join(partes))
+    return "\n".join(out)
+
+
 def main(argv=None):
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
-    ap = argparse.ArgumentParser(description="Estado de um SP numa só leitura")
-    ap.add_argument("sp", help="slug ou caminho .md")
+    for fluxo in (sys.stdout, sys.stderr):  # stderr também: as recusas («transição inválida») têm acentos
+        if hasattr(fluxo, "reconfigure"):
+            fluxo.reconfigure(encoding="utf-8")
+    ap = argparse.ArgumentParser(description="Estado de um SP numa só leitura; com um estado, grava-o na fila de painéis")
+    ap.add_argument("sp", nargs="?", help="slug ou caminho .md")
+    ap.add_argument("novo", nargs="?", metavar="estado", help="estado a gravar: " + ", ".join(sp_painel_estado.ESTADOS))
     ap.add_argument("--project")
+    ap.add_argument("--msg", help="texto que acompanha o estado (pergunta, motivo do bloqueio)")
+    ap.add_argument("--fila", help="fila-id, quando o slug está em mais de uma fila")
+    ap.add_argument("--root", help=f"pasta do estado das filas (por defeito ${sp_painel_estado.ENV_ROOT} ou ~/.claude/sp-fila)")
+    ap.add_argument("--listar", action="store_true", help="todas as filas e SPs pelo nome")
+    ap.add_argument("--json", action="store_true", help="com --listar: saída em JSON")
+    ap.add_argument("--migrar", action="store_true", help="converter o sp-fila-estado.json antigo numa fila")
+    ap.add_argument("--antigo", help="com --migrar: caminho do estado antigo")
     args = ap.parse_args(argv)
+    if args.listar or args.migrar or args.novo is not None:
+        try:
+            if args.listar:
+                print(listar(args.root, args.json))
+            elif args.migrar:
+                fid = sp_painel_estado.migrar_antigo(args.antigo, root=args.root)
+                print(f"migrado para a fila {fid}" if fid else "sem estado antigo: nada a migrar")
+            else:
+                sp = sp_painel_estado.transitar(args.sp, args.novo, msg=args.msg, fila=args.fila, root=args.root)
+                print(f"{sp['slug']} · {sp['estado']} · fila {sp['fila']}")
+        except (sp_painel_estado.ErroEstado, TimeoutError) as e:
+            print(f"sp-estado: {e}", file=sys.stderr)
+            return 1
+        return 0
+    if args.sp is None:
+        ap.error("falta o slug (ou --listar / --migrar)")
     out = estado(args.sp, project=args.project)
     print(out)
     return 1 if out.startswith("SP não encontrado") else 0
