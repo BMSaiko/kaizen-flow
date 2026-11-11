@@ -40,6 +40,11 @@ def reflect_lacunas(slug, texto):
 MAX_LINHAS = 30
 
 
+def _modo(estado):
+    """Modo da corrida: `execucao:` da mãe; sem ele, paralelo (`--concorrencia N`) ou série."""
+    return estado.get("modo") or (f"paralelo (--concorrencia {estado['concorrencia']})" if estado.get("concorrencia") else "série")
+
+
 def relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora, custos=None, sps=None):
     """Relatório final em ≤ MAX_LINHAS linhas: feito, parado, porquê, próximo passo (listas longas cortam em «+N mais»)."""
     rel_dir.mkdir(parents=True, exist_ok=True)
@@ -56,7 +61,7 @@ def relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora, custos=None,
                           for s in estado["falhados"]]),
               ("Próximos passos", passos)]
     cabeca = ["---", "type: report", "tags: [sp-fila]", f"date: {agora:%Y-%m-%d}", "---",
-              f"# Fila de SPs ({agora:%Y-%m-%d %H:%M})", f"Fim: {motivo}."]
+              f"# Fila de SPs ({agora:%Y-%m-%d %H:%M})", f"Fim: {motivo}.", f"Modo: {_modo(estado)}."]
     for cap in range(len(passos) + len(excluidos) + len(commits) + 99, 0, -1):
         corpo = []
         for nome, xs in secoes:
@@ -72,7 +77,7 @@ def progresso(mae_path, estado, fila, motivo, agora):
     """Acrescenta `## Progresso (sessão <data>)` à mãe: feitos, falhados, por correr."""
     listar = lambda xs: [f"- {x}" for x in xs] or ["- nenhum"]
     porcorrer = [sp.slug for sp in fila if sp.slug not in estado["falhados"]]
-    linhas = ["", f"## Progresso (sessão {agora:%Y-%m-%d %H:%M})", "", f"Paragem: {motivo}.", "", "Feitos:",
+    linhas = ["", f"## Progresso (sessão {agora:%Y-%m-%d %H:%M})", "", f"Paragem: {motivo}.", f"Modo: {_modo(estado)}.", "", "Feitos:",
               *listar(estado["feitos"]), "", "Falhados:", *listar(estado["falhados"]), "", "Por correr:",
               *listar(porcorrer), ""]
     with Path(mae_path).open("a", encoding="utf-8") as f:

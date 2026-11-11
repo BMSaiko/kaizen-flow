@@ -81,15 +81,52 @@ def test_estado_final_le_ultima_linha_estado():
     assert sfs.estado_final("ESTADO: inventado") == "desconhecido"
 
 
-def test_plano_inclui_model_michi_exec_em_cada_item(monkeypatch):
-    monkeypatch.setattr(sfs, "modelo_agent", lambda papel="michi-exec": "claude-sonnet-5-5")
-    itens = json.loads(sfs.plano([{"slug": "a", "worktree": "w", "prompt": "p"}]))["itens"]
-    assert itens[0]["model"] == "claude-sonnet-5-5"
+def test_plano_usa_o_modelo_do_nivel_de_cada_sp(monkeypatch):
+    monkeypatch.setattr(sfs, "modelo_agent", lambda nivel=None: {"simples": "m-s", "complexo": "m-c"}.get(nivel, "m-d"))
+    itens = json.loads(sfs.plano([{"slug": "a", "worktree": "w", "prompt": "p", "michi_modelo": "simples"},
+                                  {"slug": "b", "worktree": "w", "prompt": "p", "michi_modelo": "complexo"},
+                                  {"slug": "c", "worktree": "w", "prompt": "p"}]))["itens"]
+    assert [i["model"] for i in itens] == ["m-s", "m-c", "m-d"]
 
 
-def test_modelo_agent_le_o_papel_michi_exec():
+def test_plano_effort_low_em_todos_os_itens(monkeypatch):
+    monkeypatch.setattr(sfs, "modelo_agent", lambda nivel=None: "m")
+    itens = json.loads(sfs.plano([{"slug": s, "worktree": "w", "prompt": "p", "michi_modelo": n}
+                                  for s, n in (("a", "simples"), ("b", "complexo"), ("c", None))]))["itens"]
+    assert itens and all(i.get("effort") == "low" for i in itens)
+
+
+def test_plano_sem_modelos_sai_sem_model_e_com_effort_low(monkeypatch):
+    monkeypatch.setattr(sfs, "modelos", None)
+    item = json.loads(sfs.plano([{"slug": "a", "worktree": "w", "prompt": "p"}]))["itens"][0]
+    assert "model" not in item and item["effort"] == "low"
+
+
+def test_modelo_agent_segue_modelos_michi():
     import modelos
     if not modelos.DEFAULT.exists():  # pacote kaizen-flow sem .claude/modelos.json
-        assert sfs.modelo_agent() is None
+        assert sfs.modelo_agent("complexo") is None
         return
-    assert sfs.modelo_agent() == modelos.papel(modelos.load(), "michi-exec")["model"]
+    cfg = modelos.load()
+    assert sfs.modelo_agent("complexo") == modelos.michi(cfg, "complexo")[0]["model"]
+    assert sfs.modelo_agent(None) == modelos.michi(cfg, "default")[0]["model"]
+
+
+def test_estado_continuar_e_aceite():
+    assert "continuar" in sfs.ESTADOS
+    assert sfs.estado_final("progresso gravado\nESTADO: continuar") == "continuar"
+
+
+def test_prompt_tem_continuar_e_aninhamento():
+    p = sfs.prompt("s", "w")
+    assert "ESTADO: continuar" in p and "## Progresso" in p and "Agent" in p
+
+
+def test_nivel_do_sp_le_o_frontmatter(tmp_path):
+    d = tmp_path / "knowledge" / "projects" / "x" / "y" / "sp" / "TODO"
+    d.mkdir(parents=True)
+    (d / "s-1.md").write_text("---\nslug: s-1\nmichi_modelo: simples\n---\n# x\n", encoding="utf-8")
+    (d / "s-2.md").write_text("---\nslug: s-2\n---\n", encoding="utf-8")
+    assert sfs.nivel_sp("s-1", tmp_path) == "simples"
+    assert sfs.nivel_sp("s-2", tmp_path) is None
+    assert sfs.nivel_sp("nao-existe", tmp_path) is None

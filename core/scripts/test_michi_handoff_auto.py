@@ -19,15 +19,15 @@ class FakeBackend:
 
 
 def test_decide_modelo_diferente_pede_handoff():
-    assert mha.decide("claude-opus-5-5", "claude-sonnet-5-5")[0] == "handoff"
+    assert mha.decide("claude-opus-5-5", "claude-sonnet-5-5", painel=True)[0] == "handoff"
 
 
 def test_decide_contexto_pede_handoff_mesmo_com_modelo_certo():
-    assert mha.decide("claude-sonnet-5-5", "claude-sonnet-5-5", contexto=True)[0] == "handoff"
+    assert mha.decide("claude-sonnet-5-5", "claude-sonnet-5-5", contexto=True, painel=True)[0] == "handoff"
 
 
 def test_decide_modelo_certo_sem_contexto_fica():
-    assert mha.decide("claude-sonnet-5-5", "claude-sonnet-5-5")[0] == "ficar"
+    assert mha.decide("claude-sonnet-5-5", "claude-sonnet-5-5", painel=True)[0] == "ficar"
 
 
 def test_decide_marca_handed_nunca_faz_ciclo():
@@ -35,7 +35,7 @@ def test_decide_marca_handed_nunca_faz_ciclo():
 
 
 def test_decide_sem_modelo_esperado_degrada_para_ficar():
-    estado, motivo = mha.decide("claude-opus-5-5", None)
+    estado, motivo = mha.decide("claude-opus-5-5", None, painel=True)
     assert estado == "ficar" and "aviso" in motivo
 
 
@@ -108,7 +108,7 @@ def test_origem_prefere_wezterm_e_cai_para_tmux(monkeypatch):
 def test_main_decide_imprime_estado_e_motivo(monkeypatch, capsys):
     monkeypatch.setattr(mha, "esperado", lambda: "claude-sonnet-5-5")
     assert mha.main(["decide", "--sessao", "claude-opus-5-5"]) == 0
-    assert capsys.readouterr().out.startswith("handoff ")
+    assert capsys.readouterr().out.startswith("subagent ")
 
 
 def test_main_go_sem_painel_interativo_avisa_e_sai_1(monkeypatch, capsys):
@@ -158,3 +158,20 @@ def test_spawn_real_encadeia_ensure_painel_prompt_e_comando(monkeypatch):
 
     assert mha._spawn_real("wezterm", run=run)("abc", True) == "9"
     assert passos == [("pane", "C:/wt/abc"), ("wait", "9"), ("send", "/michi --auto abc --handed")]
+
+
+def test_decide_por_defeito_e_subagent():
+    assert mha.decide("claude-opus-5-5", "claude-sonnet-5-5")[0] == "subagent"
+    assert mha.decide("claude-sonnet-5-5", None)[0] == "subagent"
+
+
+def test_decide_dentro_de_subagent_fica():
+    assert mha.decide("claude-opus-5-5", "claude-sonnet-5-5", contexto=True, em_subagent=True)[0] == "ficar"
+
+
+def test_main_decide_flags_painel_e_em_subagent(monkeypatch, capsys):
+    monkeypatch.setattr(mha, "esperado", lambda: "claude-sonnet-5-5")
+    mha.main(["decide", "--sessao", "claude-opus-5-5", "--em-subagent"])
+    assert capsys.readouterr().out.startswith("ficar")
+    mha.main(["decide", "--sessao", "claude-opus-5-5", "--painel"])
+    assert capsys.readouterr().out.startswith("handoff")

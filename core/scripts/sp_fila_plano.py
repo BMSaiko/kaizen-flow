@@ -27,6 +27,26 @@ def load(root, project=None):
     return items
 
 
+def aplicar_master(items, run=run_hidden):
+    """Põe em cada `sp.status` a pasta onde o SP está em master (`git ls-tree`), não a do disco da worktree onde corre.
+    Fora de um repo, sem master ou SP ausente de master: mantém o estado do disco."""
+    por_dir = {}
+    for sp, _ in items:
+        d = sp.path.parent.parent
+        if d not in por_dir:
+            r = kf_git.run(d, "ls-tree", "-r", "--name-only", "master", "--", ".", run=run)
+            por_dir[d] = {}
+            if r.returncode == 0:
+                for linha in (r.stdout or "").splitlines():
+                    pasta, _, nome = linha.strip().partition("/")
+                    if pasta in ("TODO", "Doing", "Done") and nome:
+                        por_dir[d][nome.rpartition("/")[2]] = pasta
+        pasta = por_dir[d].get(sp.path.name)
+        if pasta:
+            sp.status = pasta
+    return items
+
+
 def autorizacao(fm):
     """Motivo de exclusão por autorizações insuficientes, ou ''."""
     commit, push, pr = (fm.get(k, "") for k in ("commit", "push", "pr"))
@@ -67,7 +87,7 @@ def plan(items, maximo=None, so=None, por_commitar=()):
     for sp, fm in items:
         if sp.status == "Done" or (so is not None and sp.slug not in so):
             continue
-        why = estatico(sp, fm) or ("por commitar (SP fora do HEAD; a worktree nasceria sem ele)" if sp.slug in por_commitar else "")
+        why = estatico(sp, fm) or (f"por commitar (SP fora do HEAD; a worktree nasceria sem ele): git add {sp.path.name} && git commit, em master, e repetir" if sp.slug in por_commitar else "")
         if why:
             excluidos.append((sp.slug, why))
         else:

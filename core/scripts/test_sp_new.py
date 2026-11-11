@@ -476,3 +476,11 @@ def test_children_com_nivel_e_execucao_vazio_na_mae(tmp_path):
     assert "execucao" not in texts[1] + texts[2]
     with pytest.raises(sp_new.SpNewError):
         sp_new.parse_niveis("a@xl")
+
+
+def test_program_filhos_herdam_gate_e_a_mae_nao(tmp_path):
+    root = project(tmp_path)
+    paths = sp_new.create_program(root, "atlas", "prog", "P2", TODAY, [("a", []), ("b", ["a"])], gates=["python -m pytest -q"])
+    heads = [p.read_text(encoding="utf-8").split("---\n")[1] for p in paths]
+    assert "gates:" not in heads[0]
+    assert all("gates:\n  - cmd: python -m pytest -q\n" in h for h in heads[1:])

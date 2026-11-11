@@ -27,19 +27,19 @@ license: MIT
 | 10 | Reflect | `/reflect final` em subagente leve¹ | A/B/C proposto; o user aplica | user |
 | 11 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | user |
 
-¹ `Agent` com o modelo do papel `michi-leve`; ² idem com `sub-agente` (`python -I scripts/modelos.py get <papel>`). Resumo curto de volta; o principal escreve no SP e pergunta ao user. `/reflect fase` também, se o patch for só texto. Detalhe: `michi-orquestracao.md` §Sub-agentes.
+¹ `Agent` com o papel `michi-leve`; ² idem `sub-agente` (`modelos.py get <papel>`). Resumo curto de volta; `/reflect fase` também, se o patch for só texto. Detalhe: `michi-orquestracao.md` §Sub-agentes.
 
 Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_requests`, go/no-go em Decisões; `references/michi-spike.md`.
 
-`skip <fase>` salta só essa fase (`skip harden|pentest|review`; nunca os gates). SP completo: `sp-fechar.py <slug>` faz gates + context-budget + `done` + `COMMIT_*.md` (bloqueia se o diff altera scripts do motor com o pacote kf desatualizado: `/kaizen-sync`), antes com `## Prova de done`. Linha `PRÓXIMO FILHO`/`ÚLTIMO FILHO` no output: manual = `AskUserQuestion` «abrir o próximo?»/«fechar a mãe?»; auto = `--next` e fechar a mãe sozinho, sempre numa worktree (`sb-worktree.py ensure <mãe>` → `sp-move done` → commit → `merge`; nunca no checkout principal; fechar antes do `clean` do filho ou numa worktree nova). Nunca omitir.
+`skip <fase>` salta só essa fase (`skip harden|pentest|review`; nunca os gates). SP completo: `sp-fechar.py <slug>` com `## Prova de done`; linha `PRÓXIMO FILHO`/`ÚLTIMO FILHO`: manual = `AskUserQuestion`, auto ou fila (`--programa`) = sem perguntar (`--seguinte` abre o próximo; `fechar-mae` no fim) e fechar a mãe numa worktree (`michi-lifecycle.md` §Fecho). Nunca omitir.
 
 ## Arranque
 
-1. `python -I scripts/sp-estado.py <slug>` (fase, passos, gates, ramo) e ler `perfil`/`max_tentativas`/`parar_se`. SP vazio = Grill, não paragem; correr sempre o Arranque todo e a «sessão suja» (`michi-orquestracao.md`) antes da fase 1. «SP não encontrado»: ver `git rev-list --count HEAD..master`; se o ramo está atrás, `git merge master` e repetir antes de criar SP (evita slug duplicado).
+1. `python -I scripts/sp-estado.py <slug>` (fase, passos, gates, ramo) e ler `perfil`/`max_tentativas`/`parar_se`. SP vazio = Grill, não paragem; correr sempre o Arranque todo e a «sessão suja» (`michi-orquestracao.md`) antes da fase 1. «SP não encontrado»: ramo atrás de `master` → `git merge master` e repetir (evita slug duplicado).
 2. SP em TODO (p.ex. vindo de `/sp-handoff`): `python -I scripts/sp-move.py <slug> --start` (move o SP e as mães em TODO para Doing, idempotente). `python -I scripts/sb-worktree.py ensure <slug>`; editar pelo caminho absoluto da worktree; `merge` + `clean` só no fecho com o SP em Done.
-3. `python -I scripts/tab-title.py <slug>`. Sem `--handed`: `python -I scripts/michi_handoff_auto.py decide --sessao <id do modelo> [--contexto]` (`--contexto` se o michi não é o 1.º pedido; handoff consumido não conta); `handoff` → `... go <slug> [--auto]` (painel novo com `michi-exec` e `--handed`, fecha este depois; rc 1 = ficar e avisar). Com `--handed` ou `ficar`: continuar, sem ciclo.
+3. `python -I scripts/tab-title.py <slug>`. Sessão principal: `python -I scripts/michi-lancar.py <slug>` → `Agent` com esse plano, terminar o turno, sem polling; retorno `ESTADO:` em `michi-orquestracao.md` §Sub-agentes. Painel WezTerm só com `--painel` (`michi_handoff_auto.py decide --painel`, `go <slug>`). Já dentro de um sub-agent ou `--handed`: seguir sem relançar.
 4. Modo: `--auto` ou `modo: auto` no frontmatter = sem `AskUserQuestion` (`modo: manual` = sem auto, sem pergunta); sem nenhum, perguntar «com/sem auto» (`michi-modo-auto.md`).
-   Se o `sp-estado` diz «perguntar concorrência» (SP com filhos), mesmo em `modo: manual`, `AskUserQuestion` «com ou sem concorrência?» (defeito: sem; com → N): sem = fila em série; com = `/sp-fila --programa <slug> --concorrencia N`.
+   Se o `sp-estado` diz `execução: por escolher` (SP-mãe com filhos), mesmo em `modo: manual`, `AskUserQuestion` «sequencial ou paralelo?» (caso a caso, sem defeito) e gravar antes de lançar: `python -I scripts/sp-execucao.py <slug> sequencial|paralelo`; com `execucao:` preenchido não perguntar. Depois `/sp-fila --programa <slug>` (sequencial = um filho de cada vez; paralelo = até 3 subagents).
 5. Checkpoint: `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate.
 
 Hooks (`michi.<phase.start|phase.end|gate.failed|commit|closed>`), sessão suja, handoff, `[context-guard]`, sub-agentes: `references/michi-orquestracao.md`.
@@ -54,9 +54,8 @@ Hooks (`michi.<phase.start|phase.end|gate.failed|commit|closed>`), sessão suja,
 
 ## Style e Pitfalls
 
-- 16 entradas em `references/michi-style.md` (pergunta em texto livre, honrar «skip fase X»). Ler só a relevante.
-- 30 entradas em `references/michi-pitfalls.md` (índice `michi-pitfalls-index.md`). Ler só a relevante.
+`references/michi-style.md` (16) e `michi-pitfalls.md` (30, índice `michi-pitfalls-index.md`): ler só a relevante.
 
 ## See also
 
-`.claude/skills/reflect/` · `references/michi-skip-grill-play.md` · `knowledge/infra/skills/self-improvement-loop/SKILL.md` · `knowledge/infra/skills/learn-from-session/SKILL.md` · `scripts/skill-cut.py`
+`reflect` · `references/michi-skip-grill-play.md` · `knowledge/infra/skills/{self-improvement-loop,learn-from-session}/` · `scripts/skill-cut.py`

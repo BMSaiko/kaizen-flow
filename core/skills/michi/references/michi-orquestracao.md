@@ -48,6 +48,12 @@ Papéis via `python -I scripts/modelos.py get <papel>` (nunca IDs no texto). Pro
 | 7 Review | `sub-agente` | ficheiro de achados (formato do `review-ciclo`); no chat ≤20 linhas |
 | 9 Report, 10 Reflect | `michi-leve` | texto para o SP |
 
+**Michi num sub-agent** (`michi-lancar.py`; modelo do `michi_modelo`, `effort` low): sem `AskUserQuestion`; as fases acima usam `Agent` se existir no sub-agent (aninhamento confirmado em 2026-11-10), senão correm nele. Sem painéis nem `sp-handoff --launch`; sem merge nem `clean`. `modo: manual`: sign-off do DP e proposta de commit saem como `pergunta`. Protocolo de retorno (único sítio; o `/sp-fila` remete para aqui), última linha `ESTADO: done|pergunta|bloqueado|falhou|continuar`:
+- `pergunta` → `AskUserQuestion` do principal e `SendMessage` ao sub-agent com a resposta.
+- `done` → propor `sb-worktree.py merge <slug>` (automático com `commit: auto`); quem encadeia o SP seguinte é o principal.
+- `continuar` → o sub-agent gravou `## Progresso`; o principal lança outro `Agent` com o mesmo plano.
+- `bloqueado`/`falhou` → resumo ao user.
+
 ## Contexto (context-guard)
 
 Se aparecer `[context-guard] Contexto … >= limite`: acabar o passo em curso (nunca a meio de uma edição ou teste) e correr em modo automático (`--launch --auto`, sem perguntar) o handoff que o aviso nomear: `/sp-handoff` se a sessão correu `/michi <SP>`, `/handoff` se é conversa livre.
@@ -56,6 +62,7 @@ Se aparecer `[context-guard] Contexto … >= limite`: acabar o passo em curso (n
 |---|---|---|
 | Fim de fase com verificação verde, SP em Doing | `/sp-handoff` manual: regista `## Progresso`, pergunta sim/não | um por fase, não por passo; nunca a meio de edição/teste; não repetir se o guard já o fez nessa fase |
 | `[context-guard]` ≥ limite | `--launch --auto`, sem perguntar | acabar o passo em curso primeiro |
+| `[context-guard]` dentro de sub-agent | grava `## Progresso`, devolve `ESTADO: continuar` | nunca abre painel |
 | Modo auto (`--auto`) | `--launch --auto` por fase | sem `AskUserQuestion` |
 | Sem SP em Doing | nada (`/handoff` só em conversa livre) | |
 | `/michi` com contexto ≥ 40K (`CLAUDE_MICHI_START_LIMIT`) | `[context-guard]` no arranque: `/sp-handoff --launch --auto`, sem perguntar | uma vez por sessão; não começar o ciclo na sessão cheia |

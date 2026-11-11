@@ -16,6 +16,7 @@ aviso do context-guard) recusa lançar se o ficheiro não existir em `handoffs/`
 rc: 0 ok, 1 erro
 """
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -95,11 +96,16 @@ def send(text, pane, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=pa
                         screen=screen)
 
 
-def launch(path, pane=None):
-    pane = pane or pane_lib.pane_id()
+def launch(path, pane=None, env=None, run=pane_lib.run_hidden):
+    pane = pane or pane_lib.pane_id(env)
     pane_lib.send_argv(pane, continuation_prompt(path))
-    pane_lib.pane_exists(pane)
-    return pane_lib.launch_detached(__file__, ["--send", str(path), "--pane", str(pane)])
+    sock = pane_lib.live_socket(env, run)
+    if sock is None:
+        raise HandoffError("nenhum GUI do WezTerm vivo: retoma à mão numa sessão nova com "
+                           f'`python -I scripts/handoff.py --consume "{path}"`')
+    novo = pane_lib.socket_env(sock, env)
+    pane_lib.pane_exists(pane, run, novo, retoma=path)
+    return pane_lib.launch_detached(__file__, ["--send", str(path), "--pane", str(pane), "--socket", sock], novo)
 
 
 def main(argv=None):
@@ -112,6 +118,7 @@ def main(argv=None):
     ap.add_argument("--slug", default="", help="com --write: nome curto da conversa")
     ap.add_argument("--file", help="ficheiro com o corpo do handoff (com --write)")
     ap.add_argument("--pane", help="painel do WezTerm (default: $WEZTERM_PANE)")
+    ap.add_argument("--socket", help=argparse.SUPPRESS)
     ap.add_argument("--dry-run", action="store_true", help="com --launch: só mostra os comandos")
     ap.add_argument("--auto", action="store_true", help="com --launch: modo do context-guard")
     ap.add_argument("--dir", default=str(HANDOFFS_DIR), help=argparse.SUPPRESS)
@@ -126,6 +133,8 @@ def main(argv=None):
         elif args.consume:
             consume(args.consume)
         elif args.send:
+            if args.socket:
+                os.environ["WEZTERM_UNIX_SOCKET"] = args.socket
             send(continuation_prompt(args.send), args.pane or pane_lib.pane_id(), inspect=pane_lib.check_prompt, confirm=True)
         else:
             if args.auto:

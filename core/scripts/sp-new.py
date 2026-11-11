@@ -268,7 +268,7 @@ def parse_niveis(text):
     return niveis
 
 
-def create_program(root, project, slug, priority, today, children, modo="manual", auth=None, niveis=None):
+def create_program(root, project, slug, priority, today, children, modo="manual", auth=None, niveis=None, gates=()):
     root = Path(root)
     auth = check_auth(auth)
     names = [name for name, _ in children]
@@ -299,7 +299,7 @@ def create_program(root, project, slug, priority, today, children, modo="manual"
         extra += [f"  - slug: {name}", f"    depends_on: [{', '.join(deps)}]", "    state: TODO"]
     paths = [create(root, project, slug, priority, today, extra=extra, modo=modo, auth=auth, programa=True)]
     for name, deps in children:
-        paths.append(create(root, project, name, priority, today, parent=slug, depends_on=deps, modo=modo, auth=auth, michi=(niveis or {}).get(name, "default")))
+        paths.append(create(root, project, name, priority, today, parent=slug, depends_on=deps, modo=modo, auth=auth, gates=gates, michi=(niveis or {}).get(name, "default")))
     return paths
 
 
@@ -359,7 +359,7 @@ def main(argv=None):
                 raise SpNewError("--program exige --children")
             children = [(fs(n), [fs(d) for d in deps]) for n, deps in parse_children(args.children)]
             niveis = {fs(n): v for n, v in parse_niveis(args.children).items()}
-            paths = create_program(args.root, args.project, fs(args.program), args.priority, today, children, args.modo, auth, niveis)
+            paths = create_program(args.root, args.project, fs(args.program), args.priority, today, children, args.modo, auth, niveis, args.gate)
             print("\n".join(str(p) for p in paths))
             if args.modo != "auto":
                 print("aviso: programa em modo: manual; sp-fila para a cada pergunta/commit. "

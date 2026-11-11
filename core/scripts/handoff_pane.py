@@ -64,10 +64,60 @@ def enter_argv(pane):
     return ["wezterm", "cli", "send-text", "--pane-id", str(pane), "--no-paste", "\r"]
 
 
-def pane_exists(pane, run=run_hidden):
-    out = run(["wezterm", "cli", "list", "--format", "json"], check=True, capture_output=True, text=True, encoding="utf-8").stdout
-    if not any(str(p.get("pane_id")) == str(pane) for p in json.loads(out)):
-        raise HandoffError(f"painel {pane} não existe")
+def socket_dir(env=None):
+    env = os.environ if env is None else env
+    home = env.get("USERPROFILE") or env.get("HOME") or str(Path.home())
+    return Path(home) / ".local" / "share" / "wezterm"
+
+
+def _lista(run, env):
+    """Painéis do GUI a que `env` aponta; HandoffError se o GUI não responde."""
+    kw = {"env": env} if env is not None else {}
+    out = run(["wezterm", "cli", "list", "--format", "json"], check=True, capture_output=True, text=True,
+              encoding="utf-8", **kw).stdout
+    return json.loads(out)
+
+
+def live_socket(env=None, run=run_hidden, sockets=None):
+    """Socket do GUI do WezTerm vivo: o atual (`WEZTERM_UNIX_SOCKET`), senão o `gui-sock-*` vivo mais recente.
+
+    "" = o ambiente responde sem socket definido; None = nenhum GUI vivo.
+    """
+    env = dict(os.environ if env is None else env)
+    atual = env.get("WEZTERM_UNIX_SOCKET", "")
+    if sockets is None:
+        try:
+            sockets = sorted(socket_dir(env).glob("gui-sock-*"), key=lambda f: f.stat().st_mtime, reverse=True)
+        except OSError:
+            sockets = []
+    candidatos = [atual] if (atual or not sockets) else [""]
+    candidatos += [str(s) for s in sockets if str(s) != atual]
+    for sock in candidatos:
+        teste = {k: v for k, v in env.items() if k != "WEZTERM_UNIX_SOCKET"}
+        if sock:
+            teste["WEZTERM_UNIX_SOCKET"] = sock
+        try:
+            _lista(run, teste)
+            return sock
+        except (HandoffError, OSError, ValueError):
+            continue
+    return None
+
+
+def socket_env(sock, env=None):
+    """Ambiente com `WEZTERM_UNIX_SOCKET` ajustado ao socket escolhido."""
+    env = dict(os.environ if env is None else env)
+    if sock:
+        env["WEZTERM_UNIX_SOCKET"] = sock
+    return env
+
+
+def pane_exists(pane, run=run_hidden, env=None, retoma=None):
+    """Confere que o painel existe no GUI de `env`; `retoma` (ficheiro) acrescenta a retoma manual à mensagem."""
+    if not any(str(p.get("pane_id")) == str(pane) for p in _lista(run, env)):
+        dica = (f': retoma à mão numa sessão nova com `python -I scripts/handoff.py --consume "{retoma}"`'
+                if retoma else "")
+        raise HandoffError(f"painel {pane} não existe no WezTerm (janela fechada?){dica}")
 
 
 def prompt_has_text(screen):
@@ -164,10 +214,10 @@ def send_lines(lines, pane, text_argv, key_argv, delay=SEND_DELAY, gap=SEND_GAP,
         line(text)
 
 
-def launch_detached(script, args):
+def launch_detached(script, args, env=None):
     """Corre `script args...` num processo separado, sem janela, para o envio só chegar depois de o turno atual acabar."""
     argv = [sys.executable, "-I", str(Path(script).resolve()), *args]
     flags = NO_WINDOW | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)  # DETACHED_PROCESS faria cada filho abrir consola
     subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     creationflags=flags, close_fds=True)
+                     creationflags=flags, close_fds=True, **({"env": env} if env is not None else {}))
     return argv

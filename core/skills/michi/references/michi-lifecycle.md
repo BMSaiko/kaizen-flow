@@ -22,3 +22,7 @@ DR/DP: `doc-move.py <dr|dp> <slug> todo|doing|done` e `doc-list.py <dr|dp> [--al
 | SP complete | `sp-move.py <slug> done` |
 
 `/michi status` = `sp-list.py --all` + `doc-list.py dr` + `doc-list.py dp`; mostrar as pastas `Doing` com a hora da última modificação para destacar trabalho parado.
+
+## Fecho
+
+`sp-fechar.py <slug>` faz gates + context-budget + `done` + `COMMIT_*.md` (bloqueia se o diff altera scripts do motor com o pacote kf desatualizado: `/kaizen-sync`), antes com `## Prova de done`. Linha `PRÓXIMO FILHO`/`ÚLTIMO FILHO` no output: manual = `AskUserQuestion` «abrir o próximo?»/«fechar a mãe?»; auto = `--next` e fechar a mãe sozinho, sempre numa worktree (`sb-worktree.py ensure <mãe>` → `sp-move done` → commit → `merge`; nunca no checkout principal; fechar antes do `clean` do filho ou numa worktree nova).

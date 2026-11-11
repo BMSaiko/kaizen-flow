@@ -156,3 +156,26 @@ def test_cli_dry_run_mostra_o_limite_de_falhas(tmp_path, capsys):
     make_sp(tmp_path, "um")
     assert sp_fila.main(["--dry-run", "--root", str(tmp_path), "--max-falhas", "3"]) == 0
     assert "Limites:" in capsys.readouterr().out
+
+
+def test_por_commitar_diz_o_comando_a_correr(tmp_path):
+    make_sp(tmp_path, "um")
+    _, excl = sp_fila.plan(sp_fila.load(tmp_path), por_commitar={"um"})
+    assert "git add um.md && git commit" in dict(excl)["um"]
+
+
+def test_aplicar_master_usa_a_pasta_de_master_e_nao_a_do_disco(tmp_path):
+    import subprocess
+    git = lambda *a: subprocess.run(["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t", *a], check=True, capture_output=True)  # noqa: E731
+    git("init", "-b", "master")
+    make_sp(tmp_path, "um", folder="Done")
+    make_sp(tmp_path, "dois")
+    git("add", "."); git("commit", "-m", "x")
+    git("checkout", "-b", "atrasada")
+    um = tmp_path / "p" / "sp"
+    (um / "Done" / "um.md").rename(um / "TODO" / "um.md")  # disco da worktree atrasada: um ainda em TODO
+    items = sp_fila.load(tmp_path)
+    assert {sp.slug: sp.status for sp, _ in items}["um"] == "TODO"
+    from sp_fila_plano import aplicar_master
+    aplicar_master(items)
+    assert {sp.slug: sp.status for sp, _ in items} == {"um": "Done", "dois": "TODO"}

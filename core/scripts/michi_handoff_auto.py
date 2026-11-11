@@ -4,9 +4,9 @@
 traz `--handed` e fica sempre (sem ciclo). `go` abre um painel novo (modelo `michi-exec`, `/michi <slug> --handed`)
 e só depois de ele estar pronto fecha o painel de origem; se o spawn falhar, o antigo mantém-se.
 
-Uso: python -I scripts/michi_handoff_auto.py decide --sessao <modelo> [--contexto] [--handed]
+Uso: python -I scripts/michi_handoff_auto.py decide --sessao <modelo> [--contexto] [--handed] [--painel] [--em-subagent]
      python -I scripts/michi_handoff_auto.py go <slug> [--auto]
-rc: decide 0 (imprime `handoff <motivo>` ou `ficar <motivo>`); go 0 ok, 1 falhou (painel antigo intacto)
+rc: decide 0 (imprime `subagent|handoff|ficar <motivo>`); go 0 ok, 1 falhou (painel antigo intacto)
 """
 import argparse
 import os
@@ -38,10 +38,15 @@ def esperado():
         return None
 
 
-def decide(sessao, esperado_id, contexto=False, handed=False):
-    """(`handoff`|`ficar`, motivo). A marca `--handed` ganha a tudo (anti-ciclo); sem modelo esperado só avisa."""
+def decide(sessao, esperado_id, contexto=False, handed=False, painel=False, em_subagent=False):
+    """(`subagent`|`handoff`|`ficar`, motivo). `--handed` ou dentro de sub-agent = ficar (anti-ciclo); por defeito
+    `subagent` (`michi-lancar.py`); a lógica de painel só com `--painel` (sem modelo esperado só avisa)."""
     if handed:
         return "ficar", "sessão já veio de um handoff (--handed)"
+    if em_subagent:
+        return "ficar", "já dentro de um sub-agent: segue o ciclo sem relançar"
+    if not painel:
+        return "subagent", "sessão principal: lançar Agent com michi-lancar.py"
     if not esperado_id:
         return "ficar", "aviso: sem modelo esperado para michi-exec; sem handoff"
     if sessao != esperado_id:
@@ -89,12 +94,14 @@ def main(argv=None):
     d.add_argument("--sessao", required=True, help="ID do modelo desta sessão")
     d.add_argument("--contexto", action="store_true")
     d.add_argument("--handed", action="store_true")
+    d.add_argument("--painel", action="store_true", help="pedido explícito de painel WezTerm/tmux")
+    d.add_argument("--em-subagent", action="store_true", help="o michi já corre num sub-agent")
     g = sub.add_parser("go")
     g.add_argument("slug")
     g.add_argument("--auto", action="store_true")
     a = ap.parse_args(argv)
     if a.cmd == "decide":
-        estado, motivo = decide(a.sessao, esperado(), a.contexto, a.handed)
+        estado, motivo = decide(a.sessao, esperado(), a.contexto, a.handed, a.painel, a.em_subagent)
         print(f"{estado} {motivo}")
         return 0
     nome = detect_backend()[0]

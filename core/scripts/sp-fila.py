@@ -40,11 +40,15 @@ from sp_fila_execucao import (_custos, _ler_sp,  # noqa: E402,F401
                               seguinte, IntegracaoPendente, SlugObrigatorio)
 import sp_fila_subagents  # noqa: E402
 
+MAX_PARALELO = 3  # teto de subagents michi em simultâneo (paralelo e `--concorrencia`)
+MODOS = ("sequencial", "paralelo")
+
 AJUDA = """Orquestrador do sp-fila em paralelo (subagents):
+- Modo: com `--programa <mãe>` vem de `execucao:` da mãe (vazio → perguntar ao user «sequencial ou paralelo?» e gravar com `sp-execucao.py <mãe> <modo>`); sequencial = 1 subagent de cada vez, paralelo = até 3 (`MAX_PARALELO`).
 - O lançamento imprime um JSON `{"acao": "lancar", "itens": [...]}`: por item, um `Agent` com `prompt` e `description`, `run_in_background: true`, sem `isolation` (a worktree já existe em `worktree`); até N em simultâneo.
 - Terminar o turno depois de lançar; cada subagent avisa ao acabar (notificação), sem vigia nem Monitor.
 - Fim de cada subagent: ler a última linha `ESTADO:`. `pergunta` → AskUserQuestion ao user com o slug, depois SendMessage ao subagent com a resposta; `done` → `sb-worktree.py merge <slug>` com confirmação do user, depois `sp-fila.py --seguinte --slug <slug>`; `bloqueado`/`falhou` → avisar o user e `--seguinte --slug <slug>`.
-- O `--seguinte` imprime o JSON dos próximos a lançar (se houver); repetir até «fila terminada».
+- Merge antes do `--seguinte` (lê master). O `--seguinte` imprime o JSON dos próximos a lançar (se houver), lançados sem perguntar; repetir até «fila terminada». `fechar-mae: <mãe>` = fechar a mãe na worktree dela. Protocolo `ESTADO:`: `michi-orquestracao.md`.
 - Relato por subagent: ≤3 linhas + TLDR."""
 
 
@@ -125,11 +129,15 @@ def main(argv=None):
     ap.add_argument("--estado", default=str(ESTADO), help=argparse.SUPPRESS)
     ap.add_argument("--relatorios", default=str(RELATORIOS), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    max_dado = args.max
     if args.max is None and not args.concorrencia:
         args.max = MAX_DEFEITO  # em paralelo None = sem máximo
     estado = Path(args.estado)
     if args.concorrencia is not None and args.concorrencia < 1:
         print(f"erro: --concorrencia exige N >= 1 (recebido {args.concorrencia}); sem a opção a fila corre em série", file=sys.stderr)
+        return 1
+    if args.concorrencia is not None and args.concorrencia > MAX_PARALELO:
+        print(f"erro: --concorrencia máx. {MAX_PARALELO} subagents em simultâneo (recebido {args.concorrencia})", file=sys.stderr)
         return 1
 
     if args.ajuda:
@@ -162,6 +170,14 @@ def main(argv=None):
             return 1
         args.projeto = mae[0].project
         items = load(args.root, args.projeto)
+    modo = None
+    if mae and not args.dry_run and not args.seguinte:  # o modo é da mãe (`execucao:`), nunca escolhido pela fila
+        modo = str(mae[1].get("execucao") or "").strip()
+        if modo not in MODOS:
+            print(f"erro: modo por escolher: sp-execucao.py {args.programa} sequencial|paralelo", file=sys.stderr)
+            return 1
+        args.concorrencia = 1 if modo == "sequencial" else min(args.concorrencia or MAX_PARALELO, MAX_PARALELO)
+        args.max = max_dado
     so = descendentes(items, args.programa) if args.programa else None
     if args.dry_run:
         fila, excluidos = plan(items, args.max, so, sem_commit(items))
@@ -196,7 +212,7 @@ def main(argv=None):
         num = lambda k: float(fm[k]) if fm.get(k) not in (None, "") else None
         usd = num("orcamento_usd")
         novo = {"max": args.max, "concorrencia": max(1, args.concorrencia or 0) if args.concorrencia else None, "ate": args.ate, "orcamento": int(num("orcamento_requests") or args.orcamento or 0) or None,
-                "max_falhas": max(0, args.max_falhas), "seguidas": 0, "usados": 0, "feitos": [], "falhados": [], "sessoes": {}, "projeto": args.projeto,
+                "max_falhas": max(0, args.max_falhas), "seguidas": 0, "usados": 0, "modo": modo, "feitos": [], "falhados": [], "sessoes": {}, "projeto": args.projeto,
                 "programa": args.programa, "horas": num("orcamento_horas"), "usd": usd,
                 "inicio": datetime.now().isoformat(timespec="seconds")}
         if usd is not None:
@@ -223,6 +239,9 @@ def main(argv=None):
             print(f"lançado · {', '.join(out['slugs'])} · terminar o turno")
     else:
         print(f"fila terminada: {out['motivo']}\nrelatório: {out['relatorio']}")
+        if out.get("fechar_mae"):
+            m = out["fechar_mae"]
+            print(f"fechar-mae: {m} · `sb-worktree.py ensure {m}` → `sp-move.py {m} done` → commit → `sb-worktree.py merge {m}`")
     return 0
 
 
