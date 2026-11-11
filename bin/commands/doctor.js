@@ -7,6 +7,7 @@ const { detectMode } = require("../mode.js");
 const { ADAPTERS } = require("./adapters.js");
 const { init, readSettings, configDir } = require("./init.js");
 const { pythonCmd, py } = require("./python.js");
+const { homedir } = require("../env.js");
 
 function checkInstall(dir, harness) {
   const problems = [];
@@ -30,7 +31,7 @@ function checkInstall(dir, harness) {
 
 // Só lê: procura o nome do script do guard (a sintaxe de hooks do Codex não está verificada nesta versão).
 function codexHookState(configPath) {
-  const p = configPath || path.join(process.env.CODEX_HOME || path.join(require("os").homedir(), ".codex"), "config.toml");
+  const p = configPath || path.join(process.env.CODEX_HOME || path.join(homedir(), ".codex"), "config.toml");
   if (!fs.existsSync(p)) return "sem-config";
   try { return fs.readFileSync(p, "utf8").includes("context-guard") ? "ligado" : "ausente"; } catch (e) { return "sem-config"; }
 }

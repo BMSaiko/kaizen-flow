@@ -5,12 +5,13 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 const { init } = require("./init.js");
 const { pythonCmd } = require("./python.js");
+const { PY_FLAGS, pyEnv } = require("../env.js");
 
 const PROJECT = "demo";
 
 // corre um comando no projeto de exemplo; falha (exceção) se o rc não for 0
 function run(cmd, args, cwd, label, okRcs = [0]) {
-  const r = spawnSync(cmd, args, { cwd, encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
+  const r = spawnSync(cmd, args, { cwd, encoding: "utf8", env: pyEnv() });
   if (!okRcs.includes(r.status)) throw new Error(`${label} falhou (rc ${r.status}): ${(r.stderr || r.stdout || "").trim()}`);
   for (const line of (r.stdout || "").split(/\r?\n/).filter(Boolean)) console.log(`    ${line}`);
   return r.stdout || "";
@@ -25,7 +26,7 @@ function demo(args) {
   if (!python) throw new Error("falta: Python 3 no PATH (ou KAIZEN_PYTHON)");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-demo-"));
   console.log(`demo: ${dir}`);
-  const py = (script, rest, label, okRcs) => run(python, ["-I", "-B", path.join("scripts", script), ...rest], dir, label, okRcs);
+  const py = (script, rest, label, okRcs) => run(python, [...PY_FLAGS, path.join("scripts", script), ...rest], dir, label, okRcs);
   try {
     console.log("[init] repo git novo e peças do kaizen-flow (skills, comandos, scripts)");
     run("git", ["init", "-q"], dir, "git init");

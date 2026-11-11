@@ -3,10 +3,11 @@ const fs = require("fs");
 const { spawnSync } = require("child_process");
 const path = require("path");
 const { plan, overlay, files, sha } = require("../sync.js");
+const { homedir } = require("../env.js");
 
 const PKG = path.resolve(__dirname, "..", "..");
 const CORE_DIR = path.join(PKG, "core");
-const VAULT = process.env.KAIZEN_SOURCE || path.join(require("os").homedir(), "Documents", "Second-Brain");
+const VAULT = process.env.KAIZEN_SOURCE || path.join(homedir(), "Documents", "Second-Brain");
 
 // cpSync recursivo escreve em caminhos com mojibake quando o destino tem Unicode (Node 22, Windows)
 function copy(src, dst) {
