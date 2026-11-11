@@ -310,7 +310,7 @@ def split(value):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Cria um SP vazio em sp/TODO")
-    ap.add_argument("--project", required=True)
+    ap.add_argument("--project", required=True, type=lambda v: v.replace("\\", "/").rstrip("/").split("/")[-1])
     ap.add_argument("--slug")
     ap.add_argument("--program", metavar="SLUG", help="cria um SP-mãe com os filhos de --children")
     ap.add_argument("--children", help="a,b:a,c:a+b (b depende de a; c de a e b)")

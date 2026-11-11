@@ -351,3 +351,13 @@ def test_main_testes_para_ao_atingir_limite(tmp_path, capsys):
     assert sp_gates.main(["--testes", str(repo), "--sp", str(sp)]) == 1
     assert sp_gates.main(["--testes", str(repo), "--sp", str(sp)]) == sp_gates.RC_LIMITE
     assert sp.read_text(encoding="utf-8").count("- tentativa") == 1
+
+
+def test_main_com_caminho_do_sp_corre_os_gates(tmp_path):
+    sp = tmp_path / "x.md"
+    sp.write_text(sp_text((f"{PY} -c pass", {})), encoding="utf-8")
+    try:
+        rc = sp_gates.main([str(sp)])
+    except SystemExit as e:
+        rc = e.code
+    assert rc in (0, None)

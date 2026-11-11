@@ -68,12 +68,10 @@ def consume(path, out=print):
 
 
 def _fila(root):
-    try:
-        return pe.criar_fila(FILA, root=root)
-    except pe.ErroEstado as e:
-        if "já existe" not in str(e):
-            raise
-        return pe.fila_id(FILA)
+    fid = pe.fila_id(FILA)
+    if (pe.raiz(root) / fid).exists():  # verifica a pasta, não o texto do erro de `criar_fila`
+        return fid
+    return pe.criar_fila(FILA, root=root)
 
 
 def _enviar(backend, pane, texto, run, sleep):

@@ -203,3 +203,13 @@ def test_seguinte_nunca_relanca_sp_ja_doing_nem_ja_lancado(tmp_path):
 
 
 # --- relatório integrado com a vigia (fila-relatorio-integrado) ---
+
+
+def test_fim_guarda_ultima_json_para_o_gastos(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Done")
+    st = _estado(tmp_path, sessoes={"a": {}})
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0))
+    assert out["acao"] == "fim" and not st.exists()
+    assert json.loads(st.with_name("ultima.json").read_text(encoding="utf-8"))["sessoes"] == {"a": {}}
+    assert st.with_name("ultima.json").is_file()

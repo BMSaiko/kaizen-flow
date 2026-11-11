@@ -5,6 +5,7 @@ Uso:
 
 Arranca sozinho com `sp-fila.py` em paralelo; `sp-fila.py --parar` termina-o. Pidfile, log e memória
 (`vigia.pid`, `vigia.log`, `vigia.json`) ficam na pasta da fila de painéis. Um só vigia por fila.
+rc: 0 fim da fila (ou --uma-vez), 1 erro
 """
 import argparse
 import os

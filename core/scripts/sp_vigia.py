@@ -3,7 +3,10 @@
 `passo(ctx, mem)` é um tick: `done` de SP auto → merge (lock global do `sb-agent`), fecha o painel, limpa a worktree e
 lança o seguinte; SP manual, gates vermelhos ou conflito → `bloqueado` com motivo; `pergunta`/`bloqueado`/`falhou` →
 título `? `/`! `/`x ` + toast, um por transição; painel morto sem estado → `falhou`. Devolve "continua" ou "fim".
-Os efeitos vivem no `Contexto` (o real é `ContextoReal`; os testes trocam-no)."""
+Os efeitos vivem no `Contexto` (o real é `ContextoReal`; os testes trocam-no).
+
+Uso: módulo importado por sp-vigia.py; sem execução direta
+rc: sem execução direta"""
 import json
 import os
 import re

@@ -461,3 +461,15 @@ def test_sp_fila_estado_delega_no_modulo_novo():
     import sp_fila_estado
     assert sp_fila_estado.bloqueio is pe.bloqueio and sp_fila_estado.guardar is pe.guardar
     assert sp_fila_estado.pid_vivo is pe.pid_vivo and sp_fila_estado.migrar_para_filas
+
+
+def test_listar_omite_arvores_terminadas_e_todas_mostra(tmp_path):
+    velha = pe.criar_fila(programa="velha", ordem=["v1"], root=tmp_path, agora=T0)
+    pe.registar(velha, "v1", root=tmp_path, agora=T0)
+    pe.transitar("v1", "a-correr", root=tmp_path, agora=T0)
+    pe.transitar("v1", "done", root=tmp_path, agora=T0)
+    viva = pe.criar_fila(programa="viva", ordem=["x1"], root=tmp_path, agora=T0)
+    pe.registar(viva, "x1", root=tmp_path, agora=T0)
+    texto = cli.listar(tmp_path)
+    assert "viva" in texto and "velha" not in texto
+    assert "velha" in cli.listar(tmp_path, todas=True)

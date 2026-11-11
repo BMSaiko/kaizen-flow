@@ -38,6 +38,8 @@ from sp_fila_plano import descendentes, limite, load, plan, render_plan, sem_com
 from sp_fila_relatorio import gastos, relatorio, render_gastos  # noqa: E402,F401
 from sp_fila_execucao import (_custos, _ler_sp,  # noqa: E402,F401
                               seguinte, IntegracaoPendente, SlugObrigatorio)
+import sp_fila_estado  # noqa: E402
+from sp_fila_estado import estado_de  # noqa: E402
 import sp_fila_execucao  # noqa: E402
 import sp_fila_paineis  # noqa: E402
 import sp_vigia  # noqa: E402
@@ -156,6 +158,11 @@ def main(argv=None):
     if args.max is None and not args.concorrencia:
         args.max = MAX_DEFEITO  # em paralelo None = sem máximo
     estado = Path(args.estado)
+    if args.estado == str(ESTADO):  # defeito: o estado é da mãe (`--programa`) ou onde está o SP (`--seguinte --slug`)
+        if args.programa:
+            estado = estado_de(args.programa)
+        elif args.seguinte or args.gastos or args.parar:
+            estado = sp_fila_estado.localizar(args.slug) or estado
     if args.concorrencia is not None and args.concorrencia < 1:
         print(f"erro: --concorrencia exige N >= 1 (recebido {args.concorrencia}); sem a opção a fila corre em série", file=sys.stderr)
         return 1
@@ -190,6 +197,8 @@ def main(argv=None):
         print("fila abandonada")
         return 0
     if args.gastos:
+        if not estado.exists() and estado.with_name("ultima.json").exists():
+            estado = estado.with_name("ultima.json")  # fila já terminada: os gastos ficam consultáveis
         if not estado.exists():
             print("erro: sem fila em curso", file=sys.stderr)
             return 1

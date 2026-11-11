@@ -249,3 +249,17 @@ def test_parar_abandona_estado_corrompido(tmp_path, capsys):
     st = tmp_path / "e.json"
     st.write_text("{lixo", encoding="utf-8")
     assert sp_fila.main(["--parar", "--estado", str(st)]) == 0 and not st.exists()
+
+
+def test_estado_por_mae_nao_se_partilha(tmp_path):
+    import sp_fila_estado as fe
+    a, b = fe.estado_de("mae-a", tmp_path), fe.estado_de("mae-b", tmp_path)
+    assert a != b and a.name == "fila.json"
+    a.parent.mkdir(parents=True)
+    b.parent.mkdir(parents=True)
+    fe.guardar(a, {"sessoes": {"ta1": {}}})
+    fe.guardar(b, {"sessoes": {"tb1": {}}})
+    assert fe.estados_existentes(tmp_path) == [a, b]
+    assert fe.localizar("tb1", tmp_path, tmp_path / "x.json") == b
+    assert fe.localizar("nada", tmp_path, tmp_path / "x.json") is None
+    assert fe.localizar(None, tmp_path, tmp_path / "x.json") is None  # ambíguo: duas filas

@@ -39,3 +39,10 @@ def test_nao_sobrescreve_sem_forcar(tmp_path):
 
 def test_main_origem_inexistente_rc1(tmp_path):
     assert sp_prova.main(["p", "--arquivo", str(tmp_path / "nao"), "--root", str(tmp_path)]) == 1
+
+
+def test_project_com_barra_nao_duplica_caminho(tmp_path):
+    src = tmp_path / "x.txt"
+    src.write_text("a")
+    a = sp_prova.destino(tmp_path, "p", "kaizen/kaizenflow")
+    assert a == sp_prova.destino(tmp_path, "p", "kaizenflow")

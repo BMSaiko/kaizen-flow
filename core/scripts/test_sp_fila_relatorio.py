@@ -110,3 +110,9 @@ def test_commit_md_lista_o_relatorio(tmp_path):
 
 
 # --- fc-robustez: cenários de falha do modo --concorrencia ---
+
+
+def test_gastos_acha_o_custo_pelo_slug_sem_sufixo_de_data():
+    from sp_fila_relatorio import gastos
+    linhas, total = gastos({"feitos": ["meu-sp-2026-11-11"]}, {"meu-sp": 1.5})
+    assert linhas == [("meu-sp-2026-11-11", 1.5)] and total == 1.5

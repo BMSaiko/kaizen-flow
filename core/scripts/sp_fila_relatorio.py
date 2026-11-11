@@ -4,6 +4,7 @@ Uso: módulo importado por sp-fila.py; sem execução direta
 rc: n/a
 """
 from pathlib import Path
+import re
 import sys
 from pathlib import Path
 
@@ -16,7 +17,8 @@ from sp_fila_estado import REPO
 def gastos(estado, custos):
     """[(slug, USD)] das sessões da corrida (em curso, feitas e falhadas) e o total. Só mede, nunca limita."""
     slugs = [*estado.get("sessoes", {}), *estado.get("feitos", []), *estado.get("falhados", [])]
-    linhas = [(s, custos.get(s, 0.0)) for s in dict.fromkeys(slugs)]
+    # o claude-usage atribui o custo ao slug sem o sufixo de data; o estado guarda o slug completo
+    linhas = [(s, custos.get(s) or custos.get(re.sub(r"-\d{4}-\d{2}-\d{2}$", "", s), 0.0)) for s in dict.fromkeys(slugs)]
     return linhas, sum(c for _, c in linhas)
 
 

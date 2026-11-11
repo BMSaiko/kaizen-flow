@@ -81,10 +81,20 @@ def move(root, slug, dest, project=None):
         matches = [sp for sp in matches if sp.project == project]
     if not matches:
         raise SpMoveError(f"SP '{slug}' não encontrado; ver scripts/sp-list.py")
+    dups = []
+    if target == "Done" and len({sp.project for sp in matches}) == 1 and len(matches) > 1:
+        # fechar: a cópia em TODO é resto de um fecho mal arrumado (a mãe fica duplicada); sai
+        dups = [sp for sp in matches if sp.status == "TODO"]
+        if len(dups) < len(matches):
+            matches = [sp for sp in matches if sp.status != "TODO"]
     if len(matches) > 1:
         opts = ", ".join(f"{sp.project} ({sp.status})" for sp in matches)
         raise SpMoveError(f"SP '{slug}' ambíguo: {opts}; usar --project")
     sp = matches[0]
+    for d in dups:  # a cópia desatualizada sai sempre, mesmo que o SP já esteja no destino
+        if d.path != sp.path and d.path.exists():
+            kaizen_engine.relocate(d.path, d.path.with_suffix(".md.dup"))
+            d.path.with_suffix(".md.dup").unlink()
     if sp.status == target:
         return f"{slug}: já está em {target} ({sp.path})"
     if target == "Doing":

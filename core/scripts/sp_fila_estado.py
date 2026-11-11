@@ -22,6 +22,7 @@ REPO = Path(__file__).resolve().parent.parent
 USER = _cfg.user_name(REPO)
 SCRIPTS = Path(__file__).resolve().parent
 ESTADO = Path.home() / ".claude" / "sp-fila-estado.json"
+ESTADOS_DIR = Path.home() / ".claude" / "sp-fila"  # um estado por mãe: `<mãe>/fila.json`
 RELATORIOS = REPO / "knowledge" / "infra" / "reports" / "sp-fila"
 REQ_POR_SP = 50  # unidade de contagem do teto opt-in (--orcamento / orcamento_requests); por defeito sem limite
 ORCAMENTO = None  # sem limite de requests
@@ -30,6 +31,32 @@ MAX_DEFEITO = 5
 
 
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def estado_de(programa, base=None):
+    """Caminho do estado da fila da mãe `programa` (`<base>/<mãe>/fila.json`); duas mães não partilham estado."""
+    return Path(base or ESTADOS_DIR) / programa / "fila.json"
+
+
+def estados_existentes(base=None):
+    """Estados por mãe que existem em disco, por ordem de nome."""
+    d = Path(base or ESTADOS_DIR)
+    return sorted(d.glob("*/fila.json")) if d.is_dir() else []
+
+
+def localizar(slug=None, base=None, legado=None):
+    """Estado onde está o SP `slug` (em `sessoes`); sem slug, o único existente; None se não há ou é ambíguo."""
+    legado = Path(legado or ESTADO)
+    cands = estados_existentes(base) + ([legado] if legado.exists() else [])
+    if slug:
+        for c in cands:
+            try:
+                if slug in ler(c).get("sessoes", {}):
+                    return c
+            except (OSError, ValueError):
+                continue
+        return None
+    return cands[0] if len(cands) == 1 else None
 
 
 def run_hidden(*args, **kwargs):

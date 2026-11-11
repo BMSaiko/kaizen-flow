@@ -176,8 +176,12 @@ FILA_ESTADO = Path.home() / ".claude" / "sp-fila-estado.json"
 
 def em_fila(slug, estado=None):
     """True se `slug` é uma sessão lançada pela fila (consta de `sessoes` no estado)."""
+    if estado is None:  # estados por mãe (`~/.claude/sp-fila/<mãe>/fila.json`) e o único antigo
+        base = Path.home() / ".claude" / "sp-fila"
+        cands = sorted(base.glob("*/fila.json")) if base.is_dir() else []
+        return any(em_fila(slug, c) for c in cands + [FILA_ESTADO])
     try:
-        return slug in json.loads(Path(estado or FILA_ESTADO).read_text(encoding="utf-8")).get("sessoes", {})
+        return slug in json.loads(Path(estado).read_text(encoding="utf-8")).get("sessoes", {})
     except (OSError, ValueError, AttributeError):
         return False
 

@@ -489,3 +489,36 @@ def test_parar_termina_o_vigia_antes_de_apagar_a_fila(tmp_path, monkeypatch, cap
     assert sp_fila.main(["--parar", "--estado", str(st)]) == 0
     assert mortos == [(777, True)] and "vigia 777 terminado" in capsys.readouterr().out
     assert not (pe.raiz() / fid).exists()
+
+
+def test_segunda_mae_arranca_com_estado_proprio(tmp_path, monkeypatch, capsys):
+    import sp_fila_estado as fe
+    root = tmp_path / "sps"
+    for m in ("mae-a", "mae-b"):
+        make_sp(root, m, kind="program", modo="manual", extra={"execucao": "paralelo"})
+        make_sp(root, m + "-f1", extra={"parent": m})
+    base = tmp_path / "estados"
+    monkeypatch.setattr(fe, "ESTADOS_DIR", base)
+    em_curso = fe.estado_de("mae-a")
+    em_curso.parent.mkdir(parents=True)
+    fe.guardar(em_curso, {"sessoes": {"mae-a-f1": {}}, "feitos": [], "falhados": [], "inicio": datetime.now().isoformat(timespec="seconds")})
+    monkeypatch.setattr(sp_fila.sp_fila_execucao, "_backend_defeito", lambda: PainelFalso())
+    monkeypatch.setattr(sp_fila, "seguinte", lambda *a, **k: {"acao": "espera", "sessoes": ["mae-a-f1"], "pendentes": ["mae-b-f1"]})
+    monkeypatch.setattr(sp_fila, "_arrancar_vigia", lambda *a, **k: None)
+    rc = sp_fila.main(["--programa", "mae-b", "--root", str(root), "--relatorios", str(tmp_path / "rel")])
+    assert rc == 0, capsys.readouterr().err
+    assert fe.estado_de("mae-b").exists() and fe.estado_de("mae-a").exists()
+    assert "sem vaga de painel" in capsys.readouterr().out
+
+
+def test_mae_com_um_so_filho_fecha_no_fim(tmp_path):
+    root = tmp_path / "sps"
+    _prog(root, "sequencial", filhos=(("a", ()),))
+    st = _estado(tmp_path, concorrencia=1, max=None, modo="sequencial", programa="mae", projeto="p")
+    t = datetime(2026, 11, 10, 12, 0)
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), t)
+    assert out["slugs"] == ["a"]
+    _fechar(root, "a")
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), t, slug="a")
+    assert out["acao"] == "fim" and out["fechar_mae"] == "mae"
+    assert Path(out["relatorio"]).is_file()

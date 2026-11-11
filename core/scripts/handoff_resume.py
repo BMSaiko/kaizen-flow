@@ -5,7 +5,8 @@ Não apaga nada: só injeta `additionalContext` a mandar correr `handoff.py --co
 Ignora `*-pendentes.md` (gerados no fim de sessão) e handoffs com mais de `MAX_AGE_H` horas.
 Qualquer erro: rc 0 sem saída (nunca falha o arranque).
 
-Uso (settings.json): python -I scripts/handoff_resume.py   (JSON do hook no stdin)
+Uso: python -I scripts/handoff_resume.py   (hook SessionStart em settings.json; JSON do hook no stdin)
+rc: 0 sempre
 """
 import json
 import sys

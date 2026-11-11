@@ -220,7 +220,7 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
             alvo_mae = _mae_na_worktree(mae, run) if mae is not None else None
             if alvo_mae is not None:
                 progresso(alvo_mae, estado, fila, motivo, agora)
-        Path(estado_path).unlink()
+        Path(estado_path).replace(Path(estado_path).with_name("ultima.json"))  # `--gastos` lê-o depois do fim
         # Programa com a árvore toda em Done (em master): o principal fecha a mãe na worktree dela.
         fechar = estado.get("programa") if so and all(sp.status == "Done" for sp, _ in items if sp.slug in so) else None
         return {"acao": "fim", "motivo": motivo, "relatorio": str(path), "fechar_mae": fechar}

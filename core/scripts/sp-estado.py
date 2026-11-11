@@ -105,9 +105,14 @@ def _uma_linha(texto):
     return " ".join("".join(c if c.isprintable() else " " for c in str(texto)).split())
 
 
-def listar(root=None, em_json=False):
-    """Filas e SPs pelo nome, com as vagas livres do teto global. O pane nunca sai: o user vê o slug."""
+def listar(root=None, em_json=False, todas=False):
+    """Filas e SPs pelo nome, com as vagas livres do teto global. O pane nunca sai: o user vê o slug.
+
+    Árvores já terminadas (todos os SPs em done/falhou) ficam de fora, a não ser com `todas`."""
     filas = sp_painel_estado.filas(root)
+    if not todas:
+        filas = [f for f in filas if f.get("erro") or not f["sps"]
+                 or any(sp["estado"] not in sp_painel_estado.FINAIS for sp in f["sps"])]
     livres, teto = sp_painel_estado.vagas_livres(root), sp_painel_estado.MAX_PARALELO
     if em_json:
         limpas = [{**f, "sps": [{k: v for k, v in sp.items() if k != "pane"} for sp in f["sps"]]} for f in filas]
@@ -136,13 +141,14 @@ def main(argv=None):
     ap.add_argument("--root", help=f"pasta do estado das filas (por defeito ${sp_painel_estado.ENV_ROOT} ou ~/.claude/sp-fila)")
     ap.add_argument("--listar", action="store_true", help="todas as filas e SPs pelo nome")
     ap.add_argument("--json", action="store_true", help="com --listar: saída em JSON")
+    ap.add_argument("--todas", action="store_true", help="com --listar: inclui as filas já terminadas")
     ap.add_argument("--migrar", action="store_true", help="converter o sp-fila-estado.json antigo numa fila")
     ap.add_argument("--antigo", help="com --migrar: caminho do estado antigo")
     args = ap.parse_args(argv)
     if args.listar or args.migrar or args.novo is not None:
         try:
             if args.listar:
-                print(listar(args.root, args.json))
+                print(listar(args.root, args.json, args.todas))
             elif args.migrar:
                 fid = sp_painel_estado.migrar_antigo(args.antigo, root=args.root)
                 print(f"migrado para a fila {fid}" if fid else "sem estado antigo: nada a migrar")

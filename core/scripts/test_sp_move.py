@@ -333,3 +333,11 @@ def test_tipo_dr_move_doc_e_rejeita_opcoes_de_sp(tmp_path, capsys):
         sp_move.main(["--root", str(tmp_path), "--tipo", "dr", "x", "done", "--start"])
     assert sp_move.main(["--root", str(tmp_path), "--tipo", "dr", "nao-existe", "done"]) == 1
     assert "não encontrado" in capsys.readouterr().err
+
+
+def test_copia_em_todo_e_removida_ao_fechar(tmp_path):
+    todo = make_sp(tmp_path, "atlas/sp/TODO", "mae")
+    make_sp(tmp_path, "atlas/sp/Doing", "mae", status="Doing")
+    sp_move.move(tmp_path, "mae", "done")
+    assert not todo.exists() and not (tmp_path / "atlas/sp/Doing/mae.md").exists()
+    assert (tmp_path / "atlas/sp/Done/mae.md").exists()
