@@ -36,23 +36,14 @@ Regras que saíram do `SKILL.md` sem alteração de contrato. Prova, reflect por
 
 Build/tests/lint/typecheck/e2e aplicáveis; cada comando e RC vão para o report; falha = corrigir a causa e repetir todos, sem `|| true`. Ordem: gates → `/harden` → `/pentest` → `/review-ciclo` (`michi-gates.md`). SP com `gates:`: `python -I scripts/sp-gates.py <SP>` (rc≠0 = não fecha). **Fecho num só passo:** `python -I scripts/sp-fechar.py <slug> [--next]` = gates + context-budget + `done` + `COMMIT_*.md` (pára sem mover se falhar). Antes de `sp-move.py ... done` e do `COMMIT_*.md`: prova de done como cliente final, em `## Prova de done` (se falhar, o SP não passa a Done); E2E de fecho de árvore só quando este SP fecha mãe+filhos+netos (`sp-list.py --tree-closed <slug>`). Detalhe: `michi-fases-detalhe.md` §Fase 5.
 
-## Sub-agentes
+## Painéis
 
-Por defeito não há sub-agentes: o michi e todas as fases correm na sessão principal. Esta secção só se aplica com pedido explícito do user. Papéis via `python -I scripts/modelos.py get <papel>` (nunca IDs no texto). Prompt mínimo: slug ou caminho + skill + limite de linhas; o resultado completo vai para ficheiro (Brief, achados) e só o resumo volta. Vazio ou falha = fazer a fase no principal, sem bloquear. Grill, DP, DA, pentest, PR e commit ficam no principal.
+Não há sub-agentes (`Agent`): o michi e todas as fases correm na sessão principal. Outra sessão é sempre um painel WezTerm com `claude` próprio: `/sp-fila` (um painel por SP, vigia `sp-vigia.py`), `sp-autor.py` (preencher um SP) ou `--painel`. Cada painel commita na sua worktree e reporta o estado em ficheiro, nunca por mensagem:
 
-| Fase | Papel | Devolve |
-|---|---|---|
-| 2 DR | `sub-agente` | caminho do Brief + síntese ≤20 linhas |
-| 5 Gates | `michi-leve` | tabela `cmd\|RC` + ≤10 linhas do 1.º falhado; corrige o principal |
-| 5 harden | `sub-agente` | achados ≤10 linhas |
-| 7 Review | `sub-agente` | ficheiro de achados (formato do `review-ciclo`); no chat ≤20 linhas |
-| 9 Report, 10 Reflect | `michi-leve` | texto para o SP |
+- `python -I scripts/sp-estado.py <slug> done|pergunta|bloqueado|falhou --msg "<texto>"` (o `sp-autor` usa a chave `sp-autor-<slug>` na fila `sp-autor`); antes de parar a meio, gravar `## Progresso` no SP.
+- O principal (ou o user) lê com `python -I scripts/sp-estado.py --listar`: `pergunta` → `AskUserQuestion` e a resposta vai ao painel pelo user; `done` → propor `sb-worktree.py merge <slug>` (automático com `commit: auto`); `bloqueado`/`falhou` → resumo ao user.
 
-**Michi num sub-agent** (`michi-lancar.py`; modelo do `michi_modelo`, `effort` low): sem `AskUserQuestion`; as fases acima usam `Agent` se existir no sub-agent (aninhamento confirmado em 2026-11-10), senão correm nele. Sem painéis nem `sp-handoff --launch`; sem merge nem `clean`. `modo: manual`: sign-off do DP e proposta de commit saem como `pergunta`. Só com pedido explícito do user; o `/sp-fila` não usa sub-agents (painéis + vigia, ver `kaizen-flow.md` §Orquestrador). Protocolo de retorno, última linha `ESTADO: done|pergunta|bloqueado|falhou|continuar`:
-- `pergunta` → `AskUserQuestion` do principal e `SendMessage` ao sub-agent com a resposta.
-- `done` → propor `sb-worktree.py merge <slug>` (automático com `commit: auto`); quem encadeia o SP seguinte é o principal.
-- `continuar` → o sub-agent gravou `## Progresso`; o principal lança outro `Agent` com o mesmo plano.
-- `bloqueado`/`falhou` → resumo ao user.
+Num painel de fila: sem merge nem `clean` (faz o vigia) e quem encadeia o SP seguinte é o driver (`kaizen-flow.md` §Orquestrador).
 
 ## Contexto (context-guard)
 
@@ -62,7 +53,7 @@ Se aparecer `[context-guard] Contexto … >= limite`: acabar o passo em curso (n
 |---|---|---|
 | Fim de fase com verificação verde, SP em Doing | `/sp-handoff` manual: regista `## Progresso`, pergunta sim/não | um por fase, não por passo; nunca a meio de edição/teste; não repetir se o guard já o fez nessa fase |
 | `[context-guard]` ≥ limite | `--launch --auto`, sem perguntar | acabar o passo em curso primeiro |
-| `[context-guard]` dentro de sub-agent | grava `## Progresso`, devolve `ESTADO: continuar` | nunca abre painel |
+| `[context-guard]` dentro de um painel de fila | grava `## Progresso` e `sp-estado.py <slug> bloqueado --msg contexto` | nunca abre outro painel |
 | Modo auto (`--auto`) | `--launch --auto` por fase | sem `AskUserQuestion` |
 | Sem SP em Doing | nada (`/handoff` só em conversa livre) | |
 | `/michi` com contexto ≥ 40K (`CLAUDE_MICHI_START_LIMIT`) | `[context-guard]` no arranque: `/sp-handoff --launch --auto`, sem perguntar | uma vez por sessão; não começar o ciclo na sessão cheia |

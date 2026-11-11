@@ -75,7 +75,7 @@ python scripts/sp-new.py --project app --slug login --priority P2
 
 ### `painelBackend`
 
-Where `sp-handoff --spawn` opens the new session (`sp-fila --concorrencia N` uses `Agent` subagents and ignores it):
+Where `sp-handoff --spawn` opens the new session (`sp-fila --concorrencia N` and `sp-autor.py` open their panes through the same backend):
 
 | Value | Behaviour |
 |---|---|

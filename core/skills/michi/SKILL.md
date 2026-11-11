@@ -27,7 +27,7 @@ license: MIT
 | 10 | Reflect | `/reflect final` | A/B/C proposto; o user aplica | user |
 | 11 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | user |
 
-Sem `Agent`: fases na sessão principal (delegar só a pedido do user: §Sub-agentes).
+Sem `Agent`: fases na sessão principal; outra sessão = painel WezTerm (`michi-orquestracao.md` §Painéis).
 
 Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_requests`, go/no-go em Decisões; `references/michi-spike.md`.
 
@@ -37,12 +37,12 @@ Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_reque
 
 1. `python -I scripts/sp-estado.py <slug>` (fase, passos, gates, ramo) e ler `perfil`/`max_tentativas`/`parar_se`. SP vazio = Grill, não paragem; correr sempre o Arranque todo e a «sessão suja» (`michi-orquestracao.md`) antes da fase 1. «SP não encontrado»: ramo atrás de `master` → `git merge master` e repetir.
 2. SP em TODO (p.ex. vindo de `/sp-handoff`): `python -I scripts/sp-move.py <slug> --start` (move o SP e as mães em TODO para Doing, idempotente). `python -I scripts/sb-worktree.py ensure <slug>`; editar pelo caminho absoluto da worktree; `merge` + `clean` só no fecho com o SP em Done.
-3. `python -I scripts/tab-title.py <slug>` e seguir nesta sessão: sem `michi-lancar.py` nem `Agent` (só com pedido explícito do user; `ESTADO:` em §Sub-agentes). Painel WezTerm só com `--painel` (`michi_handoff_auto.py decide --painel`, `go <slug>`). Já dentro de um sub-agent ou `--handed`: seguir sem relançar.
+3. `python -I scripts/tab-title.py <slug>` e seguir nesta sessão, sem `Agent`. Painel WezTerm só com `--painel` (`michi_handoff_auto.py decide --painel`, `go <slug>`). Já dentro de um painel ou `--handed`: seguir sem relançar.
 4. Modo: `--auto` ou `modo: auto` no frontmatter = sem `AskUserQuestion` (`modo: manual` = sem auto, sem pergunta); sem nenhum, perguntar «com/sem auto» (`michi-modo-auto.md`).
    Se o `sp-estado` diz `execução: por escolher` (SP-mãe com filhos), mesmo em `modo: manual`, `AskUserQuestion` «sequencial ou paralelo?» (caso a caso, sem defeito) e gravar antes de lançar: `python -I scripts/sp-execucao.py <slug> sequencial|paralelo`; com `execucao:` preenchido não perguntar. Depois `/sp-fila --programa <slug>` (sequencial = um filho de cada vez; paralelo = até 3 painéis no total, com o vigia a fazer merge e avisos).
 5. Checkpoint: `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate.
 
-Hooks (`michi.<phase.start|phase.end|gate.failed|commit|closed>`), sessão suja, handoff, `[context-guard]`, sub-agentes: `michi-orquestracao.md`.
+Hooks (`michi.<phase.start|phase.end|gate.failed|commit|closed>`), sessão suja, handoff, `[context-guard]`, painéis: `michi-orquestracao.md`.
 
 ## Regras transversais
 

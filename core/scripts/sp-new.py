@@ -268,7 +268,8 @@ def parse_niveis(text):
     return niveis
 
 
-def create_program(root, project, slug, priority, today, children, modo="manual", auth=None, niveis=None, gates=()):
+def create_program(root, project, slug, priority, today, children, modo="manual", auth=None, niveis=None, gates=(), michi="default"):
+    """Mãe + filhos; `gates` e `michi` valem para todos os filhos (`niveis` sobrepõe o nível por filho)."""
     root = Path(root)
     auth = check_auth(auth)
     names = [name for name, _ in children]
@@ -299,7 +300,7 @@ def create_program(root, project, slug, priority, today, children, modo="manual"
         extra += [f"  - slug: {name}", f"    depends_on: [{', '.join(deps)}]", "    state: TODO"]
     paths = [create(root, project, slug, priority, today, extra=extra, modo=modo, auth=auth, programa=True)]
     for name, deps in children:
-        paths.append(create(root, project, name, priority, today, parent=slug, depends_on=deps, modo=modo, auth=auth, gates=gates, michi=(niveis or {}).get(name, "default")))
+        paths.append(create(root, project, name, priority, today, parent=slug, depends_on=deps, modo=modo, auth=auth, gates=gates, michi=(niveis or {}).get(name, michi)))
     return paths
 
 
@@ -359,7 +360,7 @@ def main(argv=None):
                 raise SpNewError("--program exige --children")
             children = [(fs(n), [fs(d) for d in deps]) for n, deps in parse_children(args.children)]
             niveis = {fs(n): v for n, v in parse_niveis(args.children).items()}
-            paths = create_program(args.root, args.project, fs(args.program), args.priority, today, children, args.modo, auth, niveis, args.gate)
+            paths = create_program(args.root, args.project, fs(args.program), args.priority, today, children, args.modo, auth, niveis, args.gate, args.michi)
             print("\n".join(str(p) for p in paths))
             if args.modo != "auto":
                 print("aviso: programa em modo: manual; sp-fila para a cada pergunta/commit. "
@@ -376,7 +377,7 @@ def main(argv=None):
             if args.parent:
                 link_parent(args.root, args.project, args.parent, args.slug, args.depends_on)
             print(path)
-            print(f"modelo sp-autor (Agent que preenche o SP): {_modelo_sp_autor()}", file=sys.stderr)
+            print(f"modelo sp-autor (painel sp-autor.py que preenche o SP): {_modelo_sp_autor()}", file=sys.stderr)
         else:
             raise SpNewError("indicar --slug (ou --program com --children)")
     except SpNewError as exc:

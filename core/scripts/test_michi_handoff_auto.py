@@ -108,7 +108,7 @@ def test_origem_prefere_wezterm_e_cai_para_tmux(monkeypatch):
 def test_main_decide_imprime_estado_e_motivo(monkeypatch, capsys):
     monkeypatch.setattr(mha, "esperado", lambda: "claude-sonnet-5-5")
     assert mha.main(["decide", "--sessao", "claude-opus-5-5"]) == 0
-    assert capsys.readouterr().out.startswith("subagent ")
+    assert capsys.readouterr().out.startswith("ficar ")
 
 
 def test_main_go_sem_painel_interativo_avisa_e_sai_1(monkeypatch, capsys):
@@ -160,9 +160,10 @@ def test_spawn_real_encadeia_ensure_painel_prompt_e_comando(monkeypatch):
     assert passos == [("pane", "C:/wt/abc"), ("wait", "9"), ("send", "/michi --auto abc --handed")]
 
 
-def test_decide_por_defeito_e_subagent():
-    assert mha.decide("claude-opus-5-5", "claude-sonnet-5-5")[0] == "subagent"
-    assert mha.decide("claude-sonnet-5-5", None)[0] == "subagent"
+def test_decide_por_defeito_fica_na_sessao():
+    assert mha.decide("claude-opus-5-5", "claude-sonnet-5-5")[0] == "ficar"
+    assert mha.decide("claude-sonnet-5-5", None)[0] == "ficar"
+    assert "Agent" not in mha.decide("claude-opus-5-5", "claude-sonnet-5-5")[1]
 
 
 def test_decide_dentro_de_subagent_fica():

@@ -62,7 +62,7 @@ Todo o script tem teste dedicado, exceto os da tabela, que têm justificação.
 | `sp_fila_estado/execucao/paralelo/plano/relatorio.py` | módulos internos de `sp-fila.py`, exercitados por `test_sp_fila_*.py` (auxiliares em `sp_fila_testlib.py`) |
 | `handoff_spawn.py` | `test_handoff_spawn.py` (`run`/`sleep`/`copy` falsos) |
 | `sp_painel_estado.py` | `test_sp_painel_estado.py` (estado por fila e por SP, `sp-estado.py` com estado, `--listar`, `--migrar`) |
-| `michi-lancar.py` | `test_michi_lancar.py` |
+| `sp-autor.py` | `test_sp_autor_painel.py` |
 | `handoff_pane.py` (socket) | `test_handoff_socket.py` (socket do WezTerm morto, painel inexistente; `run` injetado) |
 | `context-guard.py` | hook do vault; o teste (`test_context_guard.py`) fica no vault porque afirma textos em português (ver `SKIP` em `bin/sync.js`) |
 | `wt_redirect.py` | depende de `sb-worktree.py` do vault; o teste (`test_wt_redirect.py`) fica no vault (`SKIP`) |

@@ -200,6 +200,19 @@ def test_cli_program_aplica_modo_e_commit_aos_filhos(tmp_path):
         assert "\nmodo: auto\n" in text and "commit: auto" in text
 
 
+def test_cli_program_propaga_gate_e_michi_aos_filhos(tmp_path):
+    root = project(tmp_path)
+    args = ["--project", "atlas", "--program", "prog", "--children", "a,b@simples:a", "--priority", "P2", "--root", str(root),
+            "--gate", "python -m pytest x.py -q", "--michi", "complexo"]
+    assert sp_new.main(args) == 0
+    filhos = {p.name: p.read_text(encoding="utf-8") for p in (root / "atlas/sp/TODO").glob("*.md") if "prog" not in p.name}
+    assert len(filhos) == 2
+    for nome, text in filhos.items():
+        assert "cmd: python -m pytest x.py -q" in text, nome
+        nivel = "simples" if "-b-" in nome else "complexo"
+        assert f"michi_modelo: {nivel}" in text, nome
+
+
 def test_autorizacoes_vao_para_o_frontmatter_e_validam(tmp_path):
     auth = {"commit": "auto", "push": "nunca", "pr": "nunca", "restricoes": "não tocar em AGENTS.md"}
     path = sp_new.create(project(tmp_path), "atlas", "abc", "P2", TODAY, auth=auth)

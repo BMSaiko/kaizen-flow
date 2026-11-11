@@ -73,7 +73,7 @@ More detail in [Install](#install) and the [documentation](#documentation).
   <img src="docs/assets/sp-fila-parallel.svg" alt="sp-fila parallel: up to N panes, one worktree each, a watcher that brings blocked panes to you" width="100%">
 </p>
 
-In parallel mode each story runs as a background `Agent` subagent with its own worktree; the main session merges, brings questions and permission requests to you, and launches the next. No terminal multiplexer is needed.
+In parallel mode each story runs in its own terminal pane (up to 3 in total) with its own worktree and a status file; a watcher merges, brings questions and permission requests to you, and launches the next. No `Agent` subagents are used.
 
 ## Why it uses fewer tokens and ships more
 

@@ -39,14 +39,15 @@ def esperado():
 
 
 def decide(sessao, esperado_id, contexto=False, handed=False, painel=False, em_subagent=False):
-    """(`subagent`|`handoff`|`ficar`, motivo). `--handed` ou dentro de sub-agent = ficar (anti-ciclo); por defeito
-    `subagent` (`michi-lancar.py`); a lógica de painel só com `--painel` (sem modelo esperado só avisa)."""
+    """(`handoff`|`ficar`, motivo). `--handed` ou dentro de outra sessão lançada = ficar (anti-ciclo); por defeito
+    `ficar` (o michi corre na sessão principal, sem `Agent`); a lógica de painel só com `--painel` (sem modelo
+    esperado só avisa)."""
     if handed:
         return "ficar", "sessão já veio de um handoff (--handed)"
     if em_subagent:
         return "ficar", "já dentro de um sub-agent: segue o ciclo sem relançar"
     if not painel:
-        return "subagent", "sessão principal: lançar Agent com michi-lancar.py"
+        return "ficar", "sessão principal: o michi segue nesta sessão (painel só com --painel)"
     if not esperado_id:
         return "ficar", "aviso: sem modelo esperado para michi-exec; sem handoff"
     if sessao != esperado_id:

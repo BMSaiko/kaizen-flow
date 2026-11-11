@@ -17,7 +17,6 @@ import painel_backend  # noqa: E402
 import sp_painel_estado as pe  # noqa: E402
 from sp_fila_estado import RELATORIOS, REPO, REQ_POR_SP, SCRIPTS, bloqueio, guardar, ler, registar_sessao, run_hidden
 import sp_fila_paineis  # noqa: E402
-import sp_fila_subagents  # noqa: E402
 from sp_fila_plano import aplicar_master, descendentes, limite, limite_paralelo, load, plan, sem_commit
 from sp_fila_relatorio import destino_relatorio, escrever_commit_md, progresso, relatorio
 
@@ -100,7 +99,7 @@ def _mae_na_worktree(mae, run):
     except ValueError:
         return mae.path
     try:
-        wt = Path(sp_fila_subagents.lancar(mae.slug, run=run)["worktree"])
+        wt = Path(sp_fila_paineis._ensure(mae.slug, run))
     except RuntimeError as e:
         print(f"aviso: sem `## Progresso` na mãe ({e})", file=sys.stderr)
         return None
