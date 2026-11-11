@@ -19,7 +19,8 @@ function copy(src, dst) {
   }
 }
 
-const coreRel = (to) => to.replace(/^\.claude\//, "");
+// skills e commands vão para a raiz de core/; a config (.claude/modelos.json) mantém .claude/
+const coreRel = (to) => to.replace(/^\.claude\/(skills|commands)\//, "$1/");
 
 // o vault é pessoal: tudo o que o identifica sai ao copiar para core/
 const SANITIZE = [

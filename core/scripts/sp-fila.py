@@ -7,7 +7,7 @@ prioridade, depois idade, com `depends_on` a mandar. Nunca faz push/PR: isso é 
 Uso:
   python -I scripts/sp-fila.py --dry-run [--max N] [--ate HH:MM] [--projeto P]   # ordem e exclusões
   python -I scripts/sp-fila.py [--max N] [--max-falhas N] [--ate HH:MM] [--projeto P] [--orcamento N]   # arranca a fila (para ao fim de N falhas seguidas, defeito 2)
-  python -I scripts/sp-fila.py [--concorrencia N]   # modo paralelo: plano JSON para até N subagents `Agent` (worktree própria), sem orçamento nem máximo
+  python -I scripts/sp-fila.py [--concorrencia N]   # modo paralelo: abre até N painéis `claude` (worktree e modelo do SP), sem orçamento nem máximo
   python -I scripts/sp-fila.py --ajuda      # regras do agente principal no modo paralelo
   python -I scripts/sp-fila.py --programa <slug-mãe> [--max N]   # só a árvore da mãe; orçamento lido dela
   python -I scripts/sp-fila.py --seguinte [--slug S]   # no fecho de cada SP da fila: regista e lança o seguinte
@@ -31,25 +31,27 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-# Módulos irmãos (a CLI e os testes continuam a ver tudo aqui): estado, plano, relatório, execução, subagents.
+# Módulos irmãos (a CLI e os testes continuam a ver tudo aqui): estado, plano, relatório, execução, painéis.
 from sp_fila_estado import (MAX_DEFEITO, MAX_FALHAS_DEFEITO, NO_WINDOW, ORCAMENTO, REQ_POR_SP, RELATORIOS, ESTADO, USER,  # noqa: E402,F401
                             atualizar, bloqueio, guardar, ler, migrar, run_hidden)
 from sp_fila_plano import descendentes, limite, load, plan, render_plan, sem_commit, sp_list  # noqa: E402,F401
 from sp_fila_relatorio import gastos, relatorio, render_gastos  # noqa: E402,F401
 from sp_fila_execucao import (_custos, _ler_sp,  # noqa: E402,F401
                               seguinte, IntegracaoPendente, SlugObrigatorio)
-import sp_fila_subagents  # noqa: E402
+import sp_fila_execucao  # noqa: E402
+import sp_fila_paineis  # noqa: E402
+import sp_vigia  # noqa: E402
 
-MAX_PARALELO = 3  # teto de subagents michi em simultâneo (paralelo e `--concorrencia`)
+MAX_PARALELO = 3  # teto de painéis michi abertos em simultâneo, somando todas as filas (paralelo e `--concorrencia`)
 MODOS = ("sequencial", "paralelo")
 
-AJUDA = """Orquestrador do sp-fila em paralelo (subagents):
-- Modo: com `--programa <mãe>` vem de `execucao:` da mãe (vazio → perguntar ao user «sequencial ou paralelo?» e gravar com `sp-execucao.py <mãe> <modo>`); sequencial = 1 subagent de cada vez, paralelo = até 3 (`MAX_PARALELO`).
-- O lançamento imprime um JSON `{"acao": "lancar", "itens": [...]}`: por item, um `Agent` com `prompt` e `description`, `run_in_background: true`, sem `isolation` (a worktree já existe em `worktree`); até N em simultâneo.
-- Terminar o turno depois de lançar; cada subagent avisa ao acabar (notificação), sem vigia nem Monitor.
-- Fim de cada subagent: ler a última linha `ESTADO:`. `pergunta` → AskUserQuestion ao user com o slug, depois SendMessage ao subagent com a resposta; `done` → `sb-worktree.py merge <slug>` com confirmação do user, depois `sp-fila.py --seguinte --slug <slug>`; `bloqueado`/`falhou` → avisar o user e `--seguinte --slug <slug>`.
-- Merge antes do `--seguinte` (lê master). O `--seguinte` imprime o JSON dos próximos a lançar (se houver), lançados sem perguntar; repetir até «fila terminada». `fechar-mae: <mãe>` = fechar a mãe na worktree dela. Protocolo `ESTADO:`: `michi-orquestracao.md`.
-- Relato por subagent: ≤3 linhas + TLDR."""
+AJUDA = """Orquestrador do sp-fila em paralelo (painéis):
+- Modo: com `--programa <mãe>` vem de `execucao:` da mãe (vazio → perguntar ao user «sequencial ou paralelo?» e gravar com `sp-execucao.py <mãe> <modo>`); sequencial = 1 painel de cada vez, paralelo = até 3 (`MAX_PARALELO`, total das filas).
+- O lançamento abre os painéis sozinho (`sp_fila_paineis.lancar`): por SP, worktree própria, separador com o slug, `claude --model <modelo do SP>` e `/michi --auto <SP>`; imprime «lançado em painéis» com slug · modelo · worktree. Sem vaga: o SP fica `pendente` e sai «sem vaga de painel». `--dry-run --concorrencia N` mostra os painéis previstos sem abrir nada.
+- Terminar o turno depois de lançar. Cada painel grava o seu estado com `sp-estado.py <slug> <estado> --msg "<resumo>"`; `sp-estado.py --listar` mostra todas as filas e SPs pelo nome.
+- Estado de cada SP: `pergunta` → AskUserQuestion ao user com o slug e a msg, a resposta segue no painel desse SP; `done` → `sb-worktree.py merge <slug>` com confirmação do user, depois `sp-fila.py --seguinte --slug <slug>`; `bloqueado`/`falhou` → avisar o user e `--seguinte --slug <slug>`.
+- Merge antes do `--seguinte` (lê master). O `--seguinte` fecha o painel do SP, liberta a vaga e abre os próximos (se houver) sem perguntar; repetir até «fila terminada». `fechar-mae: <mãe>` = fechar a mãe na worktree dela.
+- Relato por SP: ≤3 linhas + TLDR."""
 
 
 def _resumo_antigo(estado, args):
@@ -109,6 +111,27 @@ def abandonar_obsoleta(estado, atual, motivo, args, entrada=input, tty=None):
     return True
 
 
+def _arrancar_vigia(estado):
+    """Paralelo: o vigia da fila de painéis corre destacado (merge, avisos, seguinte); um só por fila."""
+    try:
+        fid = ler(estado).get("fila_paineis")
+        if not fid:
+            return None
+        pasta = sp_fila_paineis.pe.raiz() / fid
+        pidf = sp_vigia.caminhos(pasta)[0]
+        try:
+            if sp_fila_paineis.pe.pid_vivo(int(pidf.read_text(encoding="utf-8").strip())):
+                return None  # `--seguinte` com vigia já vivo
+        except (OSError, ValueError):
+            pass
+        p = sp_vigia.arrancar(fid, Path(__file__).resolve().parent / "sp-vigia.py")
+        print(f"vigia · pid {p.pid} · log {sp_vigia.caminhos(pasta)[1]}")
+        return p
+    except Exception as e:  # noqa: BLE001 — sem vigia a fila segue (avisos e merge pelo user)
+        print(f"aviso: vigia não arrancou: {e}", file=sys.stderr)
+        return None
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Fila autónoma de SPs")
     ap.add_argument("--abandonar-obsoleta", action="store_true", help="ao arrancar: abandona sem perguntar uma fila obsoleta (arrancada há mais de 60 min e nenhum SP em Doing); fila viva nunca é tocada")
@@ -116,11 +139,11 @@ def main(argv=None):
     ap.add_argument("--seguinte", action="store_true", help="no fecho de um SP da fila: regista e lança o seguinte")
     ap.add_argument("--slug", help="com --seguinte: o SP que fechou (só essa sessão; sem ele fecham todas)")
     ap.add_argument("--gastos", action="store_true", help="mostra o custo (USD) de cada sessão da corrida; só mede, não limita")
-    ap.add_argument("--ajuda", action="store_true", help="regras do orquestrador (subagents, perguntas, fecho de cada SP, relato)")
+    ap.add_argument("--ajuda", action="store_true", help="regras do orquestrador (painéis, perguntas, fecho de cada SP, relato)")
     ap.add_argument("--parar", action="store_true", help="abandona a fila")
     ap.add_argument("--max", type=int, default=None, help=f"nº máximo de SPs (defeito {MAX_DEFEITO}; em --concorrencia só conta se passado)")
     ap.add_argument("--ate", metavar="HH:MM", help="hora limite")
-    ap.add_argument("--concorrencia", type=int, metavar="N", help="modo paralelo (N=1 também): até N subagents `Agent` em background, cada um com a sua worktree; imprime o plano em JSON, sem limite de quota")
+    ap.add_argument("--concorrencia", type=int, metavar="N", help="modo paralelo (N=1 também): abre até N painéis `claude`, cada um com a sua worktree e o modelo do SP; sem limite de quota")
     ap.add_argument("--orcamento", type=int, default=ORCAMENTO, help=f"teto opcional de requests totais; cada SP gasta {REQ_POR_SP} (sem ele, sem limite)")
     ap.add_argument("--max-falhas", type=int, default=MAX_FALHAS_DEFEITO, metavar="N", help=f"para a fila após N SPs falhados seguidos (defeito {MAX_FALHAS_DEFEITO}; 0 = sem este limite)")
     ap.add_argument("--projeto")
@@ -137,18 +160,32 @@ def main(argv=None):
         print(f"erro: --concorrencia exige N >= 1 (recebido {args.concorrencia}); sem a opção a fila corre em série", file=sys.stderr)
         return 1
     if args.concorrencia is not None and args.concorrencia > MAX_PARALELO:
-        print(f"erro: --concorrencia máx. {MAX_PARALELO} subagents em simultâneo (recebido {args.concorrencia})", file=sys.stderr)
+        print(f"erro: --concorrencia máx. {MAX_PARALELO} painéis em simultâneo (recebido {args.concorrencia})", file=sys.stderr)
         return 1
 
     if args.ajuda:
         print(AJUDA)
         return 0
     if args.parar:
+        fid = None
         try:
             if estado.exists():
                 print(_resumo_antigo(estado, args))
+                fid = ler(estado).get("fila_paineis")
         except ValueError:  # corrompido: abandonar na mesma
             pass
+        if fid:  # a fila de painéis desta corrida também sai (vagas livres, `sp-estado.py --listar` limpo)
+            try:  # o vigia primeiro: não pode agir sobre uma fila a meio de ser apagada
+                pid = sp_vigia.parar(sp_vigia.caminhos(sp_fila_paineis.pe.raiz() / fid)[0],
+                                     sp_fila_paineis.pe.pid_vivo, sp_vigia.matar_pid)
+                if pid:
+                    print(f"vigia {pid} terminado")
+            except Exception as e:  # noqa: BLE001
+                print(f"aviso: vigia de {fid} não terminado: {e}", file=sys.stderr)
+            try:
+                sp_fila_paineis.pe.remover_fila(fid)
+            except Exception as e:  # noqa: BLE001
+                print(f"aviso: fila de painéis {fid} não removida: {e}", file=sys.stderr)
         estado.unlink(missing_ok=True)
         print("fila abandonada")
         return 0
@@ -182,6 +219,9 @@ def main(argv=None):
     if args.dry_run:
         fila, excluidos = plan(items, args.max, so, sem_commit(items))
         print(render_plan(fila, excluidos))
+        if args.concorrencia:  # o que o lançador de painéis abriria (slug · modelo · worktree), sem abrir nada
+            print("Painéis previstos:")
+            print(sp_fila_paineis.render_dry_run(sp_fila_paineis.plano_dry_run(fila, maximo=args.concorrencia)))
         print(f"Limites: máx {args.max or 'sem'} SPs · {args.max_falhas or 'sem'} falhas seguidas · "
               f"{'até ' + args.ate if args.ate else 'sem hora limite'} · {args.orcamento or 'sem'} requests")
         return 0
@@ -207,6 +247,9 @@ def main(argv=None):
                 pass
             print(f"erro: fila já em curso ({estado}); `--seguinte` continua, `--parar` abandona", file=sys.stderr)
             return 1
+        if args.concorrencia and sp_fila_execucao._backend_defeito() is None:
+            print(f"erro: {sp_fila_execucao.falta_backend()}", file=sys.stderr)
+            return 1
         estado.parent.mkdir(parents=True, exist_ok=True)
         fm = mae[1] if mae else {}
         num = lambda k: float(fm[k]) if fm.get(k) not in (None, "") else None
@@ -231,10 +274,14 @@ def main(argv=None):
         return 1
     if out["acao"] == "espera":
         print(f"a aguardar · {', '.join(out['sessoes'])}")
+        if out.get("pendentes"):
+            print(f"sem vaga de painel (máx. {MAX_PARALELO} no total das filas) · pendentes: {', '.join(out['pendentes'])}")
     elif out["acao"] == "lancou":
-        if out.get("itens"):  # paralelo: o agente principal lança um `Agent` por item (regras: `--ajuda`)
-            print(f"lançar como subagents · {', '.join(out['slugs'])} · regras: `sp-fila.py --ajuda`")
-            print(sp_fila_subagents.plano(out["itens"]))
+        if out.get("itens"):  # paralelo: um painel por SP, já aberto com o modelo do SP
+            print(f"lançado em painéis · {', '.join(out['slugs'])} · terminar o turno")
+            for i in out["itens"]:
+                print(f"  {i['slug']} · {i.get('modelo') or '?'} · {i.get('worktree') or '?'}")
+            _arrancar_vigia(estado)
         else:
             print(f"lançado · {', '.join(out['slugs'])} · terminar o turno")
     else:

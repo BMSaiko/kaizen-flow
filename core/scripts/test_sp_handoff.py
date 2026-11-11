@@ -399,14 +399,16 @@ class FakeRun:
     """Regista os comandos; `spawn` devolve ids de painel 11, 12, ... e falha para os slugs em `falha`."""
 
     def __init__(self, falha=()):
-        self.calls, self.falha, self.next_pane = [], set(falha), 11
+        self.calls, self.falha, self.next_pane, self.typed = [], set(falha), 11, ""
 
-    screens = None  # ecrãs sucessivos de get-text/capture-pane; omissão: prompt vazio
+    screens = None  # ecrãs sucessivos de get-text/capture-pane; omissão: painel real (texto no prompt, Enter limpa)
 
     def __call__(self, argv, **kw):
         self.calls.append(argv)
+        if "send-text" in argv or "send-keys" in argv:
+            self.typed = "" if argv[-1] in ("\r", chr(13), "Enter") else self.typed + str(argv[-1])
         if "get-text" in argv or "capture-pane" in argv:
-            out = self.screens.pop(0) if self.screens else "❯ \n"
+            out = self.screens.pop(0) if self.screens else "❯ " + self.typed + "\n"
             return sp_handoff.subprocess.CompletedProcess(argv, 0, stdout=out, stderr="")
         if "sb-worktree.py" in " ".join(map(str, argv)):
             slug = argv[-1]
@@ -471,8 +473,8 @@ def test_spawn_clipboard_imprime_comandos_sem_painel(tmp_path, capsys):
 
 def test_spawn_espera_pelo_prompt_e_repete_enter_perdido(tmp_path):
     run = FakeRun()
-    # 1.º ecrã: a arrancar (sem prompt); 2.º: prompt pronto; 3.º: texto ficou por submeter; 4.º: submetido
-    run.screens = ["a iniciar\n", "❯ \n", "❯ /michi --auto a\n", "❯ \n"]
+    # a arrancar (sem prompt); prompt pronto; texto chegou ao prompt; ficou por submeter; submetido
+    run.screens = ["a iniciar\n", "❯ \n", "❯ /michi --auto a\n", "❯ /michi --auto a\n", "❯ \n"]
     res = spawn(["a"], tmp_path, run)
     assert res[0]["ok"]
     assert sum(1 for c in run.calls if c[-1] == "\r") == 2
@@ -483,7 +485,7 @@ def test_spawn_aprova_so_o_vault_no_aviso_mcp(tmp_path):
     run = FakeRun()
     nl = chr(10)
     aviso = "2 new MCP servers found in this project" + nl + "❯ [✓] vault" + nl + "  [✓] roblox" + nl
-    run.screens = [aviso, "❯ " + nl, "❯ " + nl]
+    run.screens = [aviso, "❯ " + nl, "❯ /michi --auto a" + nl, "❯ " + nl]
     res = spawn(["a"], tmp_path, run)
     assert res[0]["ok"]
     teclas = [c[-1] for c in run.calls if "send-text" in c][:4]
@@ -493,7 +495,7 @@ def test_spawn_aprova_so_o_vault_no_aviso_mcp(tmp_path):
 
 def test_spawn_enter_que_nunca_submete_falha_so_esse_sp(tmp_path):
     run = FakeRun()
-    run.screens = ["❯ \n"] + ["❯ /michi --auto a\n"] * 3
+    run.screens = ["❯ \n"] + ["❯ /michi --auto a\n"] * 4  # chegou ao prompt + 3 Enters perdidos
     res = spawn(["a"], tmp_path, run)
     assert not res[0]["ok"] and "Enter" in res[0]["erro"]
 

@@ -22,6 +22,18 @@ def _sem_custos_reais(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _paineis_falsos(monkeypatch, tmp_path_factory):
+    """Estado das filas de painéis numa pasta temporária e backend de painéis falso por defeito (nunca abre WezTerm real)."""
+    monkeypatch.setenv("SP_FILA_ROOT", str(tmp_path_factory.mktemp("sp-fila")))
+    try:
+        import sp_fila_execucao
+        from sp_fila_testlib import PainelFalso
+    except ImportError:
+        return
+    monkeypatch.setattr(sp_fila_execucao, "_backend_defeito", lambda: PainelFalso(), raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _cwd_isolado(monkeypatch, tmp_path_factory):
     """Fora de worktree de agente `sp-move` ignora claims: os testes nunca tocam em `.git/sb-claims` real."""
     monkeypatch.chdir(tmp_path_factory.mktemp("cwd"))

@@ -38,7 +38,7 @@ Build/tests/lint/typecheck/e2e aplicáveis; cada comando e RC vão para o report
 
 ## Sub-agentes
 
-Papéis via `python -I scripts/modelos.py get <papel>` (nunca IDs no texto). Prompt mínimo: slug ou caminho + skill + limite de linhas; o resultado completo vai para ficheiro (Brief, achados) e só o resumo volta. Vazio ou falha = fazer a fase no principal, sem bloquear. Grill, DP, DA, pentest, PR e commit ficam no principal.
+Por defeito não há sub-agentes: o michi e todas as fases correm na sessão principal. Esta secção só se aplica com pedido explícito do user. Papéis via `python -I scripts/modelos.py get <papel>` (nunca IDs no texto). Prompt mínimo: slug ou caminho + skill + limite de linhas; o resultado completo vai para ficheiro (Brief, achados) e só o resumo volta. Vazio ou falha = fazer a fase no principal, sem bloquear. Grill, DP, DA, pentest, PR e commit ficam no principal.
 
 | Fase | Papel | Devolve |
 |---|---|---|
@@ -48,7 +48,7 @@ Papéis via `python -I scripts/modelos.py get <papel>` (nunca IDs no texto). Pro
 | 7 Review | `sub-agente` | ficheiro de achados (formato do `review-ciclo`); no chat ≤20 linhas |
 | 9 Report, 10 Reflect | `michi-leve` | texto para o SP |
 
-**Michi num sub-agent** (`michi-lancar.py`; modelo do `michi_modelo`, `effort` low): sem `AskUserQuestion`; as fases acima usam `Agent` se existir no sub-agent (aninhamento confirmado em 2026-11-10), senão correm nele. Sem painéis nem `sp-handoff --launch`; sem merge nem `clean`. `modo: manual`: sign-off do DP e proposta de commit saem como `pergunta`. Protocolo de retorno (único sítio; o `/sp-fila` remete para aqui), última linha `ESTADO: done|pergunta|bloqueado|falhou|continuar`:
+**Michi num sub-agent** (`michi-lancar.py`; modelo do `michi_modelo`, `effort` low): sem `AskUserQuestion`; as fases acima usam `Agent` se existir no sub-agent (aninhamento confirmado em 2026-11-10), senão correm nele. Sem painéis nem `sp-handoff --launch`; sem merge nem `clean`. `modo: manual`: sign-off do DP e proposta de commit saem como `pergunta`. Só com pedido explícito do user; o `/sp-fila` não usa sub-agents (painéis + vigia, ver `kaizen-flow.md` §Orquestrador). Protocolo de retorno, última linha `ESTADO: done|pergunta|bloqueado|falhou|continuar`:
 - `pergunta` → `AskUserQuestion` do principal e `SendMessage` ao sub-agent com a resposta.
 - `done` → propor `sb-worktree.py merge <slug>` (automático com `commit: auto`); quem encadeia o SP seguinte é o principal.
 - `continuar` → o sub-agent gravou `## Progresso`; o principal lança outro `Agent` com o mesmo plano.

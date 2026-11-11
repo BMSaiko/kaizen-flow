@@ -2,11 +2,12 @@
 
 const MARKER = "<!-- kaizen-flow -->";
 
-// mapeia o núcleo para destinos: prefixo de origem -> prefixo de destino
+// mapeia o núcleo para destinos: prefixo de origem -> prefixo de destino;
+// a config em .claude/ (modelos.json, lida pelos scripts) vai sempre para .claude/ do projeto
 function remap(core, map) {
   const files = [];
   for (const f of core) {
-    for (const [from, to] of map) {
+    for (const [from, to] of [...map, [".claude/", ".claude/"]]) {
       if (f.rel.startsWith(from)) {
         files.push({ path: to + f.rel.slice(from.length), data: f.data });
         break;

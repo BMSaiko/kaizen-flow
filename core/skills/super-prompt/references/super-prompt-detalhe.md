@@ -14,7 +14,7 @@
 | `--permitir "<cmd>"` (repetível) | comandos pré-aprovados | `michi-modo-auto.md` §Autorizações do SP |
 | `--decisao "<texto>"` (repetível) | `## Decisões` | decisões do grill, uma por flag |
 | `--parent <slug>`, `--depends-on <slug> ...` | `parent:`/`depends_on:` | só em SP filho |
-| `--program <slug> --children a,b:a,c:a+b` | SP-mãe (`kind: program`) + filhos | escalão grande/médio; `b:a` = b depende de a; `--modo auto --commit auto` vai à mãe e aos filhos (sem `--modo auto` há aviso: a fila pára a cada commit) |
+| `--program <slug> --children a,b:a,c:a+b` | SP-mãe (`kind: program`) + filhos | escalão grande/médio; `b:a` = b depende de a; filho de prova/fecho depende de todos os irmãos (`prova:a+b+c`), senão a fila elege-o primeiro; `--modo auto --commit auto` vai à mãe e aos filhos (sem `--modo auto` há aviso: a fila pára a cada commit) |
 | `--root` | raiz alternativa | testes |
 
 `sp-validate.py` recusa comandos proibidos (`--force`, `reset --hard`, `git add -A`, `.env*`).
@@ -71,4 +71,4 @@ Colar o corpo (ou passar como objetivo do `/michi`). A sessão nova salta grill 
 `sp-new.py` devolve `knowledge/projects/kaizen/<projeto>/sp/TODO/<projeto>-<nome>-<YYYY-MM-DD>.md` (o slug é o nome do ficheiro sem `.md`; o nome curto recebe projeto e data). `<nome>`: minúsculas ascii, hífens, ≤48 caracteres. Done antigos (`<nome>-<data>.md`) continuam resolúveis. SPs fora do padrão: `python -I scripts/sp-organize.py` (dry-run; `--apply` só com aprovação).
 
 ## Autor
-Prompt do `sp-autor`: slug, projeto, grill (`## Spec`), DR mini, flags (`--michi`/`@nível`: simples = tarefa mecânica, default = normal, complexo = refactor largo ou risco alto), regra «preencher 8 secções, §4 verificável, §7 concreto, validar». Resumo devolvido: `Caminhos:` / `Ordem e dependências:` / `michi_modelo:` por SP / `Dúvidas:`. Revisão: mesmo prompt com os caminhos e os ajustes do user, instância nova.
+Entradas (principal; ou prompt do `sp-autor` se o user pedir sub-agente): slug, projeto, grill (`## Spec`), DR mini, flags (`--michi`/`@nível`: simples = tarefa mecânica, default = normal, complexo = refactor largo ou risco alto), regra «preencher 8 secções, §4 verificável, §7 concreto, validar». Resumo: `Caminhos:` / `Ordem e dependências:` / `michi_modelo:` por SP / `Dúvidas:`. Revisão: mesmas entradas com os caminhos e os ajustes do user.

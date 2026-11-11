@@ -55,8 +55,10 @@ class _Res:
 class _Painel:
     """Ecrã simulado: o texto fica no prompt até o Enter número `enters_perdidos + 1`."""
 
-    def __init__(self, enters_perdidos=0):
+    def __init__(self, enters_perdidos=0, textos_perdidos=0):
         self.perdidos = enters_perdidos
+        self.textos_perdidos = textos_perdidos  # escritas descartadas (sessão a reiniciar depois de /clear)
+        self.escritas = 0
         self.enters = 0
         self.texto = ""
 
@@ -68,7 +70,9 @@ class _Painel:
             return _Res("")
         if "get-text" in argv:
             return _Res("saida\n❯ " + self.texto)
-        self.texto = argv[-1]
+        self.escritas += 1
+        if self.escritas > self.textos_perdidos:
+            self.texto = argv[-1]
         return _Res("")
 
 
@@ -94,6 +98,19 @@ def test_send_confirmed_esgota_tentativas_e_falha():
     with pytest.raises(hp.HandoffError, match="Enter não submeteu"):
         _enviar(p)
     assert p.enters == hp.ENTER_TRIES
+
+
+def test_send_confirmed_reescreve_o_texto_perdido_depois_do_clear():
+    p = _Painel(textos_perdidos=1)
+    _enviar(p)
+    assert (p.escritas, p.enters) == (2, 1)
+
+
+def test_send_confirmed_falha_se_o_texto_nunca_chega_ao_prompt():
+    p = _Painel(textos_perdidos=99)
+    with pytest.raises(hp.HandoffError, match="não chegou ao prompt"):
+        _enviar(p)
+    assert p.enters == 0
 
 
 def test_read_screen_usa_get_text_no_wezterm_e_capture_pane_no_tmux():

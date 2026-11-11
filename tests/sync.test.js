@@ -15,6 +15,7 @@ function fakeVault() {
   const v = tmp();
   for (const s of SKILLS) put(v, `.claude/skills/${s}/SKILL.md`);
   for (const c of ["sp", "sp-list", "sp-handoff", "handoff"]) put(v, `.claude/commands/${c}.md`);
+  put(v, ".claude/modelos.json", "{}");
   for (const s of ["conftest", "context-guard", "da-stop", "context-budget", "handoff", "handoff_pane", "handoff_spawn", "handoff_resume", "test_handoff_autoconsumo", "modelos", "michi_handoff_auto", "test_michi_handoff_auto", "painel_backend", "sp_progresso", "skill-cut", "kaizen_config", "kaizen_engine", "kaizen_hooks", "wt_redirect", "kf_ligados", "kf_errlog", "test_kf_errlog", "kf_git", "test_kf_git", "pentest", "test_pentest", "review_ciclo", "test_review_ciclo", "pr_corpo", "test_pr_corpo", "pr_watch", "test_pr_watch", "test_kaizen_engine", "test_kaizen_hooks", "test_michi_tree_close", "michi-lancar", "test_michi_lancar", "test_handoff_socket", "sp-list", "sp-move"]) put(v, `scripts/${s}.py`);
   return v;
 }
@@ -48,10 +49,11 @@ test("plan lista peças em falta e avisa de scripts relacionados fora do pacote"
   const v = fakeVault();
   fs.rmSync(path.join(v, "scripts", "handoff.py"));
   fs.rmSync(path.join(v, ".claude", "skills", "swot"), { recursive: true });
+  fs.rmSync(path.join(v, ".claude", "modelos.json"));
   put(v, "scripts/handoff-extra.py");
   put(v, "scripts/limpa-cache.py");
   const { missing, unlisted } = plan(v);
-  assert.deepStrictEqual(missing.sort(), [".claude/skills/swot", "scripts/handoff.py"]);
+  assert.deepStrictEqual(missing.sort(), [".claude/modelos.json", ".claude/skills/swot", "scripts/handoff.py"]);
   assert.deepStrictEqual(unlisted, ["scripts/handoff-extra.py"]);
 });
 

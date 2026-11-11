@@ -1,4 +1,4 @@
-"""Testes de scripts/sp-fila.py: modo --concorrencia (teto, lançamento por subagent, retoma, sessões mortas)."""
+"""Testes de scripts/sp-fila.py: modo --concorrencia (teto, lançamento em painéis, retoma, sessões mortas)."""
 import json
 import sys
 from datetime import datetime
@@ -9,7 +9,9 @@ from sp_fila_testlib import (
     slugs,
     _runner,
     _estado,
+    PainelFalso,
 )
+import sp_painel_estado as pe
 
 
 def test_concorrencia_so_lanca_ate_ao_teto(tmp_path):
@@ -18,7 +20,8 @@ def test_concorrencia_so_lanca_ate_ao_teto(tmp_path):
         make_sp(root, s)
     calls = []
     st = _estado(tmp_path, concorrencia=2, max=5)
-    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0))
+    painel = PainelFalso()
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0), backend=painel)
     estado = json.loads(st.read_text(encoding="utf-8"))
     assert out["acao"] == "lancou" and out["slugs"] == ["a", "b"]
     assert list(estado["sessoes"]) == ["a", "b"] and estado["usados"] == 2 * sp_fila.REQ_POR_SP
@@ -26,16 +29,113 @@ def test_concorrencia_so_lanca_ate_ao_teto(tmp_path):
     assert sum("ensure" in c for c in flat) == 2 and not any("--spawn" in c for c in flat)
     assert not any("--launch" in c or "push" in c for c in flat)
     assert [i["slug"] for i in out["itens"]] == ["a", "b"] and out["itens"][0]["worktree"] == "/wt/sb-a"
-    assert estado["sessoes"]["a"]["subagent"] is True and estado["sessoes"]["b"]["worktree"] == "/wt/sb-b"
+    assert all(i["estado"] == "a-correr" and "pane" not in i for i in out["itens"])
+    assert estado["sessoes"]["a"]["painel"] is True and "subagent" not in estado["sessoes"]["a"]
+    assert estado["sessoes"]["b"]["worktree"] == "/wt/sb-b"
+    assert [cwd for _, cwd in painel.abertos] == ["/wt/sb-a", "/wt/sb-b"] and painel.abertos[0][0][0] == "claude"
+    assert sorted(painel.titulos_postos.values()) == ["a", "b"]
+    assert estado["fila_paineis"] and pe.ler(estado["fila_paineis"], "a")["estado"] == "a-correr"
 
 
-def test_main_imprime_o_plano_dos_subagents(tmp_path, monkeypatch, capsys):
+def test_parar_apaga_tambem_a_fila_de_paineis_e_liberta_as_vagas(tmp_path, capsys):
+    root = tmp_path / "sps"
+    make_sp(root, "a")
+    st = _estado(tmp_path, concorrencia=1, max=None)
+    sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0), backend=PainelFalso())
+    fid = json.loads(st.read_text(encoding="utf-8"))["fila_paineis"]
+    outra = pe.criar_fila(programa="outra-mae")
+    assert pe.vagas_livres() == 2
+    assert sp_fila.main(["--parar", "--estado", str(st)]) == 0
+    assert not st.exists() and fid not in [f["fila"] for f in pe.filas()]
+    assert outra in [f["fila"] for f in pe.filas()] and pe.vagas_livres() == 3
+    assert "fila abandonada" in capsys.readouterr().out
+
+
+def test_main_imprime_os_paineis_lancados(tmp_path, monkeypatch, capsys):
     st = _estado(tmp_path, concorrencia=2, max=None)
-    item = {"slug": "a", "worktree": "/wt/sb-a"}
+    item = {"slug": "a", "estado": "a-correr", "modelo": "claude-sonnet-5-5", "worktree": "/wt/sb-a", "titulo": "a", "msg": None}
     monkeypatch.setattr(sp_fila, "seguinte", lambda *a, **k: {"acao": "lancou", "slugs": ["a"], "itens": [item]})
     rc = sp_fila.main(["--seguinte", "--estado", str(st), "--root", str(tmp_path / "sps"), "--relatorios", str(tmp_path / "rel")])
     out = capsys.readouterr().out
-    assert rc == 0 and "lançar como subagents · a" in out and "/wt/sb-a" in out
+    assert rc == 0 and "lançado em painéis · a" in out and "subagent" not in out
+    assert "a · claude-sonnet-5-5 · /wt/sb-a" in out
+
+
+def test_paralelo_sem_vaga_global_fica_pendente_e_espera(tmp_path):
+    """Outras filas com os 3 painéis ocupados: nada abre, o SP não conta como falhado e a fila não termina."""
+    root = tmp_path / "sps"
+    make_sp(root, "a")
+    outra = pe.criar_fila("outra")
+    for s in ("x", "y", "z"):
+        pe.registar(outra, s)
+        assert pe.reclamar_vaga(s, fila=outra)
+    st = _estado(tmp_path, concorrencia=2, max=None)
+    painel = PainelFalso()
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0), backend=painel)
+    estado = json.loads(st.read_text(encoding="utf-8"))
+    assert out["acao"] == "espera" and out["pendentes"] == ["a"] and painel.abertos == []
+    assert estado["sessoes"] == {} and estado["falhados"] == [] and estado["usados"] == 0
+    assert pe.ler(estado["fila_paineis"], "a")["estado"] == "pendente"
+
+
+def test_paralelo_painel_que_nao_abre_marca_falhado(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a")
+    st = _estado(tmp_path, concorrencia=1, max=None)
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0),
+                           backend=PainelFalso(falha_abrir="sem wezterm"))
+    assert out["acao"] == "fim" and "erro a lançar a" in out["motivo"] and "sem wezterm" in out["motivo"]
+
+
+def test_paralelo_sem_backend_termina_com_erro_claro(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys.modules["sp_fila_execucao"], "_backend_defeito", lambda: None)
+    root = tmp_path / "sps"
+    make_sp(root, "a")
+    calls = []
+    st = _estado(tmp_path, concorrencia=1, max=None)
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0))
+    assert out["acao"] == "fim" and "sem backend de painéis" in out["motivo"]
+    assert not any("ensure" in c for c in calls)
+
+
+def test_main_paralelo_sem_backend_recusa_antes_de_criar_estado(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(sys.modules["sp_fila_execucao"], "_backend_defeito", lambda: None)
+    make_sp(tmp_path / "sps", "a")
+    st = tmp_path / "estado.json"
+    rc = sp_fila.main(["--concorrencia", "2", "--estado", str(st), "--root", str(tmp_path / "sps"), "--relatorios", str(tmp_path / "rel")])
+    assert rc == 1 and not st.exists() and "sem backend de painéis" in capsys.readouterr().err
+
+
+def test_dry_run_com_concorrencia_imprime_slug_modelo_worktree(tmp_path, capsys):
+    root = tmp_path / "sps"
+    make_sp(root, "a")
+    make_sp(root, "b")
+    rc = sp_fila.main(["--dry-run", "--concorrencia", "2", "--estado", str(tmp_path / "e.json"), "--root", str(root)])
+    out = capsys.readouterr().out
+    assert rc == 0 and not (tmp_path / "e.json").exists()
+    linhas = [ln for ln in out.splitlines() if ln.startswith(("a · ", "b · "))]
+    assert len(linhas) == 2 and all(ln.count(" · ") == 2 for ln in linhas)
+    assert "sb-a" in linhas[0] and "claude-" in linhas[0]
+
+
+def test_dry_run_com_concorrencia_1_deixa_o_resto_pendente(tmp_path, capsys):
+    root = tmp_path / "sps"
+    make_sp(root, "a")
+    make_sp(root, "b")
+    rc = sp_fila.main(["--dry-run", "--concorrencia", "1", "--estado", str(tmp_path / "e.json"), "--root", str(root)])
+    out = capsys.readouterr().out
+    assert rc == 0 and "b · pendente (sem vaga)" in out and out.count("claude-") == 1
+
+
+def test_sessao_fechada_liberta_a_vaga_do_painel(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a")
+    st = _estado(tmp_path, concorrencia=1, max=None)
+    sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0))
+    fila = json.loads(st.read_text(encoding="utf-8"))["fila_paineis"]
+    _fechar(root, "a")
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0), slug="a")
+    assert out["acao"] == "fim" and pe.ler(fila, "a")["estado"] == "done" and pe.vagas_livres() == pe.MAX_PARALELO
 
 
 def test_concorrencia_1_sp_move_doing_corre_na_worktree_do_filho(tmp_path):
@@ -150,7 +250,7 @@ def test_paralelo_nao_lanca_dependente_de_sp_em_curso(tmp_path):
     assert out["slugs"] == ["a"]
 
 
-def test_concorrencia_1_lanca_por_subagent_como_qualquer_paralelo(tmp_path):
+def test_concorrencia_1_lanca_em_painel_como_qualquer_paralelo(tmp_path):
     root = tmp_path / "sps"
     make_sp(root, "a")
     calls = []
@@ -164,7 +264,7 @@ def test_sessao_fechada_fora_de_done_vira_falhada_e_a_fila_lanca_a_seguinte(tmp_
     root = tmp_path / "sps"
     make_sp(root, "a", folder="Doing")
     make_sp(root, "b")
-    st = _estado(tmp_path, concorrencia=2, max=9, sessoes={"a": {"subagent": True}})
+    st = _estado(tmp_path, concorrencia=2, max=9, sessoes={"a": {"painel": True}})
     out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0), slug="a")
     estado = json.loads(st.read_text(encoding="utf-8"))
     assert out["acao"] == "lancou" and out["slugs"] == ["b"]
@@ -191,11 +291,11 @@ def test_retoma_apos_crash_nao_relanca_sessoes_registadas(tmp_path):
     make_sp(root, "a", folder="Doing")
     make_sp(root, "b")
     (tmp_path / "estado.json.123.tmp").write_text("{lixo", encoding="utf-8")  # escrita atómica interrompida
-    st = _estado(tmp_path, concorrencia=1, max=9, sessoes={"a": {"subagent": True}})
+    st = _estado(tmp_path, concorrencia=1, max=9, sessoes={"a": {"painel": True}})
     calls = []
     out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0), slug="zz")
     assert out["acao"] == "espera" and calls == []
-    assert json.loads(st.read_text(encoding="utf-8"))["sessoes"] == {"a": {"subagent": True}}
+    assert json.loads(st.read_text(encoding="utf-8"))["sessoes"] == {"a": {"painel": True}}
 
 
 def test_paralelo_faz_ensure_antes_do_sp_move_para_doing(tmp_path):
@@ -353,3 +453,39 @@ def test_progresso_da_mae_vai_para_a_worktree_dela_nunca_master(tmp_path, monkey
     assert out["acao"] == "fim" and out["fechar_mae"] == "mae"
     assert "## Progresso" in copia.read_text(encoding="utf-8")
     assert "## Progresso" not in (root / "p" / "sp" / "TODO" / "mae.md").read_text(encoding="utf-8")
+
+
+def test_lancou_em_paineis_arranca_o_vigia_da_fila(tmp_path, monkeypatch, capsys):
+    root = tmp_path / "sps"
+    make_sp(root, "a")
+    st = _estado(tmp_path, concorrencia=1, max=None)
+    sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0), backend=PainelFalso())
+    fid = json.loads(st.read_text(encoding="utf-8"))["fila_paineis"]
+    item = {"slug": "a", "estado": "a-correr", "modelo": "m", "worktree": "/wt/sb-a"}
+    monkeypatch.setattr(sp_fila, "seguinte", lambda *a, **k: {"acao": "lancou", "slugs": ["a"], "itens": [item]})
+    lancados = []
+
+    class P:
+        pid = 4242
+    monkeypatch.setattr(sp_fila.sp_vigia, "arrancar", lambda fila, script: lancados.append((fila, Path(script).name)) or P())
+    assert sp_fila.main(["--seguinte", "--estado", str(st), "--root", str(root), "--relatorios", str(tmp_path / "rel")]) == 0
+    assert lancados == [(fid, "sp-vigia.py")] and "vigia · pid 4242" in capsys.readouterr().out
+    (pe.raiz() / fid / "vigia.pid").write_text("4242", encoding="utf-8")
+    monkeypatch.setattr(pe, "pid_vivo", lambda p: True)
+    sp_fila.main(["--seguinte", "--estado", str(st), "--root", str(root), "--relatorios", str(tmp_path / "rel")])
+    assert len(lancados) == 1  # vigia vivo: não lança outro
+
+
+def test_parar_termina_o_vigia_antes_de_apagar_a_fila(tmp_path, monkeypatch, capsys):
+    root = tmp_path / "sps"
+    make_sp(root, "a")
+    st = _estado(tmp_path, concorrencia=1, max=None)
+    sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0), backend=PainelFalso())
+    fid = json.loads(st.read_text(encoding="utf-8"))["fila_paineis"]
+    (pe.raiz() / fid / "vigia.pid").write_text("777", encoding="utf-8")
+    mortos = []
+    monkeypatch.setattr(pe, "pid_vivo", lambda p: p == 777)
+    monkeypatch.setattr(sp_fila.sp_vigia, "matar_pid", lambda p: mortos.append((p, (pe.raiz() / fid).is_dir())))
+    assert sp_fila.main(["--parar", "--estado", str(st)]) == 0
+    assert mortos == [(777, True)] and "vigia 777 terminado" in capsys.readouterr().out
+    assert not (pe.raiz() / fid).exists()

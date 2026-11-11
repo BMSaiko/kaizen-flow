@@ -97,6 +97,53 @@ def _runner_worktree(calls, wt):
     return run
 
 
+class PainelFalso:
+    """Backend de painéis falso (interface de `painel_backend.Backend` + `titulo`/`titulos`), sem WezTerm real."""
+    nome = "falso"
+
+    def __init__(self, titulos=None, falha_abrir=None, falha_enviar=False, interativo=True):
+        self.interativo = interativo
+        self.abertos, self.abertos_ids, self.enviados, self.fechados = [], [], [], []
+        self.titulos_postos = {}
+        self._titulos = dict(titulos or {})
+        self.falha_abrir, self.falha_enviar = falha_abrir, falha_enviar
+
+    def abrir(self, cmd, cwd):
+        if self.falha_abrir:
+            raise OSError(self.falha_abrir)
+        pid = str(100 + len(self.abertos))
+        self.abertos.append((list(cmd), str(cwd)))
+        self.abertos_ids.append(pid)
+        return pid
+
+    def listar(self):
+        return {p: None for p in self.abertos_ids if p not in self.fechados}
+
+    def fechar(self, id):
+        self.fechados.append(str(id))
+        return True
+
+    def ecra(self, id):
+        return "❯ "
+
+    def enviar(self, id, texto):
+        if self.falha_enviar:
+            return False
+        self.enviados.append((str(id), texto))
+        return True
+
+    def estado(self, id):
+        return "vivo" if str(id) in self.listar() else "morto"
+
+    def titulo(self, id, texto):
+        self.titulos_postos[str(id)] = texto
+        self._titulos[str(id)] = texto
+        return True
+
+    def titulos(self):
+        return dict(self._titulos)
+
+
 def _relatorio_com(tmp_path, **estado_over):
     root = tmp_path / "sps"
     make_sp(root, "a", folder="Done")

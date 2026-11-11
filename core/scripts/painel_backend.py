@@ -67,6 +67,14 @@ class Backend(abc.ABC):
         """'vivo' ou 'morto'."""
         return "vivo" if str(id) in self.listar() else "morto"
 
+    def titulo(self, id, texto):
+        """Põe `texto` no título do separador do painel; True se pôs. Defeito: False (backend sem separadores)."""
+        return False
+
+    def titulos(self):
+        """{id: título} dos painéis com título posto. Defeito: {}."""
+        return {}
+
 
 class _Multiplexer(Backend):
     def __init__(self, run=run_hidden):
@@ -89,12 +97,21 @@ class WeztermBackend(_Multiplexer):
             self.run(["wezterm", "cli", "activate-pane", "--pane-id", origem], capture_output=True, text=True, encoding="utf-8")
         return pane
 
-    def listar(self):
+    def _lista(self):
         try:
-            lista = json.loads(self.run(["wezterm", "cli", "list", "--format", "json"], capture_output=True, text=True, encoding="utf-8").stdout)
+            return json.loads(self.run(["wezterm", "cli", "list", "--format", "json"], capture_output=True, text=True, encoding="utf-8").stdout)
         except (OSError, ValueError, subprocess.SubprocessError):
-            return {}
-        return {str(p["pane_id"]): p.get("cwd") for p in lista}
+            return []
+
+    def listar(self):
+        return {str(p["pane_id"]): p.get("cwd") for p in self._lista()}
+
+    def titulo(self, id, texto):
+        self.run(["wezterm", "cli", "set-tab-title", "--pane-id", str(id), texto], capture_output=True, text=True, encoding="utf-8")
+        return True
+
+    def titulos(self):
+        return {str(p["pane_id"]): p["tab_title"] for p in self._lista() if p.get("tab_title")}
 
     def fechar(self, id):
         if str(id) not in self.listar():

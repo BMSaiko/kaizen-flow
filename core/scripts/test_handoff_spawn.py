@@ -17,9 +17,10 @@ class _Res:
 class FakeRun:
     """Regista os argv e responde conforme o comando; `screen` é o que o painel mostra."""
 
-    def __init__(self, screen="❯ "):
+    def __init__(self, screen=None):
         self.calls = []
-        self.screen = screen
+        self.screen = screen  # None = painel real: o texto escrito aparece no prompt e o Enter limpa-o
+        self.typed = ""
 
     def __call__(self, argv, **kwargs):
         self.calls.append(argv)
@@ -27,8 +28,10 @@ class FakeRun:
             return _Res("aviso\nC:/wt/" + argv[-1] + "\n")
         if argv[:2] == ["tmux", "split-window"]:
             return _Res("%9\n")
+        if argv[:2] == ["tmux", "send-keys"]:
+            self.typed = argv[-1] if "-l" in argv else ""
         if argv[:2] == ["tmux", "capture-pane"]:
-            return _Res(self.screen)
+            return _Res(self.screen if self.screen is not None else "❯ " + self.typed)
         return _Res()
 
 

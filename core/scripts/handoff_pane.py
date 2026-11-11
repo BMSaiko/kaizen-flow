@@ -180,8 +180,19 @@ def read_screen(backend, pane, run=run_hidden):
 
 def send_confirmed(pane, text, text_argv, key_argv, screen, run=run_hidden, sleep=time.sleep, enter_gap=ENTER_GAP,
                    tries=ENTER_TRIES, settle=ENTER_SETTLE):
-    """Envia `text` e Enter e lê o ecrã (`screen(pane)`); se o texto continuar no prompt (Enter perdido), repete o Enter."""
-    run(text_argv(pane, text), check=True)
+    """Envia `text` e Enter e lê o ecrã (`screen(pane)`); se o texto continuar no prompt (Enter perdido), repete o Enter.
+
+    Antes do Enter confirma que o texto chegou ao prompt: logo a seguir a `/clear` o Claude Code reinicia a
+    sessão (hooks SessionStart) e descarta o que for escrito entretanto; nesse caso espera e reescreve.
+    """
+    for _ in range(tries):
+        run(text_argv(pane, text), check=True)
+        sleep(enter_gap)
+        if prompt_has_text(screen(pane)):
+            break
+        sleep(settle)
+    else:
+        raise HandoffError(f"painel {pane}: o texto {text!r} não chegou ao prompt")
     for _ in range(tries):
         sleep(enter_gap)
         run(key_argv(pane), check=True)

@@ -131,7 +131,7 @@ def test_write_aceita_25_linhas_e_recusa_secao_copiada_do_sp(tmp_path):
 
 CAMPOS = ("Estado", "Último passo", "Próximo passo", "Ficheiros tocados", "Gates por correr")
 _RAIZ = Path(__file__).resolve().parents[1]
-COMANDOS = _RAIZ / ".claude" / "commands" if (_RAIZ / ".claude").is_dir() else _RAIZ / "commands"
+COMANDOS = _RAIZ / ".claude" / "commands" if (_RAIZ / ".claude" / "commands").is_dir() else _RAIZ / "commands"
 
 
 def test_retoma_so_com_o_handoff_regista_campos_e_apaga(tmp_path, capsys):

@@ -52,6 +52,8 @@ Primeira release do kaizen-flow (histórico desde 2026-10-22).
 - `sync --check` para detetar um `core/` desatualizado.
 
 ### Fixed
+- `kaizen sync` copia `.claude/modelos.json` para `core/.claude/` e os adapters instalam-no em `.claude/` do projeto: sem ele `sp-fila --concorrencia` parava com «sem modelo» (24 falhas em `test_sp_fila_paralelo.py`).
+- Testes de handoff simulam o texto no prompt (o envio confirma-o antes do Enter).
 - Runner de testes portável (Node 18 no Windows não expande globs).
 - Handoffs sem consola a piscar no Windows (`CREATE_NO_WINDOW`).
 - Testes e caminhos POSIX independentes do ambiente e do WezTerm no CI.

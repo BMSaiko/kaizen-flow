@@ -11,6 +11,7 @@ rc: n/a
 import json
 import os
 import re
+import shutil
 import time
 from contextlib import contextmanager
 from datetime import datetime
@@ -27,7 +28,7 @@ TRANSICOES = {
     "pergunta": {"a-correr", "done", "bloqueado", "falhou"},
     "bloqueado": {"a-correr", "pendente", "falhou"},
     "falhou": {"pendente"},
-    "done": set(),
+    "done": {"bloqueado"},  # só o vigia: done que não pode integrar (SP manual, gates, conflito)
 }
 MODOS = ("sequencial", "paralelo")
 CAMPOS = ("modelo", "worktree", "pane")
@@ -238,7 +239,10 @@ def _dirs(r):
 
 
 def _ficheiros_sp(d):
-    return sorted((p for p in d.glob("*.json") if p.name.lower() != "fila.json"), key=lambda p: p.name)
+    return sorted((p for p in d.glob("*.json") if p.name.lower() not in NAO_SP), key=lambda p: p.name)
+
+
+NAO_SP = {"fila.json", "vigia.json"}  # a memória do vigia vive na pasta da fila e não é estado de SP
 
 
 def _ativos(r):
@@ -442,6 +446,17 @@ def filas(root=None):
         dados["sps"] = [sps[s] for s in ordem + [s for s in sps if s not in ordem]]
         out.append(dados)
     return out
+
+
+def remover_fila(fila, root=None):
+    """Apaga `<fila-id>/` (fila abandonada com `sp-fila.py --parar`): as vagas dos seus SPs ficam livres. True se existia."""
+    fid = _nome(fila, "fila")
+    with _exclusivo(root) as r:
+        d = r / fid
+        if not (d / "fila.json").is_file():
+            return False
+        shutil.rmtree(d)
+    return True
 
 
 def filas_ativas(root=None):

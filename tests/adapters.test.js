@@ -27,13 +27,14 @@ test("adaptador claude reproduz o layout .claude/ sem diferenças", () => {
   const { files } = require("../adapters/claude").render(core);
   assert.strictEqual(files.length, core.length);
   for (const f of files) {
-    const rel = f.path.replace(/^\.claude\//, "");
+    const rel = f.path.replace(/^\.claude\/(skills|commands)\//, "$1/");
     const src = core.find((c) => c.rel === rel);
     assert.ok(src, `sem origem para ${f.path}`);
     assert.ok(src.data.equals(f.data));
   }
   assert.ok(files.some((f) => f.path === ".claude/skills/michi/SKILL.md"));
   assert.ok(files.some((f) => f.path === "scripts/sp-list.py"));
+  assert.ok(files.some((f) => f.path === ".claude/modelos.json"));
 });
 
 for (const h of ["claude", "codex", "agents-md", "opencode", "cursor", "gemini"]) {

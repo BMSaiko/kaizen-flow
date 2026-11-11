@@ -73,6 +73,26 @@ def test_wezterm_abrir_estado_fechar(monkeypatch):
     assert b.fechar("9") is False and not any(c[2] == "kill-pane" for c in chamadas)
 
 
+def test_titulo_por_defeito_nao_faz_nada():
+    b = Falso()
+    assert b.titulo(b.abrir(["x"], "/tmp/a"), "meu-sp") is False and b.titulos() == {}
+
+
+def test_wezterm_titulo_e_titulos_do_separador():
+    chamadas = []
+    lista = json.dumps([{"pane_id": 7, "tab_title": "a"}, {"pane_id": 8, "tab_title": ""}, {"pane_id": 9}])
+    b = pb.WeztermBackend(_run(lista, chamadas))
+    assert b.titulo("7", "meu-sp") is True
+    assert ["wezterm", "cli", "set-tab-title", "--pane-id", "7", "meu-sp"] in chamadas
+    assert b.titulos() == {"7": "a"}
+
+
+def test_wezterm_titulos_sem_executavel_e_vazio():
+    def run(argv, **kw):
+        raise FileNotFoundError("wezterm")
+    assert pb.WeztermBackend(run).titulos() == {}
+
+
 def test_wezterm_devolve_foco_ao_painel_de_origem(monkeypatch):
     monkeypatch.setenv("WEZTERM_PANE", "3")
     chamadas = []

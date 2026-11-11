@@ -14,6 +14,8 @@ const RELATED_RE = /^(test_)?(sp|doc|handoff|kaizen|michi)[-_.]/;
 
 // fixtures dos testes do sp-fila (test_sp_fila.py)
 const FIXTURES = "scripts/fixtures/par-watch";
+// config lida pelos scripts em ../.claude/ (modelos.py): fica em core/.claude/
+const CONFIGS = [".claude/modelos.json"];
 
 const ls = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir) : []);
 
@@ -28,6 +30,10 @@ function plan(vault) {
   const commands = ls(path.join(vault, ".claude", "commands")).filter((n) => COMMAND_RE.test(n));
   for (const n of commands) parts.push([`.claude/commands/${n}`, `.claude/commands/${n}`]);
   for (const need of ["sp.md", "sp-list.md", "sp-handoff.md"]) if (!commands.includes(need)) missing.push(`.claude/commands/${need}`);
+  for (const c of CONFIGS) {
+    if (fs.existsSync(path.join(vault, c))) parts.push([c, c]);
+    else missing.push(c);
+  }
 
   const scripts = ls(path.join(vault, "scripts"));
   const chosen = new Set(scripts.filter((n) => SCRIPT_RE.test(n) && !SKIP.has(n)));
