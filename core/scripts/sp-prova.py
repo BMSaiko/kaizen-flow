@@ -23,7 +23,7 @@ NOME_OK = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 def destino(root, nome, project):
-    project = project.replace("\\", "/").rstrip("/").split("/")[-1]  # «kaizen/kaizenflow» = «kaizenflow»
+    project = project.replace("\\", "/").rstrip("/").split("/")[-1]  # «proj/kaizenflow» = «kaizenflow»
     if not NOME_OK.match(nome) or ".." in nome:
         raise ValueError(f"nome inválido: {nome!r}")
     if not nome.endswith(".md"):

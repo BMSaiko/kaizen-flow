@@ -129,7 +129,7 @@ def _arrancar_vigia(estado):
         p = sp_vigia.arrancar(fid, Path(__file__).resolve().parent / "sp-vigia.py")
         print(f"vigia · pid {p.pid} · log {sp_vigia.caminhos(pasta)[1]}")
         return p
-    except Exception as e:  # noqa: BLE001 — sem vigia a fila segue (avisos e merge pelo user)
+    except Exception as e:  # noqa: BLE001 — sem vigia a fila segue (avisos e merge pelo utilizador)
         print(f"aviso: vigia não arrancou: {e}", file=sys.stderr)
         return None
 

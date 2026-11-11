@@ -44,5 +44,5 @@ def test_main_origem_inexistente_rc1(tmp_path):
 def test_project_com_barra_nao_duplica_caminho(tmp_path):
     src = tmp_path / "x.txt"
     src.write_text("a")
-    a = sp_prova.destino(tmp_path, "p", "kaizen/kaizenflow")
+    a = sp_prova.destino(tmp_path, "p", "proj/kaizenflow")
     assert a == sp_prova.destino(tmp_path, "p", "kaizenflow")

@@ -106,7 +106,7 @@ def _uma_linha(texto):
 
 
 def listar(root=None, em_json=False, todas=False):
-    """Filas e SPs pelo nome, com as vagas livres do teto global. O pane nunca sai: o user vê o slug.
+    """Filas e SPs pelo nome, com as vagas livres do teto global. O pane nunca sai: o utilizador vê o slug.
 
     Árvores já terminadas (todos os SPs em done/falhou) ficam de fora, a não ser com `todas`."""
     filas = sp_painel_estado.filas(root)

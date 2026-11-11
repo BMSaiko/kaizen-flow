@@ -105,7 +105,7 @@ def _fim(ctx, res):
         ctx.log(f"fecho da mãe {mae}: rc={rc} {out}")
     if res.get("relatorio"):
         _seguro(ctx, ctx.nota_relatorio, res["relatorio"],
-                "\n## Pendente para o user\n- `/kaizen-sync` pedido pelo `sp-fechar` (não corre nos painéis nem no vigia).\n"
+                "\n## Pendente para o utilizador\n- `/kaizen-sync` pedido pelo `sp-fechar` (não corre nos painéis nem no vigia).\n"
                 + ("" if not mae else f"- Mãe `{mae}`: ver o log do vigia se o fecho falhou.\n"))
     ctx.log(f"fila terminada: {res.get('motivo') or ''}")
     return "fim"
@@ -126,7 +126,7 @@ def _bloquear(ctx, mem, sp, motivo):
 def _done(ctx, mem, sp):
     slug = sp["slug"]
     if ctx.modo(sp) != "auto":
-        return _bloquear(ctx, mem, sp, "SP manual: merge pelo user")
+        return _bloquear(ctx, mem, sp, "SP manual: merge pelo utilizador")
     rc, out = ctx.arrumar(sp)
     if rc != 0:
         return _bloquear(ctx, mem, sp, "resto do fecho por commitar: " + (out or "").strip()[-300:])

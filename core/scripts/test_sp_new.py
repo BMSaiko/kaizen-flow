@@ -501,6 +501,6 @@ def test_program_filhos_herdam_gate_e_a_mae_nao(tmp_path):
 
 def test_project_com_barra_usa_o_ultimo_componente(tmp_path, capsys):
     root = project(tmp_path, "kaizenflow")
-    rc = sp_new.main(["--root", str(root), "--project", "kaizen/kaizenflow", "--slug", "kaizenflow-abc-2026-11-11", "--priority", "P2"])
+    rc = sp_new.main(["--root", str(root), "--project", "proj/kaizenflow", "--slug", "kaizenflow-abc-2026-11-11", "--priority", "P2"])
     assert rc == 0
     assert (root / "kaizenflow" / "sp" / "TODO" / "kaizenflow-abc-2026-11-11.md").exists()
