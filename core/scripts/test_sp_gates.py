@@ -26,8 +26,8 @@ def sp_text(*gates):
 def test_parse_gates_le_so_o_frontmatter():
     gates = sp_gates.parse_gates(sp_text(("echo a", {"cwd": ".", "timeout": 5}), ("echo b", {})))
     assert gates == [
-        {"cmd": "echo a", "cwd": ".", "timeout": 5, "inputs": []},
-        {"cmd": "echo b", "cwd": ".", "timeout": 300, "inputs": []},
+        {"cmd": "echo a", "cwd": ".", "timeout": 5, "inputs": [], "timeout_declarado": True},
+        {"cmd": "echo b", "cwd": ".", "timeout": 300, "inputs": [], "timeout_declarado": False},
     ]
 
 
@@ -358,3 +358,11 @@ def test_main_com_caminho_do_sp_corre_os_gates(tmp_path):
     except SystemExit as e:
         rc = e.code
     assert rc in (0, None)
+
+
+def test_avisos_suite_completa_sem_timeout():
+    sem = sp_gates.parse_gates(sp_text(("python -m pytest scripts -q", {})))
+    com = sp_gates.parse_gates(sp_text(("python -m pytest scripts -q", {"timeout": 1200})))
+    um = sp_gates.parse_gates(sp_text(("python -m pytest scripts/sub -q", {})))
+    assert sp_gates.avisos(sem) and "timeout" in sp_gates.avisos(sem)[0]
+    assert sp_gates.avisos(com) == [] and sp_gates.avisos(um) == []
