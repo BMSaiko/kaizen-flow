@@ -116,12 +116,4 @@ Loop: Announce → Select → Execute → Checkpoint → Verify → Report. Time
 
 Ferramentas Pi → Claude Code. Sem sub-agentes (sequencial; ver CLAUDE.md).
 
-| Pi | Claude Code |
-|----|-------------|
-| `sb_search` | `Grep` (conteúdo) / `Glob` (nomes) |
-| `sb_read` | `Read` (usar `offset`/`limit`) |
-| `sb_list` | `Glob` (ordenar por data) |
-| `sb_resolve` | `Glob` por `**/<nome>.md` (wikilink → caminho) |
-| `bash` + `find`/`grep` | Proibido; usar `Glob`/`Grep` |
-| `subagents` / paralelo | Chamadas de ferramentas paralelas na mesma resposta; nunca `Agent` salvo pedido do user |
-| `sync_daily_notes` | Ler/editar a daily note à mão |
+Mapa `sb_*` → ferramentas nativas, `bash find/grep` proibido e `Agent` proibido (paralelo = chamadas de ferramentas paralelas): dono `AGENTS.md` (§Ferramentas do vault e §Sessão e execução). Extras: `sb_list` → `Glob` (ordenar por data); `sync_daily_notes` → ler/editar a daily note à mão.

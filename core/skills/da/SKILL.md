@@ -28,7 +28,7 @@ Anunciar → executar → verificar (reler o ficheiro alterado, menor teste) →
 `python -I scripts/da-stop.py <SP> --passo N.M --tentativas K --causa "<texto>" --proximo "<texto>"`:
 
 - rc 0: tentar de novo com abordagem diferente (nunca repetir às cegas); time-box 3 min de debug por tentativa.
-- rc 1: **parar**. O relatório fixo `## Paragem DA` (Passo, Tentativas, Causa, Próximo passo) vai para `## Report modo auto` do SP. Reverter: `michi-checkpoint.py restore --slug <SP>` (plano), `--apply` em auto ou após `AskUserQuestion` em manual (recusa se o HEAD mudou). Não commita nem move para Done (`michi-modo-auto.md` §Paragem).
+- rc 1: **parar**. O relatório fixo `## Paragem DA` (Passo, Tentativas, Causa, Próximo passo) vai para `## Report modo auto` do SP. Reverter: `michi-checkpoint.py restore` (`michi-modo-auto.md` §Paragem). Não commita nem move para Done (`michi-modo-auto.md` §Paragem).
 
 Outros `parar_se` do perfil (ambiguidade, ficheiro fora de escopo, custo) também param, com o mesmo relatório.
 

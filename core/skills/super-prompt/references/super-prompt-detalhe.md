@@ -17,7 +17,7 @@
 | `--program <slug> --children a,b:a,c:a+b` | SP-mãe (`kind: program`) + filhos | escalão grande/médio; `b:a` = b depende de a; filho de prova/fecho depende de todos os irmãos (`prova:a+b+c`), senão a fila elege-o primeiro; `--modo auto --commit auto` vai à mãe e aos filhos (sem `--modo auto` há aviso: a fila pára a cada commit) |
 | `--root` | raiz alternativa | testes |
 
-`sp-validate.py` recusa comandos proibidos (`--force`, `reset --hard`, `git add -A`, `.env*`).
+`sp-validate.py` recusa os comandos irreversíveis (lista em `michi-modo-auto.md`).
 
 **Escalão:** `python -I scripts/sp-escalao.py` propõe (pequena = 1 SP; média = pai+filhos; grande = árvore); override numa linha; critérios no playbook `kaizen-flow` §Escalões.
 
