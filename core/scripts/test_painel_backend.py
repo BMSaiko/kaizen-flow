@@ -147,14 +147,14 @@ def test_background_corre_processo_escreve_log_e_da_estado_por_pid(tmp_path):
         for _ in range(50):  # o log enche-se de forma assíncrona
             if "ola" in b.ecra(i):
                 break
-            time.sleep(0.1)
+            time.sleep(0.1)  # espera real: o subprocesso escreve o log e termina de forma assíncrona; relógio injetado não o acelera
         assert "ola" in b.ecra(i)
     finally:
         assert b.fechar(i) is True
     for _ in range(50):
         if b.estado(i) == "morto":
             break
-        time.sleep(0.1)
+        time.sleep(0.1)  # espera real: o subprocesso escreve o log e termina de forma assíncrona; relógio injetado não o acelera
     assert b.estado(i) == "morto" and i not in b.listar()
     assert b.fechar(i) is False
 
@@ -165,7 +165,7 @@ def test_background_processo_que_termina_fica_morto(tmp_path):
     for _ in range(100):
         if b.estado(i) == "morto":
             break
-        time.sleep(0.1)
+        time.sleep(0.1)  # espera real: o subprocesso escreve o log e termina de forma assíncrona; relógio injetado não o acelera
     assert b.estado(i) == "morto"
     assert "fim" in b.ecra(i)  # o log sobrevive ao processo
 

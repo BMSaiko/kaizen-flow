@@ -45,4 +45,4 @@ Cada fase é um ciclo TDD (Seams → Red → Green → tautologia). Sem código 
 Planear sem Brief do DR; fase sem Done when/Gate; >7 fases (dividir em sub-planos); código no corpo; iteração infinita; ignorar baixa confiança do Brief; saltar o Quality Gate; caminhos hardcoded (`sb_resolve`); assumir paralelismo sem verificar.
 
 ## Adaptação Claude Code
-`sb_search` → `Grep`/`Glob`; `sb_read` → `Read` (`offset`/`limit`); `sb_resolve` → `Glob **/<nome>.md`; `bash find/grep` proibido; paralelo = chamadas de ferramentas paralelas, nunca `Agent` salvo pedido do user.
+Mapa `sb_*` → ferramentas nativas, `bash find/grep` proibido e `Agent` proibido: dono `AGENTS.md` (§Ferramentas do vault e §Sessão e execução).

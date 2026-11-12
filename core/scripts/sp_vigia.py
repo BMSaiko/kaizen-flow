@@ -7,7 +7,6 @@ Os efeitos vivem no `Contexto` (o real é `ContextoReal`; os testes trocam-no).
 
 Uso: módulo importado por sp-vigia.py; sem execução direta
 rc: sem execução direta"""
-import json
 import os
 import re
 import subprocess
@@ -15,6 +14,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import sp_leitura  # noqa: E402
+from painel_backend import popen_sem_janela, run_hidden  # noqa: E402
+from sp_disco import guardar, ler_json  # noqa: E402
 
 MARCAS = {"pergunta": "? ", "bloqueado": "! ", "falhou": "x "}
 LOCK_OCUPADO = "outro merge em curso"
@@ -26,18 +28,15 @@ def memoria_nova():
 
 
 def ler_memoria(path):
+    dados = ler_json(path)
     try:
-        dados = json.loads(Path(path).read_text(encoding="utf-8"))
         return {"avisos": dict(dados.get("avisos") or {}), "tratados": list(dados.get("tratados") or [])}
-    except (OSError, ValueError, AttributeError):
+    except (AttributeError, TypeError, ValueError):
         return memoria_nova()
 
 
 def guardar_memoria(path, mem):
-    p = Path(path)
-    tmp = p.with_suffix(".tmp")
-    tmp.write_text(json.dumps(mem, ensure_ascii=False, indent=1), encoding="utf-8")
-    os.replace(tmp, p)
+    guardar(path, mem)
 
 
 def reclamar_pidfile(path, pid, vivo):
@@ -201,14 +200,10 @@ def caminhos(pasta):
     return p / "vigia.pid", p / "vigia.log", p / "vigia.json"
 
 
-DESTACADO = (getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-             | getattr(subprocess, "CREATE_NO_WINDOW", 0))
-
-
 def arrancar(fila, script, run=subprocess.Popen):
     """Lança `sp-vigia.py <fila>` destacado da sessão (sobrevive ao fim do turno); devolve o processo."""
-    return run([sys.executable, "-I", str(script), str(fila)], creationflags=DESTACADO, close_fds=True,
-               stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return popen_sem_janela([sys.executable, "-I", str(script), str(fila)], "destacado", run=run, close_fds=True,
+                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def parar(pidfile, vivo, matar):
@@ -227,8 +222,7 @@ def parar(pidfile, vivo, matar):
 
 def matar_pid(pid):
     if os.name == "nt":
-        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True,
-                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        run_hidden(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
     else:
         import signal
         os.kill(pid, signal.SIGTERM)
@@ -278,9 +272,7 @@ def modo_do_sp(path):
         texto = Path(path).read_text(encoding="utf-8")
     except (OSError, TypeError):
         return None
-    fm = texto.split("---", 2)[1] if texto.startswith("---") else ""
-    m = re.search(r"^modo:\s*(\S+)", fm, re.M)
-    return m.group(1).strip("'\"") if m else None
+    return sp_leitura.frontmatter(texto).get("modo") or None
 
 
 def toast_windows(texto, run=subprocess.Popen):
@@ -289,9 +281,8 @@ def toast_windows(texto, run=subprocess.Popen):
     ps = ("Add-Type -AssemblyName System.Windows.Forms; $n=New-Object System.Windows.Forms.NotifyIcon; "
           "$n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; "
           f"$n.ShowBalloonTip(8000,'sp-fila','{t}','Info'); Start-Sleep 9; $n.Dispose()")
-    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    return run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], creationflags=flags,
-               stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return popen_sem_janela(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], run=run,
+                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 class ContextoReal(Contexto):
@@ -302,7 +293,7 @@ class ContextoReal(Contexto):
         self.pe, self.fila, self.log_path = pe, fila, Path(log_path)
         self.run = run or fe.run_hidden
         self.scripts, self.repo = fe.SCRIPTS, fe.REPO
-        self.estado_path = Path(estado_path or fe.ESTADO)
+        self.estado_path = Path(estado_path or fe.estado_de(fila))
         self.rel_dir = Path(rel_dir or fe.RELATORIOS)
         self.root = root
         if backend is None:

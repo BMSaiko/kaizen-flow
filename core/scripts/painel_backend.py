@@ -18,6 +18,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sp_disco import ler_json  # noqa: E402
+
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 ESTADO_DIR = Path.home() / ".claude" / "sp-fila-paineis"
 NOMES = ("wezterm", "tmux", "background")
@@ -29,10 +32,33 @@ class BackendError(Exception):
     pass
 
 
+_GRUPO = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+_FLAGS = {
+    "janela": NO_WINDOW,                                              # sem consola
+    "grupo": NO_WINDOW | _GRUPO,                                      # sem consola, grupo próprio (DETACHED faria cada filho abrir consola)
+    "destacado": NO_WINDOW | _GRUPO | getattr(subprocess, "DETACHED_PROCESS", 0),  # sobrevive à sessão (vigia)
+}
+
+
 def run_hidden(*args, **kwargs):
-    """subprocess.run sem abrir janela de consola no Windows."""
+    """Único sítio que corre `subprocess.run` sem abrir janela de consola no Windows."""
     kwargs.setdefault("creationflags", NO_WINDOW)
     return subprocess.run(*args, **kwargs)
+
+
+def enviar_prompt(backend, pane, texto, run, sleep):
+    """Único envio de um prompt a um painel: WezTerm/tmux esperam o prompt `❯` e enviam com Enter confirmado; os outros pela `enviar`."""
+    if backend.nome in ("wezterm", "tmux"):
+        import handoff_spawn  # tarde: só para painéis reais
+        handoff_spawn._wait_prompt(backend.nome, pane, run, sleep)
+        handoff_spawn._send_line(backend.nome, pane, texto, run, sleep)
+    elif not backend.enviar(pane, texto):
+        raise RuntimeError(f"painel {pane}: o envio do prompt falhou")
+
+
+def popen_sem_janela(argv, modo="janela", run=None, **kwargs):
+    """Único sítio que lança `Popen` sem janela; `modo`: `janela`, `grupo` ou `destacado`; `run` substitui o Popen (testes)."""
+    return (run or subprocess.Popen)(argv, creationflags=_FLAGS[modo], **kwargs)
 
 
 class Backend(abc.ABC):
@@ -223,13 +249,12 @@ class BackgroundBackend(Backend):
         self.dir.mkdir(parents=True, exist_ok=True)
         self._limpar()
         provisorio = self.dir / f"novo-{os.getpid()}-{time.time_ns()}.log"
-        flags = (getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | NO_WINDOW) if os.name == "nt" else 0
         extra = {} if os.name == "nt" else {"start_new_session": True}
         erro = None
         with open(provisorio, "ab") as log:
             try:
-                proc = self.popen([str(c) for c in cmd], cwd=str(cwd), stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
-                                  creationflags=flags, close_fds=True, **extra)
+                proc = popen_sem_janela([str(c) for c in cmd], "grupo", run=self.popen, cwd=str(cwd), stdin=subprocess.DEVNULL,
+                                        stdout=log, stderr=subprocess.STDOUT, close_fds=True, **extra)
             except OSError as e:
                 erro = e
         if erro is not None:  # fora do `with`: no Windows o ficheiro só se apaga depois de fechado
@@ -247,8 +272,8 @@ class BackgroundBackend(Backend):
 
     def _registo(self, id):
         try:
-            return json.loads((self.dir / f"{int(id)}.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+            return ler_json(self.dir / f"{int(id)}.json")
+        except ValueError:  # id que não é inteiro
             return None
 
     def _limpar(self, dias=2):

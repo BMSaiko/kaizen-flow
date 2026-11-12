@@ -1,14 +1,11 @@
 """Testes de scripts/sp-validate.py (fixtures em ficheiros temporários)."""
-import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_validate", Path(__file__).with_name("sp-validate.py"))
-sp_validate = importlib.util.module_from_spec(_spec)
-sys.modules["sp_validate"] = sp_validate
-_spec.loader.exec_module(sp_validate)
+sp_validate = carregar(Path(__file__).with_name("sp-validate.py"), "sp_validate", fresco=True)
 
 SECTIONS = [
     ("1. Role", "És o agente."),

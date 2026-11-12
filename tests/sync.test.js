@@ -135,3 +135,18 @@ test("sync --check imprime a fonte e sai 1 quando o sync apagaria ficheiros rast
   assert.ok(r.stdout.includes(`fonte ${v}`), r.stdout);
   assert.match(r.stdout, /removeria rastreado: core\/scripts\/rastreado\.py/);
 });
+
+test("owns(rel) é verdadeiro exatamente para as origens que plan() devolve", () => {
+  const { owns } = require("../bin/sync.js");
+  const v = fakeVault();
+  put(v, "scripts/test_sp_fila_tema.py");
+  put(v, "scripts/test_michi_nucleo.py"); // SKIP
+  put(v, "scripts/ficheiro-solto.py"); // fora das regras
+  const { parts } = plan(v);
+  const origins = parts.map((p) => p[0]).filter((o) => o.startsWith("scripts/") && o.endsWith(".py"));
+  for (const o of origins) assert.ok(owns(o), `owns devia aceitar ${o}`);
+  const all = fs.readdirSync(path.join(v, "scripts")).map((n) => `scripts/${n}`);
+  for (const o of all.filter((x) => !origins.includes(x))) assert.ok(!owns(o), `owns devia recusar ${o}`);
+  assert.ok(!owns("scripts/test_michi_nucleo.py"));
+  assert.ok(!owns("scripts/ficheiro-solto.py"));
+});

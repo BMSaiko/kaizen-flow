@@ -5,9 +5,11 @@ Uso: python -I scripts/da-stop.py <SP> --passo N.M --tentativas K --causa TXT [-
 rc: 0 tentar de novo, 1 parar (relatório no stdout)
 """
 import argparse
-import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import sp_leitura  # noqa: E402
 
 PERFIS = {
     "cauteloso": (1, ["gate-falha", "ambiguidade", "ficheiro-fora-de-escopo", "custo"]),
@@ -17,13 +19,7 @@ PERFIS = {
 
 
 def _front(path):
-    m = re.match(r"---\n(.*?)\n---", Path(path).read_text(encoding="utf-8").replace("\r\n", "\n"), re.S)
-    campos = {}
-    for linha in (m.group(1) if m else "").splitlines():
-        k, _, v = linha.partition(":")
-        if _ and not k.startswith(" "):
-            campos[k.strip()] = v.strip()
-    return campos
+    return sp_leitura.campos(Path(path).read_text(encoding="utf-8"))
 
 
 def limites(path):

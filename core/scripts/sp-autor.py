@@ -18,6 +18,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import modelos  # noqa: E402
+from handoff_pane import consume_ficheiro  # noqa: E402
+from painel_backend import enviar_prompt  # noqa: E402
 import sp_painel_estado as pe  # noqa: E402
 
 MODELOS = modelos.DEFAULT  # os testes trocam-no
@@ -55,7 +57,7 @@ def prompt(sp, semente):
             f"(semente: decisões e contexto; lida e apagada). Preenche as 8 secções de {sp} pela skill super-prompt §Gerar, "
             "sem fazer o trabalho do SP, sem commit, sem abrir outros painéis. No fim corre "
             f"`python -I scripts/sp-estado.py {chave(slug)} done --msg '<resumo numa linha>'` "
-            f"(ou bloqueado/falhou com o motivo) e fecha com /quit.")
+            f"(ou bloqueado/falhou com o motivo) e fecha este painel com `wezterm cli kill-pane --pane-id $WEZTERM_PANE` (não uses /quit).")
 
 
 def consume(path, out=print):
@@ -63,8 +65,7 @@ def consume(path, out=print):
     p = Path(path)
     if not p.is_file():
         raise SpAutorErro(f"semente inexistente: {p}")
-    out(p.read_bytes().decode("utf-8"))
-    p.unlink()
+    consume_ficheiro(p, out)
 
 
 def _fila(root):
@@ -72,15 +73,6 @@ def _fila(root):
     if (pe.raiz(root) / fid).exists():  # verifica a pasta, não o texto do erro de `criar_fila`
         return fid
     return pe.criar_fila(FILA, root=root)
-
-
-def _enviar(backend, pane, texto, run, sleep):
-    if backend.nome in ("wezterm", "tmux"):
-        import handoff_spawn  # tarde: só para painéis reais
-        handoff_spawn._wait_prompt(backend.nome, pane, run, sleep)
-        handoff_spawn._send_line(backend.nome, pane, texto, run, sleep)
-    elif not backend.enviar(pane, texto):
-        raise RuntimeError(f"painel {pane}: o envio do prompt falhou")
 
 
 def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sleep):
@@ -103,7 +95,7 @@ def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sle
         f = getattr(backend, "titulo", None)
         if f:
             f(pane, titulo(slug_de(sp)))
-        _enviar(backend, pane, prompt(sp, semente), run, sleep)
+        enviar_prompt(backend, pane, prompt(sp, semente), run, sleep)
         pe.registar(fila, k, root=estado_root, pane=str(pane))
     except Exception as e:  # noqa: BLE001 — liberta a vaga e fecha o que abriu
         msg = f"erro a lançar {k}: {e}"

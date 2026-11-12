@@ -1,15 +1,12 @@
 """Testes de scripts/kf_errlog.py (log JSONL das falhas dos scripts do kf)."""
-import importlib.util
 import json
 import sys
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("kf_errlog", Path(__file__).with_name("kf_errlog.py"))
-kf_errlog = importlib.util.module_from_spec(_spec)
-sys.modules["kf_errlog"] = kf_errlog
-_spec.loader.exec_module(kf_errlog)
+kf_errlog = carregar(Path(__file__).with_name("kf_errlog.py"), "kf_errlog", fresco=True)
 
 
 @pytest.fixture

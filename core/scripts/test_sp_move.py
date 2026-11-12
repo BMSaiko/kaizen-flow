@@ -1,22 +1,17 @@
 """Testes de scripts/sp-move.py (fixtures em ficheiros temporários)."""
-import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_move", Path(__file__).with_name("sp-move.py"))
-sp_move = importlib.util.module_from_spec(_spec)
-sys.modules["sp_move"] = sp_move
-_spec.loader.exec_module(sp_move)
+sp_move = carregar(Path(__file__).with_name("sp-move.py"), "sp_move", fresco=True)
 
 
-def make_sp(root, rel, slug, status="TODO", project="atlas", body="# corpo\r\nlinha 2\r\n"):
-    path = root / rel / f"{slug}.md"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    head = f"---\nstatus: {status}\ncreated: 2026-10-01T10:00:00Z\nupdated: 2026-10-01T10:00:00Z\nslug: {slug}\nproject: {project}\n---\n"
-    path.write_bytes((head + body).encode("utf-8"))
-    return path
+from functools import partial
+from conftest import criar_sp
+
+make_sp = partial(criar_sp, project="atlas", body="# corpo\r\nlinha 2\r\n")
 
 
 def test_move_todo_para_doing_atualiza_pasta_status_e_updated(tmp_path):

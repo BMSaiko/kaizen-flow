@@ -1,14 +1,11 @@
 """Testes de doc-list.py (listar DRs/DPs por estado)."""
-import importlib.util
 import os
 import sys
 import time
 from pathlib import Path
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("doc_list", Path(__file__).with_name("doc-list.py"))
-doc_list = importlib.util.module_from_spec(_spec)
-sys.modules["doc_list"] = doc_list
-_spec.loader.exec_module(doc_list)
+doc_list = carregar(Path(__file__).with_name("doc-list.py"), "doc_list", fresco=True)
 
 
 def _doc(root, rel):

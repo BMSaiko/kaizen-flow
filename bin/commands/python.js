@@ -1,6 +1,7 @@
 "use strict";
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { PY_FLAGS, pyEnv } = require("../env.js");
 
 const PKG = path.resolve(__dirname, "..", "..");
 
@@ -19,7 +20,7 @@ function pythonCmd() {
 function py(args, cwd) {
   const cmd = pythonCmd();
   if (!cmd) { console.error("falta: Python 3 no PATH (ou KAIZEN_PYTHON)"); return 1; }
-  const r = spawnSync(cmd, ["-I", "-B", ...args], { cwd, stdio: "inherit", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
+  const r = spawnSync(cmd, [...PY_FLAGS, ...args], { cwd, stdio: "inherit", env: pyEnv() });
   return r.status === null ? 1 : r.status;
 }
 
@@ -27,7 +28,7 @@ function py(args, cwd) {
 function usage(sub, rest) {
   const cmd = pythonCmd();
   if (!cmd) { console.error("falta: Python 3 no PATH (ou KAIZEN_PYTHON)"); return 1; }
-  const r = spawnSync(cmd, ["-I", "-B", path.join(PKG, "usage", "kaizen_usage.py"), sub, ...rest], { stdio: "inherit", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
+  const r = spawnSync(cmd, [...PY_FLAGS, path.join(PKG, "usage", "kaizen_usage.py"), sub, ...rest], { stdio: "inherit", env: pyEnv() });
   return r.status === null ? 1 : r.status;
 }
 

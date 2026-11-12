@@ -5,25 +5,20 @@ Os scripts `sp-*` importam isto em vez de repetirem parsers e `importlib`.
 Uso: módulo importado pelos scripts sp-* (`kaizen_engine.load(nome)`); sem execução direta
 rc: n/a
 """
-import importlib.util
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import sp_leitura  # noqa: E402
+from sp_carregar import carregar  # noqa: E402
 
 
 def load(name):
     """Carrega `scripts/<name>.py` (nome com hífen incluído) uma só vez por processo."""
-    key = name.replace("-", "_")
-    if key in sys.modules:
-        return sys.modules[key]
-    spec = importlib.util.spec_from_file_location(key, HERE / f"{name}.py")
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[key] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    return carregar(HERE / f"{name}.py", name.replace("-", "_"))
 
 
 def relocate(src, dst):
@@ -53,19 +48,7 @@ def frontmatter_lines(text):
 
 
 def parse_frontmatter(text):
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return {}
-    fm = {}
-    for line in lines[1:]:
-        if line.strip() == "---":
-            break
-        key, sep, value = line.partition(":")
-        if not sep or not key.strip():
-            continue
-        value = re.sub(r"\s+#.*$", "", value.strip()).strip("'\"")
-        fm[key.strip()] = value
-    return fm
+    return sp_leitura.frontmatter(text)
 
 
 def parse_list(value):

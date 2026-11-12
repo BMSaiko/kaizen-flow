@@ -1,17 +1,13 @@
 """Testes de scripts/doc-move.py e doc-list.py (fixtures temporárias)."""
-import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
 
 def load(name):
-    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), Path(__file__).with_name(f"{name}.py"))
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[mod.__name__] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    return carregar(Path(__file__).with_name(f"{name}.py"), name.replace("-", "_"), fresco=True)
 
 
 doc_move, doc_list = load("doc-move"), load("doc-list")

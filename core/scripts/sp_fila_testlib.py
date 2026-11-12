@@ -3,16 +3,14 @@
 Uso: importado pelos test_sp_fila_*.py; sem execução direta
 rc: n/a
 """
-import importlib.util
 import json
 import sys
 from datetime import datetime
 from pathlib import Path
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent))
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_fila", Path(__file__).with_name("sp-fila.py"))
-sp_fila = importlib.util.module_from_spec(_spec)
-sys.modules["sp_fila"] = sp_fila
-_spec.loader.exec_module(sp_fila)
+sp_fila = carregar(Path(__file__).with_name("sp-fila.py"), "sp_fila", fresco=True)
 
 
 def make_sp(root, slug, folder="TODO", project="p", priority="P2", created="2026-10-01T10:00:00Z", modo="auto",

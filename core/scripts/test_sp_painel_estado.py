@@ -1,5 +1,4 @@
 """Testes de scripts/sp_painel_estado.py e da escrita/listagem de scripts/sp-estado.py (estado por fila e por SP)."""
-import importlib.util
 import json
 import subprocess
 import sys
@@ -10,11 +9,10 @@ from pathlib import Path
 import pytest
 
 import sp_painel_estado as pe
+from sp_carregar import carregar  # noqa: E402
 
 SCRIPTS = Path(__file__).resolve().parent
-_spec = importlib.util.spec_from_file_location("sp_estado_cli", SCRIPTS / "sp-estado.py")
-cli = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(cli)
+cli = carregar(SCRIPTS / "sp-estado.py", "sp_estado_cli", registar=False, fresco=True)
 
 T0 = datetime(2026, 11, 11, 10, 0, 0)
 
@@ -200,6 +198,19 @@ def test_reclamar_vaga_de_estado_final_e_invalido(tmp_path):
     pe.transitar("x", "done", root=tmp_path)
     with pytest.raises(pe.ErroEstado, match="inválida"):
         pe.reclamar_vaga("x", root=tmp_path)
+
+
+API_PUBLICA = ("criar_fila", "registar", "ler", "procurar", "transitar", "vagas_livres", "reclamar_vaga", "filas",
+               "filas_ativas", "remover_fila", "migrar_antigo", "ErroEstado", "SemVaga")
+
+
+def test_api_publica_inalterada():
+    assert len(API_PUBLICA) == 13
+    for nome in API_PUBLICA:
+        assert hasattr(pe, nome), nome
+    assert issubclass(pe.SemVaga, pe.ErroEstado)
+    for nome in ("pid_vivo", "bloqueio", "guardar", "LOCK_VELHO_S", "_lock_obsoleto"):  # reexportados para sp_fila_estado
+        assert hasattr(pe, nome), nome
 
 
 def test_corrida_de_claims_entre_threads(tmp_path):

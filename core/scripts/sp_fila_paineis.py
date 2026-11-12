@@ -15,6 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sp_painel_estado as pe  # noqa: E402
+from painel_backend import enviar_prompt  # noqa: E402
 from sp_fila_estado import REPO, SCRIPTS, run_hidden  # noqa: E402
 
 try:
@@ -128,16 +129,6 @@ def _ensure(slug, run):
     return linhas[-1]
 
 
-def _enviar(backend, pane, texto, run, sleep):
-    """WezTerm/tmux: espera o prompt `❯` e envia com Enter confirmado; outros backends pela sua `enviar`."""
-    if backend.nome in ("wezterm", "tmux"):
-        import handoff_spawn  # tarde: só para painéis reais
-        handoff_spawn._wait_prompt(backend.nome, pane, run, sleep)
-        handoff_spawn._send_line(backend.nome, pane, texto, run, sleep)
-    elif not backend.enviar(pane, texto):
-        raise RuntimeError(f"painel {pane}: o envio do prompt falhou")
-
-
 def _titulos(backend):
     f = getattr(backend, "titulos", None)
     try:
@@ -186,7 +177,7 @@ def _lancar_um(alvo, fila, backend, run, sleep, verificar, root, estado_root):
         _por_titulo(backend, pane, titulo)
         res["titulo"] = titulo
         if interativo:
-            _enviar(backend, pane, texto, run, sleep)
+            enviar_prompt(backend, pane, texto, run, sleep)
         pe.registar(fila, alvo.slug, root=estado_root, pane=str(pane))
     except Exception as e:  # noqa: BLE001 — qualquer falha deste SP liberta a vaga e não pára os outros
         msg = f"erro a lançar {alvo.slug}: {e}"

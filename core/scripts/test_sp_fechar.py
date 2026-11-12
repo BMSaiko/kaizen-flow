@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
 SCRIPTS = Path(__file__).resolve().parent
 PROJECT = "demo"
@@ -17,11 +18,7 @@ def fs(nome):
     return f"{PROJECT}-{nome}-2026-11-01"
 
 
-def run(script, *args, cwd=None):
-    r = subprocess.run([sys.executable, "-I", str(SCRIPTS / script), *args],
-                       capture_output=True, text=True, encoding="utf-8",
-                       cwd=cwd or tempfile.gettempdir())
-    return r.returncode, r.stdout, r.stderr
+from conftest import executar_cli as run  # noqa: E402
 
 
 @pytest.fixture
@@ -109,10 +106,7 @@ def test_sp_fora_de_doing_erro(root):
 
 
 def test_worktree_hint_so_em_worktree(tmp_path):
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("sp_fechar", SCRIPTS / "sp-fechar.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    mod = carregar(SCRIPTS / "sp-fechar.py", "sp_fechar", registar=False, fresco=True)
     repo = tmp_path / "r"
     g = lambda *a, c=repo: subprocess.run(["git", "-C", str(c), *a], check=True, capture_output=True)
     subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
@@ -125,11 +119,7 @@ def test_worktree_hint_so_em_worktree(tmp_path):
 
 
 def _mod():
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("sp_fechar", SCRIPTS / "sp-fechar.py")
-    m = importlib.util.module_from_spec(spec)
-    sys.modules["sp_fechar"] = m
-    spec.loader.exec_module(m)
+    m = carregar(SCRIPTS / "sp-fechar.py", "sp_fechar", fresco=True)
     return m
 
 
@@ -234,11 +224,8 @@ def test_guarda_skill_michi_regista_regra():
 
 def test_changed_paths_ignora_apagamento_em_stage(tmp_path):
     """Rename TODO->Done: o stage não lista a origem já apagada (git add falhava)."""
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("sp_fechar_mod", SCRIPTS / "sp-fechar.py")
-    mod = importlib.util.module_from_spec(spec)
     sys.path.insert(0, str(SCRIPTS))
-    spec.loader.exec_module(mod)
+    mod = carregar(SCRIPTS / "sp-fechar.py", "sp_fechar_mod", registar=False, fresco=True)
     g = lambda *a: subprocess.run(["git", "-C", str(tmp_path), "-c", "user.email=a@b", "-c", "user.name=a", *a],
                                   check=True, capture_output=True)
     g("init", "-q")

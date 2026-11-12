@@ -6,9 +6,10 @@ const crypto = require("crypto");
 const SKILLS = ["michi", "super-prompt", "grill-me", "dr", "dp", "da", "brainstorm", "swot", "pentest", "review-ciclo", "pr-fase"];
 const COMMAND_RE = /^(sp(-[a-z]+)*|handoff)\.md$/;
 const SCRIPT_RE = /^(sp|doc)[-_][a-z_-]+\.py$/;
-const SCRIPT_NAMES = ["conftest.py", "context-guard.py", "da-stop.py", "context-budget.py", "handoff.py", "handoff_pane.py", "handoff_spawn.py", "handoff_resume.py", "test_handoff_autoconsumo.py", "modelos.py", "michi_handoff_auto.py", "test_michi_handoff_auto.py", "painel_backend.py","sp_progresso.py", "skill-cut.py", "kaizen_config.py", "kaizen_engine.py", "kaizen_hooks.py", "wt_redirect.py", "kf_ligados.py", "kf_errlog.py", "test_kf_errlog.py", "kf_git.py", "test_kf_git.py", "pentest.py", "test_pentest.py", "review_ciclo.py", "test_review_ciclo.py", "pr_corpo.py", "test_pr_corpo.py", "pr_watch.py", "test_pr_watch.py", "test_kaizen_engine.py", "test_kaizen_hooks.py", "test_michi_tree_close.py", "sp-autor.py", "test_sp_autor_painel.py", "test_handoff_socket.py"];
-// testes que ficam no vault: afirmam textos em português ou dependem do vault inteiro
-const SKIP = new Set(["test_michi_nucleo.py", "test_context_guard.py", "test_e2e_kaizen_pacote.py", "test_e2e_kaizen_sp.py", "michi-checkpoint.py", "test_michi_checkpoint.py", "michi-escopo.py", "test_michi_escopo.py", "test_guard_escopo.py", "test_wt_redirect.py", "test_michi_metodologias.py", "sp-migrar-slug.py", "test_sp_migrar_slug.py"]);
+const MANIFEST = JSON.parse(fs.readFileSync(path.join(__dirname, "sync-manifest.json"), "utf8"));
+const SCRIPT_NAMES = MANIFEST.scriptNames;
+// SKIP (no manifesto): testes que ficam no vault; afirmam textos em português ou dependem do vault inteiro
+const SKIP = new Set(MANIFEST.skip);
 // ficheiros do vault com nomes de kaizen que ainda assim não entram no pacote vão para SKIP; o resto avisa
 const RELATED_RE = /^(test_)?(sp|doc|handoff|kaizen|michi)[-_.]/;
 
@@ -18,6 +19,16 @@ const FIXTURES = "scripts/fixtures/par-watch";
 const CONFIGS = [".claude/modelos.json"];
 
 const ls = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir) : []);
+
+// regra única: o nome de um ficheiro de scripts/ é peça do sync? (usada por plan() e owns())
+function isScriptPiece(n) {
+  if (SKIP.has(n)) return false;
+  if (SCRIPT_RE.test(n) || SCRIPT_NAMES.includes(n)) return true;
+  const t = n.match(/^test_(.+)\.py$/);
+  if (!t) return false;
+  const base = `${t[1]}.py`;
+  return [base, base.replace(/_/g, "-")].some((x) => SCRIPT_RE.test(x) || SCRIPT_NAMES.includes(x));
+}
 
 // devolve { parts: [[origem, destino]], missing: [...], unlisted: [...] } sem tocar em disco
 function plan(vault) {
@@ -36,17 +47,8 @@ function plan(vault) {
   }
 
   const scripts = ls(path.join(vault, "scripts"));
-  const chosen = new Set(scripts.filter((n) => SCRIPT_RE.test(n) && !SKIP.has(n)));
-  for (const n of SCRIPT_NAMES) {
-    if (scripts.includes(n)) chosen.add(n);
-    else missing.push(`scripts/${n}`);
-  }
-  for (const n of [...chosen]) {
-    const t = `test_${n.replace(/-/g, "_")}`;
-    if (!n.startsWith("test_") && scripts.includes(t) && !SKIP.has(t)) chosen.add(t);
-  }
-  // testes divididos por tema (test_sp_fila_<tema>.py) sem módulo homónimo
-  for (const n of scripts) if (/^test_(sp|doc)_[a-z_]+\.py$/.test(n) && !SKIP.has(n)) chosen.add(n);
+  for (const n of SCRIPT_NAMES) if (!scripts.includes(n)) missing.push(`scripts/${n}`);
+  const chosen = new Set(scripts.filter(isScriptPiece));
   for (const n of [...chosen].sort()) parts.push([`scripts/${n}`, `scripts/${n}`]);
   if (fs.existsSync(path.join(vault, FIXTURES))) parts.push([FIXTURES, FIXTURES]);
 
@@ -62,14 +64,7 @@ function owns(rel) {
   if (c) return COMMAND_RE.test(c[1]);
   if (rel.startsWith(`${FIXTURES}/`)) return true;
   const sc = rel.match(/^scripts\/([^/]+\.py)$/);
-  if (!sc) return false;
-  const n = sc[1];
-  if (SKIP.has(n)) return false;
-  if (SCRIPT_RE.test(n) || SCRIPT_NAMES.includes(n)) return true;
-  const t = n.match(/^test_(.+)\.py$/);
-  if (!t) return false;
-  const base = `${t[1]}.py`;
-  return [base, base.replace(/_/g, "-")].some((x) => SCRIPT_RE.test(x) || SCRIPT_NAMES.includes(x));
+  return sc ? isScriptPiece(sc[1]) : false;
 }
 
 const sha = (buf) => crypto.createHash("sha256").update(buf).digest("hex");

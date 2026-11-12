@@ -1,5 +1,4 @@
 """Testes do handoff com socket do WezTerm morto e painel inexistente (run injetado; sem WezTerm real)."""
-import importlib.util
 import json
 import os
 import sys
@@ -9,11 +8,9 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import handoff_pane as hp  # noqa: E402
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("handoff_sock", Path(__file__).with_name("handoff.py"))
-handoff = importlib.util.module_from_spec(_spec)
-sys.modules["handoff_sock"] = handoff
-_spec.loader.exec_module(handoff)
+handoff = carregar(Path(__file__).with_name("handoff.py"), "handoff_sock", fresco=True)
 
 
 class _Res:

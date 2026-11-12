@@ -23,6 +23,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 ## [0.2.0] - 2026-11-08
 
 ### Changed
+- Refactor de `bin/`: um só predicado de seleção do sync (`plan()` e `owns()`), `SCRIPT_NAMES`/`SKIP` em `bin/sync-manifest.json`, lançamento do Python (`-I -B`, `PYTHONDONTWRITEBYTECODE`) e `homedir` em `bin/env.js`; sem mudança de comportamento (`core/` idêntico).
 - CI: workflow reutilizável `test.yml` (matriz Node x Python 3.10/3.13, cache npm/pip) usado por `ci`, `publish` e `release`.
 
 ### Added

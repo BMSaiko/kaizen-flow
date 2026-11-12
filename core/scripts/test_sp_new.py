@@ -1,17 +1,14 @@
 """Testes de scripts/sp-new.py (FS em diretório temporário, data injetada)."""
-import importlib.util
 import sys
 from datetime import date
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
 _here = Path(__file__).parent
 for name, file in (("sp_validate", "sp-validate.py"), ("sp_new", "sp-new.py")):
-    _spec = importlib.util.spec_from_file_location(name, _here / file)
-    mod = importlib.util.module_from_spec(_spec)
-    sys.modules[name] = mod
-    _spec.loader.exec_module(mod)
+    mod = carregar(_here / file, name, fresco=True)
 sp_new, sp_validate = sys.modules["sp_new"], sys.modules["sp_validate"]
 
 TODAY = date(2026, 10, 18)

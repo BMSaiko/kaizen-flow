@@ -1,13 +1,11 @@
-import importlib.util
 import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
+from sp_carregar import carregar  # noqa: E402
 
 _p = Path(__file__).resolve().parent / "sp-envelhecer.py"
-_s = importlib.util.spec_from_file_location("sp_env", _p)
-env = importlib.util.module_from_spec(_s)
-_s.loader.exec_module(env)
+env = carregar(_p, "sp_env", registar=False, fresco=True)
 
 
 def mk(root, name, prio, updated, status="TODO", extra=""):

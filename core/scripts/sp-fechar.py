@@ -12,7 +12,6 @@ RC 0 = fechado; 1 = gate/orçamento vermelho (SP fica em Doing); 2 = erro de uso
 rc: 0 fechado, 1 verificação falhou (SP continua em Doing), 2 gates inválidos
 """
 import argparse
-import json
 import re
 import subprocess
 import sys
@@ -25,6 +24,7 @@ import kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
 import kf_ligados  # noqa: E402
 import wt_redirect  # noqa: E402
+from sp_disco import ler_json  # noqa: E402
 
 sp_list = kaizen_engine.load("sp-list")
 sp_gates = kaizen_engine.load("sp-gates")
@@ -181,8 +181,8 @@ def em_fila(slug, estado=None):
         cands = sorted(base.glob("*/fila.json")) if base.is_dir() else []
         return any(em_fila(slug, c) for c in cands + [FILA_ESTADO])
     try:
-        return slug in json.loads(Path(estado).read_text(encoding="utf-8")).get("sessoes", {})
-    except (OSError, ValueError, AttributeError):
+        return slug in ler_json(estado, {}).get("sessoes", {})
+    except AttributeError:
         return False
 
 

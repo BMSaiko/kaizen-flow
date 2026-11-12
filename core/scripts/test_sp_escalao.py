@@ -1,14 +1,11 @@
 """Testes de scripts/sp-escalao.py."""
-import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_escalao", Path(__file__).parent / "sp-escalao.py")
-sp_escalao = importlib.util.module_from_spec(_spec)
-sys.modules["sp_escalao"] = sp_escalao
-_spec.loader.exec_module(sp_escalao)
+sp_escalao = carregar(Path(__file__).parent / "sp-escalao.py", "sp_escalao", fresco=True)
 
 
 @pytest.mark.parametrize("f,r,h,esperado", [

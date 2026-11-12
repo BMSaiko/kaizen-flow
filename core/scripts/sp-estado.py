@@ -27,6 +27,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
+import sp_leitura  # noqa: E402
 import sp_painel_estado  # noqa: E402
 
 MAX_LINES = 30
@@ -36,8 +37,7 @@ MAX_PROGRESSO = 3
 
 def section(text, prefix):
     """Corpo da secção `## <prefix>...` até à seguinte `## `."""
-    m = re.search(rf"^##\s+{re.escape(prefix)}[^\n]*\n(.*?)(?=^##\s|\Z)", text, re.S | re.M)
-    return m.group(1) if m else ""
+    return sp_leitura.seccao(text, prefix)
 
 
 def git_state():

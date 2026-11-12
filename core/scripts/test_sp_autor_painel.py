@@ -1,5 +1,4 @@
 """sp-autor.py: o SP é preenchido num painel `sp-autor` (modelo do papel), com semente efémera e estado em ficheiro."""
-import importlib.util
 import json
 import subprocess
 import sys
@@ -10,10 +9,9 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 import sp_painel_estado as pe  # noqa: E402
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_autor", SCRIPTS / "sp-autor.py")
-sa = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(sa)
+sa = carregar(SCRIPTS / "sp-autor.py", "sp_autor", registar=False, fresco=True)
 
 
 class FakeBackend:

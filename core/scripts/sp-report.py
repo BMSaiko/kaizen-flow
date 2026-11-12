@@ -14,7 +14,6 @@ rc: 0 ok, 1 erro, 3 secção «Dificuldades» vazia
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import re
 import subprocess
 import sys
@@ -23,21 +22,18 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import kf_git  # noqa: E402
+import sp_leitura  # noqa: E402
+from sp_carregar import carregar  # noqa: E402
 SEM_PATCH = re.compile(r"^(?:[-*]\s*)?Reflect\s+[^:]*:\s*sem patch\.?\s*$", re.I)
 LINHA = re.compile(r"^(?:[-*]\s*)?Reflect\b[^:\n]*:\s*\S", re.I)
 
 
 def _load(name: str, filename: str):
-    spec = importlib.util.spec_from_file_location(name, HERE / filename)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    return carregar(HERE / filename, name, fresco=True)
 
 
 def section(text: str, prefix: str) -> str:
-    m = re.search(rf"^##\s+{re.escape(prefix)}[^\n]*\n(.*?)(?=^##\s|\Z)", text, re.S | re.M)
-    return m.group(1) if m else ""
+    return sp_leitura.seccao(text, prefix)
 
 
 def dificuldades(text: str) -> list[str]:

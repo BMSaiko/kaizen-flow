@@ -1,5 +1,4 @@
 """Testes de scripts/handoff.py (ficheiros temporários; nada fala com o WezTerm)."""
-import importlib.util
 import os
 import sys
 import time
@@ -7,11 +6,9 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("handoff", Path(__file__).with_name("handoff.py"))
-handoff = importlib.util.module_from_spec(_spec)
-sys.modules["handoff"] = handoff
-_spec.loader.exec_module(handoff)
+handoff = carregar(Path(__file__).with_name("handoff.py"), "handoff", fresco=True)
 
 BODY = "**Feito**\n- a\n\n**Por fazer**\n- b\n\n**Próximo passo**\nc\n"
 

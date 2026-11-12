@@ -1,12 +1,9 @@
 """Testes de scripts/sp-organize.py (FS em diretório temporário)."""
-import importlib.util
 import sys
 from pathlib import Path
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_organize", Path(__file__).with_name("sp-organize.py"))
-sp_organize = importlib.util.module_from_spec(_spec)
-sys.modules["sp_organize"] = sp_organize
-_spec.loader.exec_module(sp_organize)
+sp_organize = carregar(Path(__file__).with_name("sp-organize.py"), "sp_organize", fresco=True)
 
 
 def sp(root, rel, slug="abc", status="TODO", project="atlas", date="2026-10-18"):

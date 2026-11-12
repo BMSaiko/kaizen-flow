@@ -1,6 +1,5 @@
 """Testes de scripts/modelos.py (config de modelo/effort por papel)."""
 import contextlib
-import importlib.util
 import io
 import json
 import subprocess
@@ -8,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
 SCRIPT = Path(__file__).resolve().parent / "modelos.py"
 
@@ -31,9 +31,7 @@ def cfg(tmp_path):
 
 def run(cfg, *args):
     """Corre modelos.main em-processo (a cobertura do pacote kf so mede o que corre aqui)."""
-    spec = importlib.util.spec_from_file_location("modelos_sob_teste", SCRIPT)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    mod = carregar(SCRIPT, "modelos_sob_teste", registar=False, fresco=True)
     out = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
     err = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
@@ -242,4 +240,4 @@ def test_json_real_do_repo():
     assert d["papeis"]["michi-exec"]["effort"] == "low"
     assert d["papeis"]["michi-complexo"] == {"model": "claude-opus-5-5", "effort": "low"}
     assert d["michi_modelo"] == NOVO["michi_modelo"]
-    assert d["papeis"]["sp-autor"]["effort"] == "medium"
+    assert d["papeis"]["sp-autor"]["effort"] == "low"

@@ -8,12 +8,13 @@ rc: n/a
 """
 import json
 import os  # noqa: F401  (os testes instrumentam `sp_fila_estado.os`)
-import subprocess
+import subprocess  # noqa: F401
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+from painel_backend import run_hidden  # noqa: E402,F401  (reexportado: a fila e o vigia importam-no daqui)
 import sp_painel_estado  # noqa: E402
 from sp_painel_estado import LOCK_VELHO_S, _lock_obsoleto, bloqueio, guardar, pid_vivo  # noqa: E402,F401
 
@@ -28,9 +29,6 @@ REQ_POR_SP = 50  # unidade de contagem do teto opt-in (--orcamento / orcamento_r
 ORCAMENTO = None  # sem limite de requests
 MAX_FALHAS_DEFEITO = 2  # falhas seguidas até parar a fila
 MAX_DEFEITO = 5
-
-
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def estado_de(programa, base=None):
@@ -57,12 +55,6 @@ def localizar(slug=None, base=None, legado=None):
                 continue
         return None
     return cands[0] if len(cands) == 1 else None
-
-
-def run_hidden(*args, **kwargs):
-    """subprocess.run sem janela de consola no Windows: o vigia chama wezterm/git a cada ciclo e as janelas piscavam."""
-    kwargs.setdefault("creationflags", NO_WINDOW)
-    return subprocess.run(*args, **kwargs)
 
 
 def registar_sessao(dados, slug, inicio, **campos):
