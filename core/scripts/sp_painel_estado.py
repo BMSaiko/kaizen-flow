@@ -8,20 +8,20 @@ por isso a contagem do teto e a ocupação da vaga são um só passo. Só stdlib
 Uso: módulo importado por sp-estado.py e sp_fila_estado.py; sem execução direta
 rc: n/a
 """
-import json
 import os
-import re
 import shutil
-import time
+import sys
 from contextlib import contextmanager
-from datetime import datetime
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sp_disco import LOCK_VELHO_S, _lock_obsoleto, _pid_do_lock, _recuperar, bloqueio, guardar, ler_json, pid_vivo  # noqa: E402,F401
+from sp_estado_base import (ESTADOS, ILEGIVEL, ErroEstado, SemVaga, _ler_json, _ler_sp, _nome, _slug, _ts,  # noqa: E402,F401
+                            fila_id, CAMPOS, FINAIS, NAO_SP, _campos, _dirs, _ficheiros_sp, _procurar, _sp_novo)
 
 MAX_PARALELO = 3  # teto global de painéis ativos, somando todas as filas
 ENV_ROOT = "SP_FILA_ROOT"
-ESTADOS = ("pendente", "a-correr", "pergunta", "done", "bloqueado", "falhou")
 ATIVOS = frozenset({"a-correr", "pergunta"})  # ocupam vaga
-FINAIS = frozenset({"done", "falhou"})
 TRANSICOES = {
     "pendente": {"a-correr", "bloqueado", "falhou"},
     "a-correr": {"pergunta", "done", "bloqueado", "falhou"},
@@ -31,152 +31,6 @@ TRANSICOES = {
     "done": {"bloqueado"},  # só o vigia: done que não pode integrar (SP manual, gates, conflito)
 }
 MODOS = ("sequencial", "paralelo")
-CAMPOS = ("modelo", "worktree", "pane")
-ILEGIVEL = "ilegível"
-LOCK_VELHO_S = 60  # um bloqueio mais antigo, sem pid legível, é de uma sessão morta
-_NOME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,149}$")
-_DISPOSITIVO = re.compile(r"^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)", re.IGNORECASE)
-_LIMITES_ANTIGOS = ("max", "ate", "horas", "usd", "orcamento", "max_falhas", "concorrencia")
-
-
-class ErroEstado(Exception):
-    """Pedido recusado sem escrever (nome inválido, slug desconhecido, transição inválida, JSON ilegível)."""
-
-
-class SemVaga(ErroEstado):
-    """O teto global de painéis ativos está atingido."""
-
-
-# --- primitivas partilhadas com sp_fila_estado (bloqueio e escrita atómica) ---
-
-def pid_vivo(pid):
-    """True se o processo `pid` existe. Windows: OpenProcess + GetExitCodeProcess (259 = ainda ativo); nunca `os.kill(pid, 0)`, que lá termina o processo."""
-    if pid <= 0:
-        return False
-    if os.name != "nt":
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
-            return False
-        except OSError:  # PermissionError: existe, é de outro utilizador
-            return True
-        return True
-    import ctypes
-    from ctypes import wintypes
-    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    k32.OpenProcess.restype = wintypes.HANDLE
-    k32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
-    k32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
-    k32.CloseHandle.argtypes = (wintypes.HANDLE,)
-    h = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
-    if not h:
-        return ctypes.get_last_error() == 5  # ERROR_ACCESS_DENIED: existe; qualquer outro erro (87 = pid inválido): não existe
-    try:
-        codigo = wintypes.DWORD()
-        return bool(k32.GetExitCodeProcess(h, ctypes.byref(codigo))) and codigo.value == 259  # STILL_ACTIVE
-    finally:
-        k32.CloseHandle(h)
-
-
-def _lock_obsoleto(lock):
-    """Com pid legível manda o pid (dono morto = obsoleto, vivo = nunca); sem ele (formato antigo, escrita a meio) manda a idade."""
-    try:
-        pid = int(lock.read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
-        return time.time() - lock.stat().st_mtime > LOCK_VELHO_S
-    return not pid_vivo(pid)
-
-
-def _pid_do_lock(lock):
-    try:
-        return int(lock.read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
-        return None
-
-
-def _recuperar(lock):
-    """Apaga o lock de um dono morto; True se apagou.
-
-    Entre ler o pid e saber que morreu, o dono pode ter largado o lock e outro processo criado um novo: apagar aí
-    tirava o bloqueio a um dono vivo. Por isso a recuperação corre uma de cada vez (`<lock>.rec`, O_CREAT|O_EXCL)
-    e só apaga se o lock ainda tem o mesmo pid morto (um lock com pid morto já ninguém larga nem recria)."""
-    if not _lock_obsoleto(lock):
-        return False
-    guarda = Path(f"{lock}.rec")
-    try:
-        os.close(os.open(guarda, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
-    except (FileExistsError, PermissionError):
-        try:
-            if time.time() - guarda.stat().st_mtime > LOCK_VELHO_S:  # recuperação que morreu a meio
-                guarda.unlink(missing_ok=True)
-        except OSError:
-            pass
-        return False
-    try:
-        pid = _pid_do_lock(lock)
-        if pid is None:
-            morto = time.time() - lock.stat().st_mtime > LOCK_VELHO_S
-        else:
-            morto = not pid_vivo(pid) and _pid_do_lock(lock) == pid
-        if morto:
-            lock.unlink(missing_ok=True)
-        return morto
-    finally:
-        try:
-            guarda.unlink(missing_ok=True)
-        except OSError:  # fica para a recuperação por idade
-            pass
-
-
-@contextmanager
-def bloqueio(path, espera=15.0):
-    """Exclusão mútua entre processos sobre `path`: ficheiro `<path>.lock` (guarda o pid do dono) criado com O_CREAT|O_EXCL.
-
-    Recupera o lock de um dono morto de imediato e o de mtime > LOCK_VELHO_S (sem pid legível)."""
-    lock = Path(f"{path}.lock")
-    limite_t = time.monotonic() + espera
-    while True:
-        try:
-            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            try:
-                os.write(fd, str(os.getpid()).encode())
-            finally:
-                os.close(fd)
-            break
-        except (FileExistsError, PermissionError):  # Windows: PermissionError se o dono está a apagar o .lock
-            try:
-                if _recuperar(lock):
-                    continue
-            except OSError:
-                pass
-            if time.monotonic() > limite_t:
-                raise TimeoutError(f"estado bloqueado há demasiado tempo: {lock}")
-            time.sleep(0.02)
-    try:
-        yield
-    finally:
-        for tentativa in range(100):
-            try:
-                lock.unlink(missing_ok=True)
-                break
-            except PermissionError:  # Windows: antivírus/indexador seguram o .lock; largar sem o apagar bloquearia os outros
-                if tentativa == 99:
-                    raise
-                time.sleep(0.02)
-
-
-def guardar(path, estado):
-    """Escrita atómica: ficheiro temporário + os.replace (um leitor nunca vê JSON a meio)."""
-    tmp = Path(f"{path}.{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(estado, ensure_ascii=False, indent=1), encoding="utf-8")
-    for tentativa in range(500):
-        try:
-            os.replace(tmp, path)
-            return
-        except PermissionError:  # Windows: um leitor sem bloqueio (painel, vigia) tem o destino aberto
-            if tentativa == 499:
-                raise
-            time.sleep(0.02)
 
 
 # --- nomes, raiz e leitura ---
@@ -184,65 +38,6 @@ def guardar(path, estado):
 def raiz(root=None):
     """Pasta do estado: argumento, variável `SP_FILA_ROOT` ou `~/.claude/sp-fila`."""
     return Path(root or os.environ.get(ENV_ROOT) or Path.home() / ".claude" / "sp-fila")
-
-
-def _nome(valor, que):
-    """Um nome (fila ou slug) vira nome de ficheiro: só letras, dígitos, `.`, `_` e `-`, sem `..`."""
-    if not isinstance(valor, str) or not _NOME.match(valor) or ".." in valor or valor.endswith("."):
-        raise ErroEstado(f"{que} inválido: {valor!r}")
-    if _DISPOSITIVO.match(valor):  # Windows: `NUL.json` é o dispositivo, não um ficheiro
-        raise ErroEstado(f"{que} inválido: {valor!r} (nome reservado no Windows)")
-    return valor
-
-
-def _slug(valor):
-    if _nome(valor, "slug").lower() == "fila":
-        raise ErroEstado(f"slug inválido: {valor!r} (reservado)")
-    return valor
-
-
-def fila_id(programa=None, agora=None):
-    """Id da fila: o slug da mãe (programa) ou `fila-AAAAMMDD-HHMMSS` na fila sem programa."""
-    if programa:
-        return _nome(programa, "programa")
-    return "fila-" + (agora or datetime.now()).strftime("%Y%m%d-%H%M%S")
-
-
-def _ts(agora=None):
-    return (agora or datetime.now()).isoformat(timespec="seconds")
-
-
-def _ler_json(path):
-    try:
-        dados = json.loads(Path(path).read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        raise
-    except (OSError, ValueError) as e:
-        raise ErroEstado(f"estado {ILEGIVEL}: {path} ({e})") from e
-    if not isinstance(dados, dict):
-        raise ErroEstado(f"estado {ILEGIVEL}: {path} (não é um objeto JSON)")
-    return dados
-
-
-def _ler_sp(path):
-    dados = _ler_json(path)
-    if dados.get("estado") not in ESTADOS:
-        raise ErroEstado(f"estado {ILEGIVEL}: {path} (estado {dados.get('estado')!r})")
-    return dados
-
-
-def _dirs(r):
-    """Pastas de fila dentro da raiz, por ordem de nome."""
-    if not r.is_dir():
-        return []
-    return sorted((d for d in r.iterdir() if d.is_dir() and (d / "fila.json").is_file()), key=lambda d: d.name)
-
-
-def _ficheiros_sp(d):
-    return sorted((p for p in d.glob("*.json") if p.name.lower() not in NAO_SP), key=lambda p: p.name)
-
-
-NAO_SP = {"fila.json", "vigia.json"}  # a memória do vigia vive na pasta da fila e não é estado de SP
 
 
 def _ativos(r):
@@ -265,38 +60,6 @@ def _exclusivo(root):
     r.mkdir(parents=True, exist_ok=True)
     with bloqueio(r / "estado"):
         yield r
-
-
-def _sp_novo(fid, slug, agora=None):
-    return {"slug": slug, "fila": fid, "estado": "pendente", "modelo": None, "worktree": None, "pane": None,
-            "inicio": None, "fim": None, "msg": None, "atualizado": _ts(agora)}
-
-
-def _campos(campos):
-    estranhos = sorted(set(campos) - set(CAMPOS))
-    if estranhos:
-        raise ErroEstado(f"campo desconhecido: {', '.join(estranhos)} (válidos: {', '.join(CAMPOS)})")
-    return {k: (None if v is None else str(v)) for k, v in campos.items()}
-
-
-def _procurar(r, slug):
-    candidatas = []
-    for d in _dirs(r):
-        p = d / f"{slug}.json"
-        if not p.is_file():
-            continue
-        try:
-            acabado = _ler_sp(p)["estado"] in FINAIS
-        except (ErroEstado, FileNotFoundError):
-            acabado = False
-        try:
-            criada = str(_ler_json(d / "fila.json").get("criada") or "")
-        except (ErroEstado, FileNotFoundError):
-            criada = ""
-        candidatas.append((not acabado, criada, d.name))
-    if not candidatas:
-        raise ErroEstado(f"slug desconhecido: {slug} (nenhuma fila o regista)")
-    return max(candidatas)[2]
 
 
 # --- API ---
@@ -465,71 +228,6 @@ def filas_ativas(root=None):
 
 
 def migrar_antigo(path=None, root=None, agora=None):
-    """Converte o `~/.claude/sp-fila-estado.json` (estado único) numa fila; devolve o fila-id ou None se não há ficheiro.
-
-    O ficheiro antigo fica onde está (a série `sp-handoff --launch` ainda o usa). Recusa com `ErroEstado`:
-    JSON ilegível, formato desconhecido, nomes inválidos, fila já migrada ou sessões que rebentam o teto."""
-    path = Path(path) if path else Path.home() / ".claude" / "sp-fila-estado.json"
-    try:
-        bruto = path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return None
-    except OSError as e:
-        raise ErroEstado(f"estado antigo {ILEGIVEL}: {path} ({e})") from e
-    try:
-        antigo = json.loads(bruto)
-    except ValueError as e:
-        raise ErroEstado(f"estado antigo {ILEGIVEL}: {path} ({e}); corrigir ou apagar à mão") from e
-    if not isinstance(antigo, dict) or not ({"sessoes", "lancado"} & set(antigo)):
-        raise ErroEstado(f"estado antigo em formato desconhecido: {path} (sem `sessoes` nem `lancado`)")
-    sessoes = antigo.get("sessoes") or {}
-    if not isinstance(sessoes, dict):
-        raise ErroEstado(f"estado antigo em formato desconhecido: {path} (`sessoes` não é um objeto)")
-    sessoes = {s: (v if isinstance(v, dict) else {}) for s, v in sessoes.items()}
-    listas = {}
-    for campo in ("feitos", "falhados"):
-        valor = antigo.get(campo) or []
-        if not isinstance(valor, list) or not all(isinstance(s, str) for s in valor):
-            raise ErroEstado(f"estado antigo em formato desconhecido: {path} (`{campo}` não é uma lista de slugs)")
-        listas[campo] = valor
-    lancado = antigo.get("lancado")
-    if lancado:
-        if not isinstance(lancado, str):
-            raise ErroEstado(f"estado antigo em formato desconhecido: {path} (`lancado` não é um slug)")
-        sessoes.setdefault(lancado, {})
-    try:
-        modo = "paralelo" if int(antigo.get("concorrencia") or 1) > 1 else "sequencial"
-    except (TypeError, ValueError):
-        raise ErroEstado(f"estado antigo em formato desconhecido: {path} (`concorrencia` não é um número)") from None
-    feitos = [s for s in dict.fromkeys(listas["feitos"]) if s not in sessoes]
-    falhados = [s for s in dict.fromkeys(listas["falhados"]) if s not in sessoes and s not in feitos]
-    for s in [*sessoes, *feitos, *falhados]:
-        _slug(s)
-    try:
-        criada = datetime.fromisoformat(str(antigo.get("inicio")))
-    except ValueError:
-        criada = agora or datetime.now()
-    programa = antigo.get("programa") or None
-    fid = fila_id(programa, criada)
-    with _exclusivo(root) as r:
-        d = r / fid
-        if d.exists():
-            raise ErroEstado(f"estado antigo já migrado: a fila {fid} existe")
-        if sessoes and _ativos(r) + len(sessoes) > MAX_PARALELO:
-            raise ErroEstado(f"migração recusada: {len(sessoes)} sessões em curso passam o teto de {MAX_PARALELO} painéis")
-        d.mkdir()
-        agora_ts = _ts(agora)
-        for slug, estado in [*((s, "done") for s in feitos), *((s, "falhou") for s in falhados), *((s, "a-correr") for s in sessoes)]:
-            sp = _sp_novo(fid, slug, agora)
-            info = sessoes.get(slug, {})
-            sp.update(estado=estado, msg="migrado de sp-fila-estado.json",
-                      worktree=info.get("worktree"), pane=None if info.get("painel") is None else str(info["painel"]),
-                      inicio=info.get("inicio") if estado == "a-correr" else None,
-                      fim=agora_ts if estado in FINAIS else None)
-            guardar(d / f"{slug}.json", sp)
-        guardar(d / "fila.json", {"fila": fid, "programa": programa,
-                                  "modo": modo,
-                                  "limites": {k: antigo[k] for k in _LIMITES_ANTIGOS if antigo.get(k) is not None},
-                                  "ordem": [*feitos, *falhados, *sessoes], "criada": criada.isoformat(timespec="seconds"),
-                                  "migrada_de": str(path)})
-    return fid
+    """Converte o `~/.claude/sp-fila-estado.json` numa fila (lógica em `sp_estado_migracao`); fila-id ou None se não há ficheiro."""
+    import sp_estado_migracao
+    return sp_estado_migracao.migrar_antigo(path, root=root, agora=agora)

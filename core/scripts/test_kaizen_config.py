@@ -1,16 +1,13 @@
-import importlib.util
 import json
 import sys
 from pathlib import Path
+from sp_carregar import carregar  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 
 
 def load(name, file):
-    spec = importlib.util.spec_from_file_location(name, HERE / file)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
+    mod = carregar(HERE / file, name, fresco=True)
     return mod
 
 

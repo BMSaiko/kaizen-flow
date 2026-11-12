@@ -1,14 +1,11 @@
 """Testes de scripts/sp-move.py (fixtures em ficheiros temporários)."""
-import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_move", Path(__file__).with_name("sp-move.py"))
-sp_move = importlib.util.module_from_spec(_spec)
-sys.modules["sp_move"] = sp_move
-_spec.loader.exec_module(sp_move)
+sp_move = carregar(Path(__file__).with_name("sp-move.py"), "sp_move", fresco=True)
 
 
 def make_sp(root, rel, slug, status="TODO", project="atlas", body="# corpo\r\nlinha 2\r\n"):

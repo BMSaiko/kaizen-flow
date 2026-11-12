@@ -1,12 +1,9 @@
 """Testes de scripts/sp-report.py (SP de exemplo em texto, sem git)."""
-import importlib.util
 import sys
 from pathlib import Path
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_report", Path(__file__).with_name("sp-report.py"))
-sp_report = importlib.util.module_from_spec(_spec)
-sys.modules["sp_report"] = sp_report
-_spec.loader.exec_module(sp_report)
+sp_report = carregar(Path(__file__).with_name("sp-report.py"), "sp_report", fresco=True)
 
 SP = """---
 status: Done

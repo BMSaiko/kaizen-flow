@@ -1,14 +1,11 @@
 """Testes de scripts/sp-metricas.py e da ligação ao sp-move done (e2e em diretório temporário)."""
-import importlib.util
 import sys
 from pathlib import Path
+from sp_carregar import carregar  # noqa: E402
 
 _here = Path(__file__).parent
 for name, file in (("sp_metricas", "sp-metricas.py"), ("sp_move", "sp-move.py")):
-    _spec = importlib.util.spec_from_file_location(name, _here / file)
-    mod = importlib.util.module_from_spec(_spec)
-    sys.modules[name] = mod
-    _spec.loader.exec_module(mod)
+    mod = carregar(_here / file, name, fresco=True)
 sp_metricas, sp_move = sys.modules["sp_metricas"], sys.modules["sp_move"]
 
 

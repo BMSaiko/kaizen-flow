@@ -10,7 +10,6 @@ Uso: python -I scripts/sp-metricas.py <ficheiro-sp-em-Done>
      python -I scripts/sp-metricas.py --reflect <ficheiro-sp|slug>  (custo do SP, mediana dos anteriores, aviso a 2x)
 rc: 0 ok, 2 erro de uso
 """
-import importlib.util
 import re
 import statistics
 import sys
@@ -21,6 +20,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 import sp_indice  # noqa: E402
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent))
+from sp_carregar import carregar  # noqa: E402
 
 REL = Path("knowledge/infra/reports/sp-metricas.md")
 HEADER = (
@@ -35,9 +36,7 @@ def custo_por_slug(usage_root=None):
     path = Path(__file__).with_name("claude-usage.py")
     if not path.is_file():
         return {}
-    spec = importlib.util.spec_from_file_location("claude_usage", path)
-    cu = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(cu)
+    cu = carregar(path, "claude_usage", registar=False)
     root = usage_root or str(Path.home() / ".claude" / "projects")
     out = defaultdict(float)
     for _ts, sid, model, t in cu.load(root):

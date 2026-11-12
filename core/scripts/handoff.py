@@ -79,9 +79,7 @@ def _check(path):
 
 def consume(path, out=print):
     """Imprime o handoff e só depois o apaga (se imprimir falhar, o ficheiro fica)."""
-    path = _check(path)
-    out(path.read_bytes().decode("utf-8"))
-    path.unlink()
+    pane_lib.consume_ficheiro(_check(path), out)
 
 
 def continuation_prompt(path):
@@ -91,9 +89,7 @@ def continuation_prompt(path):
 
 def send(text, pane, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=pane_lib.run_hidden, sleep=time.sleep,
          inspect=None, confirm=False):
-    screen = (lambda p: pane_lib.read_screen("wezterm", p, run)) if confirm else None
-    pane_lib.send_lines(["/clear", text], pane, pane_lib.send_argv, pane_lib.enter_argv, delay, gap, enter_gap, run, sleep, inspect,
-                        screen=screen)
+    pane_lib.send_comandos(["/clear", text], pane, "wezterm", delay, gap, enter_gap, run, sleep, inspect, confirm)
 
 
 def launch(path, pane=None, env=None, run=pane_lib.run_hidden):

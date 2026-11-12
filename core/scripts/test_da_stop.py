@@ -1,12 +1,9 @@
 """Testes de scripts/da-stop.py: tentativas por perfil e relatório de paragem."""
-import importlib.util
 import sys
 from pathlib import Path
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("da_stop", Path(__file__).with_name("da-stop.py"))
-ds = importlib.util.module_from_spec(_spec)
-sys.modules["da_stop"] = ds
-_spec.loader.exec_module(ds)
+ds = carregar(Path(__file__).with_name("da-stop.py"), "da_stop", fresco=True)
 
 
 def sp(tmp_path, front=""):

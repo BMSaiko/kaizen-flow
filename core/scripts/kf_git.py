@@ -6,14 +6,17 @@ Uso: módulo importado pelos scripts do kf (`kf_git.git(...)`); sem execução d
 rc: n/a
 """
 import subprocess
+import sys
+from pathlib import Path
 
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
+
 _CACHE = {}
 
 
 def _executar(argv, **kw):
-    kw.setdefault("creationflags", NO_WINDOW)
-    return subprocess.run(argv, **kw)
+    return run_hidden(argv, **kw)
 
 
 def invalidar():

@@ -1,12 +1,9 @@
 """Testes de scripts/sp-estado.py (estado de um SP numa só leitura)."""
-import importlib.util
 import sys
 from pathlib import Path
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_estado", Path(__file__).with_name("sp-estado.py"))
-sp_estado = importlib.util.module_from_spec(_spec)
-sys.modules["sp_estado"] = sp_estado
-_spec.loader.exec_module(sp_estado)
+sp_estado = carregar(Path(__file__).with_name("sp-estado.py"), "sp_estado", fresco=True)
 
 SP = """---
 status: {st}

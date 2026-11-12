@@ -8,6 +8,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_config
 import kaizen_hooks
+from sp_carregar import carregar  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -97,12 +98,7 @@ def test_cli_bloqueado_rc1(tmp_path, monkeypatch):
 
 
 def _load(name):
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), Path(__file__).with_name(f"{name}.py"))
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    return carregar(Path(__file__).with_name(f"{name}.py"), name.replace("-", "_"), fresco=True)
 
 
 def _sp(root, slug="abc"):

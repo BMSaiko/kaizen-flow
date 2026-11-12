@@ -34,6 +34,30 @@ def _paineis_falsos(monkeypatch, tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
+def _sem_wezterm_real(monkeypatch):
+    """Rede de segurança no ponto único (`subprocess.run`/`Popen`): lançar `wezterm` real num teste é erro; quem precisa troca-o."""
+    import subprocess
+    run, popen = subprocess.run, subprocess.Popen
+
+    def _verificar(argv):
+        primeiro = argv if isinstance(argv, (str, bytes)) else (list(argv) or [""])[0]
+        if Path(str(primeiro)).stem.lower() == "wezterm":
+            raise AssertionError(f"teste lançou o wezterm real: {argv}")
+
+    def run_guardado(argv, *a, **kw):
+        _verificar(argv)
+        return run(argv, *a, **kw)
+
+    class PopenGuardado(popen):
+        def __init__(self, argv, *a, **kw):
+            _verificar(argv)
+            super().__init__(argv, *a, **kw)
+
+    monkeypatch.setattr(subprocess, "run", run_guardado)
+    monkeypatch.setattr(subprocess, "Popen", PopenGuardado)
+
+
+@pytest.fixture(autouse=True)
 def _cwd_isolado(monkeypatch, tmp_path_factory):
     """Fora de worktree de agente `sp-move` ignora claims: os testes nunca tocam em `.git/sb-claims` real."""
     monkeypatch.chdir(tmp_path_factory.mktemp("cwd"))

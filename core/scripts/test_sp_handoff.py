@@ -1,15 +1,12 @@
 """Testes de scripts/sp-handoff.py (fixtures em ficheiros temporários)."""
-import importlib.util
 import json
 import sys
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_handoff", Path(__file__).with_name("sp-handoff.py"))
-sp_handoff = importlib.util.module_from_spec(_spec)
-sys.modules["sp_handoff"] = sp_handoff
-_spec.loader.exec_module(sp_handoff)
+sp_handoff = carregar(Path(__file__).with_name("sp-handoff.py"), "sp_handoff", fresco=True)
 
 
 def make_sp(root, rel, slug, status="Doing", project="atlas", body="# Super Prompt\n\n## 1. Role\nx\n"):

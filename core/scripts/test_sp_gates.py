@@ -1,14 +1,11 @@
 """Testes de scripts/sp-gates.py (gates executáveis do frontmatter do SP)."""
-import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_gates", Path(__file__).with_name("sp-gates.py"))
-sp_gates = importlib.util.module_from_spec(_spec)
-sys.modules["sp_gates"] = sp_gates
-_spec.loader.exec_module(sp_gates)
+sp_gates = carregar(Path(__file__).with_name("sp-gates.py"), "sp_gates", fresco=True)
 
 PY = f'"{sys.executable}"'
 

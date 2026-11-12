@@ -12,6 +12,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from painel_backend import popen_sem_janela, run_hidden as run_hidden_base  # noqa: E402
+
 SEND_DELAY = 5.0
 SEND_GAP = 2.0
 ENTER_GAP = 0.5
@@ -29,13 +32,11 @@ def pane_id(env=None):
     return pane
 
 
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 CLI_TIMEOUT = 10
 
 
-def run_hidden(*args, **kwargs):
-    """subprocess.run sem abrir janela de consola no Windows (wezterm/clip são apps de consola)."""
-    kwargs.setdefault("creationflags", NO_WINDOW)
+def run_cli(*args, **kwargs):
+    """`run_hidden` do backend com a política dos painéis: wezterm sem auto-start, timeout e erros como HandoffError."""
     argv = list(args[0]) if args else list(kwargs.pop("args"))
     if argv[:2] == ["wezterm", "cli"] and "--no-auto-start" not in argv:
         # Sem GUI acessível, o wezterm cli arranca um mux-server que herda o pipe e deixa o run pendurado.
@@ -43,7 +44,7 @@ def run_hidden(*args, **kwargs):
     if argv[:1] in (["wezterm"], ["tmux"]):
         kwargs.setdefault("timeout", CLI_TIMEOUT)
     try:
-        return subprocess.run(argv, *args[1:], **kwargs)
+        return run_hidden_base(argv, *args[1:], **kwargs)
     except subprocess.TimeoutExpired as exc:
         raise HandoffError(f"{' '.join(argv[:3])} não respondeu em {exc.timeout:.0f}s") from exc
     except subprocess.CalledProcessError as exc:
@@ -52,6 +53,8 @@ def run_hidden(*args, **kwargs):
         raise HandoffError(f"{argv[0]} inacessível ({' '.join(argv[:4])}, rc={exc.returncode}): "
                            "abre a sessão nova à mão com o /michi impresso") from exc
 
+
+run_hidden = run_cli  # nome histórico usado pelos handoffs e pela fila
 
 def send_argv(pane, text):
     if any(ch in text for ch in "\r\n\x1b"):
@@ -225,10 +228,25 @@ def send_lines(lines, pane, text_argv, key_argv, delay=SEND_DELAY, gap=SEND_GAP,
         line(text)
 
 
+def send_comandos(linhas, pane, backend="wezterm", delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=None, sleep=time.sleep,
+                  inspect=None, confirm=False):
+    """Único `send` dos handoffs: escreve `linhas` no painel (wezterm/tmux), com o ecrã lido para confirmar se `confirm`."""
+    run = run or run_hidden
+    text_argv, key_argv = _argvs(backend, pane)
+    screen = (lambda p: read_screen(backend, p, run)) if confirm else None
+    send_lines(linhas, pane, text_argv, key_argv, delay, gap, enter_gap, run, sleep, inspect, screen=screen)
+
+
+def consume_ficheiro(path, out=print):
+    """Único `consume`: imprime o ficheiro (utf-8) e só depois o apaga (se imprimir falhar, o ficheiro fica)."""
+    path = Path(path)
+    out(path.read_bytes().decode("utf-8"))
+    path.unlink()
+
+
 def launch_detached(script, args, env=None):
     """Corre `script args...` num processo separado, sem janela, para o envio só chegar depois de o turno atual acabar."""
     argv = [sys.executable, "-I", str(Path(script).resolve()), *args]
-    flags = NO_WINDOW | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)  # DETACHED_PROCESS faria cada filho abrir consola
-    subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     creationflags=flags, close_fds=True, **({"env": env} if env is not None else {}))
+    popen_sem_janela(argv, "grupo", stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     close_fds=True, **({"env": env} if env is not None else {}))
     return argv

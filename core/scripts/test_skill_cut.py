@@ -1,12 +1,9 @@
 """Testes de skill-cut.py (mover uma secção de SKILL.md para references/ com contagem verificada)."""
-import importlib.util
 import sys
 from pathlib import Path
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("skill_cut", Path(__file__).with_name("skill-cut.py"))
-skill_cut = importlib.util.module_from_spec(_spec)
-sys.modules["skill_cut"] = skill_cut
-_spec.loader.exec_module(skill_cut)
+skill_cut = carregar(Path(__file__).with_name("skill-cut.py"), "skill_cut", fresco=True)
 
 SKILL = "# Skill\n\n## Pitfalls\n\n- **Um.** primeiro\n  continua\n- **Dois.** segundo\n\n## Outro\n\nfica\n"
 

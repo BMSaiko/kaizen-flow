@@ -1,14 +1,11 @@
 """Testes de scripts/sp-prova.py."""
-import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_prova", Path(__file__).with_name("sp-prova.py"))
-sp_prova = importlib.util.module_from_spec(_spec)
-sys.modules["sp_prova"] = sp_prova
-_spec.loader.exec_module(sp_prova)
+sp_prova = carregar(Path(__file__).with_name("sp-prova.py"), "sp_prova", fresco=True)
 
 
 def test_grava_bytes_com_dolar_e_crases(tmp_path):

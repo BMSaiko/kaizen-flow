@@ -1,14 +1,11 @@
 """Testes de scripts/sp-execucao.py (grava/lê execucao: da mãe, em bytes)."""
-import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_execucao", Path(__file__).with_name("sp-execucao.py"))
-sp_execucao = importlib.util.module_from_spec(_spec)
-sys.modules["sp_execucao"] = sp_execucao
-_spec.loader.exec_module(sp_execucao)
+sp_execucao = carregar(Path(__file__).with_name("sp-execucao.py"), "sp_execucao", fresco=True)
 
 MAE = "---\nstatus: TODO\nupdated: 2026-01-01T00:00:00Z\nslug: mae\nproject: demo\npriority: P2\nkind: program\nexecucao:\n---\n# SP\n"
 

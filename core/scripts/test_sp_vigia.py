@@ -4,7 +4,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import painel_backend  # noqa: E402
 import sp_vigia  # noqa: E402
+from sp_carregar import carregar  # noqa: E402
 
 
 class Backend:
@@ -320,7 +322,7 @@ def test_arrancar_destacado():
     sp_vigia.arrancar("f1", "x/sp-vigia.py", run=lambda argv, **kw: chamadas.append((argv, kw)))
     argv, kw = chamadas[0]
     assert argv[-2:] == ["x/sp-vigia.py", "f1"] and "-I" in argv
-    assert kw["creationflags"] == sp_vigia.DESTACADO
+    assert kw["creationflags"] == painel_backend._FLAGS["destacado"]
 
 
 def test_parar_mata_vivo_e_apaga_pidfile(tmp_path):
@@ -339,10 +341,7 @@ def test_parar_pid_morto_so_apaga(tmp_path):
 
 
 def _cli():
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("sp_vigia_cli", Path(__file__).parent / "sp-vigia.py")
-    m = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(m)
+    m = carregar(Path(__file__).parent / "sp-vigia.py", "sp_vigia_cli", registar=False, fresco=True)
     return m
 
 
@@ -392,3 +391,10 @@ def test_cli_erro_fatal_vai_para_o_log(tmp_path, monkeypatch):
         pass
     assert any("vigia morreu" in m and "boom" in m for m in ctx.logs)
     assert not (tmp_path / "f1" / "vigia.pid").exists()
+
+
+def test_contexto_real_usa_o_estado_da_fila(tmp_path):
+    import sp_fila_estado as fe
+    c = sp_vigia.ContextoReal("fila-x", tmp_path / "v.log", backend=object())
+    assert c.estado_path == fe.estado_de("fila-x")
+    assert c.estado_path != fe.ESTADO

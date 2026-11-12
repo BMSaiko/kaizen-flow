@@ -1,12 +1,9 @@
 """Testes de scripts/context-budget.py (ficheiros temporários)."""
-import importlib.util
 import sys
 from pathlib import Path
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("context_budget", Path(__file__).with_name("context-budget.py"))
-context_budget = importlib.util.module_from_spec(_spec)
-sys.modules["context_budget"] = context_budget
-_spec.loader.exec_module(context_budget)
+context_budget = carregar(Path(__file__).with_name("context-budget.py"), "context_budget", fresco=True)
 
 
 def test_skill_descriptions_conta_nome_e_descricao(tmp_path):

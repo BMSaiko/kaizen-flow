@@ -1,13 +1,10 @@
 """Testes de scripts/sp-list.py (fixtures em ficheiros temporários)."""
 import dataclasses
-import importlib.util
 import sys
 from pathlib import Path
+from sp_carregar import carregar  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location("sp_list", Path(__file__).with_name("sp-list.py"))
-sp_list = importlib.util.module_from_spec(_spec)
-sys.modules["sp_list"] = sp_list
-_spec.loader.exec_module(sp_list)
+sp_list = carregar(Path(__file__).with_name("sp-list.py"), "sp_list", fresco=True)
 
 
 def make_sp(root, rel, slug, status="TODO", created="2026-10-01T10:00:00Z", priority=None, project=None,

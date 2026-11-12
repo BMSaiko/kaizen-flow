@@ -18,6 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kf_git  # noqa: E402
+import sp_leitura  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 TEMPLATE = next((p for p in (RAIZ / ".claude" / "skills" / "pr-fase" / "PR_TEMPLATE.md", RAIZ / "skills" / "pr-fase" / "PR_TEMPLATE.md") if p.exists()), None)
@@ -27,15 +28,14 @@ TEMPLATE_FALLBACK = "## O que foi feito\n{feito}\n\n## Decisões tomadas\n{decis
 def seccao(texto, *titulos):
     """Conteúdo da primeira secção `## <titulo>` (prefixo, sem distinguir maiúsculas) até ao próximo `## `."""
     for t in titulos:
-        m = re.search(rf"^##\s+{re.escape(t)}[^\n]*\n(.*?)(?=^##\s|\Z)", texto, re.S | re.M | re.I)
-        if m and m.group(1).strip():
-            return m.group(1).strip()
+        corpo = sp_leitura.seccao(texto, t, maiusculas=False).strip()
+        if corpo:
+            return corpo
     return ""
 
 
 def frontmatter(texto, chave):
-    m = re.search(rf"^{chave}:\s*(\S+)", texto, re.M)
-    return m.group(1) if m else ""
+    return (sp_leitura.frontmatter(texto).get(chave, "").split() or [""])[0]
 
 
 ATRIBUICAO = re.compile(r"^.*(co-authored-by|generated with).*\n?", re.I | re.M)
@@ -47,8 +47,7 @@ def provas_e_gates(sp_texto):
     caminhos = sorted(set(re.findall(r"[\w./\\-]*proofs[/\\][\w./\-]+", sp_texto)))
     if caminhos:
         linhas.append("Provas: " + ", ".join(f"`{c}`" for c in caminhos))
-    fm = re.match(r"---\n(.*?)\n---", sp_texto, re.S)
-    cmds = re.findall(r"cmd:\s*(.+)", fm.group(1)) if fm else []
+    cmds = re.findall(r"cmd:\s*(.+)", sp_leitura.bloco(sp_texto))
     if cmds:
         linhas.append("Gates: " + "; ".join(f"`{c.strip()}`" for c in cmds))
     return linhas
