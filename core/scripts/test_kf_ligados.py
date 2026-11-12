@@ -16,11 +16,7 @@ PROJECT = "demo"
 FILL = "conteúdo de teste"
 
 
-def run(script, *args, env=None):
-    e = {**os.environ, **(env or {})}
-    r = subprocess.run([sys.executable, "-I", str(SCRIPTS / script), *args],
-                       capture_output=True, text=True, encoding="utf-8", env=e, cwd=tempfile.gettempdir())
-    return r.returncode, r.stdout, r.stderr
+from conftest import executar_cli as run  # noqa: E402
 
 
 @pytest.fixture

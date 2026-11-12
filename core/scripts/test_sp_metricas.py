@@ -9,17 +9,15 @@ for name, file in (("sp_metricas", "sp-metricas.py"), ("sp_move", "sp-move.py"))
 sp_metricas, sp_move = sys.modules["sp_metricas"], sys.modules["sp_move"]
 
 
-def make_sp(root, slug, extra=""):
-    path = root / "atlas/sp/Doing" / f"{slug}.md"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    head = (f"---\nstatus: Doing\ncreated: 2026-10-01T10:00:00Z\nupdated: 2026-10-01T10:00:00Z\n"
-            f"slug: {slug}\nproject: atlas\n{extra}---\n")
-    path.write_text(head + "# corpo\n- reflect: sem patch\n- reflect: patch x\n", encoding="utf-8")
-    return path
+from functools import partial
+from conftest import criar_sp
+
+make_sp = partial(criar_sp, rel="atlas/sp/Doing", status="Doing", project="atlas",
+                  body="# corpo\n- reflect: sem patch\n- reflect: patch x\n")
 
 
 def test_linha_tem_horas_custo_reflects_e_gates(tmp_path):
-    sp = make_sp(tmp_path, "abc", "gates_tentativas: 1\n")
+    sp = make_sp(tmp_path, slug="abc", extra="gates_tentativas: 1\n")
     sp.write_text(sp.read_text(encoding="utf-8").replace("updated: 2026-10-01T10:00:00Z", "updated: 2026-10-01T12:30:00Z"),
                   encoding="utf-8")
     row = sp_metricas.linha(sp, {"abc": 1.5})
@@ -28,7 +26,7 @@ def test_linha_tem_horas_custo_reflects_e_gates(tmp_path):
 
 def test_sp_move_done_acrescenta_linha_uma_so_vez(tmp_path, monkeypatch):
     (tmp_path / "knowledge/infra/reports").mkdir(parents=True)
-    make_sp(tmp_path, "abc")
+    make_sp(tmp_path, slug="abc")
     monkeypatch.setattr(sp_metricas, "custo_por_slug", lambda: {"abc": 0.25})
     msg = sp_move.move(tmp_path, "abc", "done")
     assert "(+métricas)" in msg
@@ -38,7 +36,7 @@ def test_sp_move_done_acrescenta_linha_uma_so_vez(tmp_path, monkeypatch):
 
 
 def test_sem_pasta_de_relatorios_e_noop(tmp_path):
-    sp = make_sp(tmp_path, "abc")
+    sp = make_sp(tmp_path, slug="abc")
     assert sp_metricas.registar(tmp_path, sp, custos={}) is None
 
 

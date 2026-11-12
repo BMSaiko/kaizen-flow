@@ -61,3 +61,79 @@ def _sem_wezterm_real(monkeypatch):
 def _cwd_isolado(monkeypatch, tmp_path_factory):
     """Fora de worktree de agente `sp-move` ignora claims: os testes nunca tocam em `.git/sb-claims` real."""
     monkeypatch.chdir(tmp_path_factory.mktemp("cwd"))
+
+
+CRIADO = "2026-10-01T10:00:00Z"
+
+
+def criar_sp(root, rel, slug, status="TODO", project=None, body="# corpo\n", created=CRIADO, phase=None,
+             priority=None, parent=None, depends_on=None, kind=None, extra=""):
+    """Cria `root/rel/slug.md` com frontmatter de SP e devolve o caminho (escrita em bytes: preserva CRLF do `body`).
+
+    Campos opcionais só entram se passados; `extra` é texto cru no fim do frontmatter (cada linha termina em LF).
+    """
+    path = Path(root) / rel / f"{slug}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    linhas = [f"status: {status}", f"created: {created}", f"updated: {created}"]
+    if phase:
+        linhas.append(f"phase: {phase}")
+    linhas.append(f"slug: {slug}")
+    for chave, valor in (("project", project), ("priority", priority), ("parent", parent), ("kind", kind)):
+        if valor:
+            linhas.append(f"{chave}: {valor}")
+    if depends_on:
+        linhas.append(f"depends_on: [{', '.join(depends_on)}]")
+    head = "---\n" + "\n".join(linhas) + "\n" + extra + "---\n"
+    path.write_bytes((head + body).encode("utf-8"))
+    return path
+
+
+@pytest.fixture
+def make_sp():
+    """Fábrica de SPs em diretório temporário: ver `criar_sp`."""
+    return criar_sp
+
+
+def processo_cli(script, *args, cwd=None, env=None, input=None, isolado=True):
+    """Lança `script` com `sys.executable` (`-I` se `isolado`) e devolve o `CompletedProcess`; `env` junta-se ao ambiente atual."""
+    import os
+    import subprocess
+    caminho = Path(script)
+    if not caminho.is_absolute():
+        caminho = Path(__file__).parent / caminho
+    cmd = [sys.executable] + (["-I"] if isolado else []) + [str(caminho), *map(str, args)]
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", cwd=cwd,
+                          env={**os.environ, **env} if env else None, input=input)
+
+
+def executar_cli(script, *args, **kw):
+    """Como `processo_cli`, mas devolve `(rc, stdout, stderr)`; `script` relativo resolve-se a `scripts/`."""
+    r = processo_cli(script, *args, **kw)
+    return r.returncode, r.stdout, r.stderr
+
+
+@pytest.fixture
+def run_cli():
+    """Fábrica `run_cli(script, *args, cwd=None, env=None)` -> `(rc, stdout, stderr)`: ver `executar_cli`."""
+    return executar_cli
+
+
+class Relogio:
+    """Relógio controlado: `agora()` devolve o instante atual e `dormir(s)` avança-o sem esperar."""
+
+    def __init__(self, inicio=0.0):
+        self.t = float(inicio)
+        self.dormidos = []
+
+    def agora(self):
+        return self.t
+
+    def dormir(self, segundos):
+        self.dormidos.append(segundos)
+        self.t += segundos
+
+
+@pytest.fixture
+def relogio():
+    """Relógio injetável (`agora`/`dormir`) no lugar de `time.time`/`time.sleep` reais."""
+    return Relogio()

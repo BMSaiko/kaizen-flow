@@ -57,7 +57,7 @@ def prompt(sp, semente):
             f"(semente: decisões e contexto; lida e apagada). Preenche as 8 secções de {sp} pela skill super-prompt §Gerar, "
             "sem fazer o trabalho do SP, sem commit, sem abrir outros painéis. No fim corre "
             f"`python -I scripts/sp-estado.py {chave(slug)} done --msg '<resumo numa linha>'` "
-            f"(ou bloqueado/falhou com o motivo) e fecha com /quit.")
+            f"(ou bloqueado/falhou com o motivo) e fecha este painel com `wezterm cli kill-pane --pane-id $WEZTERM_PANE` (não uses /quit).")
 
 
 def consume(path, out=print):

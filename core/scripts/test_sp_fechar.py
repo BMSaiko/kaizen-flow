@@ -18,11 +18,7 @@ def fs(nome):
     return f"{PROJECT}-{nome}-2026-11-01"
 
 
-def run(script, *args, cwd=None):
-    r = subprocess.run([sys.executable, "-I", str(SCRIPTS / script), *args],
-                       capture_output=True, text=True, encoding="utf-8",
-                       cwd=cwd or tempfile.gettempdir())
-    return r.returncode, r.stdout, r.stderr
+from conftest import executar_cli as run  # noqa: E402
 
 
 @pytest.fixture

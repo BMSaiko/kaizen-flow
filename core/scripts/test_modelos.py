@@ -240,4 +240,4 @@ def test_json_real_do_repo():
     assert d["papeis"]["michi-exec"]["effort"] == "low"
     assert d["papeis"]["michi-complexo"] == {"model": "claude-opus-5-5", "effort": "low"}
     assert d["michi_modelo"] == NOVO["michi_modelo"]
-    assert d["papeis"]["sp-autor"]["effort"] == "medium"
+    assert d["papeis"]["sp-autor"]["effort"] == "low"

@@ -7,24 +7,10 @@ from sp_carregar import carregar  # noqa: E402
 sp_list = carregar(Path(__file__).with_name("sp-list.py"), "sp_list", fresco=True)
 
 
-def make_sp(root, rel, slug, status="TODO", created="2026-10-01T10:00:00Z", priority=None, project=None,
-            parent=None, depends_on=None, kind=None):
-    path = root / rel / f"{slug}.md"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["---", f"status: {status}", f"created: {created}", f"updated: {created}", "phase: SP", f"slug: {slug}"]
-    if project:
-        lines.append(f"project: {project}")
-    if priority:
-        lines.append(f"priority: {priority}")
-    if parent:
-        lines.append(f"parent: {parent}")
-    if depends_on:
-        lines.append(f"depends_on: [{', '.join(depends_on)}]")
-    if kind:
-        lines.append(f"kind: {kind}")
-    lines += ["---", "# corpo"]
-    path.write_text("\n".join(lines), encoding="utf-8")
-    return path
+from functools import partial
+from conftest import criar_sp
+
+make_sp = partial(criar_sp, phase="SP", body="# corpo")
 
 
 def test_parse_frontmatter_aspas_e_sem_aspas():

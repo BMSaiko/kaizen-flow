@@ -9,12 +9,10 @@ from sp_carregar import carregar  # noqa: E402
 sp_handoff = carregar(Path(__file__).with_name("sp-handoff.py"), "sp_handoff", fresco=True)
 
 
-def make_sp(root, rel, slug, status="Doing", project="atlas", body="# Super Prompt\n\n## 1. Role\nx\n"):
-    path = root / rel / f"{slug}.md"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    head = f"---\nstatus: {status}\ncreated: 2026-10-01T10:00:00Z\nupdated: 2026-10-01T10:00:00Z\nslug: {slug}\nproject: {project}\n---\n"
-    path.write_bytes((head + body).encode("utf-8"))
-    return path
+from functools import partial
+from conftest import criar_sp
+
+make_sp = partial(criar_sp, status="Doing", project="atlas", body="# Super Prompt\n\n## 1. Role\nx\n")
 
 
 def test_resolve_unico_doing_sem_slug(tmp_path):
