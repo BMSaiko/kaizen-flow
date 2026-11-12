@@ -434,6 +434,10 @@ def test_full_slug_junta_projeto_e_data_e_e_idempotente():
     assert sp_new.full_slug("atlas", "x-2026-10-21", date(2026, 11, 1)) == "atlas-x-2026-10-21"
 
 
+def test_full_slug_nao_prefixa_projeto_que_nao_e_slug():
+    assert sp_new.full_slug("_default", "login", date(2026, 10, 21)) == "login-2026-10-21"
+
+
 def test_check_master_reconhece_formato_novo_e_antigo():
     with pytest.raises(sp_new.SpNewError):
         sp_new.check_master("atlas", "atlas-dup-2026-11-07", ["knowledge/projects/atlas/sp/Doing/atlas-dup-2026-11-07.md"])
