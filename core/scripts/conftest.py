@@ -10,6 +10,25 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+# Testes de 30-40 s (análise de todas as sessões AMATA). O gate completo corre-os; `-m "not lento"` salta-os.
+LENTOS = (
+    ("test_amata_solver_primitivas", "test_fixtures_derivam_para_a_integranda"),
+    ("test_amata_solver_cli", "test_subcomando_test_chega_a_100"),
+    ("test_amata_solver_parser", "test_taxa_falhas_baixa"),
+    ("test_amata_solver_parser", "test_taxa_expr_alta"),
+)
+_LENTOS_IDS = tuple(f"{modulo}.py::{nome}" for modulo, nome in LENTOS)
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "lento: teste de 30-40 s; `-m \"not lento\"` para uma corrida rápida")
+
+
+def pytest_collection_modifyitems(items):
+    for item in items:
+        if item.nodeid.endswith(_LENTOS_IDS):
+            item.add_marker(pytest.mark.lento)
+
 
 @pytest.fixture(autouse=True)
 def _sem_custos_reais(monkeypatch):
