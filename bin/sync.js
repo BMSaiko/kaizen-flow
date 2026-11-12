@@ -15,6 +15,8 @@ const RELATED_RE = /^(test_)?(sp|doc|handoff|kaizen|michi)[-_.]/;
 
 // fixtures dos testes do sp-fila (test_sp_fila.py)
 const FIXTURES = "scripts/fixtures/par-watch";
+// layouts guardados do wez.py
+const LAYOUTS = "scripts/wez-layouts";
 // config lida pelos scripts em ../.claude/ (modelos.py): fica em core/.claude/
 const CONFIGS = [".claude/modelos.json"];
 
@@ -51,6 +53,7 @@ function plan(vault) {
   const chosen = new Set(scripts.filter(isScriptPiece));
   for (const n of [...chosen].sort()) parts.push([`scripts/${n}`, `scripts/${n}`]);
   if (fs.existsSync(path.join(vault, FIXTURES))) parts.push([FIXTURES, FIXTURES]);
+  if (fs.existsSync(path.join(vault, LAYOUTS))) parts.push([LAYOUTS, LAYOUTS]);
 
   const unlisted = scripts.filter((n) => n.endsWith(".py") && !chosen.has(n) && !SKIP.has(n) && RELATED_RE.test(n)).map((n) => `scripts/${n}`);
   return { parts, missing, unlisted };
@@ -62,7 +65,7 @@ function owns(rel) {
   if (m) return SKILLS.includes(m[1]);
   const c = rel.match(/^\.claude\/commands\/([^/]+)$/);
   if (c) return COMMAND_RE.test(c[1]);
-  if (rel.startsWith(`${FIXTURES}/`)) return true;
+  if (rel.startsWith(`${FIXTURES}/`) || rel.startsWith(`${LAYOUTS}/`)) return true;
   const sc = rel.match(/^scripts\/([^/]+\.py)$/);
   return sc ? isScriptPiece(sc[1]) : false;
 }

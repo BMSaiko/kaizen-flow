@@ -27,9 +27,10 @@ const cmds = {
   status: () => process.exit(py(["scripts/sp-list.py", "--all"], path.resolve(arg || "."))),
   audit: () => require("./commands/audit.js").run(arg),
   demo: () => require("./commands/demo.js").demo(argv.slice(1)),
+  term: () => process.exit(require("./commands/term.js").run(argv.slice(1))),
 };
 if (!Object.hasOwn(cmds, cmd)) {
-  console.log(`kaizen <init [repo] [--harness ${Object.keys(ADAPTERS).join("|")}] | doctor [repo] [--harness h] [--fix] | status [repo] | usage [flags] | report [--week YYYY-WNN] [flags] | audit [dir] | sync [--check|--stamp] | demo [--keep]>`);
+  console.log(`kaizen <init [repo] [--harness ${Object.keys(ADAPTERS).join("|")}] | doctor [repo] [--harness h] [--fix] | status [repo] | usage [flags] | report [--week YYYY-WNN] [flags] | audit [dir] | sync [--check|--stamp] | term <ls|fila|michi|limpar|orq> | demo [--keep]>`);
   process.exit(cmd ? 1 : 0);
 }
 try {
