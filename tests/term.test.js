@@ -33,7 +33,21 @@ test("term limpar/orq: por implementar, rc 2", () => {
 test("init instala os scripts de term (wez, painel_backend, open-doc)", () => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-term-"));
   assert.strictEqual(run("init", d, "--harness", "claude").status, 0);
-  for (const f of ["wez.py", "painel_backend.py", "open-doc.py", "wez-layouts/dev.json"]) {
+  for (const f of ["wez.py", "painel_backend.py", "open-doc.py", "kf_term_ls.py", "wez-layouts/dev.json"]) {
     assert.ok(fs.existsSync(path.join(d, "scripts", f)), f);
   }
+});
+
+test("term ls num projeto limpo: rc 0, sem SPs, --json devolve []", () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-ls-"));
+  assert.strictEqual(run("init", d, "--harness", "claude").status, 0);
+  const vazio = fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-ls-estado-"));
+  const env = { ...process.env, WEZTERM_PANE: "", TMUX_PANE: "", SP_FILA_ROOT: vazio };
+  const t = spawnSync("node", [BIN, "term", "ls"], { encoding: "utf8", env, cwd: d });
+  assert.strictEqual(t.status, 0, t.stderr);
+  assert.match(t.stdout, /sem SPs/);
+  assert.match(t.stderr, /aviso/);
+  const j = spawnSync("node", [BIN, "term", "ls", "--json"], { encoding: "utf8", env, cwd: d });
+  assert.strictEqual(j.status, 0);
+  assert.deepStrictEqual(JSON.parse(j.stdout), []);
 });

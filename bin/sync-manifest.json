@@ -25,6 +25,8 @@
     "kf_ligados.py",
     "kf_painel_hook.py",
     "test_kf_painel_hook.py",
+    "kf_term_ls.py",
+    "test_kf_term_ls.py",
     "kf_errlog.py",
     "test_kf_errlog.py",
     "kf_git.py",

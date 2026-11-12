@@ -4,7 +4,7 @@ const { py } = require("./python.js");
 
 // subcomando -> { ajuda, script (relativo ao projeto), args fixos } ou { ajuda, pendente } quando o script ainda não existe
 const SUBS = {
-  ls: { ajuda: "painéis do WezTerm pelo nome", script: "scripts/wez.py", args: ["pane", "ls"] },
+  ls: { ajuda: "painéis com SP, fase, estado e fila (--json, --fila X)", script: "scripts/kf_term_ls.py", args: [] },
   fila: { ajuda: "executar a fila de SPs (sp-fila)", script: "scripts/sp-fila.py", args: [] },
   michi: { ajuda: "lançar o michi de um SP num painel", script: "scripts/michi_handoff_auto.py", args: ["go"] },
   limpar: { ajuda: "limpar painéis e estado órfãos", pendente: "kaizenflow-term-limpeza-2026-11-12" },
