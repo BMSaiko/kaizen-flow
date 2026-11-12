@@ -123,13 +123,14 @@ def parse_gates(text):
             break
         m = re.match(r"^\s*-\s*cmd:\s*(.*?)\s*$", line)
         if m:
-            current = {"cmd": m.group(1), "cwd": ".", "timeout": DEFAULT_TIMEOUT, "inputs": []}
+            current = {"cmd": m.group(1), "cwd": ".", "timeout": DEFAULT_TIMEOUT, "inputs": [], "timeout_declarado": False}
             gates.append(current)
             continue
         m = re.match(r"^\s+(cwd|timeout|inputs):\s*(.*?)\s*$", line)
         if m and current is not None:
             if m.group(1) == "timeout":
                 current["timeout"] = int(m.group(2))
+                current["timeout_declarado"] = True
             elif m.group(1) == "inputs":
                 current["inputs"] = [x.strip().strip("'\"") for x in m.group(2).split(",") if x.strip()]
             else:
@@ -151,6 +152,16 @@ def problems(gates):
         if bad:
             found.append(f"gate {i}: comando proibido ({bad}): {cmd}")
     return found
+
+
+SUITE_COMPLETA = re.compile(r"\bpytest\s+scripts\b(?!/)")
+
+
+def avisos(gates):
+    """Avisos (não bloqueiam): gate de suite completa sem `timeout:` declarado usa o defeito e arrisca falso vermelho (rc 124)."""
+    return [f"aviso: gate {i} parece suite completa sem `timeout:` (defeito {DEFAULT_TIMEOUT} s): declarar `timeout:` no SP ({g['cmd'].strip()})"
+            for i, g in enumerate(gates, 1)
+            if SUITE_COMPLETA.search(g["cmd"]) and not g.get("timeout_declarado")]
 
 
 def input_hash(g):
@@ -368,6 +379,8 @@ def main(argv=None):
     if bad:
         print("\n".join(bad), file=sys.stderr)
         return 2
+    for aviso in avisos(gates):
+        print(aviso, file=sys.stderr)
     results = run(gates, cache_path=None if args.full else CACHE_PATH)
     print(summary(results))
     print(table(results, len(gates)))
