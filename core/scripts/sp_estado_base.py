@@ -13,7 +13,7 @@ from pathlib import Path
 ESTADOS = ("pendente", "a-correr", "pergunta", "done", "bloqueado", "falhou")
 ILEGIVEL = "ilegível"
 FINAIS = frozenset({"done", "falhou"})
-CAMPOS = ("modelo", "worktree", "pane")
+CAMPOS = ("modelo", "worktree", "pane", "fase", "pergunta")
 NAO_SP = {"fila.json", "vigia.json"}  # a memória do vigia vive na pasta da fila e não é estado de SP
 _NOME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,149}$")
 _DISPOSITIVO = re.compile(r"^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)", re.IGNORECASE)
@@ -85,7 +85,7 @@ def _ficheiros_sp(d):
 
 def _sp_novo(fid, slug, agora=None):
     return {"slug": slug, "fila": fid, "estado": "pendente", "modelo": None, "worktree": None, "pane": None,
-            "inicio": None, "fim": None, "msg": None, "atualizado": _ts(agora)}
+            "inicio": None, "fim": None, "msg": None, "atualizado": _ts(agora), "fase": None, "pergunta": None}
 
 
 def _campos(campos):
