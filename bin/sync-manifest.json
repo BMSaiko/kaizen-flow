@@ -23,6 +23,8 @@
     "kaizen_hooks.py",
     "wt_redirect.py",
     "kf_ligados.py",
+    "kf_painel_hook.py",
+    "test_kf_painel_hook.py",
     "kf_errlog.py",
     "test_kf_errlog.py",
     "kf_git.py",
