@@ -32,6 +32,8 @@
 You are <role>. You operate with <constraints on style, scope, decision authority>.
 ## 2. Context
 - Project / Repo / State (branch, last commit, key facts) / Relevant files
+- Números de baseline (falhas, testes, tempo): contá-los na worktree antes de escrever e anotar data e comando (`contado em AAAA-MM-DD com <cmd>`); um número herdado de outro SP desatualiza-se.
+- Gate longo (suite completa, ~min): declarar `timeout:` no frontmatter; o defeito de 300 s dá falso vermelho (rc 124).
 ## 3. Objective (single sentence)
 <One sentence. Se não cabe numa frase, restart grill-me.>
 ## 4. Success criteria (verifiable)

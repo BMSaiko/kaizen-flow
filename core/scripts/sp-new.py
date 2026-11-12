@@ -51,12 +51,15 @@ DATE_TAIL = re.compile(r"-\d{4}-\d{2}-\d{2}$")
 
 
 def full_slug(project, name, today):
-    """Slug `<projeto>-<nome>-AAAA-MM-DD`; idempotente (não repete projeto nem data já presentes)."""
+    """Slug `<projeto>-<nome>-AAAA-MM-DD`; idempotente (não repete projeto nem data já presentes).
+
+    Projeto que não serve de prefixo de slug (p.ex. `_default`, a pasta que o `kaizen init` cria) não é prefixado.
+    """
     if not name:
         return name
     if not DATE_TAIL.search(name):
         name = f"{name}-{today.isoformat()}"
-    if not name.startswith(project + "-"):
+    if SLUG_RE.fullmatch(project) and not name.startswith(project + "-"):
         name = f"{project}-{name}"
     return name
 
