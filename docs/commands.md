@@ -32,7 +32,7 @@ kaizen term ls [--json] [--fila X]|fila|michi              # terminal panes (lim
 | | `--source`, `--prices`, `--repo`, `--claude-root`, `--codex-root` | Same as `usage`. |
 | `kaizen audit [dir]` | | Scans for personal data (names, local paths, wikilinks). rc 1 on any hit. |
 | `kaizen demo` | `--keep` | Runs the whole cycle in a temp git repo: `init`, `sp-new` (gate `node --version`), `sp-move doing`, `sp-gates`, `sp-move done`, `sp-report`. The folder is deleted at the end unless `--keep`. Recording in `docs/assets/demo.cast`. |
-| `kaizen term <sub>` | `ls`, `fila`, `michi` | Drives WezTerm panes through `scripts/painel_backend.py` and `scripts/wez.py`: `ls` lists SPs with pane, michi phase, state and queue (see below), `fila` runs the SP queue, `michi` launches a SP's michi in a pane. `limpar` and `orq` exit 2 (not implemented yet). |
+| `kaizen term <sub>` | `ls`, `fila`, `michi` | Drives WezTerm panes through `scripts/painel_backend.py` and `scripts/wez.py`: `ls` lists SPs with pane, michi phase, state and queue (see below), `fila` picks a program and runs its SP queue in a new pane, `michi` picks a SP and launches its michi in a new pane (both: see `kaizen term fila|michi` below). `limpar` and `orq` exit 2 (not implemented yet). |
 | `kaizen sync` | `--check`, `--stamp` | Maintainers only: refreshes `core/` from the author's vault. `--check` verifies without writing, `--stamp` stamps the build. Not needed by users. |
 
 ## Workflow scripts (installed in `scripts/`)
@@ -87,3 +87,21 @@ PAINEL  SP        FASE   ESTADO             FILA
 - Without a backend (outside WezTerm/tmux) or when it fails or exceeds 5 s, a warning goes to stderr and `vivo` stays `null`; the list still prints (rc 0).
 - Skeleton of the state fields: `docs/estado-paineis.md`.
 
+### `kaizen term fila` and `kaizen term michi`
+
+A picker with a preview and a confirmation before anything starts. `michi` lists the eligible SPs (TODO/Doing, not a program, every `depends_on` in Done: the same rule as `sp-list`, Doing first); `fila` lists the programs (SP-mãe) that have eligible children.
+
+```
+1) slug-a
+2) slug-b
+número (q cancela): 2
+--- slug-b ---
+## 1. Role ...            (SP body without frontmatter, first 30 lines)
+lançar michi de slug-b num painel novo? [s/N] s
+lançado michi de slug-b no painel 42
+```
+
+- Only `s`/`sim`/`y`/`yes` launches; empty, `n`, `q` or anything else cancels and touches nothing. `--sim` is the explicit confirmation when there is no terminal.
+- `--slug SP` (michi) or `--programa MÃE` (fila) skips the list but still previews and confirms; a SP that is not eligible exits 2.
+- The pane is named by the SP slug (`fila-<mãe>` for a queue). `michi` reuses `michi_handoff_auto.py` (worktree via `sb-worktree.py ensure`); `fila` runs `python -I scripts/sp-fila.py --programa <mãe>` in the project root.
+- Without a backend (outside WezTerm/tmux) it prints the equivalent command and exits 0. A launch that fails exits 1 with the cause; a pane title that fails is only a warning.
