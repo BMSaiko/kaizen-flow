@@ -14,6 +14,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 - `sp-list --tipo dr|dp` e `sp-move --tipo dr|dp` (lógica em `doc_ops.py`); `sp-list` mostra no arranque, em dry-run, o que `sp-envelhecer` subiria (`--sem-envelhecer` desliga); `sp-new` aceita `--ficheiros/--horas/--risco` e usa `sp-escalao` quando falta `--priority`.
 - `test_orfaos.py`: falha e lista todo script de `core/scripts` sem chamador fora de `commands.md`, `agent-commands.md` e CHANGELOG.
 
+### Changed
+- Refactor do vault chega ao `core/`: regras das skills `da`, `dr`, `dp` e `super-prompt` passam a apontar para um só dono (`AGENTS.md`, `michi-modo-auto.md`); sync, testes e audit verdes.
+
 ### Deprecated
 - `doc-list.py` e `doc-move.py` ficam como aliases finos obsoletos de `sp-list --tipo` e `sp-move --tipo`, durante pelo menos uma versão.
 
