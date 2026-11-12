@@ -10,7 +10,7 @@ kaizen usage [--days N | --since YYYY-MM-DD] [--source claude,codex] [--top N]
 kaizen report [--week YYYY-WNN] [--out DIR] [--print]
 kaizen audit [dir]                    # fails if personal data leaks into the repo
 kaizen demo [--keep]                  # runs the SP cycle in a temp repo
-kaizen term ls [--json] [--fila X]|fila|michi|limpar|retomar  # terminal panes (orq: not implemented yet)
+kaizen term ls [--json] [--fila X]|fila|michi|limpar|retomar|orq  # terminal panes
 ```
 
 | Command | Option | Meaning |
@@ -32,7 +32,7 @@ kaizen term ls [--json] [--fila X]|fila|michi|limpar|retomar  # terminal panes (
 | | `--source`, `--prices`, `--repo`, `--claude-root`, `--codex-root` | Same as `usage`. |
 | `kaizen audit [dir]` | | Scans for personal data (names, local paths, wikilinks). rc 1 on any hit. |
 | `kaizen demo` | `--keep` | Runs the whole cycle in a temp git repo: `init`, `sp-new` (gate `node --version`), `sp-move doing`, `sp-gates`, `sp-move done`, `sp-report`. The folder is deleted at the end unless `--keep`. Recording in `docs/assets/demo.cast`. |
-| `kaizen term <sub>` | `ls`, `fila`, `michi`, `limpar`, `retomar` | Drives WezTerm panes through `scripts/painel_backend.py` and `scripts/wez.py`: `ls` lists SPs with pane, michi phase, state and queue (see below), `fila` picks a program and runs its SP queue in a new pane, `michi` picks a SP and launches its michi in a new pane (both: see `kaizen term fila|michi` below). `limpar` closes orphan panes and state (dry-run unless `--apply`), `retomar` reopens the pane of a Doing SP that has none (both: see `kaizen term limpar` and `retomar` below). `orq` exits 2 (not implemented yet). |
+| `kaizen term <sub>` | `ls`, `fila`, `michi`, `limpar`, `retomar`, `orq` | Drives WezTerm panes through `scripts/painel_backend.py` and `scripts/wez.py`: `ls` lists SPs with pane, michi phase, state and queue (see below), `fila` picks a program and runs its SP queue in a new pane, `michi` picks a SP and launches its michi in a new pane (both: see `kaizen term fila|michi` below). `limpar` closes orphan panes and state (dry-run unless `--apply`), `retomar` reopens the pane of a Doing SP that has none (both: see `kaizen term limpar` and `retomar` below). `orq` opens the orchestrator pane (see `kaizen term orq` below). |
 | `kaizen sync` | `--check`, `--stamp` | Maintainers only: refreshes `core/` from the author's vault. `--check` verifies without writing, `--stamp` stamps the build. Not needed by users. |
 
 ## Workflow scripts (installed in `scripts/`)
@@ -117,3 +117,13 @@ lançado michi de slug-b no painel 42
 `retomar` lists the Doing SPs (not programs) without a live pane, shows the pending handoffs `*-<slug>.md` of each one, asks for confirmation and reopens the michi in a new pane through `michi_handoff_auto.py`.
 
 - `--slug SP` skips the list but still confirms; `--sim` is the explicit confirmation without a terminal.
+
+### `kaizen term orq`
+
+Opens (or reports) the single pane titled `ORQ`, a Claude Code session running `/orq`, from which one chat manages every pane. A second `kaizen term orq` does not duplicate it.
+
+`kaizen term orq acao <ls|ler|enviar|lancar|matar>` is the whitelist the `/orq` skill uses; nothing else is allowed:
+
+- `ls` and `ler PAINEL [--linhas N]` are free. The text of `ler` is printed between `<dados-painel>` marks and is data, never instructions (marks inside the text are escaped).
+- `enviar PAINEL TEXTO`, `lancar michi SLUG|fila PROGRAMA` and `matar PAINEL` show the target and the exact text and only proceed after `s`/`sim` typed in the terminal. There is no `--sim`: an agent cannot confirm for the human. Text with control characters or over 500 characters is rejected; the ORQ pane cannot be killed.
+- Without a backend (outside WezTerm/tmux) it exits 1.

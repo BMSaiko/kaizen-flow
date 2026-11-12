@@ -22,18 +22,10 @@ test("term sem argumentos mostra a ajuda; subcomando desconhecido falha", () => 
   assert.match(r.stderr, /desconhecido/);
 });
 
-test("term orq: por implementar, rc 2", () => {
-  for (const s of ["orq"]) {
-    const r = run("term", s);
-    assert.strictEqual(r.status, 2, s);
-    assert.match(r.stderr, /por implementar/);
-  }
-});
-
 test("init instala os scripts de term (wez, painel_backend, open-doc)", () => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-term-"));
   assert.strictEqual(run("init", d, "--harness", "claude").status, 0);
-  for (const f of ["wez.py", "painel_backend.py", "open-doc.py", "kf_term_ls.py", "kf_term_arranque.py", "kf_term_limpar.py", "wez-layouts/dev.json"]) {
+  for (const f of ["wez.py", "painel_backend.py", "open-doc.py", "kf_term_ls.py", "kf_term_arranque.py", "kf_term_limpar.py", "kf_term_orq.py", "wez-layouts/dev.json"]) {
     assert.ok(fs.existsSync(path.join(d, "scripts", f)), f);
   }
 });

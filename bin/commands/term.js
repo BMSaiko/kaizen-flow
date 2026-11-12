@@ -9,7 +9,7 @@ const SUBS = {
   michi: { ajuda: "escolher um SP (preview) e lançar o michi num painel", script: "scripts/kf_term_arranque.py", args: ["michi"] },
   limpar: { ajuda: "limpar painéis e estado órfãos (dry-run; --apply executa)", script: "scripts/kf_term_limpar.py", args: ["limpar"] },
   retomar: { ajuda: "reabrir o painel de um SP em Doing sem painel", script: "scripts/kf_term_limpar.py", args: ["retomar"] },
-  orq: { ajuda: "orquestrador de painéis (Claude Code)", pendente: "kaizenflow-term-orq-2026-11-12" },
+  orq: { ajuda: "orquestrador de painéis: abre o ORQ (ou `orq acao ls|ler|enviar|lancar|matar`)", script: "scripts/kf_term_orq.py", args: [] },
 };
 
 function help() {

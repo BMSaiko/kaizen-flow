@@ -31,6 +31,8 @@
     "test_kf_term_arranque.py",
     "kf_term_limpar.py",
     "test_kf_term_limpar.py",
+    "kf_term_orq.py",
+    "test_kf_term_orq.py",
     "kf_errlog.py",
     "test_kf_errlog.py",
     "kf_git.py",
