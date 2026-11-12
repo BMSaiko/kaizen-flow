@@ -117,6 +117,30 @@ def test_wezterm_spawn_sem_no_color_no_ambiente(monkeypatch):
     assert envs[0]["PATH_MARCA"] == "fica"
 
 
+def test_wezterm_spawn_repete_sem_socket_herdado(monkeypatch):
+    monkeypatch.setenv("WEZTERM_UNIX_SOCKET", "C:/velho/gui-sock-1")
+    monkeypatch.delenv("WEZTERM_PANE", raising=False)
+    envs = []
+
+    def run(argv, **kw):
+        envs.append(kw.get("env"))
+        if "WEZTERM_UNIX_SOCKET" in kw["env"]:
+            raise subprocess.CalledProcessError(1, argv, "", "connect failed")
+        return SimpleNamespace(stdout="9\n", returncode=0)
+    assert pb.WeztermBackend(run).abrir(["claude"], "C:/wt") == "9"
+    assert len(envs) == 2 and "WEZTERM_UNIX_SOCKET" not in envs[1]
+
+
+def test_wezterm_spawn_erro_final_traz_stderr(monkeypatch):
+    monkeypatch.setenv("WEZTERM_UNIX_SOCKET", "C:/velho/gui-sock-1")
+
+    def run(argv, **kw):
+        raise subprocess.CalledProcessError(1, argv, "", "sem janela")
+    with pytest.raises(subprocess.CalledProcessError) as e:
+        pb.WeztermBackend(run).abrir(["claude"], "C:/wt")
+    assert "sem janela" in e.value.stderr
+
+
 def test_wezterm_sem_executavel_lista_vazia():
     def run(argv, **kw):
         raise FileNotFoundError("wezterm")

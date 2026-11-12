@@ -12,7 +12,7 @@ test("todo o script .py referido em core/ existe em core/scripts", () => {
   const missing = [];
   for (const f of core) {
     if (!/\.(md|py)$/.test(f.rel)) continue;
-    for (const m of f.data.toString("utf8").matchAll(/(?:scripts\/)?\b((?:sp|doc|handoff|context|skill|kaizen|test)[a-z0-9_-]*\.py)\b/g)) {
+    for (const m of f.data.toString("utf8").matchAll(/(?:scripts\/)?(?<![\w-])((?:sp|doc|handoff|context|skill|kaizen|test)[a-z0-9_-]*\.py)\b/g)) {
       if (!scripts.has(m[1]) && !OPTIONAL.has(m[1])) missing.push(`${f.rel}: ${m[1]}`);
     }
   }

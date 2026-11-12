@@ -116,8 +116,19 @@ class WeztermBackend(_Multiplexer):
     def abrir(self, cmd, cwd):
         # o painel herda o ambiente do cli: tirar o NO_COLOR/FORCE_COLOR das ferramentas do Claude Code, senão abre sem cor
         env = {k: v for k, v in os.environ.items() if k not in SEM_COR}
-        pane = self.run(["wezterm", "cli", "spawn", "--cwd", str(cwd), "--", *cmd], check=True, capture_output=True,
-                        text=True, encoding="utf-8", env=env).stdout.strip()
+        argv = ["wezterm", "cli", "spawn", "--cwd", str(cwd), "--", *cmd]
+        try:
+            pane = self.run(argv, check=True, capture_output=True, text=True, encoding="utf-8", env=env).stdout.strip()
+        except subprocess.CalledProcessError as erro:
+            if "WEZTERM_UNIX_SOCKET" not in env:
+                raise
+            # socket herdado de uma janela WezTerm entretanto reiniciada: o cli volta a descobrir a janela viva sem ele
+            env.pop("WEZTERM_UNIX_SOCKET")
+            try:
+                pane = self.run(argv, check=True, capture_output=True, text=True, encoding="utf-8", env=env).stdout.strip()
+            except subprocess.CalledProcessError as erro2:
+                raise subprocess.CalledProcessError(erro2.returncode, erro2.cmd, erro2.output,
+                                                    (erro.stderr or "") + (erro2.stderr or "")) from erro2
         origem = os.environ.get("WEZTERM_PANE")
         if origem:  # o spawn foca o painel novo; devolver o foco ao painel que lançou a fila
             self.run(["wezterm", "cli", "activate-pane", "--pane-id", origem], capture_output=True, text=True, encoding="utf-8")

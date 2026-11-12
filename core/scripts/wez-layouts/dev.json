@@ -1,0 +1,10 @@
+{
+  "titulo": "dev",
+  "descricao": "vault à esquerda, atlas-desktop à direita, michi por baixo do vault",
+  "janela_nova": false,
+  "paineis": [
+    {"nome": "vault", "cwd": "~/Documents/Second-Brain"},
+    {"nome": "atlas", "cwd": "~/Documents/code/atlas-desktop", "split": {"de": "vault", "dir": "right", "percent": 50}},
+    {"nome": "michi", "cwd": "~/Documents/Second-Brain", "split": {"de": "vault", "dir": "bottom", "percent": 40}}
+  ]
+}

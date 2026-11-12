@@ -10,6 +10,7 @@ kaizen usage [--days N | --since YYYY-MM-DD] [--source claude,codex] [--top N]
 kaizen report [--week YYYY-WNN] [--out DIR] [--print]
 kaizen audit [dir]                    # fails if personal data leaks into the repo
 kaizen demo [--keep]                  # runs the SP cycle in a temp repo
+kaizen term ls|fila|michi              # terminal panes (limpar, orq: not implemented yet)
 ```
 
 | Command | Option | Meaning |
@@ -31,6 +32,7 @@ kaizen demo [--keep]                  # runs the SP cycle in a temp repo
 | | `--source`, `--prices`, `--repo`, `--claude-root`, `--codex-root` | Same as `usage`. |
 | `kaizen audit [dir]` | | Scans for personal data (names, local paths, wikilinks). rc 1 on any hit. |
 | `kaizen demo` | `--keep` | Runs the whole cycle in a temp git repo: `init`, `sp-new` (gate `node --version`), `sp-move doing`, `sp-gates`, `sp-move done`, `sp-report`. The folder is deleted at the end unless `--keep`. Recording in `docs/assets/demo.cast`. |
+| `kaizen term <sub>` | `ls`, `fila`, `michi` | Drives WezTerm panes through `scripts/painel_backend.py` and `scripts/wez.py`: `ls` lists panes, `fila` runs the SP queue, `michi` launches a SP's michi in a pane. `limpar` and `orq` exit 2 (not implemented yet). |
 | `kaizen sync` | `--check`, `--stamp` | Maintainers only: refreshes `core/` from the author's vault. `--check` verifies without writing, `--stamp` stamps the build. Not needed by users. |
 
 ## Workflow scripts (installed in `scripts/`)
