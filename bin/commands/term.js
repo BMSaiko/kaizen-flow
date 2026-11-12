@@ -5,8 +5,8 @@ const { py } = require("./python.js");
 // subcomando -> { ajuda, script (relativo ao projeto), args fixos } ou { ajuda, pendente } quando o script ainda não existe
 const SUBS = {
   ls: { ajuda: "painéis com SP, fase, estado e fila (--json, --fila X)", script: "scripts/kf_term_ls.py", args: [] },
-  fila: { ajuda: "executar a fila de SPs (sp-fila)", script: "scripts/sp-fila.py", args: [] },
-  michi: { ajuda: "lançar o michi de um SP num painel", script: "scripts/michi_handoff_auto.py", args: ["go"] },
+  fila: { ajuda: "escolher um programa (preview) e lançar a fila num painel", script: "scripts/kf_term_arranque.py", args: ["fila"] },
+  michi: { ajuda: "escolher um SP (preview) e lançar o michi num painel", script: "scripts/kf_term_arranque.py", args: ["michi"] },
   limpar: { ajuda: "limpar painéis e estado órfãos", pendente: "kaizenflow-term-limpeza-2026-11-12" },
   orq: { ajuda: "orquestrador de painéis (Claude Code)", pendente: "kaizenflow-term-orq-2026-11-12" },
 };
