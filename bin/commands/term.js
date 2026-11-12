@@ -7,12 +7,13 @@ const SUBS = {
   ls: { ajuda: "painéis com SP, fase, estado e fila (--json, --fila X)", script: "scripts/kf_term_ls.py", args: [] },
   fila: { ajuda: "escolher um programa (preview) e lançar a fila num painel", script: "scripts/kf_term_arranque.py", args: ["fila"] },
   michi: { ajuda: "escolher um SP (preview) e lançar o michi num painel", script: "scripts/kf_term_arranque.py", args: ["michi"] },
-  limpar: { ajuda: "limpar painéis e estado órfãos", pendente: "kaizenflow-term-limpeza-2026-11-12" },
+  limpar: { ajuda: "limpar painéis e estado órfãos (dry-run; --apply executa)", script: "scripts/kf_term_limpar.py", args: ["limpar"] },
+  retomar: { ajuda: "reabrir o painel de um SP em Doing sem painel", script: "scripts/kf_term_limpar.py", args: ["retomar"] },
   orq: { ajuda: "orquestrador de painéis (Claude Code)", pendente: "kaizenflow-term-orq-2026-11-12" },
 };
 
 function help() {
-  const linhas = Object.entries(SUBS).map(([n, s]) => `  ${n.padEnd(7)}${s.ajuda}${s.pendente ? " (por implementar)" : ""}`);
+  const linhas = Object.entries(SUBS).map(([n, s]) => `  ${n.padEnd(8)}${s.ajuda}${s.pendente ? " (por implementar)" : ""}`);
   return `kaizen term <${Object.keys(SUBS).join("|")}> [args...]\n${linhas.join("\n")}`;
 }
 
