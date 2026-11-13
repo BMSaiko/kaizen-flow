@@ -201,8 +201,9 @@ def test_merge_auto_exige_pr_auto():
     assert any("merge auto exige pr auto" in e for e in errs)
 
 
-def _novo(modo="auto", extra=(), data="2026-11-13"):
-    return build(modo=modo, extra=extra).replace("date: 2026-10-18", f"date: {data}")
+def _novo(modo="auto", extra=(), data="2026-11-13", decisoes=True):
+    texto = build(modo=modo, extra=extra).replace("date: 2026-10-18", f"date: {data}")
+    return texto + "\n## Decisões\n- decisão do grill\n" if decisoes and data >= "2026-11-13" else texto
 
 
 def test_auto_sem_gates_a_partir_de_2026_11_13_e_erro():
@@ -219,8 +220,12 @@ def test_auto_antigo_sem_gates_mantem_so_aviso():
     assert sp_validate.warnings(antigo)
 
 
-def test_manual_sem_gates_nunca_e_erro():
-    assert sp_validate.validate(_novo(modo="manual"), folder="TODO") == []
+def test_manual_novo_sem_gates_e_erro_desde_o_portao():
+    assert any("gates" in e for e in sp_validate.validate(_novo(modo="manual"), folder="TODO"))
+
+
+def test_manual_antigo_sem_gates_nunca_e_erro():
+    assert sp_validate.validate(_novo(modo="manual", data="2026-11-12"), folder="TODO") == []
 
 
 def test_programa_auto_sem_gates_esta_isento():

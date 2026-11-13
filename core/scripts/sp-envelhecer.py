@@ -60,6 +60,15 @@ def apply(sp, new, base):
     sp_indice.invalidar()
 
 
+def _auto_commit():
+    """Módulo auto_commit, ou None (o pacote kaizen-flow não o inclui: sem commit automático)."""
+    try:
+        import auto_commit
+    except ImportError:
+        return None
+    return auto_commit
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--apply", action="store_true")
@@ -78,8 +87,8 @@ def main(argv=None):
         print(f"{sp.slug}: {old} -> {new} ({age}d parado)")
         if args.apply:
             apply(sp, new, base)
-    if args.hook and rows:
-        import auto_commit
+    if args.hook and rows and _auto_commit():
+        auto_commit = _auto_commit()
         rel = [str(sp.path.resolve().relative_to(REPO)).replace("\\", "/") for sp, *_ in rows
                if sp.path.resolve().is_relative_to(REPO)]
         msg = auto_commit.commit_push(rel, "vault: envelhece prioridade de %d SP(s)" % len(rel))

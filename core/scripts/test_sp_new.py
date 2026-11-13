@@ -597,3 +597,10 @@ def test_cli_program_herda_defeito_auto_sem_aviso(cfg, tmp_path, capsys):
     for p in (root / "atlas/sp/TODO").glob("*.md"):
         text = p.read_text(encoding="utf-8")
         assert "\nmodo: auto\n" in text and "commit: auto" in text and "merge: nunca" in text
+
+
+def test_create_ui_e_origem(tmp_path):
+    (tmp_path / "proj").mkdir()
+    p = sp_new.create(tmp_path, "proj", "x", "P2", date(2026, 11, 13), ui=True, origem="veredicto:abc")
+    texto = p.read_text(encoding="utf-8")
+    assert "ui: sim" in texto and "origem: veredicto:abc" in texto and "## Esboço" in texto

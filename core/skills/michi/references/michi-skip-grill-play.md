@@ -2,6 +2,8 @@
 
 > O pitfall «skip grill + instrução vaga e grande» (`michi-pitfalls.md` §3) liga aqui. Com `skip grill` e uma instrução grande e difusa («refactor X», «limpa Y», «corrige os bugs de Z»): não saltar para DR/DP/DA nem fazer 5 perguntas. Fazer isto.
 
+> `skip grill` só vale para executar um SP já aprovado. Para **criar** um SP o grill-me é obrigatório (mínimo 1 ronda, `sp-aprovar.py --rondas`).
+
 ## O scan de 5 minutos (antes de perguntar)
 
 Um scan é um censo, não pesquisa: saber o que existe e o que partiria.

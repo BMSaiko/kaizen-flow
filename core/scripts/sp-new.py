@@ -6,7 +6,7 @@ Recusa slug já existente no projeto (em qualquer pasta) e projeto inexistente.
 Nunca faz commit.
 
 Uso:
-  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--michi simples|default|complexo] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--parent <slug>] [--depends-on <slug> ...]
+  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--michi simples|default|complexo] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--ui] [--origem <veredicto:id|pentest:slug>] [--parent <slug>] [--depends-on <slug> ...]
   python -I scripts/sp-new.py --project <nome> --program <slug> --children a,b@complexo:a,c:a+b --priority P1|P2|P3
 
 `--parent <mãe>` exige que a mãe seja `kind: program` e acrescenta o filho a `children:` dela (depends_on, `state: TODO`, sem duplicar).
@@ -188,7 +188,7 @@ def check_permitir(permitir):
             raise SpNewError(f"permitir proibido ({sp_gates.forbidden(cmd)}): {cmd}")
 
 
-def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None, perfil=None, escopo=(), fora_de_escopo=(), permitir=(), decisoes=(), michi="default", programa=False):
+def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None, perfil=None, escopo=(), fora_de_escopo=(), permitir=(), decisoes=(), michi="default", programa=False, ui=False, origem=None):
     root = Path(root)
     check(root, project, slug, priority, modo)
     if michi not in NIVEIS:
@@ -222,6 +222,10 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
     if prova is not None:
         head.append(f"prova: {prova.strip()}")
     head += extra
+    if ui:
+        head.append("ui: sim")
+    if origem:
+        head.append(f"origem: {origem.strip()}")
     if parent:
         head.append(f"parent: {parent}")
     if depends_on:
@@ -232,7 +236,9 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
         body += [f"## {title}", "", ""]
     if decisoes:
         body += ["## Decisões", ""] + [f"- {d.strip()}" for d in decisoes] + [""]
-    path = root / project / "sp" / "TODO" / f"{slug}.md"
+    if ui:
+        body += ["## Esboço", "", "(ASCII ou mermaid do ecrã; o resumo mostra-o)", ""]
+    path =root / project / "sp" / "TODO" / f"{slug}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(head + body), encoding="utf-8")
     sp_list.sp_indice.invalidar()  # mtime de pasta é grosseiro no Windows: sem isto o slug novo fica fora da cache
@@ -356,6 +362,8 @@ def main(argv=None):
     ap.add_argument("--prova", help="comando ou critério verificável da prova")
     ap.add_argument("--permitir", action="append", default=[], help="comando pré-aprovado (repetível; irreversíveis são recusados)")
     ap.add_argument("--decisao", action="append", default=[], help="decisão do grill (repetível), vai para ## Decisões")
+    ap.add_argument("--ui", action="store_true", help="SP com UI: grava ui: sim e a secção ## Esboço (obrigatória)")
+    ap.add_argument("--origem", help="origem do SP (veredicto:<id> ou pentest:<slug>): fica aprovado pela origem, sem grill")
     ap.add_argument("--perfil", help="perfil de execução: cauteloso|normal|autonomo")
     ap.add_argument("--max-tentativas", type=int, help="tentativas por gate (override do perfil)")
     ap.add_argument("--max-requests", type=int, help="máximo de pedidos (override do perfil)")
@@ -402,7 +410,7 @@ def main(argv=None):
                 print(f"aviso: ramo {atras} commits atrás de master; git merge master", file=sys.stderr)
             check_master(args.project, args.slug, master_paths)
             check_links(args.root, args.project, args.parent, args.depends_on)
-            path = create(args.root, args.project, args.slug, args.priority, today, args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao, michi=args.michi)
+            path = create(args.root, args.project, args.slug, args.priority, today, args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao, michi=args.michi, ui=args.ui, origem=args.origem)
             if args.parent:
                 link_parent(args.root, args.project, args.parent, args.slug, args.depends_on)
             print(path)

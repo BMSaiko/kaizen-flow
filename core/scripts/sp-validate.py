@@ -14,6 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import sp_aprovacao  # noqa: E402
 
 sp_list = kaizen_engine.load("sp-list")
 sp_gates = kaizen_engine.load("sp-gates")
@@ -39,6 +40,25 @@ def _sections(text):
         elif current is not None:
             found[current].append(line)
     return {n: "\n".join(body).strip() for n, body in found.items()}
+
+
+def _extra(text, titulo):
+    """Corpo da secção `## <titulo>` (sem numeração)."""
+    corpo, dentro = [], False
+    for line in text.splitlines():
+        if line.startswith("## "):
+            dentro = line[3:].strip().lower().startswith(titulo.lower())
+        elif dentro:
+            corpo.append(line)
+    return "\n".join(corpo).strip()
+
+
+def _decisoes(text):
+    return _extra(text, "Decisões")
+
+
+def _esboco(text):
+    return _extra(text, "Esboço")
 
 
 GATES_OBRIGATORIOS_DESDE = "2026-11-13"  # SPs anteriores só têm aviso
@@ -94,6 +114,13 @@ def validate(text, folder=None):
         if fm.get("modo") == "auto" and fm.get("kind") != "program" and str(fm.get("date", "")) >= GATES_OBRIGATORIOS_DESDE                 and not sp_gates.parse_gates(text):
             errors.append(f"modo auto exige 'gates:' executáveis (SP de {GATES_OBRIGATORIOS_DESDE} em diante)")
         errors += sp_gates.problems(sp_gates.parse_gates(text))
+        novo = str(fm.get("date", "")) >= sp_aprovacao.DESDE and fm.get("kind") != "program" and not fm.get("origem")
+        if novo and not sp_gates.parse_gates(text):
+            errors.append("SP novo exige 'gates:' executáveis (ponto 6 do grill: gate executável)")
+        if novo and not _decisoes(text):
+            errors.append("SP novo exige '## Decisões' não vazia (o grill-me fica registado)")
+        if fm.get("ui") == "sim" and not _esboco(text):
+            errors.append("ui: sim exige a secção '## Esboço' (ASCII ou mermaid)")
         if "permitir" in fm:
             cmds = kaizen_engine.parse_permitir(fm["permitir"])
             if not cmds:
