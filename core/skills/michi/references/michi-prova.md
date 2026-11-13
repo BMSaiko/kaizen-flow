@@ -27,3 +27,4 @@ Fim de cada fase de entrega (DA que muda código/UI): mostrar ao user uma prova 
 - Baseline de testes sem as alterações (e2e/jest): usar `git worktree`, nunca `git stash` (ficheiros versionados como `test-results/.last-run.json` fazem o `pop` abortar).
 - A prova da Fase 5 (`## Prova de done`) consolida e referencia estas, não as repete.
 - **SP com `gates:`/`prova:` no frontmatter:** a prova e os gates vêm do SP (`python -I scripts/sp-gates.py <SP>`), não são inferidos; sem esses campos vale a tabela acima.
+- **Pacote de provas (SPs de 2026-11-13 em diante):** o fecho gera `sp/proofs/<slug>/provas.json` e as imagens com `sp-provas.py`; `ui: sim` exige captura `depois` da app a correr (`--imagem F --tipo depois`); sem UI, diagrama e gates como SVG automáticos. No PR vão como «Como validar», «Como reverter» e imagens (`pr_corpo.py --pacote`).

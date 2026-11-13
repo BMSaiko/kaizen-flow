@@ -61,7 +61,26 @@ def detetar_base(repo):
     return (cand[0] if len(cand) == 1 else None), cand
 
 
-def corpo(sp_texto, review, pentest_txt):
+def bloco_provas(pasta, url_base=""):
+    """Markdown com «Como validar», «Como reverter» e as imagens do pacote `provas.json` (vazio sem pacote).
+
+    Imagens em repo privado: `<url_base>/<ficheiro>?raw=true` com `url_base` = `https://github.com/<o>/<r>/blob/<sha>/<pasta>`."""
+    f = Path(pasta) / "provas.json"
+    if not f.is_file():
+        return ""
+    d = json.loads(f.read_text(encoding="utf-8"))
+    out = ["## Como validar", *[f"- `{c}`" for c in d.get("experimentar", [])], "", "## Como reverter",
+           *[f"- `{c}`" for c in d.get("reverter", [])], ""]
+    imgs = d.get("imagens", [])
+    if imgs:
+        out.append("## Imagens")
+        for im in imgs:
+            alvo = f"{url_base.rstrip('/')}/{im['ficheiro']}?raw=true" if url_base else im["ficheiro"]
+            out.append(f"**{im['legenda']}** ({im['tipo']})\n\n![{im['legenda']}]({alvo})\n")
+    return "\n".join(out)
+
+
+def corpo(sp_texto, review, pentest_txt, pacote="", url_base=""):
     feito = seccao(sp_texto, "3. Objective", "Objective") or seccao(sp_texto, "Progresso")
     progresso = seccao(sp_texto, "Progresso")
     if progresso and progresso not in feito:
@@ -78,7 +97,9 @@ def corpo(sp_texto, review, pentest_txt):
     tpl = TEMPLATE.read_text(encoding="utf-8") if TEMPLATE else TEMPLATE_FALLBACK
     for k, v in {"feito": feito, "decisoes": decisoes or "Sem decisões registadas.", "por_fazer": por_fazer, "prova": prova}.items():
         tpl = tpl.replace("{" + k + "}", v)
-    return ATRIBUICAO.sub("", tpl), bool(feito and prova)
+    tpl = tpl.replace("{provas_visuais}", bloco_provas(pacote, url_base) if pacote else "") if "{provas_visuais}" in tpl else \
+        tpl.rstrip() + "\n\n" + (bloco_provas(pacote, url_base) if pacote else "")
+    return ATRIBUICAO.sub("", tpl).rstrip() + "\n", bool(feito and prova)
 
 
 def main(argv=None):
@@ -89,6 +110,8 @@ def main(argv=None):
     ap.add_argument("--repo", default=".")
     ap.add_argument("--titulo")
     ap.add_argument("--base")
+    ap.add_argument("--pacote", help="pasta sp/proofs/<slug> com provas.json (validar, reverter e imagens no corpo)")
+    ap.add_argument("--url-base", default="", help="URL base das imagens: https://github.com/<o>/<r>/blob/<sha>/<pasta>")
     ap.add_argument("--criar", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)
@@ -98,7 +121,7 @@ def main(argv=None):
     sp = Path(a.sp).read_text(encoding="utf-8")
     review = json.loads(Path(a.review).read_text(encoding="utf-8"))
     pent = Path(a.pentest).read_text(encoding="utf-8") if a.pentest else None
-    texto, completo = corpo(sp, review, pent)
+    texto, completo = corpo(sp, review, pent, a.pacote or "", a.url_base)
     print(texto)
     base, cand = (a.base, [a.base]) if a.base else detetar_base(a.repo)
     print(f"Base: {base or 'ambígua ' + str(cand)}", file=sys.stderr)

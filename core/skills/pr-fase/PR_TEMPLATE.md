@@ -9,3 +9,5 @@
 
 ## Prova
 {prova}
+
+{provas_visuais}
