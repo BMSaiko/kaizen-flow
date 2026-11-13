@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="182" viewBox="0 0 760 182" font-family="Segoe UI,Arial,sans-serif" font-size="13">
+<rect width="760" height="182" fill="#ffffff"/>
+<text x="16" y="24" font-size="15" font-weight="bold" fill="#1f2328">O que mudou (10 ficheiros)</text>
+<rect x="16" y="36" width="12" height="12" fill="#2da44e"/><text x="34" y="47" fill="#1f2328">novos</text>
+<rect x="126" y="36" width="12" height="12" fill="#bf8700"/><text x="144" y="47" fill="#1f2328">alterados</text>
+<rect x="236" y="36" width="12" height="12" fill="#cf222e"/><text x="254" y="47" fill="#1f2328">apagados</text>
+<text x="16" y="76" fill="#1f2328">core/scripts</text>
+<rect x="300" y="62" width="152" height="18" fill="#2da44e"/>
+<text x="304" y="75" fill="#ffffff" font-size="11">2</text>
+<rect x="452" y="62" width="228" height="18" fill="#bf8700"/>
+<text x="456" y="75" fill="#ffffff" font-size="11">3</text>
+<text x="16" y="104" fill="#1f2328">core/skills/michi/references</text>
+<rect x="300" y="90" width="76" height="18" fill="#bf8700"/>
+<text x="304" y="103" fill="#ffffff" font-size="11">1</text>
+<text x="16" y="132" fill="#1f2328">core/skills/pr-fase</text>
+<rect x="300" y="118" width="152" height="18" fill="#bf8700"/>
+<text x="304" y="131" fill="#ffffff" font-size="11">2</text>
+<text x="16" y="160" fill="#1f2328">docs/provas/provas-visuais</text>
+<rect x="300" y="146" width="152" height="18" fill="#2da44e"/>
+<text x="304" y="159" fill="#ffffff" font-size="11">2</text>
+</svg>

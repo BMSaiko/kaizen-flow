@@ -29,6 +29,7 @@ from sp_disco import ler_json  # noqa: E402
 sp_list = kaizen_engine.load("sp-list")
 sp_gates = kaizen_engine.load("sp-gates")
 sp_move = kaizen_engine.load("sp-move")
+sp_provas = kaizen_engine.load("sp-provas")
 
 HERE = Path(__file__).resolve().parent
 SECRETS = (".env", ".key", ".pem", ".p12", ".pfx", "id_rsa", ".kdbx", "secrets.", ".secrets")
@@ -62,16 +63,27 @@ def passo(nome, fn, *args):
 
 
 def run_gates(sp):
-    """Devolve (rc, texto). rc 0 = verdes ou sem gates."""
+    """Devolve (rc, texto, resultados). rc 0 = verdes ou sem gates."""
     gates = sp_gates.parse_gates(sp.path.read_text(encoding="utf-8"))
     if not gates:
-        return 0, "gates: nenhum declarado"
+        return 0, "gates: nenhum declarado", []
     bad = sp_gates.problems(gates)
     if bad:
-        return 2, "\n".join(bad)
+        return 2, "\n".join(bad), []
     results = sp_gates.run(gates)
     ok = all(r["rc"] == 0 for r in results) and len(results) == len(gates)
-    return (0 if ok else 1), sp_gates.summary(results)
+    return (0 if ok else 1), sp_gates.summary(results), results
+
+
+def pacote_de_provas(sp, resultados, cwd):
+    """Gera `sp/proofs/<slug>/provas.json` e valida-o. Devolve (rc, linhas); só SPs de 2026-11-13 em diante."""
+    if not sp_provas.exige_pacote(sp):
+        return 0, []
+    pasta, d = sp_provas.gravar(sp, cwd, None, resultados)
+    probs = sp_provas.validar(d, sp_provas.com_ui(sp), pasta)
+    if probs:
+        return 1, [f"PACOTE: {p}" for p in probs] + [f"{sp.slug}: pacote de provas inválido (anexar com sp-provas.py --imagem, ou --sem-prova \"motivo\")"]
+    return 0, [f"PROVAS: {pasta / 'provas.json'}"]
 
 
 def run_budget():
@@ -229,7 +241,7 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
     t_total = time.monotonic()
     sp = find_doing(root, slug, project)
     lines = []
-    rc, text = passo("gates", run_gates, sp)
+    rc, text, resultados = passo("gates", run_gates, sp)
     lines.append(text)
     if rc:
         return rc, lines + [f"{slug}: gate vermelho, SP continua em Doing"]
@@ -244,6 +256,11 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
     if faltas:
         registar_dispensa(sp.path, sem_prova)
         lines += [f.replace("AVISO", "DISPENSADO") for f in faltas]
+    if not sem_prova:
+        rc, extra = passo("pacote de provas", pacote_de_provas, sp, resultados, commit_dir)
+        lines += extra
+        if rc:
+            return 1, lines
     if commit:
         bloqueio = kf_por_sincronizar(commit_dir)
         if bloqueio:

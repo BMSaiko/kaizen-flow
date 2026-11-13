@@ -61,7 +61,7 @@ def _esboco(text):
     return _extra(text, "Esboço")
 
 
-GATES_OBRIGATORIOS_DESDE = "2026-11-13"  # SPs anteriores só têm aviso
+GATES_OBRIGATORIOS_DESDE ="2026-11-13"  # SPs anteriores só têm aviso
 
 
 def validate(text, folder=None):
