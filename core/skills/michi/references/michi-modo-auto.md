@@ -4,27 +4,29 @@
 
 ## Proibições (único sítio; SKILL.md e AGENTS.md só apontam para aqui)
 - `--force`, `reset --hard`, `clean -f`, `git add -A`/`.` (stage sempre explícito).
-- Push e PR só se o SP os autorizar (`push: auto` / `pr: auto`, ver «Autorizações do SP»); sem o campo, nunca.
+- Push, PR e merge só se o SP os autorizar (`push: auto` / `pr: auto` / `merge: auto`, ver «Autorizações do SP»); sem o campo, nunca.
 - Apagar ficheiros fora do SP; exceções: o `COMMIT_*.md` que originou o commit e temporários próprios (scratchpad).
 - Ler segredos (`.env*`, `*.key`, `*.pem`, … — regra crítica 8 do AGENTS.md).
 - Commitar ou mover para Done com gate ou prova a falhar.
 - Alterar `user.name`/`user.email`; `Co-Authored-By` ou atribuição a agentes.
 
 ## Autorizações do SP (único sítio)
-Frontmatter `commit`, `push`, `pr` (`auto|pergunta|nunca`) e `restricoes` (texto), gravados pelo `/super-prompt` (`sp-new.py --commit/--push/--pr/--restricoes`) e validados por `sp-validate.py` (push `auto` exige commit ≠ `nunca`; pr `auto` exige push `auto`). Valem no fecho em modo auto **e** manual:
+Frontmatter `commit`, `push`, `pr`, `merge` (`auto|pergunta|nunca`; merge só `auto|nunca`) e `restricoes` (texto), gravados por `sp-new.py --commit/--push/--pr/--merge/--restricoes` e validados por `sp-validate.py` (push `auto` exige commit ≠ `nunca`; pr `auto` exige push `auto`; merge `auto` exige pr `auto`).
+**Defeito por destino** (`kaizen_config.DESTINOS_DEFEITO`, override `destinos` em `kaizen.config.json`; o `sp-new.py` aplica-o sem perguntar, flags explícitas ganham, derivados incompatíveis rebaixam): vault = commit+push auto, pr/merge `nunca`; kaizen-flow = tudo `auto`; repo de código (atlas, foodlister) = commit+push+pr `auto`, merge `nunca`. Projeto não listado = vault. Valem no fecho em modo auto **e** manual:
 | Valor | Fecho |
 |---|---|
 | `auto` | commit local (skill `commit`) · push (skill `push`, sem force) · PR via `gh` sem atribuição, sem perguntar |
 | `pergunta` | `AskUserQuestion` como no fluxo normal |
 | `nunca` | nem propõe |
-- Sem campo (SP antigo): `pergunta`; em modo auto, commit local sem push nem PR.
+- Sem campo (SP antigo): mantém o comportamento antigo (`pergunta`; em modo auto, commit local sem push nem PR).
+- `merge: nunca` com PR aberto: regista o URL do PR em `## Report modo auto` e não faz merge. Vault: fecha com merge worktree→master e push, sem PR.
 - `permitir` (allowlist, `;`-separada, `sp-new.py --permitir` repetível) e `## Decisões` (`--decisao`, decisões do grill): **consultar antes de perguntar**. Comando em `permitir` corre sem pedir; o resto pergunta. `kaizen_engine.precisa_perguntar(fm, acao)` decide (acao = `commit|push|pr` ou o comando). Irreversíveis (`--force`, `reset --hard`, `git add -A`, segredos) perguntam sempre e `sp-validate.py`/`sp-new.py` recusam-nos em `permitir`. Decisão já em `## Decisões`: não repetir a pergunta.
 - `restricoes` é lido no arranque e cumprido à letra (pastas intocáveis, repos, ações externas); em dúvida, o mais conservador.
 
 ## Pergunta normal → ação auto
 | Normal | Auto |
 |---|---|
-| «go» por fase, `AskUserQuestion` de dúvida | default mais conservador, registado em `## Decisões modo auto` |
+| «go» por fase, `AskUserQuestion` de dúvida | decide sozinho e regista em `## Decisões modo auto`: `- dúvida: … → decisão: … (porquê)` |
 | `/sp-handoff` pergunta sim/não; sessão suja pergunta limpar | `--launch --auto` direto |
 | Prova em falta: bloquear e perguntar | prova alternativa e «sem prova» no SP |
 | Propor commit com `AskUserQuestion` | fecho automático (abaixo) |
@@ -37,7 +39,7 @@ Frontmatter `commit`, `push`, `pr` (`auto|pergunta|nunca`) e `restricoes` (texto
 5. `git rev-parse --abbrev-ref HEAD` = `master` (SB-VERIFY).
 
 ## Paragem
-Gate/prova falhada após 2 tentativas, ou proibição em causa: não commita, não move para Done, regista em `## Report modo auto` reverte ao checkpoint e para.
+Só para quem: ação irreversível ou externa não autorizada, gate/prova falhada após 2 tentativas, ou dúvida que invalida a §3 do SP (spec). Não commita, não move para Done, regista em `## Report modo auto` reverte ao checkpoint e para.
 Checkpoint: antes da DA (ou de fase com escrita) `python -I scripts/michi-checkpoint.py save --slug <SP>`. Na paragem: `restore --slug <SP>` mostra o plano; em auto, `--apply` e regista a reversão no Report; em manual, `AskUserQuestion` antes de `--apply` (recusa se o HEAD mudou).
 
 ## Report (`## Report modo auto` no SP + resumo curto no chat)

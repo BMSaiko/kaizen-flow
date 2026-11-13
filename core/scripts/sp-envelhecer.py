@@ -7,7 +7,7 @@ Idade = dias desde `updated` (fallback `created`). P3->P2 aos 14 dias, P2->P1 ao
 Uso:
   python -I scripts/sp-envelhecer.py              # dry-run (lista as subidas)
   python -I scripts/sp-envelhecer.py --apply      # escreve
-  python -I scripts/sp-envelhecer.py --hook       # SessionStart: --apply, no máximo 1x/dia (selo)
+  python -I scripts/sp-envelhecer.py --hook       # SessionStart: --apply + commit/push autónomo, 1x/dia (selo)
 rc: 0
 """
 import argparse
@@ -78,6 +78,13 @@ def main(argv=None):
         print(f"{sp.slug}: {old} -> {new} ({age}d parado)")
         if args.apply:
             apply(sp, new, base)
+    if args.hook and rows:
+        import auto_commit
+        rel = [str(sp.path.resolve().relative_to(REPO)).replace("\\", "/") for sp, *_ in rows
+               if sp.path.resolve().is_relative_to(REPO)]
+        msg = auto_commit.commit_push(rel, "vault: envelhece prioridade de %d SP(s)" % len(rel))
+        if msg:
+            print(msg)
     if not rows:
         print("nada a subir")
     if args.hook:
