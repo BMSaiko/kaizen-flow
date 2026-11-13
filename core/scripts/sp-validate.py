@@ -41,6 +41,9 @@ def _sections(text):
     return {n: "\n".join(body).strip() for n, body in found.items()}
 
 
+GATES_OBRIGATORIOS_DESDE = "2026-11-13"  # SPs anteriores só têm aviso
+
+
 def validate(text, folder=None):
     """Devolve a lista de erros (vazia = válido). `folder` = pasta (TODO|Doing|Done) ou None."""
     errors = []
@@ -67,6 +70,10 @@ def validate(text, folder=None):
             errors.append("push auto exige commit ≠ nunca")
         if fm.get("pr") == "auto" and fm.get("push") != "auto":
             errors.append("pr auto exige push auto")
+        if fm.get("merge") and fm["merge"] not in ("auto", "nunca"):
+            errors.append(f"merge '{fm['merge']}' inválido (auto|nunca)")
+        if fm.get("merge") == "auto" and fm.get("pr") != "auto":
+            errors.append("merge auto exige pr auto")
         if fm.get("perfil") and fm["perfil"] not in ("cauteloso", "normal", "autonomo"):
             errors.append(f"perfil '{fm['perfil']}' inválido (cauteloso|normal|autonomo)")
         for key in ("max_tentativas", "max_requests"):
@@ -84,6 +91,8 @@ def validate(text, folder=None):
             errors.append("fora_de_escopo exige escopo")
         if fm.get("perfil") == "autonomo" and not sp_gates.parse_gates(text):
             errors.append("perfil autonomo exige gates")
+        if fm.get("modo") == "auto" and fm.get("kind") != "program" and str(fm.get("date", "")) >= GATES_OBRIGATORIOS_DESDE                 and not sp_gates.parse_gates(text):
+            errors.append(f"modo auto exige 'gates:' executáveis (SP de {GATES_OBRIGATORIOS_DESDE} em diante)")
         errors += sp_gates.problems(sp_gates.parse_gates(text))
         if "permitir" in fm:
             cmds = kaizen_engine.parse_permitir(fm["permitir"])

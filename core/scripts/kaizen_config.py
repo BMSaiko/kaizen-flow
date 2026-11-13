@@ -74,3 +74,25 @@ def hooks(repo):
             continue
         out.append({"event": h["event"], "cmd": cmd, "modo": modo, "timeout": timeout, "if": cond})
     return out
+
+
+# Autorizações por destino (tabela única). Projeto não listado = vault.
+DESTINOS_DEFEITO = {
+    "vault": {"commit": "auto", "push": "auto", "pr": "nunca", "merge": "nunca"},
+    "kaizen-flow": {"commit": "auto", "push": "auto", "pr": "auto", "merge": "auto"},
+    "repo": {"commit": "auto", "push": "auto", "pr": "auto", "merge": "nunca"},
+}
+PROJETO_DESTINO = {"kaizenflow": "kaizen-flow", "kaizen-flow": "kaizen-flow", "atlas": "repo", "foodlister": "repo"}
+
+
+def destino(repo, project):
+    """Destino do `project` (vault|kaizen-flow|repo): `destinos` em kaizen.config.json sobrepõe a tabela; defeito vault."""
+    over = _read(repo).get("destinos")
+    if isinstance(over, dict) and over.get(project) in DESTINOS_DEFEITO:
+        return over[project]
+    return PROJETO_DESTINO.get(project, "vault")
+
+
+def autorizacoes(repo, project):
+    """Autorizações commit/push/pr/merge por defeito do destino do `project` (cópia)."""
+    return dict(DESTINOS_DEFEITO[destino(repo, project)])
