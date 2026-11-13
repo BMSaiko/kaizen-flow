@@ -2,7 +2,7 @@
 <rect width="820" height="236" fill="#0d1117"/>
 <text x="12" y="26" fill="#79c0ff" xml:space="preserve">$ python -m pytest scripts/test_sp_provas.py scripts/test_sp_fechar.py -q</text>
 <text x="12" y="44" fill="#c9d1d9" xml:space="preserve">...................................                                      [100%]</text>
-<text x="12" y="62" fill="#c9d1d9" xml:space="preserve">35 passed in 23.66s</text>
+<text x="12" y="62" fill="#c9d1d9" xml:space="preserve">35 passed in 24.16s</text>
 <text x="12" y="80" fill="#3fb950" xml:space="preserve">rc=0</text>
 <text x="12" y="98" fill="#79c0ff" xml:space="preserve">$ python -I scripts/context-budget.py</text>
 <text x="12" y="116" fill="#c9d1d9" xml:space="preserve">fonte | bytes | carregado</text>
