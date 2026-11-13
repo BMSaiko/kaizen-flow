@@ -18,6 +18,7 @@
     "open-doc.py",
     "sp_progresso.py",
     "skill-cut.py",
+    "auto_commit.py",
     "kaizen_config.py",
     "kaizen_engine.py",
     "kaizen_hooks.py",
