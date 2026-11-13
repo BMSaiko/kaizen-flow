@@ -39,20 +39,21 @@ Constrói um **Super Prompt**: instruções autónomas, prontas a colar, para um
 - Não usar: já dentro de um ciclo michi (`/dp` ou `/dr`); tarefa trivial de uma linha; execução já (`/michi <ideia>`).
 
 ## Invocação
-`/super-prompt <objetivo>` ou `--quick <objetivo ≤3 linhas>` (salta brainstorm e dr; vai a grill-me + DP; secções ≤3 linhas). Sem objetivo: perguntar uma vez.
+`/super-prompt <objetivo>` ou `--quick <objetivo ≤3 linhas>` (salta brainstorm e dr; vai a grill-me + DP; secções ≤3 linhas). O grill-me nunca se salta (mínimo 1 ronda; `--quick` e `skip grill` não o dispensam). Sem objetivo: perguntar uma vez.
 
 ## Pipeline (por ordem; cada fase aperta a seguinte)
 Tudo na sessão principal, sem `Agent`.
 1-2. **brainstorm + swot** — correr `brainstorm` e `swot` (encadeados, sobre o top 1) e escrever `## Brainstorm` e `## SWOT` (≤20 linhas); nunca bloquear.
-3. **grill-me** (principal) — skill `grill-me` até objetivo, âmbito, sucesso, constrangimentos e não-objetivos ficarem inequívocos; parar em «ok», «basta», «go»; respostas em `## Spec (grill-me output)`. Objetivo vazio/placeholder: nota de bloqueio e sair. Domínio conhecido: templates em `references/super-prompt-extra.md`. No mesmo lote de perguntas: prioridade, modo (auto/manual), autorizações (commit/push/PR/restrições, uma pergunta), perfil, escalão (`sp-escalao.py`), escopo, gates («como se verifica?») e `--decisao`. **Flag a flag: `references/super-prompt-detalhe.md`.**
+3. **grill-me** (principal) — skill `grill-me` até objetivo, âmbito, sucesso, constrangimentos e não-objetivos ficarem inequívocos; parar em «ok», «basta», «go»; respostas em `## Spec (grill-me output)`. Objetivo vazio/placeholder: nota de bloqueio e sair. Domínio conhecido: templates em `references/super-prompt-extra.md`. No mesmo lote de perguntas: prioridade, restrições, perfil, escalão (`sp-escalao.py`), escopo, gates («como se verifica?») e `--decisao`. **Flag a flag: `references/super-prompt-detalhe.md`.**
 4. **dr (mini)** — skill `dr`: o mínimo de caminhos/contexto/integração; ≤1 ecrã, cada afirmação ancorada em fonte primária, em `## DR (mini)`. Não-código: «DR skipped: non-code goal».
 
 ## Gerar o SP
 1. Todo o SP criado ou revisto (por esta skill, `/sp`, `pentest` ou pedido direto) é escrito num painel `sp-autor`: o principal cria o SP vazio (passo 2), grava a semente (grill, DR mini, flags) e corre `python -I scripts/sp-autor.py --sp <SP.md> --semente <ficheiro>` (o painel lê e apaga a semente; revisão = painel novo com os ajustes). Exceção: numa sessão nova (1.º pedido, sem trabalho anterior no contexto) o principal escreve direto. Nunca `Agent` nem `SendMessage`.
-2. O principal corre `python -I scripts/sp-new.py --project <p> --slug <slug> --priority P1|P2|P3 --modo auto|manual [flags]` (nunca criar o ficheiro à mão), preenche as **8 secções** a partir do grill e do DR, escolhe o `michi_modelo` de cada SP (`--michi` / `@nível`: simples, default, complexo) e valida com `sp-validate.py` sem avisos. Secção vazia = voltar ao grill-me. Projeto não inferível: `AskUserQuestion` antes de criar; nunca inventar pasta. Repo novo: perguntar a visibilidade no grill. Conteúdo e formato do resumo: `super-prompt-detalhe.md` §Autor.
-3. Resumo fixo: caminhos, ordem e dependências, `michi_modelo` por SP, dúvidas em aberto.
-4. Imprimir o «Super Prompt saved» e faz `AskUserQuestion`: «Iniciar com michi» (recomendada), «Rever/ajustar», resposta livre.
-5. «Rever/ajustar»: recolher o que mudar e aplicar os ajustes (SP já commitado: numa worktree); no fim repetir a pergunta. «Iniciar com michi»: arranque do michi (skill `michi`).
+2. O principal corre `python -I scripts/sp-new.py --project <p> --slug <slug> --priority P1|P2|P3 [flags] (modo auto e autorizações commit/push/PR/merge vêm por defeito do destino; só passar flags para desviar)` (nunca criar o ficheiro à mão), preenche as **8 secções** a partir do grill e do DR, escolhe o `michi_modelo` de cada SP (`--michi` / `@nível`: simples, default, complexo) e valida com `sp-validate.py` sem avisos. Secção vazia = voltar ao grill-me. Projeto não inferível: `AskUserQuestion` antes de criar; nunca inventar pasta. Repo novo: perguntar a visibilidade no grill. Conteúdo e formato do resumo: `super-prompt-detalhe.md` §Autor.
+3. Resumo: `python -I scripts/sp-resumo.py <slug>` (1 ecrã: Quê · Porquê · Forma · Limites · Prova · Destino; mãe: + filhos; `ui: sim`: + `## Esboço`, obrigatório); mostrá-lo ao user. rc 1 = falta matéria: voltar ao grill-me nessa secção. SP com `ui: sim` leva `sp-new.py --ui`.
+4. Imprimir o «Super Prompt saved» e fazer **um só** `AskUserQuestion` com duas perguntas: «Aprovas o resumo?» (Sim / Ajustar) e «Executar já ou fica em TODO?» (sem execução por omissão; usage do plano). Sem «Sim» o SP não entra na fila.
+5. «Sim»: `python -I scripts/sp-aprovar.py <slug> [--programa] --rondas <n>` (grava `aprovado:` e `grill:`; a fila e o `/michi` em auto recusam SPs por aprovar); depois «executar já» = arranque do michi (skill `michi`), «TODO» = parar. «Ajustar»: aplicar os ajustes (SP já commitado: numa worktree) e repetir o resumo.
+6. Exceção única: SP com `origem:` (correção de um veredicto `ajustar`, SP de `pentest`; `sp-new.py --origem`) fica aprovado pela origem, sem grill nem resumo.
 
 ## Reutilizar
 Colar o corpo no `/michi`: salta grill+DR, começa no DP e trata as secções 2/3/4/5 como contrato; re-perguntar esses factos = SP incompleto.

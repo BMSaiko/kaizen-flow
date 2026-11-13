@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 import kf_git  # noqa: E402
+import sp_aprovacao  # noqa: E402
 import sp_indice  # noqa: E402
 from sp_fila_estado import REQ_POR_SP, USER, run_hidden
 
@@ -68,6 +69,8 @@ def estatico(sp, fm):
         return f"modo {fm.get('modo') or 'em falta'} (só `modo: auto`)"
     if "gates" not in fm:
         return "sem gates no frontmatter"
+    if sp_aprovacao.por_aprovar(fm):
+        return f"por aprovar (sp-resumo.py {sp.slug}, e com o «sim» do {USER}: sp-aprovar.py {sp.slug})"
     return autorizacao(fm)
 
 

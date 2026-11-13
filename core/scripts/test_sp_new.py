@@ -173,7 +173,7 @@ def test_cli_program(tmp_path, capsys):
 
 def test_cli_program_avisa_se_modo_manual(tmp_path, capsys):
     root = project(tmp_path)
-    args = ["--project", "atlas", "--program", "prog", "--children", "a,b:a", "--priority", "P2", "--root", str(root)]
+    args = ["--project", "atlas", "--program", "prog", "--children", "a,b:a", "--priority", "P2", "--root", str(root), "--modo", "manual"]
     assert sp_new.main(args) == 0
     err = capsys.readouterr().err
     assert "aviso" in err and "modo: manual" in err and "--modo auto" in err
@@ -505,3 +505,102 @@ def test_project_com_barra_usa_o_ultimo_componente(tmp_path, capsys):
     rc = sp_new.main(["--root", str(root), "--project", "proj/kaizenflow", "--slug", "kaizenflow-abc-2026-11-11", "--priority", "P2"])
     assert rc == 0
     assert (root / "kaizenflow" / "sp" / "TODO" / "kaizenflow-abc-2026-11-11.md").exists()
+
+
+# --- defeito auto e autorizações por destino ---
+
+@pytest.fixture
+def cfg(tmp_path, monkeypatch):
+    repo = tmp_path / "cfg"
+    repo.mkdir()
+    monkeypatch.setattr(sp_new, "CONFIG_REPO", repo)
+    return repo
+
+
+def test_autorizacoes_por_destino_vault(cfg):
+    assert sp_new.autorizacoes_por_destino("kaizen") == {"commit": "auto", "push": "auto", "pr": "nunca", "merge": "nunca"}
+
+
+def test_autorizacoes_por_destino_kaizen_flow(cfg):
+    assert sp_new.autorizacoes_por_destino("kaizenflow") == {"commit": "auto", "push": "auto", "pr": "auto", "merge": "auto"}
+    assert sp_new.autorizacoes_por_destino("kaizen-flow") == sp_new.autorizacoes_por_destino("kaizenflow")
+
+
+@pytest.mark.parametrize("proj", ["atlas", "foodlister"])
+def test_autorizacoes_por_destino_repo_de_codigo(cfg, proj):
+    assert sp_new.autorizacoes_por_destino(proj) == {"commit": "auto", "push": "auto", "pr": "auto", "merge": "nunca"}
+
+
+def test_destinos_override_em_kaizen_config_json(cfg):
+    (cfg / "kaizen.config.json").write_text('{"destinos": {"meu": "repo", "atlas": "vault"}}', encoding="utf-8")
+    assert sp_new.autorizacoes_por_destino("meu")["pr"] == "auto"
+    assert sp_new.autorizacoes_por_destino("atlas")["pr"] == "nunca"
+
+
+def _unico(root, proj):
+    return next((root / proj / "sp" / "TODO").glob("*.md")).read_text(encoding="utf-8")
+
+
+def test_cli_sem_modo_grava_auto_e_autorizacoes_do_destino(cfg, tmp_path):
+    root = project(tmp_path, "atlas")
+    assert sp_new.main(["--project", "atlas", "--slug", "a", "--priority", "P2", "--root", str(root)]) == 0
+    text = _unico(root, "atlas")
+    assert "\nmodo: auto\n" in text
+    assert "commit: auto\npush: auto\npr: auto\nmerge: nunca\n" in text
+
+
+def test_cli_vault_sem_pr_nem_merge_de_pr(cfg, tmp_path):
+    root = project(tmp_path, "kaizen")
+    assert sp_new.main(["--project", "kaizen", "--slug", "a", "--priority", "P2", "--root", str(root)]) == 0
+    text = _unico(root, "kaizen")
+    assert "commit: auto\npush: auto\npr: nunca\n" in text and "merge: auto" not in text
+
+
+def test_cli_kaizen_flow_merge_auto_valida(cfg, tmp_path):
+    root = project(tmp_path, "kaizenflow")
+    assert sp_new.main(["--project", "kaizenflow", "--slug", "a", "--priority", "P2", "--root", str(root)]) == 0
+    text = _unico(root, "kaizenflow")
+    assert "pr: auto\nmerge: auto\n" in text
+    assert not any(e.startswith(("merge", "pr", "push")) for e in sp_validate.validate(text, "TODO"))
+
+
+def test_cli_flags_explicitas_ganham_ao_defeito(cfg, tmp_path):
+    root = project(tmp_path, "kaizenflow")
+    args = ["--project", "kaizenflow", "--slug", "a", "--priority", "P2", "--root", str(root),
+            "--modo", "manual", "--commit", "pergunta", "--pr", "nunca"]
+    assert sp_new.main(args) == 0
+    text = _unico(root, "kaizenflow")
+    assert "\nmodo: manual\n" in text and "commit: pergunta\n" in text and "pr: nunca\n" in text
+    assert "merge: auto" not in text  # pr nunca rebaixa merge
+
+
+def test_cli_push_nao_auto_rebaixa_pr_e_merge(cfg, tmp_path):
+    root = project(tmp_path, "kaizenflow")
+    args = ["--project", "kaizenflow", "--slug", "a", "--priority", "P2", "--root", str(root), "--push", "pergunta"]
+    assert sp_new.main(args) == 0
+    text = _unico(root, "kaizenflow")
+    assert "push: pergunta\n" in text and "pr: nunca\n" in text and "merge: nunca\n" in text
+
+
+def test_cli_merge_explicito_invalido_rc1(cfg, tmp_path, capsys):
+    root = project(tmp_path, "atlas")
+    args = ["--project", "atlas", "--slug", "a", "--priority", "P2", "--root", str(root), "--merge", "talvez"]
+    assert sp_new.main(args) == 1
+    assert "merge" in capsys.readouterr().err
+
+
+def test_cli_program_herda_defeito_auto_sem_aviso(cfg, tmp_path, capsys):
+    root = project(tmp_path, "atlas")
+    args = ["--project", "atlas", "--program", "prog", "--children", "a,b:a", "--priority", "P2", "--root", str(root)]
+    assert sp_new.main(args) == 0
+    assert "aviso" not in capsys.readouterr().err
+    for p in (root / "atlas/sp/TODO").glob("*.md"):
+        text = p.read_text(encoding="utf-8")
+        assert "\nmodo: auto\n" in text and "commit: auto" in text and "merge: nunca" in text
+
+
+def test_create_ui_e_origem(tmp_path):
+    (tmp_path / "proj").mkdir()
+    p = sp_new.create(tmp_path, "proj", "x", "P2", date(2026, 11, 13), ui=True, origem="veredicto:abc")
+    texto = p.read_text(encoding="utf-8")
+    assert "ui: sim" in texto and "origem: veredicto:abc" in texto and "## Esboço" in texto

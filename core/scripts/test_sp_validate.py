@@ -185,3 +185,49 @@ def test_michi_modelo_e_execucao_invalidos(extra, fragment):
                                    ["kind: program", "execucao:"], ["kind: program", "execucao: sequencial"]])
 def test_michi_modelo_e_execucao_validos_ou_ausentes(extra):
     assert sp_validate.validate(build(extra=extra), "TODO") == []
+
+
+# --- campo merge e gates obrigatórios por data ---
+
+def test_merge_valores_validos_e_invalidos():
+    ok = ["commit: auto", "push: auto", "pr: auto", "merge: auto"]
+    assert sp_validate.validate(build(extra=ok), folder="TODO") == []
+    assert sp_validate.validate(build(extra=["merge: nunca"]), folder="TODO") == []
+    assert any("merge" in e for e in sp_validate.validate(build(extra=["merge: talvez"]), folder="TODO"))
+
+
+def test_merge_auto_exige_pr_auto():
+    errs = sp_validate.validate(build(extra=["commit: auto", "push: auto", "pr: nunca", "merge: auto"]), folder="TODO")
+    assert any("merge auto exige pr auto" in e for e in errs)
+
+
+def _novo(modo="auto", extra=(), data="2026-11-13", decisoes=True):
+    texto = build(modo=modo, extra=extra).replace("date: 2026-10-18", f"date: {data}")
+    return texto + "\n## Decisões\n- decisão do grill\n" if decisoes and data >= "2026-11-13" else texto
+
+
+def test_auto_sem_gates_a_partir_de_2026_11_13_e_erro():
+    assert any("gates" in e for e in sp_validate.validate(_novo(), folder="TODO"))
+
+
+def test_auto_com_gates_a_partir_de_2026_11_13_e_valido():
+    assert sp_validate.validate(_novo(extra=GATES), folder="TODO") == []
+
+
+def test_auto_antigo_sem_gates_mantem_so_aviso():
+    antigo = _novo(data="2026-11-12")
+    assert sp_validate.validate(antigo, folder="TODO") == []
+    assert sp_validate.warnings(antigo)
+
+
+def test_manual_novo_sem_gates_e_erro_desde_o_portao():
+    assert any("gates" in e for e in sp_validate.validate(_novo(modo="manual"), folder="TODO"))
+
+
+def test_manual_antigo_sem_gates_nunca_e_erro():
+    assert sp_validate.validate(_novo(modo="manual", data="2026-11-12"), folder="TODO") == []
+
+
+def test_programa_auto_sem_gates_esta_isento():
+    prog = _novo(extra=["kind: program", "children:", "  - slug: a", "    depends_on: []", "    state: TODO"])
+    assert not any("gates" in e for e in sp_validate.validate(prog, folder="TODO"))

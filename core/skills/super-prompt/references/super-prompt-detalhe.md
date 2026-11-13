@@ -5,8 +5,8 @@
 | Flag | Preenche | Pergunta do grill |
 |---|---|---|
 | `--project`, `--slug`, `--priority P1\|P2\|P3` | frontmatter | prioridade (default P3) |
-| `--modo auto\|manual` | `modo:` (michi não repete a pergunta de arranque) | modo do michi (default manual) |
-| `--commit`, `--push`, `--pr auto\|pergunta\|nunca` | `commit:`/`push:`/`pr:` | autorizações, uma pergunta agrupada (conservador: `pergunta`; `nunca` para push/PR; valores em `michi-modo-auto.md` §Autorizações do SP) |
+| `--modo auto\|manual` | `modo:` (michi não repete a pergunta de arranque) | não perguntar: defeito `auto`; `--modo manual` só se o user pedir |
+| `--commit`, `--push`, `--pr auto\|pergunta\|nunca` | `commit:`/`push:`/`pr:` | não perguntar: defeito por destino (`michi-modo-auto.md` §Autorizações do SP); flag só para desviar |
 | `--restricoes "<texto>"` | `restricoes:` | pastas intocáveis, repos, ações externas |
 | `--perfil cauteloso\|normal\|autonomo` + `--max-tentativas/--max-requests/--parar-se` | perfil e limites | recomendado `normal`; `autonomo` só com gates (`michi/references/michi-perfis.md`) |
 | `--escopo a/**,b.py`, `--fora-de-escopo x/**` | `escopo:`/`fora_de_escopo:` | derivar de «Relevant files»; sem `escopo` o hook não guarda nada |
@@ -14,7 +14,7 @@
 | `--permitir "<cmd>"` (repetível) | comandos pré-aprovados | `michi-modo-auto.md` §Autorizações do SP |
 | `--decisao "<texto>"` (repetível) | `## Decisões` | decisões do grill, uma por flag |
 | `--parent <slug>`, `--depends-on <slug> ...` | `parent:`/`depends_on:` | só em SP filho |
-| `--program <slug> --children a,b:a,c:a+b` | SP-mãe (`kind: program`) + filhos | escalão grande/médio; `b:a` = b depende de a; filho de prova/fecho depende de todos os irmãos (`prova:a+b+c`), senão a fila elege-o primeiro; `--modo auto --commit auto` vai à mãe e aos filhos (sem `--modo auto` há aviso: a fila pára a cada commit) |
+| `--program <slug> --children a,b:a,c:a+b` | SP-mãe (`kind: program`) + filhos | escalão grande/médio; `b:a` = b depende de a; filho de prova/fecho depende de todos os irmãos (`prova:a+b+c`), senão a fila elege-o primeiro; modo e autorizações do destino vão à mãe e aos filhos |
 | `--root` | raiz alternativa | testes |
 
 `sp-validate.py` recusa os comandos irreversíveis (lista em `michi-modo-auto.md`).

@@ -6,7 +6,7 @@ Recusa slug já existente no projeto (em qualquer pasta) e projeto inexistente.
 Nunca faz commit.
 
 Uso:
-  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--michi simples|default|complexo] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--parent <slug>] [--depends-on <slug> ...]
+  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--michi simples|default|complexo] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--ui] [--origem <veredicto:id|pentest:slug>] [--parent <slug>] [--depends-on <slug> ...]
   python -I scripts/sp-new.py --project <nome> --program <slug> --children a,b@complexo:a,c:a+b --priority P1|P2|P3
 
 `--parent <mãe>` exige que a mãe seja `kind: program` e acrescenta o filho a `children:` dela (depends_on, `state: TODO`, sem duplicar).
@@ -21,11 +21,13 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_config  # noqa: E402
 import kaizen_engine  # noqa: E402
 import kf_git  # noqa: E402
 
 
 NIVEIS = ("simples", "default", "complexo")
+CONFIG_REPO = Path(__file__).resolve().parent.parent  # raiz com kaizen.config.json (testes fazem monkeypatch)
 
 
 def _modelo_sp_autor():
@@ -73,9 +75,29 @@ class SpNewError(Exception):
     pass
 
 
+def autorizacoes_por_destino(project):
+    """Autorizações por defeito (commit/push/pr/merge) do destino do `project`, da tabela de kaizen_config."""
+    return kaizen_config.autorizacoes(CONFIG_REPO, project)
+
+
+def resolver_auth(project, auth):
+    """Defeito do destino + flags explícitas (ganham); derivados incompatíveis são rebaixados (push≠auto ⇒ pr nunca ⇒ merge nunca)."""
+    explicit = {k: v for k, v in (auth or {}).items() if v is not None}
+    out = {**autorizacoes_por_destino(project), **explicit}
+    if "push" not in explicit and out.get("commit") == "nunca":
+        out["push"] = "nunca"
+    if "pr" not in explicit and out["push"] != "auto":
+        out["pr"] = "nunca"
+    if "merge" not in explicit and out["pr"] != "auto":
+        out["merge"] = "nunca"
+    return out
+
+
 def check_auth(auth):
     """`auth`: dict opcional commit/push/pr/restricoes; valida valores e dependências."""
     auth = {k: v for k, v in (auth or {}).items() if v is not None}
+    if "merge" in auth and auth["merge"] not in ("auto", "nunca"):
+        raise SpNewError(f"merge inválido '{auth['merge']}' (auto|nunca)")
     for key in ("commit", "push", "pr"):
         if key in auth and auth[key] not in AUTH_VALUES:
             raise SpNewError(f"{key} inválido '{auth[key]}' ({'|'.join(AUTH_VALUES)})")
@@ -85,6 +107,8 @@ def check_auth(auth):
         raise SpNewError("push auto exige commit ≠ nunca")
     if auth.get("pr") == "auto" and auth.get("push") != "auto":
         raise SpNewError("pr auto exige push auto")
+    if auth.get("merge") == "auto" and auth.get("pr") != "auto":
+        raise SpNewError("merge auto exige pr auto")
     return auth
 
 
@@ -164,7 +188,7 @@ def check_permitir(permitir):
             raise SpNewError(f"permitir proibido ({sp_gates.forbidden(cmd)}): {cmd}")
 
 
-def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None, perfil=None, escopo=(), fora_de_escopo=(), permitir=(), decisoes=(), michi="default", programa=False):
+def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None, perfil=None, escopo=(), fora_de_escopo=(), permitir=(), decisoes=(), michi="default", programa=False, ui=False, origem=None):
     root = Path(root)
     check(root, project, slug, priority, modo)
     if michi not in NIVEIS:
@@ -182,7 +206,7 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
     ]
     if programa:
         head.append("execucao:")
-    head += [f"{k}: {auth[k]}" for k in ("commit", "push", "pr", "restricoes") if k in auth]
+    head += [f"{k}: {auth[k]}" for k in ("commit", "push", "pr", "merge", "restricoes") if k in auth]
     head += [f"{k}: {perfil[k]}" for k in ("perfil", "max_tentativas", "max_requests") if k in perfil]
     if "parar_se" in perfil:
         head.append(f"parar_se: [{', '.join(perfil['parar_se'])}]")
@@ -198,6 +222,10 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
     if prova is not None:
         head.append(f"prova: {prova.strip()}")
     head += extra
+    if ui:
+        head.append("ui: sim")
+    if origem:
+        head.append(f"origem: {origem.strip()}")
     if parent:
         head.append(f"parent: {parent}")
     if depends_on:
@@ -208,7 +236,9 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
         body += [f"## {title}", "", ""]
     if decisoes:
         body += ["## Decisões", ""] + [f"- {d.strip()}" for d in decisoes] + [""]
-    path = root / project / "sp" / "TODO" / f"{slug}.md"
+    if ui:
+        body += ["## Esboço", "", "(ASCII ou mermaid do ecrã; o resumo mostra-o)", ""]
+    path =root / project / "sp" / "TODO" / f"{slug}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(head + body), encoding="utf-8")
     sp_list.sp_indice.invalidar()  # mtime de pasta é grosseiro no Windows: sem isto o slug novo fica fora da cache
@@ -321,16 +351,19 @@ def main(argv=None):
     ap.add_argument("--ficheiros", type=int, help="tamanho estimado: ficheiros a tocar (sp-escalao)")
     ap.add_argument("--horas", type=float, help="tamanho estimado: horas (sp-escalao)")
     ap.add_argument("--risco", choices=("baixo", "medio", "alto"), default="baixo", help="risco para o escalão (defeito baixo)")
-    ap.add_argument("--modo", default="manual", help="modo do michi: auto|manual (defeito manual)")
+    ap.add_argument("--modo", default="auto", help="modo do michi: auto|manual (defeito auto)")
     ap.add_argument("--michi", default="default", help="nível do modelo do michi: simples|default|complexo (defeito default)")
-    ap.add_argument("--commit", help="commit: auto|pergunta|nunca")
+    ap.add_argument("--commit", help="commit: auto|pergunta|nunca (defeito do destino)")
     ap.add_argument("--push", help="push: auto|pergunta|nunca")
     ap.add_argument("--pr", help="pr: auto|pergunta|nunca")
+    ap.add_argument("--merge", help="merge do PR: auto|nunca (defeito do destino)")
     ap.add_argument("--restricoes", help="restrições extra do SP (uma linha)")
     ap.add_argument("--gate", action="append", default=[], help="gate executável (repetível), corrido por sp-gates.py")
     ap.add_argument("--prova", help="comando ou critério verificável da prova")
     ap.add_argument("--permitir", action="append", default=[], help="comando pré-aprovado (repetível; irreversíveis são recusados)")
     ap.add_argument("--decisao", action="append", default=[], help="decisão do grill (repetível), vai para ## Decisões")
+    ap.add_argument("--ui", action="store_true", help="SP com UI: grava ui: sim e a secção ## Esboço (obrigatória)")
+    ap.add_argument("--origem", help="origem do SP (veredicto:<id> ou pentest:<slug>): fica aprovado pela origem, sem grill")
     ap.add_argument("--perfil", help="perfil de execução: cauteloso|normal|autonomo")
     ap.add_argument("--max-tentativas", type=int, help="tentativas por gate (override do perfil)")
     ap.add_argument("--max-requests", type=int, help="máximo de pedidos (override do perfil)")
@@ -352,12 +385,13 @@ def main(argv=None):
             print(f"aviso: escalão {escalao}; considera --program com --children: "
                   f"{sp_escalao.comando(escalao, args.project, args.slug or 'slug', args.priority or 'P2')}", file=sys.stderr)
     args.priority = args.priority or "P2"
-    auth = {"commit": args.commit, "push": args.push, "pr": args.pr, "restricoes": args.restricoes}
+    auth = {"commit": args.commit, "push": args.push, "pr": args.pr, "merge": args.merge, "restricoes": args.restricoes}
     perfil = {"perfil": args.perfil, "max_tentativas": args.max_tentativas, "max_requests": args.max_requests,
               "parar_se": [x.strip() for x in args.parar_se.split(",") if x.strip()] if args.parar_se else None}
     today = date.today()
     fs = lambda n: full_slug(args.project, n, today)  # noqa: E731
     try:
+        auth = resolver_auth(args.project, auth)
         if args.program:
             if not args.children:
                 raise SpNewError("--program exige --children")
@@ -376,7 +410,7 @@ def main(argv=None):
                 print(f"aviso: ramo {atras} commits atrás de master; git merge master", file=sys.stderr)
             check_master(args.project, args.slug, master_paths)
             check_links(args.root, args.project, args.parent, args.depends_on)
-            path = create(args.root, args.project, args.slug, args.priority, today, args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao, michi=args.michi)
+            path = create(args.root, args.project, args.slug, args.priority, today, args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao, michi=args.michi, ui=args.ui, origem=args.origem)
             if args.parent:
                 link_parent(args.root, args.project, args.parent, args.slug, args.depends_on)
             print(path)

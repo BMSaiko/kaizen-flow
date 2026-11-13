@@ -7,7 +7,7 @@ Idade = dias desde `updated` (fallback `created`). P3->P2 aos 14 dias, P2->P1 ao
 Uso:
   python -I scripts/sp-envelhecer.py              # dry-run (lista as subidas)
   python -I scripts/sp-envelhecer.py --apply      # escreve
-  python -I scripts/sp-envelhecer.py --hook       # SessionStart: --apply, no máximo 1x/dia (selo)
+  python -I scripts/sp-envelhecer.py --hook       # SessionStart: --apply + commit/push autónomo, 1x/dia (selo)
 rc: 0
 """
 import argparse
@@ -60,6 +60,15 @@ def apply(sp, new, base):
     sp_indice.invalidar()
 
 
+def _auto_commit():
+    """Módulo auto_commit, ou None (o pacote kaizen-flow não o inclui: sem commit automático)."""
+    try:
+        import auto_commit
+    except ImportError:
+        return None
+    return auto_commit
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--apply", action="store_true")
@@ -78,6 +87,13 @@ def main(argv=None):
         print(f"{sp.slug}: {old} -> {new} ({age}d parado)")
         if args.apply:
             apply(sp, new, base)
+    if args.hook and rows and _auto_commit():
+        auto_commit = _auto_commit()
+        rel = [str(sp.path.resolve().relative_to(REPO)).replace("\\", "/") for sp, *_ in rows
+               if sp.path.resolve().is_relative_to(REPO)]
+        msg = auto_commit.commit_push(rel, "vault: envelhece prioridade de %d SP(s)" % len(rel))
+        if msg:
+            print(msg)
     if not rows:
         print("nada a subir")
     if args.hook:

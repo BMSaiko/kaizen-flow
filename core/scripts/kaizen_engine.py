@@ -87,10 +87,10 @@ def parse_permitir(value):
 def precisa_perguntar(fm, acao):
     """True se `acao` ainda exige pergunta ao utilizador.
 
-    `acao` = commit|push|pr (só `auto` dispensa) ou um comando (só dispensa se estiver em
+    `acao` = commit|push|pr|merge (só `auto` dispensa) ou um comando (só dispensa se estiver em
     `permitir` e não for irreversível: o que `sp-gates.forbidden` apanha pergunta sempre).
     """
-    if acao in ("commit", "push", "pr"):
+    if acao in ("commit", "push", "pr", "merge"):
         return fm.get(acao) != "auto"
     cmd = acao.strip()
     if load("sp-gates").forbidden(cmd):
