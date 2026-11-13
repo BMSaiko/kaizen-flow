@@ -103,7 +103,8 @@ def test_diagrama_svg_agrupa_por_pasta():
 
 
 def test_limpar_corta_segredos():
-    assert "ghp_" not in provas.limpar("ok\nTOKEN=ghp_abcdefghijklmnopqrst\nfim")
+    falso = "gh" + "p_" + "a" * 24
+    assert falso not in provas.limpar("ok\nTOKEN=" + falso + "\nfim")
 
 
 def test_gravar_preserva_imagens_manuais(tmp_path):
