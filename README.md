@@ -139,6 +139,7 @@ If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the blo
 | Doc | Contents |
 |---|---|
 | [Use cases](docs/use-cases.md) | "I want to..." recipes for install, usage, stories and handoff |
+| [Term keys](docs/term.md) | Optional WezTerm shortcuts for `kaizen term` (menu and F2 table) |
 | [Commands](docs/commands.md) | every `kaizen` command, option and workflow script |
 | [Agent commands](docs/agent-commands.md) | `/sp`, `/michi`, `/sp-handoff`, `/sp-fila`, `/pentest`, `/review-ciclo`, `/pr-fase` and the michi cycle |
 | [Tests](docs/testes.md) | `npm test`, test-command detection in `init`, the michi test phase (`sp-gates --testes`), CI and coverage |
