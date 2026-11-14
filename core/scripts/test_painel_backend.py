@@ -269,3 +269,10 @@ def test_background_limpa_registos_mortos_antigos(tmp_path):
     os.utime(velho, (1.0, 1.0))
     b._limpar()
     assert not velho.exists() and not (tmp_path / "999999.log").exists()
+
+
+def test_tmux_foco_so_em_painel_existente():
+    chamadas = []
+    b = pb.TmuxBackend(_run(lambda a: "%4" + chr(9) + "/w" + chr(10), chamadas))
+    assert b.foco("%4") is True and ["tmux", "select-pane", "-t", "%4"] in chamadas
+    assert b.foco("%1") is False

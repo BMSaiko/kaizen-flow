@@ -101,6 +101,10 @@ class Backend(abc.ABC):
         """{id: título} dos painéis com título posto. Defeito: {}."""
         return {}
 
+    def foco(self, id):
+        """Põe o foco no painel (o utilizador vai escrever nele); True se pôs. Defeito: False."""
+        return False
+
 
 class _Multiplexer(Backend):
     def __init__(self, run=run_hidden):
@@ -150,6 +154,10 @@ class WeztermBackend(_Multiplexer):
     def titulos(self):
         return {str(p["pane_id"]): p["tab_title"] for p in self._lista() if p.get("tab_title")}
 
+    def foco(self, id):
+        self.run(["wezterm", "cli", "activate-pane", "--pane-id", str(id)], capture_output=True, text=True, encoding="utf-8")
+        return True
+
     def fechar(self, id):
         if str(id) not in self.listar():
             return False
@@ -184,6 +192,12 @@ class TmuxBackend(_Multiplexer):
             if id_:
                 painéis[id_] = cwd or None
         return painéis
+
+    def foco(self, id):
+        if str(id) not in self.listar():
+            return False
+        self.run(["tmux", "select-pane", "-t", str(id)], capture_output=True, text=True)
+        return True
 
     def fechar(self, id):
         if str(id) not in self.listar():
