@@ -35,13 +35,13 @@ def slug_de(sp):
     return Path(sp).stem
 
 
-def chave(slug):
+def chave(slug, rotulo=PAPEL):
     """Nome no estado das filas (não colide com o michi do mesmo SP)."""
-    return f"{PAPEL}-{slug}"
+    return f"{rotulo}-{slug}"
 
 
-def titulo(slug):
-    return f"{PAPEL} {slug}"
+def titulo(slug, rotulo=PAPEL):
+    return f"{rotulo} {slug}"
 
 
 def comando(path=None):
@@ -75,15 +75,15 @@ def _fila(root):
     return pe.criar_fila(FILA, root=root)
 
 
-def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sleep):
-    """Abre o painel; devolve {estado: a-correr|pendente|falhou, chave, pane, modelo, msg}."""
+def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sleep, rotulo=PAPEL, prompt_fn=None, foco=False):
+    """Abre o painel (`rotulo` dá chave e título; `prompt_fn(sp, semente)` substitui o prompt do sp-autor; `foco` ativa-o); devolve {estado: a-correr|pendente|falhou, chave, pane, modelo, msg}."""
     sp, semente = Path(sp), Path(semente)
     if not sp.is_file():
         raise SpAutorErro(f"SP inexistente: {sp}")
     if not semente.is_file():
         raise SpAutorErro(f"semente inexistente: {semente}")
     cmd = comando()
-    k, modelo = chave(slug_de(sp)), cmd[2]
+    k, modelo = chave(slug_de(sp), rotulo), cmd[2]
     res = {"estado": None, "chave": k, "pane": None, "modelo": modelo, "msg": None}
     fila = _fila(estado_root)
     pe.registar(fila, k, root=estado_root, modelo=modelo, worktree=str(cwd))
@@ -94,8 +94,10 @@ def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sle
         pane = backend.abrir(cmd, str(cwd))
         f = getattr(backend, "titulo", None)
         if f:
-            f(pane, titulo(slug_de(sp)))
-        enviar_prompt(backend, pane, prompt(sp, semente), run, sleep)
+            f(pane, titulo(slug_de(sp), rotulo))
+        enviar_prompt(backend, pane, (prompt_fn or prompt)(sp, semente), run, sleep)
+        if foco and getattr(backend, "foco", None):
+            backend.foco(pane)
         pe.registar(fila, k, root=estado_root, pane=str(pane))
     except Exception as e:  # noqa: BLE001 — liberta a vaga e fecha o que abriu
         msg = f"erro a lançar {k}: {e}"
