@@ -95,6 +95,8 @@ def _estado_de(dados, slug):
 
 
 def _provas(caminho, slug):
+    if not SLUG.match(slug):
+        raise ValueError("slug inválido")
     pasta = Path(caminho).parent.parent / "proofs" / slug
     try:
         d = json.loads((pasta / "provas.json").read_text(encoding="utf-8"))
