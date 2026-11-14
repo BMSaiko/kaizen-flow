@@ -2,6 +2,9 @@
 
 Só no ramo master; só os caminhos pedidos (git commit -- paths, não toca no resto do stage);
 push sem force; nunca levanta: devolve uma linha de estado.
+
+Uso: módulo importado pelos hooks (`from auto_commit import ...`), não tem CLI.
+rc: n/a (biblioteca; as funções devolvem uma linha de estado)
 """
 import subprocess
 from pathlib import Path
