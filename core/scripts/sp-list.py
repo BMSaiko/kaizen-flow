@@ -389,8 +389,14 @@ def main(argv=None):
     ap.add_argument("--tree", action="store_true", help="(predefinido) agrupa os filhos sob o SP-mãe")
     ap.add_argument("--tipo", choices=("sp",) + doc_ops.TYPES, default="sp", help="sp (predefinido) | dr | dp: lista DRs/DPs por estado")
     ap.add_argument("--sem-envelhecer", action="store_true", help="não mostra as subidas de prioridade pendentes (sp-envelhecer em dry-run)")
+    ap.add_argument("--por-rever", action="store_true", help="SPs fechados por rever (veredicto em falta; ver /rever)")
     ap.add_argument("--root", default=None, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    if args.por_rever:
+        import sp_carregar
+        sr = sp_carregar.carregar(Path(__file__).resolve().parent / "sp-rever.py", "sp_rever", registar=False)
+        sr.listar(sr.por_rever())
+        return 0
     explicit_root = args.root is not None
     if args.tipo != "sp":
         return doc_ops.listar(args.root or doc_ops.DEFAULT_ROOT, args.tipo, args.all)
