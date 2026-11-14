@@ -9,7 +9,7 @@ license: MIT
 
 **Fluxo:** dr → grill → dp → da → gates → pentest → review → pr → report → reflect → commit. **Regras duras:** sem auto-commit/push; prova e reflect por fase. O detalhe vive nas skills de fase e em `references/` (índice: `michi-orquestracao.md`).
 
-**Help:** `/michi help|-h|?` responde só com a Usage e pára. Uso: `/michi [--auto] [<idea>|<SP>]`, `skip <fase>`, `go to DA`. Suplementar: `references/michi-help.md`.
+**Help:** `/michi help|-h|?` responde só com a Usage e pára. Uso: `/michi [--auto] [<idea>|<SP>]`, `skip <fase>`, `go to DA` (`references/michi-help.md`).
 
 ## Fases
 
@@ -27,7 +27,7 @@ license: MIT
 | 10 | Reflect | `/reflect final` | A/B/C proposto; o user aplica | user |
 | 11 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | user |
 
-Sem `Agent`: fases na sessão principal; outra sessão = painel WezTerm (`michi-orquestracao.md` §Painéis).
+Sem `Agent`: fases na sessão principal; outra sessão = painel WezTerm (`michi-orquestracao.md`).
 
 Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_requests`, go/no-go em Decisões; `references/michi-spike.md`.
 
@@ -55,8 +55,8 @@ Hooks (`michi.<phase.start|phase.end|gate.failed|commit|closed>`), sessão suja,
 
 ## Style e Pitfalls
 
-`references/michi-style.md` e `michi-pitfalls.md` (índice `michi-pitfalls-index.md`): ler só a relevante.
+`references/michi-style.md` e `michi-pitfalls.md` (índice `michi-pitfalls-index.md`): só a relevante.
 
 ## See also
 
-`reflect` · `references/michi-skip-grill-play.md` · `knowledge/infra/skills/{self-improvement-loop,learn-from-session}/` · `scripts/skill-cut.py`
+`reflect` · `references/michi-skip-grill-play.md` · `scripts/skill-cut.py`

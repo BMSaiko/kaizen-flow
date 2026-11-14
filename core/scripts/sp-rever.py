@@ -21,7 +21,10 @@ from datetime import date
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-RAIZ = REPO / "knowledge" / "projects" / "kaizen"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaizen_config  # noqa: E402
+
+RAIZ = kaizen_config.sp_root(REPO)
 ESTADO = Path.home() / ".claude" / "sp-revisao.json"
 DESDE = "2026-11-13"
 OCIOSO = 15 * 60
