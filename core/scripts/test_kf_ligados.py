@@ -37,6 +37,7 @@ def cenario(tmp_path):
                "--priority", "P3", "--gate", gate)[0] == 0
     f = next((vault / PROJECT / "sp" / "TODO").glob("*s1-*.md"))
     f.write_text(re.sub(r"(## \d\. [^\n]*\n)\n+", rf"\1\n{FILL}\n\n", f.read_text(encoding="utf-8")), encoding="utf-8")
+    f.write_text(f.read_text(encoding="utf-8") + "\n## Docs\nDocs: skip — fixture\n", encoding="utf-8")
     assert run("sp-move.py", "--root", str(vault), "--project", PROJECT, f.stem, "doing")[0] == 0
     return tmp_path
 

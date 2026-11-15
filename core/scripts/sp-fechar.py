@@ -2,7 +2,7 @@
 """Fecha um SP numa só chamada: gates -> context-budget -> sp-move done -> COMMIT_*.md.
 
 Pára sem mover o SP se um gate (ou o orçamento de contexto) falhar. Sem gates declarados corre
-`test-fast.py fast`; bloqueia (RC 1) se faltar `## Prova de done` ou `## Reflect`, salvo `--sem-prova "motivo"` (fica registado no SP). Nunca faz commit nem push.
+`test-fast.py fast`; bloqueia (RC 1) se faltar `## Prova de done` ou `## Reflect`, salvo `--sem-prova "motivo"` (fica registado no SP). Bloqueia também (RC 1, sem dispensa) se faltar a fase Docs: `## Docs` não vazia, `Docs: <resumo>` na prova, ou `Docs: skip — <motivo>`. Nunca faz commit nem push.
 O COMMIT_*.md lista o stage explícito (um `git add` por caminho, sem o próprio COMMIT_*.md).
 
 Uso:
@@ -119,6 +119,21 @@ def avisos(sp_text):
     if not re.search(r"^Reflect \S", body("Reflect"), re.M):
         out.append("FALTA: sem linhas 'Reflect <fase>:' no SP (correr /reflect fase|final)")
     return out
+
+
+def falta_docs(sp_text):
+    """Lista de faltas (vazia = ok) da fase Docs. Aceita `## Docs` não vazia, `Docs: <algo>` na
+    `## Prova de done`, ou `Docs: skip — <motivo>` com motivo. `Docs: skip` sem motivo não conta."""
+    def body(title):
+        m = re.search(rf"^## {title}[^\n]*\n(.*?)(?=^## |\Z)", sp_text, re.S | re.M)
+        return m.group(1) if m else ""
+    skip = re.search(r"^Docs:\s*skip\b(.*)$", body("Prova de done"), re.M | re.I)
+    if skip:
+        motivo = skip.group(1).strip(" \t—–-:")
+        return [] if motivo else ["FALTA: 'Docs: skip' sem motivo (escrever 'Docs: skip — <motivo>')"]
+    if body("Docs").strip() or re.search(r"^Docs:\s*\S", body("Prova de done"), re.M):
+        return []
+    return ["FALTA: sem prova da fase Docs (registar '## Docs' ou 'Docs: skip — <motivo>')"]
 
 
 def registar_dispensa(path, motivo):
@@ -250,6 +265,9 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
         lines.append(text)
         if rc:
             return 1, lines + [f"{slug}: test-fast vermelho, SP continua em Doing"]
+    docs = falta_docs(sp.path.read_text(encoding="utf-8"))
+    if docs:  # --sem-prova não dispensa Docs
+        return 1, lines + docs + [f"{slug}: SP continua em Doing (registar a fase Docs; --sem-prova não a dispensa)"]
     faltas = avisos(sp.path.read_text(encoding="utf-8"))
     if faltas and not sem_prova:
         return 1, lines + faltas + [f"{slug}: sem prova/reflect, SP continua em Doing (registar, ou --sem-prova \"motivo\")"]

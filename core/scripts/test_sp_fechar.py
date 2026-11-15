@@ -34,12 +34,15 @@ def novo(root, slug, *extra):
                "--priority", "P3", *extra)
 
 
-def novo_doing(root, slug, gate_cmd):
+DOCS_OK = "## Docs\n\nREADME e MOC atualizados\n"
+
+
+def novo_doing(root, slug, gate_cmd, docs=DOCS_OK):
     vault = root / "vault"
     assert novo(root, slug, "--gate", gate_cmd)[0] == 0
     f = next((vault / PROJECT / "sp" / "TODO").glob(f"{slug}.md"))
     text = re.sub(r"(## \d\. [^\n]*\n)\n+", rf"\1\n{FILL}\n\n", f.read_text(encoding="utf-8"))
-    f.write_text(text, encoding="utf-8")
+    f.write_text(text + ("\n" + docs if docs else ""), encoding="utf-8")
     assert run("sp-move.py", "--root", str(vault), "--project", PROJECT, slug, "doing")[0] == 0
 
 
@@ -72,7 +75,7 @@ def test_sp_completo_fecha_sem_dispensa(root):
     txt = f.read_text(encoding="utf-8")
     for sec in ("Prova de done", "Reflect"):
         txt = re.sub(rf"^## {sec}[^\n]*\n.*?(?=^## |\Z)", "", txt, flags=re.S | re.M)
-    txt += "\n## Prova de done\n\nfast 2 s\n\n## Reflect\n\nReflect final: sem patch\n"
+    txt += "\n## Prova de done\n\nfast 2 s\n\n## Reflect\n\nReflect final: sem patch\n\n" + DOCS_OK
     f.write_text(txt, encoding="utf-8")
     rc, out, err = fechar(root, fs("completo"), dispensa=False)
     assert rc == 0, out + err
@@ -206,7 +209,7 @@ def test_guarda_fecho_filho_anuncia_seguinte(tmp_path):
     """Guarda: fechar um filho (sem --next) nunca omite PRÓXIMO FILHO / ÚLTIMO FILHO."""
     _prog(tmp_path, {"mae": "TODO", "a": "Doing", "b": "TODO", "c": "TODO"})
     sp = tmp_path / PROJECT / "sp" / "Doing" / "a-2026-11-01.md"
-    sp.write_text(sp.read_text(encoding="utf-8") + "\n## Prova de done\nok\n\n## Reflect\nReflect final: sem patch\n", encoding="utf-8")
+    sp.write_text(sp.read_text(encoding="utf-8") + "\n## Prova de done\nok\n\n## Reflect\nReflect final: sem patch\n\n" + DOCS_OK, encoding="utf-8")
     rc, out, err = run("sp-fechar.py", "--root", str(tmp_path), "--project", PROJECT, "a",
                        "--sem-budget", "--sem-testes", "--sem-commit")
     assert rc == 0, err
@@ -250,3 +253,55 @@ def test_seguinte_em_fila_so_reporta_sem_proximo_filho(tmp_path):
     _prog(tmp_path, {"mae": "TODO", "a": "Done", "b": "TODO"})
     out = _mod().seguinte(tmp_path, "a", PROJECT, fila=True)
     assert out.startswith("FILA:") and "PRÓXIMO FILHO" not in out and "sp-handoff" not in out
+
+
+# --- fase Docs ---
+OK_CMD = f'"{sys.executable}" -c "import sys; sys.exit(0)"'
+
+
+def _doing(root, slug):
+    return bool(list((root / "vault" / PROJECT / "sp" / "Doing").glob(f"{slug}.md")))
+
+
+def _completo(root, nome, docs, prova_extra=""):
+    """SP com prova e reflect completos; `docs` vai como secção, `prova_extra` dentro da prova."""
+    slug = fs(nome)
+    novo_doing(root, slug, OK_CMD, docs=docs)
+    f = next((root / "vault" / PROJECT / "sp" / "Doing").glob(f"{slug}.md"))
+    f.write_text(f.read_text(encoding="utf-8")
+                 + f"\n## Prova de done\n\nfast 2 s\n{prova_extra}\n## Reflect\n\nReflect final: sem patch\n",
+                 encoding="utf-8")
+    return slug, fechar(root, slug, dispensa=False)
+
+
+def test_docs_falta_bloqueia(root):
+    slug, (rc, out, err) = _completo(root, "docsfalta", docs=None)
+    assert rc == 1 and "Docs" in out + err and _doing(root, slug)
+
+
+def test_docs_secao_fecha(root):
+    slug, (rc, out, err) = _completo(root, "docssecao", docs=DOCS_OK)
+    assert rc == 0, out + err
+    assert not _doing(root, slug)
+
+
+def test_docs_linha_na_prova_fecha(root):
+    slug, (rc, out, err) = _completo(root, "docslinha", docs=None, prova_extra="Docs: README atualizado\n")
+    assert rc == 0, out + err
+
+
+def test_docs_skip_com_motivo_fecha(root):
+    slug, (rc, out, err) = _completo(root, "docsskip", docs=None, prova_extra="Docs: skip — só código interno\n")
+    assert rc == 0, out + err
+
+
+def test_docs_skip_sem_motivo_bloqueia(root):
+    slug, (rc, out, err) = _completo(root, "docsskipv", docs=None, prova_extra="Docs: skip — \n")
+    assert rc == 1 and _doing(root, slug)
+
+
+def test_sem_prova_nao_dispensa_docs(root):
+    slug = fs("semdocs")
+    novo_doing(root, slug, OK_CMD, docs=None)
+    rc, out, err = fechar(root, slug)  # com --sem-prova "teste"
+    assert rc == 1 and "Docs" in out + err and _doing(root, slug)

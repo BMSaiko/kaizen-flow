@@ -40,6 +40,7 @@ Fazer a coisa certa.
 ## Prova de done
 Correu o gate e passou.
 Segunda linha de prova.
+Docs: skip — fixture
 """
 
 

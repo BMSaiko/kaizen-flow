@@ -36,6 +36,10 @@ Regras que saíram do `SKILL.md` sem alteração de contrato. Prova, reflect por
 
 Build/tests/lint/typecheck/e2e aplicáveis; cada comando e RC vão para o report; falha = corrigir a causa e repetir todos, sem `|| true`. Ordem: gates → `/harden` → `/pentest` → `/review-ciclo` (`michi-gates.md`). SP com `gates:`: `python -I scripts/sp-gates.py <SP>` (rc≠0 = não fecha). **Fecho num só passo:** `python -I scripts/sp-fechar.py <slug> [--next]` = gates + context-budget + `done` + `COMMIT_*.md` (pára sem mover se falhar). Antes de `sp-move.py ... done` e do `COMMIT_*.md`: prova de done como cliente final, em `## Prova de done` (se falhar, o SP não passa a Done); E2E de fecho de árvore só quando este SP fecha mãe+filhos+netos (`sp-list.py --tree-closed <slug>`). Detalhe: `michi-fases-detalhe.md` §Fase 5.
 
+## Fase 8 — Docs
+
+Depois da Review e antes do PR: README, MOC e CHANGELOG atualizados, ou `Docs: skip — <motivo>`; prova em `## Docs` (ou linha `Docs:` na prova de done). `sp-fechar.py` bloqueia sem ela e `--sem-prova` não a dispensa. Detalhe: `michi-docs.md`.
+
 ## Painéis
 
 Não há sub-agentes (`Agent`; sítio único da regra no michi, os outros ficheiros só apontam): o michi e todas as fases correm na sessão principal. Outra sessão é sempre um painel WezTerm com `claude` próprio: `/sp-fila` (um painel por SP, vigia `sp-vigia.py`), `sp-autor.py` (preencher um SP) ou `--painel`. Cada painel commita na sua worktree e reporta o estado em ficheiro, nunca por mensagem:

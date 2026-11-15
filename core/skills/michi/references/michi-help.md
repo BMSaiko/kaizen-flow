@@ -8,7 +8,7 @@ If the user instruction is exactly `help`, `--help`, `-h`, or `?`, **stop
 here and reply with the Usage block below — do NOT start the workflow.**
 
 ```
-/michi                                # full workflow (dr → grill → dp → da → gates → report → reflect → commit) — DR before grill: informed questions
+/michi                                # full workflow (dr → grill → dp → da → gates → docs → report → reflect → commit) — DR before grill: informed questions
 /michi <idea>                         # jump in: DR runs first, then grill is informed by repo context
 /michi <idea>                         # jump in with a project idea (grill picks up)
 /michi <SP>                           # `modo: auto|manual` no SP decide sem pergunta; sem o campo nem --auto, pergunta «com/sem auto» no arranque
@@ -20,7 +20,7 @@ here and reply with the Usage block below — do NOT start the workflow.**
 /michi go to DA                       # jump to implementation with the current plan
 ```
 
-Phases: **dr → grill → dp → da → gates → report → reflect → commit-suggest** (DR before grill: read the repo first so grill questions are informed, not generic).
+Phases: **dr → grill → dp → da → gates → docs → report → reflect → commit-suggest** (DR before grill: read the repo first so grill questions are informed, not generic).
 Each phase is a stop point — the user can `/stop` after any step
 and resume with another `/michi …`. See `## Quick reference` below.
 

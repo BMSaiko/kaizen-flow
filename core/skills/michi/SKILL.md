@@ -5,7 +5,7 @@ version: 2.7
 ---
 ## michi — orquestrador do ciclo de projeto
 
-**Fluxo:** dr → grill → dp → da → gates → pentest → review → pr → report → reflect → commit. **Regras duras:** prova e reflect por fase; commit, push e merge só com autorização (§Regras transversais). Detalhe nas skills de fase e em `references/` (índice `michi-orquestracao.md`).
+**Fluxo:** dr → grill → dp → da → gates → pentest → review → docs → pr → report → reflect → commit. **Regras duras:** prova e reflect por fase; commit, push e merge só com autorização (§Regras transversais). Detalhe nas skills de fase e em `references/` (índice `michi-orquestracao.md`).
 
 **Help:** `/michi help|-h|?` responde só com a Usage e pára. Uso: `/michi [--auto] [<idea>|<SP>]`, `skip <fase>`, `go to DA` (`references/michi-help.md`).
 
@@ -20,10 +20,11 @@ version: 2.7
 | 5 | Gates | `sp-gates.py` · `/harden` | cada comando com RC; falha = corrigir e repetir tudo | agente |
 | 6 | Pentest | `/pentest` | sem achados abertos (ou decisão do user) | agente / user |
 | 7 | Review | `/review-ciclo` (`sp-revisor.py`, revisor independente) | APROVADO; ESCALAR após 3 iterações | agente / user |
-| 8 | PR | `/pr-fase` | corpo pela template, respeitando `pr:` | agente |
-| 9 | Report | `/report` (`sp-report.py`) | 5 secções, «Dificuldades» não vazia | agente |
-| 10 | Reflect | `/reflect final` | A/B/C proposto; o user aplica | user |
-| 11 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | user |
+| 8 | Docs | `references/michi-docs.md` | README/MOC/CHANGELOG atualizados ou skip justificado; prova em `## Docs` | agente |
+| 9 | PR | `/pr-fase` | corpo pela template, respeitando `pr:` | agente |
+| 10 | Report | `/report` (`sp-report.py`) | 5 secções, «Dificuldades» não vazia | agente |
+| 11 | Reflect | `/reflect final` | A/B/C proposto; o user aplica | user |
+| 12 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | user |
 
 Sem as skills `/harden`, `/report`, `/reflect` ou `/commit` (vault), o passo faz-se à mão: gates com RC, `sp-report.py`, `## Reflect` do SP, commit com stage explícito.
 

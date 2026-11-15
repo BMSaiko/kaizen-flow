@@ -65,11 +65,11 @@ def save(name, s):
 
 # ---------- michi-cycle
 s = head(1200, 710, "michi cycle",
-         "michi cycle: dr, grill, dp, da, gates, pentest, review-ciclo, pr-fase, report, reflect and commit proposal, with proof per phase, handoff per phase and a kaizen loop.",
+         "michi cycle: dr, grill, dp, da, gates, pentest, review-ciclo, docs, pr-fase, report, reflect and commit proposal, with proof per phase, handoff per phase and a kaizen loop.",
          "michi", "The cycle that executes an SP")
 rows = [(130, [("1 · dr", "blue", "research"), ("2 · grill", "blue", "align"), ("3 · dp", "violet", "TDD-shaped plan"), ("4 · da", "violet", "act, proof per phase")]),
-        (290, [("5 · gates", "amber", "build, tests, lint"), ("6 · pentest", "amber", "diff-local, findings → SPs"), ("7 · review-ciclo", "amber", "fix and review, capped"), ("8 · pr-fase", "amber", "PR from SP + proofs")]),
-        (450, [("9 · report", "green", "what, verified, open"), ("10 · reflect", "green", "patch the workflow"), ("11 · commit", "green", "proposal, never auto"), ("↻ kaizen", "grey", "next cycle is cheaper")])]
+        (290, [("5 · gates", "amber", "build, tests, lint"), ("6 · pentest", "amber", "diff-local, findings → SPs"), ("7 · review-ciclo", "amber", "fix and review, capped"), ("8 · docs", "amber", "README, MOC, CHANGELOG")]),
+        (450, [("9 · pr-fase", "green", "PR from SP + proofs"), ("10 · report", "green", "what, verified, open"), ("11 · reflect", "green", "patch the workflow"), ("12 · commit", "green", "proposal, never auto")])]
 for y, items in rows:
     for i, (t, c, sub) in enumerate(items):
         s += box(xs[i], y, W, H, c, t, sub, dash=(t == "↻ kaizen"))
@@ -77,7 +77,7 @@ for y, items in rows:
             s += arrow(xs[i] + W + 2, y + H // 2, xs[i + 1] - 2)
 s += elbow(1005, 130 + H + 2, 252, 195, 290) + txt(600, 246, "phase done → proof + reflect", 14, "#94a3b8")
 s += elbow(1005, 290 + H + 2, 412, 195, 450) + txt(600, 406, "checks green → report", 14, "#94a3b8")
-s += panel(85, 570, 1030, 100, "grey", "Between phases", ["context guard at 100K → handoff (progress saved in the SP, fresh session) · sp-fechar = gates + done + COMMIT file", "hooks fire on every phase start/end, failed gate, commit and close"], dash=True)
+s += panel(85, 570, 1030, 100, "grey", "Between phases", ["context guard at 100K → handoff (progress saved in the SP, fresh session) · sp-fechar = gates + done + COMMIT file", "hooks fire on every phase start/end, failed gate, commit and close · kaizen: the next cycle is cheaper"], dash=True)
 save("michi-cycle.svg", s)
 
 # ---------- sp-workflow

@@ -26,11 +26,12 @@ Stop after any step, resume later.
 | 3 | Deep planning (`/dp`) | 3-7 TDD-shaped phases, audit table, risks |
 | 4 | Deep acting (`/da`) | implementation phase by phase, with a proof per phase (screenshot, real call, output) saved in `proofs/` |
 | 5 | Gates | build, tests, lint, e2e, plus the `/harden` gate when that skill is installed (not shipped in `core/`); every command and rc recorded; proof of done before the story moves to Done |
-| 6 | Report | what changed, what was verified, real difficulties, what is open; no commit |
-| 7 | Reflect | friction found and a proposed fix to the workflow itself; you apply it |
-| 8 | Commit proposal | one conventional message; nothing is committed or pushed until you confirm |
+| 6 | Docs | README, MOC and CHANGELOG updated, or `Docs: skip — <reason>`; proof in `## Docs`; `sp-fechar.py` blocks without it |
+| 7 | Report | what changed, what was verified, real difficulties, what is open; no commit |
+| 8 | Reflect | friction found and a proposed fix to the workflow itself; you apply it |
+| 9 | Commit proposal | one conventional message; nothing is committed or pushed until you confirm |
 
-After the gates, the delivery flow can continue with three optional phases: `/pentest` (security scan of the diff), `/review-ciclo` (fix and review until approved) and `/pr-fase` (open the PR). `skip review` skips the review loop.
+After the gates, the delivery flow can continue with optional phases: `/pentest` (security scan of the diff), `/review-ciclo` (fix and review until approved) and `/pr-fase` (open the PR). The Docs phase is mandatory before closing the story. `skip review` skips the review loop.
 
 A Super Prompt given as input skips phases 1-2. Say "skip <phase>" or "go to DA" to jump. If you say the work is wrong or broken, michi asks which phase failed and restarts there (default: grill).
 

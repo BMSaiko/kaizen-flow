@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Report da fase 6 do michi, montado só com fontes duráveis do SP. Não faz commit.
+"""Report da fase 10 do michi, montado só com fontes duráveis do SP. Não faz commit.
 
 Secções fixas: Alterado · Verificado · Provas · Dificuldades · Em aberto.
 - Alterado: `git diff --stat` contra a base (por omissão `master`).
@@ -95,7 +95,7 @@ def _git_stat(base: str, cwd=None) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-    ap = argparse.ArgumentParser(description="Report da fase 6 do michi")
+    ap = argparse.ArgumentParser(description="Report da fase 10 do michi")
     ap.add_argument("sp", help="slug ou caminho .md")
     ap.add_argument("--base", default="master")
     ap.add_argument("--gates", action="store_true", help="corre os gates do SP para registar o RC")
