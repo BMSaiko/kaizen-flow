@@ -25,6 +25,28 @@ def test_check_falha_total_e_ficheiro():
     assert len(failures) == 2
 
 
+def test_limites_por_ficheiro_por_defeito():
+    limites = context_budget.FILE_LIMITS
+    assert limites == {"CLAUDE.md": 1024, "AGENTS.md": 7 * 1024, "MEMORY.md": 3584}
+    rows = [(name, limite + 1, "sempre") for name, limite in limites.items()]
+    _, failures = context_budget.check(rows, total_limit=10 ** 6)
+    assert len(failures) == 3
+
+
+def test_main_root_sem_worktree_devolve_a_raiz(tmp_path):
+    (tmp_path / ".git").mkdir()
+    assert context_budget.main_root(tmp_path) == tmp_path
+
+
+def test_main_root_numa_worktree_devolve_o_checkout_principal(tmp_path):
+    principal = tmp_path / "Second-Brain"
+    worktree = tmp_path / "wt"
+    worktree.mkdir()
+    (worktree / ".git").write_text(f"gitdir: {principal.as_posix()}/.git/worktrees/wt\n", encoding="utf-8")
+    assert context_budget.main_root(worktree) == principal
+    assert context_budget.memory_index(worktree) == context_budget.memory_index(principal)
+
+
 def test_collect_mede_ficheiros(tmp_path):
     (tmp_path / "CLAUDE.md").write_bytes(b"x" * 10)
     (tmp_path / "AGENTS.md").write_bytes(b"y" * 20)
