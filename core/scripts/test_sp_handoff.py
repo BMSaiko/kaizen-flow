@@ -559,7 +559,7 @@ def test_launch_recusa_sem_reflect_da_fase(tmp_path, capsys):
 
 def test_launch_aceita_com_reflect_da_fase(tmp_path, capsys):
     sp = _sp_fase(tmp_path, reflect="Reflect da: sem patch")
-    assert sp_handoff.main(["--launch", str(sp), "--auto", "--dry-run", "--pane", "3"]) == 0
+    assert sp_handoff.main(["--launch", str(sp), "--auto", "--dry-run", "--pane", "3", "--backend", "wezterm"]) == 0
     assert "/clear" in capsys.readouterr().out
 
 
