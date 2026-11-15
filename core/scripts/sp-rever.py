@@ -26,7 +26,7 @@ import kaizen_config  # noqa: E402
 
 RAIZ = kaizen_config.sp_root(REPO)
 ESTADO = Path.home() / ".claude" / "sp-revisao.json"
-DESDE = "2026-11-13"
+DESDE = "2026-11-12"
 OCIOSO = 15 * 60
 MAX_CORPO = 16 * 1024
 MAX_TEXTO = 4000

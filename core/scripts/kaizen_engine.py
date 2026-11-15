@@ -84,14 +84,32 @@ def parse_permitir(value):
     return [c.strip() for c in (value or "").split(";") if c.strip()]
 
 
-def precisa_perguntar(fm, acao):
+def _ramo(repo):
+    r = subprocess.run(["git", "-C", str(repo), "rev-parse", "--abbrev-ref", "HEAD"],
+                       capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def autorizacoes(fm, repo=None, ramo=None):
+    """Autorizações commit/push/pr efetivas: frontmatter do SP > método do projeto (com guarda do ramo principal) > `pergunta`."""
+    base = {}
+    if repo is not None:
+        cfg = load("kaizen_config")
+        base = cfg.metodo_autorizacoes(repo, _ramo(repo) if ramo is None else ramo) or {}
+    return {k: fm.get(k) or base.get(k, "pergunta") for k in ("commit", "push", "pr")}
+
+
+def precisa_perguntar(fm, acao, repo=None, ramo=None):
     """True se `acao` ainda exige pergunta ao utilizador.
 
     `acao` = commit|push|pr|merge (só `auto` dispensa) ou um comando (só dispensa se estiver em
     `permitir` e não for irreversível: o que `sp-gates.forbidden` apanha pergunta sempre).
+    Com `repo`, as ações commit|push|pr herdam do método `desenvolvimento` (precedência: SP > método > pergunta).
     """
-    if acao in ("commit", "push", "pr", "merge"):
-        return fm.get(acao) != "auto"
+    if acao in ("commit", "push", "pr"):
+        return autorizacoes(fm, repo, ramo)[acao] != "auto"
+    if acao == "merge":
+        return fm.get("merge") != "auto"
     cmd = acao.strip()
     if load("sp-gates").forbidden(cmd):
         return True

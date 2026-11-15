@@ -83,7 +83,8 @@ def autorizacoes_por_destino(project):
 def resolver_auth(project, auth):
     """Defeito do destino + flags explícitas (ganham); derivados incompatíveis são rebaixados (push≠auto ⇒ pr nunca ⇒ merge nunca)."""
     explicit = {k: v for k, v in (auth or {}).items() if v is not None}
-    out = {**autorizacoes_por_destino(project), **explicit}
+    metodo = kaizen_config.metodo_autorizacoes(CONFIG_REPO, "feature")  # ramo não principal: valores do método
+    out = {**autorizacoes_por_destino(project), **(metodo or {}), **explicit}
     if "push" not in explicit and out.get("commit") == "nunca":
         out["push"] = "nunca"
     if "pr" not in explicit and out["push"] != "auto":

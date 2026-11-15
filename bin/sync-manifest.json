@@ -46,6 +46,8 @@
     "test_pr_corpo.py",
     "pr_watch.py",
     "test_pr_watch.py",
+    "pr_fechar.py",
+    "test_pr_fechar.py",
     "test_kaizen_engine.py",
     "test_kaizen_hooks.py",
     "test_michi_tree_close.py",

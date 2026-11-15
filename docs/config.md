@@ -23,11 +23,30 @@ Optional, in the project root. Without it the defaults below apply. `init` only 
 | `prices` | bundled `usage/prices.json` | cost calculation |
 | `test.cmd` | detected by `init` | command that runs the target project's tests (see below) |
 | `painelBackend` | `auto` | `sp-handoff --spawn`: where the new session runs (see below) |
+| `desenvolvimento` | none | development method: default authorisations and PR closing (see below) |
 | `userName` | `user` | name the scripts' warnings use for you; empty or non-string falls back to `user` |
 
 `sources` must be a list; malformed values stop with a one-line message.
 
 `spRoot` and `docsRoot` are relative to the project root. `init` and `status` follow `spRoot` too; when `docsRoot` is not set, DR/DP folders sit next to the stories.
+
+### `desenvolvimento`
+
+Names the project's development method; without it nothing changes (every commit/push/PR still asks). `kaizen init --metodo <m>` writes it and never overwrites an existing one.
+
+```json
+{ "desenvolvimento": { "metodo": "worktree-pr", "ramo_principal": "main", "merge_estrategia": "squash" } }
+```
+
+| Method | commit / push / pr | `pr_vigia` | `pr_merge` | Closing |
+|---|---|---|---|---|
+| `worktree-pr` | `auto` / `auto` / `auto` | `true` | `auto-se-verde` | push, PR, `pr_fechar.py` watches and merges only with every check green |
+| `worktree-merge` | `auto` / `nunca` / `nunca` | `false` | `nunca` | local merge into the main branch |
+| `direto` | `pergunta` x3 | `false` | `pergunta` | current behaviour |
+
+Optional overrides: `commit`, `push`, `pr` (`auto|pergunta|nunca`), `pr_vigia` (bool), `pr_merge` (`auto-se-verde|pergunta|nunca`), `merge_estrategia` (`squash|merge|rebase`), `ramo_principal` (default `main`).
+
+Precedence: SP frontmatter > `desenvolvimento` > `pergunta`. Safety guard: the `auto` values only hold with HEAD outside `ramo_principal` (and main/master); on the main branch they fall back to `pergunta`. `restricoes` and `permitir` of the SP still win. Failed checks, conflicts or a requested review block the SP with the reason; `--admin` is never used.
 
 ### `test.cmd`
 

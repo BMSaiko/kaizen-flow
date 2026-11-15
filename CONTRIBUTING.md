@@ -21,6 +21,16 @@ node bin/kaizen.js audit .
 
 Requires Node 18+ and Python 3. Use a branch per change (`feat/<slug>`, `fix/<slug>`) and open the PR against `main`; the PR template asks for done, decisions, not done and proof.
 
+## Development method
+
+This repo uses `desenvolvimento.metodo: worktree-pr` (`kaizen.config.json`, see `docs/config.md`):
+
+- Work on a branch in its own worktree (`agent/<slug>`); never on `main`.
+- Commit, push and PR are automatic from that branch; the PR body follows the template.
+- `python scripts/pr_fechar.py <PR> --repo .` watches the PR and merges (squash) only when every check is green and there is no conflict.
+- Red checks, a conflict or a requested review stop the flow with the reason; nothing is merged and `--admin` is never used.
+- On `main` the automatic permissions fall back to asking.
+
 ## Workflow (SP and michi)
 
 Larger changes follow the kaizen flow this project ships: write the story as an SP (see `docs/commands.md`), then run it through the michi phases (research, plan, act, gates, review, PR). Small fixes do not need an SP. By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md); report vulnerabilities as described in [SECURITY.md](SECURITY.md).

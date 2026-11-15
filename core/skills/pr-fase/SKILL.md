@@ -29,6 +29,6 @@ Com `--pacote` o corpo acrescenta «Como validar», «Como reverter» e as image
 
 ## Vigia do PR
 
-Depois de `gh pr create` (rc 0), armar a vigia sem perguntar: `Monitor` sobre `python -I scripts/pr_watch.py <nº|URL> --repo <repo>` (polling de 60 s, máx. 120 min, só leitura). Uma linha por mudança: `erro` (nome+URL do check), `conflito`, `pendente`, `aguarda-review`, `pronto`, `merged`. Vigia até `pronto`/`merged` (rc 0), `closed` (2), `erro` (5) ou `conflito` (6); outros rc: 3 limite, 4 gh falhou. Avisar o user ao parar; nunca fazer merge nem push.
+Depois de `gh pr create` (rc 0), armar a vigia sem perguntar: `Monitor` sobre `python -I scripts/pr_watch.py <nº|URL> --repo <repo>` (polling de 60 s, máx. 120 min, só leitura). Uma linha por mudança: `erro` (nome+URL do check), `conflito`, `pendente`, `aguarda-review`, `pronto`, `merged`. Vigia até `pronto`/`merged` (rc 0), `closed` (2), `erro` (5) ou `conflito` (6); outros rc: 3 limite, 4 gh falhou. Avisar o user ao parar; nunca fazer merge nem push. Exceção: projeto com `desenvolvimento.metodo: worktree-pr` fecha com `python -I scripts/pr_fechar.py <nº|URL> --repo <repo>` (merge só com checks verdes; regra em `michi-modo-auto.md` §Autorizações).
 
 Testes: `python scripts/test_pr_corpo.py` · `python scripts/test_pr_watch.py`.

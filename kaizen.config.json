@@ -1,0 +1,7 @@
+{
+  "desenvolvimento": {
+    "metodo": "worktree-pr",
+    "ramo_principal": "main",
+    "merge_estrategia": "squash"
+  }
+}
