@@ -25,7 +25,7 @@ Fase 0 do DP: evidência antes de assunções. **Sem planeamento sem pesquisa**;
 ## Fases
 
 1. **Alvo:** projeto, âmbito, entidades-chave (MOC do projeto → caminho do código, nunca hardcoded).
-2. **Vault:** MOC, docs relacionados, links partidos. `mcp__vault__sb_*` primeiro, `Grep`/`Glob` depois.
+2. **Vault:** MOC, docs relacionados, links partidos. `Grep`/`Glob`.
 3. **Código:** estrutura, `git log --oneline -10`, TODO/FIXME, `git status --short`.
 4. **Erros:** padrões no MISTAKE_LOG por projeto, stack e tipo de tarefa (nunca bloqueia).
 5. **Temporal:** daily notes de hoje e ontem, sessões dos últimos 3 dias (feito, em curso, bloqueios).

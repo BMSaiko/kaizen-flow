@@ -46,36 +46,10 @@ def _spawn_pane(backend, wt, run, cmd=("claude",)):
     return painel_backend.por_nome(backend, run).abrir(list(cmd), wt)
 
 
-_KEYS = {"wezterm": {"Down": chr(27) + "[B", "Space": " ", "Enter": chr(13)}}
-
-
-def _press(backend, pane, key, run):
-    if backend == "wezterm":
-        run(["wezterm", "cli", "send-text", "--pane-id", str(pane), "--no-paste", _KEYS["wezterm"][key]], check=True)
-    else:
-        run(["tmux", "send-keys", "-t", str(pane), key], check=True)
-
-
-def _aviso_mcp(screen):
-    """True no aviso «new MCP servers found» (o `❯` dele não é o prompt)."""
-    return "new MCP server" in screen
-
-
-def _aprovar_mcp(backend, pane, run, sleep):
-    """Aprova só o `vault`: desmarca o `roblox` (2.ª linha) e confirma «Enable selected»."""
-    for key in ("Down", "Space", "Down", "Enter"):
-        _press(backend, pane, key, run)
-        sleep(0.5)
-
-
 def _wait_prompt(backend, pane, run, sleep):
     """Espera que o prompt `❯` apareça (o Claude Code descarta teclas enviadas durante o arranque)."""
     for _ in range(SPAWN_READY_S):
         screen = read_screen(backend, pane, run)
-        if _aviso_mcp(screen):
-            _aprovar_mcp(backend, pane, run, sleep)
-            sleep(2)
-            continue
         if any(ln.lstrip().startswith("❯") for ln in screen.splitlines()):
             sleep(1)
             return

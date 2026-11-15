@@ -77,7 +77,7 @@ def resolve_sp(arg, roots=None):
 def detect_gates(repo):
     """Comandos de gate sugeridos para o tipo de repo em `repo` (lista de `cmd`, por ordem)."""
     r = Path(repo)
-    if (r / "tools" / "vault-mcp").exists() and (r / "scripts" / "context-budget.py").exists():
+    if (r / "scripts" / "test-fast.py").exists() and (r / "scripts" / "context-budget.py").exists():
         return ["python -I scripts/context-budget.py", "python -I scripts/test-fast.py"]
     cmds = []
     if (r / "src-tauri" / "Cargo.toml").exists():

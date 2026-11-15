@@ -476,18 +476,6 @@ def test_spawn_espera_pelo_prompt_e_repete_enter_perdido(tmp_path):
     assert sum(1 for c in run.calls if "send-text" in c and c[-1] == "/michi --auto a") == 1
 
 
-def test_spawn_aprova_so_o_vault_no_aviso_mcp(tmp_path):
-    run = FakeRun()
-    nl = chr(10)
-    aviso = "2 new MCP servers found in this project" + nl + "❯ [✓] vault" + nl + "  [✓] roblox" + nl
-    run.screens = [aviso, "❯ " + nl, "❯ /michi --auto a" + nl, "❯ " + nl]
-    res = spawn(["a"], tmp_path, run)
-    assert res[0]["ok"]
-    teclas = [c[-1] for c in run.calls if "send-text" in c][:4]
-    assert teclas == [chr(27) + "[B", " ", chr(27) + "[B", chr(13)]
-    assert sum(1 for c in run.calls if "send-text" in c and c[-1] == "/michi --auto a") == 1
-
-
 def test_spawn_enter_que_nunca_submete_falha_so_esse_sp(tmp_path):
     run = FakeRun()
     run.screens = ["❯ \n"] + ["❯ /michi --auto a\n"] * 4  # chegou ao prompt + 3 Enters perdidos

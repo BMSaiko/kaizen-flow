@@ -11,7 +11,7 @@ Ordem fixa: **gates → harden → pentest → review**. Cada passo só corre se
 | Node (`package.json`) | `npm run lint`, `npm run typecheck`, `npm run build`, `npm test` (só os scripts que existem) |
 | Tauri (`src-tauri/Cargo.toml`) | `cargo check --manifest-path src-tauri/Cargo.toml` + os de Node |
 | Python (`pyproject.toml`/`pytest.ini`/`setup.cfg`) | `python -m pytest -q` |
-| Vault (`tools/vault-mcp` + `scripts/context-budget.py`) | `python -I scripts/context-budget.py`, `python -I scripts/test-fast.py` |
+| Vault (`scripts/context-budget.py` + `scripts/test-fast.py`) | `python -I scripts/context-budget.py`, `python -I scripts/test-fast.py` |
 
 ## Execução e resumo
 

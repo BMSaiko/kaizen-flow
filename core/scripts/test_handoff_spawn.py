@@ -125,21 +125,6 @@ def test_painel_background_e_dry_run_levam_o_modelo(tmp_path, monkeypatch, capsy
     assert "cd C:/wt/w && " + " ".join(_FLAGS) in capsys.readouterr().out
 
 
-def test_wait_prompt_aprova_aviso_mcp_e_depois_segue():
-    ecras = iter(["new MCP servers found", "❯ "])
-    chamadas = []
-
-    def fake(argv, **kw):
-        chamadas.append(argv)
-        if argv[:2] == ["tmux", "capture-pane"]:
-            return _Res(next(ecras))
-        return _Res()
-
-    hs._wait_prompt("tmux", "%1", fake, lambda s: None)
-    teclas = [c[-1] for c in chamadas if c[:2] == ["tmux", "send-keys"]]
-    assert teclas == ["Down", "Space", "Down", "Enter"]
-
-
 def test_wait_prompt_desiste_sem_prompt(monkeypatch):
     monkeypatch.setattr(hs, "SPAWN_READY_S", 3)
     with pytest.raises(hp.HandoffError, match="não ficou pronto"):
