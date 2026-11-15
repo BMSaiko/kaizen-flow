@@ -22,7 +22,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sp_disco import ler_json  # noqa: E402
 
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-ESTADO_DIR = Path.home() / ".claude" / "sp-fila-paineis"
+try:
+    _HOME = Path.home()
+except (RuntimeError, KeyError):  # ambiente sem HOME (hooks com env mínimo)
+    _HOME = Path(".")
+ESTADO_DIR = _HOME / ".claude" / "sp-fila-paineis"
 NOMES = ("wezterm", "tmux", "background")
 SEM_COR = ("NO_COLOR", "FORCE_COLOR")  # variáveis que os painéis do --spawn não devem herdar
 LOG_LINHAS = 80 # `ecra` do backend background: cauda do log
@@ -45,6 +49,10 @@ def run_hidden(*args, **kwargs):
     kwargs.setdefault("creationflags", NO_WINDOW)
     return subprocess.run(*args, **kwargs)
 
+
+def run_visivel(*args, **kwargs):
+    """Único sítio que corre `subprocess.run` herdando a consola (CLI interativa: o filho escreve no terminal do utilizador)."""
+    return subprocess.run(*args, **kwargs)
 
 def enviar_prompt(backend, pane, texto, run, sleep):
     """Único envio de um prompt a um painel: WezTerm/tmux esperam o prompt `❯` e enviam com Enter confirmado; os outros pela `enviar`."""

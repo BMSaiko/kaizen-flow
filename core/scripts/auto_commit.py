@@ -7,13 +7,16 @@ Uso: módulo importado pelos hooks (`from auto_commit import ...`), não tem CLI
 rc: n/a (biblioteca; as funções devolvem uma linha de estado)
 """
 import subprocess
+import sys as _s, pathlib as _p
+_s.path.insert(0, str(_p.Path(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 
 
 def _git(*args, timeout=60):
-    return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True,
+    return run_hidden(["git", *args], cwd=REPO, capture_output=True, text=True,
                           encoding="utf-8", timeout=timeout)
 
 

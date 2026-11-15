@@ -15,6 +15,10 @@ rc: 0 ok (inclui dry-run, cancelado, nada a fazer, sem backend), 1 falha a execu
 import argparse
 import os
 import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 from pathlib import Path
 
@@ -34,7 +38,7 @@ def painel_proprio(env=None):
     return env.get("WEZTERM_PANE") or env.get("TMUX_PANE") or None
 
 
-def worktree_suja(caminho, run=subprocess.run):
+def worktree_suja(caminho, run=run_hidden):
     """True se há alterações por guardar; False se limpa ou se a worktree já não existe; None se não se consegue ver."""
     if not caminho:
         return False

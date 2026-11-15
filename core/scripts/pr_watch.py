@@ -13,7 +13,10 @@ rc: 0 merged/pronto (ou --uma-vez), 2 fechado, 3 limite de duração, 4 gh falho
 import argparse
 import json
 import re
-import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 import time
 
@@ -38,7 +41,7 @@ def pr_ref(valor):
 
 
 def fetch(pr, repo=None):
-    r = subprocess.run(["gh", "pr", "view", pr, "--json", CAMPOS],
+    r = run_hidden(["gh", "pr", "view", pr, "--json", CAMPOS],
                        capture_output=True, text=True, cwd=repo, timeout=60)
     if r.returncode != 0:
         raise GhError((r.stderr or "gh falhou").strip())

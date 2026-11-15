@@ -9,7 +9,10 @@ rc: n/a
 """
 import json
 import re
-import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -105,7 +108,7 @@ def _acrescentar_decisao(sp, frase):
     p.write_bytes(raw.encode("utf-8"))
 
 
-def criar_ajuste(slug, frase, raiz, provas, run=subprocess.run, semente_dir=None, lancar=None):
+def criar_ajuste(slug, frase, raiz, provas, run=run_hidden, semente_dir=None, lancar=None):
     """Cria `<base>-ajuste-<n>` com as autorizações e gates do original; fica em TODO (`acao: em-todo`)."""
     frase = _frase(frase)
     original = _original(slug, raiz)
@@ -183,7 +186,7 @@ def abrir_redirecionar(slug, frase, raiz, provas, semente_dir=None, lancar=None)
     return {"acao": "falhou", "semente": semente, "motivo": (r or {}).get("msg") or "grill falhou"}
 
 
-def merge_pr_se_verde(provas, run=subprocess.run):
+def merge_pr_se_verde(provas, run=run_hidden):
     """Merge do PR (sem force nem `--admin`) só se estiver aberto e com ≥1 check, todos verdes."""
     pr = (provas or {}).get("pr") if isinstance(provas, dict) else ""
     if not (isinstance(pr, str) and pr.startswith("http")):

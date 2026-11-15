@@ -16,7 +16,10 @@ rc: 0 painel aberto / done / inline / dry-run · 1 erro, bloqueado ou falhou · 
 """
 import argparse
 import re
-import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 import time
 from pathlib import Path
@@ -87,7 +90,7 @@ def _seccao(texto, numero):
 
 
 def _git_diff(base, cwd):
-    r = subprocess.run(["git", "diff", f"{base}...HEAD", "--stat"], cwd=str(cwd), capture_output=True, text=True, encoding="utf-8")
+    r = run_hidden(["git", "diff", f"{base}...HEAD", "--stat"], cwd=str(cwd), capture_output=True, text=True, encoding="utf-8")
     if r.returncode:
         raise RevisorErro(f"git diff {base}...HEAD falhou: {r.stderr.strip()}")
     return r.stdout.strip()

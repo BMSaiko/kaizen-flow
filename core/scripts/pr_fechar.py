@@ -4,12 +4,16 @@
 Uso: python -I scripts/pr_fechar.py <nº|URL> [--repo CAMINHO] [--intervalo S] [--max-min M]
 Estratégia e permissão vêm de `desenvolvimento` em kaizen.config.json (`--repo`, defeito raiz do vault).
 Merge por `gh pr merge --<estratégia> --delete-branch`; nunca `--admin`, nunca force.
+rc: 0 merged, 10 sem permissão de merge, 11 bloqueado, 12 conflito, 3 limite de duração, 4 gh falhou, 64 uso
 Desfechos (rc): 0 merged, 10 pronto mas sem permissão de merge (pr_merge pergunta|nunca),
 11 bloqueado (checks vermelhos, review pedida, PR fechado ou erro), 12 conflito, 3 limite de duração,
 4 gh falhou, 64 uso/sem método worktree-pr. Em rc≠0 não há merge; a linha final diz o motivo.
 """
 import argparse
-import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 from pathlib import Path
 
@@ -20,7 +24,7 @@ import pr_watch  # noqa: E402
 
 
 def _gh_merge(pr, estrategia, repo):
-    r = subprocess.run(["gh", "pr", "merge", pr, f"--{estrategia}", "--delete-branch"],
+    r = run_hidden(["gh", "pr", "merge", pr, f"--{estrategia}", "--delete-branch"],
                        capture_output=True, text=True, cwd=repo, timeout=120)
     return r.returncode, (r.stderr or r.stdout).strip()
 

@@ -19,7 +19,10 @@ rc: propaga o rc do script envolvido
 import json
 import os
 import re
-import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -80,7 +83,7 @@ def filtrar_args(argv):
 
 def _branch():
     try:
-        r = subprocess.run(
+        r = run_hidden(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, timeout=2
         )
         return r.stdout.strip() if r.returncode == 0 else ""

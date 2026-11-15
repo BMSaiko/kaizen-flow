@@ -8,6 +8,9 @@ Uso: módulo importado por sp-move.py e sp-fechar.py (`redirect`); sem execuçã
 rc: 2 se não for possível criar a worktree do SP
 """
 import subprocess
+import sys as _s, pathlib as _p
+_s.path.insert(0, str(_p.Path(__file__).resolve().parent))
+from painel_backend import run_hidden, run_visivel  # noqa: E402
 import sys
 from pathlib import Path
 
@@ -41,7 +44,7 @@ def _levar_nao_commitado(repo, wt, slug):
             continue
         src = Path(s.path).resolve()
         rel = src.relative_to(Path(repo).resolve())
-        tracked = subprocess.run(["git", "-C", str(repo), "ls-files", "--error-unmatch", rel.as_posix()],
+        tracked = run_hidden(["git", "-C", str(repo), "ls-files", "--error-unmatch", rel.as_posix()],
                                  capture_output=True).returncode == 0
         dst = Path(wt) / rel
         if tracked or dst.exists():
@@ -73,4 +76,4 @@ def redirect(script, slug, argv):
     target = wt / "scripts" / here.name if wt else None
     if target is None or not target.is_file():
         return None
-    return subprocess.run([sys.executable, "-I", str(target), *argv], cwd=wt).returncode
+    return run_visivel([sys.executable, "-I", str(target), *argv], cwd=wt).returncode

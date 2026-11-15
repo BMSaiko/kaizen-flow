@@ -171,10 +171,10 @@ def _sv():
 
 def _reais(d):
     """Completa as dependências por injetar com as reais (painéis, vagas, validação)."""
-    import subprocess
     here = Path(__file__).resolve().parent
     sys.path.insert(0, str(here))
-    d.setdefault("run", subprocess.run)
+    import painel_backend
+    d.setdefault("run", painel_backend.run_hidden)
     if "lancar" not in d or "spawn" not in d or "vagas" not in d:
         import painel_backend
         import sp_painel_estado as pe
@@ -190,7 +190,7 @@ def _reais(d):
             d["spawn"] = handoff_spawn.spawn
     if "validar" not in d:
         def validar(sp):
-            r = subprocess.run([sys.executable, "-I", str(here / "sp-validate.py"), str(sp)], capture_output=True, text=True, encoding="utf-8")
+            r = painel_backend.run_hidden([sys.executable, "-I", str(here / "sp-validate.py"), str(sp)], capture_output=True, text=True, encoding="utf-8")
             return r.returncode == 0, (r.stderr or r.stdout or "").strip()[:300]
         d["validar"] = validar
     return d

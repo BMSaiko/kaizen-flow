@@ -20,7 +20,10 @@ import argparse
 import hashlib
 import json
 import re
-import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 from pathlib import Path
 
@@ -33,7 +36,7 @@ class CheckpointError(Exception):
 
 
 def _git(repo, *args, text=False):
-    proc = subprocess.run(["git", "-C", str(repo), "-c", "core.quotepath=off", *args], capture_output=True)
+    proc = run_hidden(["git", "-C", str(repo), "-c", "core.quotepath=off", *args], capture_output=True)
     if proc.returncode != 0:
         raise CheckpointError(f"git {args[0]} falhou: {proc.stderr.decode('utf-8', 'replace').strip()}")
     return proc.stdout.decode("utf-8", "replace") if text else proc.stdout

@@ -13,6 +13,10 @@ rc: 0 ok ou cancelado, 1 falha do backend, 2 pedido inválido (painel inexistent
 import argparse
 import re
 import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 from pathlib import Path
 
@@ -65,7 +69,7 @@ def _script(nome):
     return str(Path(__file__).resolve().parent / nome)
 
 
-def acao(a, backend, entrada=input, saida=print, correr=subprocess.run):
+def acao(a, backend, entrada=input, saida=print, correr=run_hidden):
     if a.acao == "ls":
         return correr([sys.executable, "-I", _script("kf_term_ls.py"), "--json"], check=False).returncode
     if a.acao == "lancar":
@@ -109,7 +113,7 @@ def acao(a, backend, entrada=input, saida=print, correr=subprocess.run):
     return 0
 
 
-def main(argv=None, backend="auto", entrada=input, saida=print, correr=subprocess.run, raiz=None):
+def main(argv=None, backend="auto", entrada=input, saida=print, correr=run_hidden, raiz=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="modo")
     sub.add_parser("abrir")

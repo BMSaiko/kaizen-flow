@@ -10,6 +10,9 @@ rc: 0 sempre
 import json
 import os
 import subprocess
+import sys as _s, pathlib as _p
+_s.path.insert(0, str(_p.Path(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 from pathlib import Path
 
@@ -22,7 +25,7 @@ EVENTOS = ("Stop", "Notification", "UserPromptSubmit")
 
 def _ramo(cwd=None):
     try:
-        r = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=cwd, capture_output=True, text=True, timeout=5)
+        r = run_hidden(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=cwd, capture_output=True, text=True, timeout=5)
     except (OSError, subprocess.SubprocessError):
         return None
     return r.stdout.strip() or None if r.returncode == 0 else None

@@ -28,6 +28,10 @@ rc: 0 ok, 1 falha
 import argparse
 import json
 import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 import time
 from pathlib import Path
@@ -48,7 +52,7 @@ sp_list = kaizen_engine.load("sp-list")
 BACKENDS = ("wezterm", "tmux", "clipboard", "background")
 
 
-def sp_root_for(agent, cwd=None, run=subprocess.run):
+def sp_root_for(agent, cwd=None, run=run_hidden):
     """Raiz dos SPs: numa worktree (`agent`), a da worktree do cwd, mesmo com o script do checkout principal."""
     if agent:
         res = run(["git", "rev-parse", "--show-toplevel"], cwd=cwd or Path.cwd(), capture_output=True, text=True)

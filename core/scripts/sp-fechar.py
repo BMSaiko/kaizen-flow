@@ -14,6 +14,9 @@ rc: 0 fechado, 1 verificação falhou (SP continua em Doing), 2 gates inválidos
 import argparse
 import re
 import subprocess
+import sys as _s, pathlib as _p
+_s.path.insert(0, str(_p.Path(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 import time
 from datetime import datetime
@@ -91,7 +94,7 @@ def run_budget():
     script = next(iter(HERE.glob("context-budg*.py")), None)
     if script is None:
         return 0, "context-budget: ausente (ignorado)"
-    r = subprocess.run([sys.executable, "-I", str(script)], capture_output=True, text=True,
+    r = run_hidden([sys.executable, "-I", str(script)], capture_output=True, text=True,
                        encoding="utf-8", errors="replace")
     tail = "\n".join((r.stdout + r.stderr).strip().splitlines()[-3:])
     return r.returncode, f"context-budget rc={r.returncode}\n{tail}"
@@ -102,7 +105,7 @@ def run_fast():
     script = HERE / "test-fast.py"
     if not script.exists():
         return 0, "test-fast: ausente (ignorado)"
-    r = subprocess.run([sys.executable, "-I", str(script), "fast"], capture_output=True, text=True,
+    r = run_hidden([sys.executable, "-I", str(script), "fast"], capture_output=True, text=True,
                        encoding="utf-8", errors="replace")
     tail = "\n".join((r.stdout + r.stderr).strip().splitlines()[-8:])
     return r.returncode, f"test-fast rc={r.returncode}\n{tail}"
@@ -146,7 +149,7 @@ def registar_dispensa(path, motivo):
 
 def changed_paths(cwd):
     """Caminhos alterados/novos segundo o git, sem COMMIT_*.md nem segredos. Vazio fora de repo git."""
-    r = subprocess.run(["git", "-C", str(cwd), "status", "--porcelain", "-uall"],
+    r = run_hidden(["git", "-C", str(cwd), "status", "--porcelain", "-uall"],
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode != 0:
         return []
@@ -189,7 +192,7 @@ def write_commit(cwd, slug, subject, paths):
 def worktree_hint(cwd, slug):
     """Se `cwd` é uma worktree (não o checkout principal), o passo que falta depois do commit."""
     def git(*a):
-        r = kf_git.run(cwd, *a, run=subprocess.run)
+        r = kf_git.run(cwd, *a, run=run_hidden)
         return r.stdout.strip() if r.returncode == 0 else None
     gd, common = git("rev-parse", "--path-format=absolute", "--git-dir"), git("rev-parse", "--path-format=absolute", "--git-common-dir")
     if not gd or not common or gd == common:

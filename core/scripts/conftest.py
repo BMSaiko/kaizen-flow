@@ -16,6 +16,7 @@ LENTOS = (
     ("test_amata_solver_cli", "test_subcomando_test_chega_a_100"),
     ("test_amata_solver_parser", "test_taxa_falhas_baixa"),
     ("test_amata_solver_parser", "test_taxa_expr_alta"),
+    ("test_amata_solver_validacao", "test_acerto_minimo_nas_sessoes"),
 )
 _LENTOS_IDS = tuple(f"{modulo}.py::{nome}" for modulo, nome in LENTOS)
 

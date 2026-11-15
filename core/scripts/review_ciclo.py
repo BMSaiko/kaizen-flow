@@ -14,7 +14,10 @@ import argparse
 import hashlib
 import json
 import re
-import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 from pathlib import Path
 
@@ -84,7 +87,7 @@ def criar_sps(bloq, project, prefixo, iteracao):
     res = []
     for i, a in enumerate(bloq, 1):
         slug = f"{prefixo}-{iteracao}-{i}"
-        r = subprocess.run([sys.executable, "-I", str(sp_new), "--project", project, "--slug", slug, "--priority", "P1", "--escopo", a["onde"]],
+        r = run_hidden([sys.executable, "-I", str(sp_new), "--project", project, "--slug", slug, "--priority", "P1", "--escopo", a["onde"]],
                            capture_output=True, text=True, encoding="utf-8", errors="replace")
         res.append((slug, r.returncode == 0))
     return res

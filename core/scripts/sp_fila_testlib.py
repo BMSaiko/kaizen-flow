@@ -76,8 +76,8 @@ def _arvore(root, mae_extra):
 
 
 def _pid_morto():
-    import subprocess
-    p = subprocess.Popen([sys.executable, "-I", "-c", "pass"])
+    import painel_backend
+    p = painel_backend.popen_sem_janela([sys.executable, "-I", "-c", "pass"])
     p.wait()
     return p.pid
 

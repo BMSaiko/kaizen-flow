@@ -24,6 +24,10 @@ import hashlib
 import json
 import re
 import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 import time
 from pathlib import Path
@@ -201,7 +205,7 @@ def run(gates, cache_path=None):
         start = time.monotonic()
         timed_out = False
         try:
-            proc = subprocess.run(g["cmd"], shell=True, cwd=g["cwd"], capture_output=True, text=True,
+            proc = run_hidden(g["cmd"], shell=True, cwd=g["cwd"], capture_output=True, text=True,
                                   encoding="utf-8", errors="replace", timeout=g["timeout"])
             rc, out = proc.returncode, (proc.stdout or "") + (proc.stderr or "")
         except subprocess.TimeoutExpired as exc:

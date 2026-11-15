@@ -6,7 +6,10 @@ Uso: módulo importado pelos scripts sp-* (`kaizen_engine.load(nome)`); sem exec
 rc: n/a
 """
 import re
-import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 from pathlib import Path
 
@@ -25,12 +28,12 @@ def relocate(src, dst):
     """Move `src` para `dst` (cria a pasta): `git mv` se rastreado, senão `rename`."""
     src, dst = Path(src), Path(dst)
     dst.parent.mkdir(parents=True, exist_ok=True)
-    tracked = subprocess.run(
+    tracked = run_hidden(
         ["git", "-C", str(src.parent), "ls-files", "--error-unmatch", src.name],
         capture_output=True,
     ).returncode == 0
     if tracked:
-        subprocess.run(["git", "-C", str(src.parent), "mv", str(src), str(dst)], check=True, capture_output=True)
+        run_hidden(["git", "-C", str(src.parent), "mv", str(src), str(dst)], check=True, capture_output=True)
     else:
         src.rename(dst)
 
@@ -85,7 +88,7 @@ def parse_permitir(value):
 
 
 def _ramo(repo):
-    r = subprocess.run(["git", "-C", str(repo), "rev-parse", "--abbrev-ref", "HEAD"],
+    r = run_hidden(["git", "-C", str(repo), "rev-parse", "--abbrev-ref", "HEAD"],
                        capture_output=True, text=True)
     return r.stdout.strip() if r.returncode == 0 else ""
 

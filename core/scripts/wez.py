@@ -11,6 +11,9 @@ import os
 import re
 import shutil
 import subprocess
+import sys as _s, pathlib as _p
+_s.path.insert(0, str(_p.Path(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 
 TIMEOUT_S = 10
@@ -40,7 +43,7 @@ def run_cli(args):
     """Corre `wezterm cli <args>` e devolve o stdout; WezError se falhar."""
     cmd = [_binary(), "cli", *args]
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+        res = run_hidden(cmd, capture_output=True, text=True, encoding="utf-8",
                              errors="replace", timeout=TIMEOUT_S)
     except FileNotFoundError:
         raise WezError("wezterm não encontrado no PATH") from None
@@ -242,7 +245,7 @@ def config_errors(config_file):
         return [f"config não existe: {config_file}"]
     cmd = [_binary(), "--config-file", config_file, "ls-fonts"]
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+        res = run_hidden(cmd, capture_output=True, text=True, encoding="utf-8",
                              errors="replace", timeout=TIMEOUT_S * 3)
     except FileNotFoundError:
         raise WezError("wezterm não encontrado no PATH") from None
@@ -287,7 +290,7 @@ def sync_copy(src, dst):
 
 def _git(repo, *args):
     try:
-        res = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True,
+        res = run_hidden(["git", "-C", repo, *args], capture_output=True, text=True,
                              encoding="utf-8", errors="replace", timeout=TIMEOUT_S * 6)
     except FileNotFoundError:
         raise WezError("git não encontrado no PATH") from None

@@ -15,7 +15,10 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 from pathlib import Path
 
@@ -61,7 +64,7 @@ def aviso_atraso(atras: int, base: str = "master") -> str:
 
 
 def _atras(base: str, cwd) -> int:
-    r = kf_git.run(cwd or ".", "rev-list", "--count", f"HEAD..{base}", run=subprocess.run)
+    r = kf_git.run(cwd or ".", "rev-list", "--count", f"HEAD..{base}", run=run_hidden)
     return int(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip().isdigit() else 0
 
 
@@ -88,7 +91,7 @@ def gerar(text: str, slug: str, diff_stat: list[str] | None = None, gates: list[
 
 
 def _git_stat(base: str, cwd=None) -> list[str]:
-    r = kf_git.run(cwd or HERE.parent, "diff", "--stat", base, run=subprocess.run)
+    r = kf_git.run(cwd or HERE.parent, "diff", "--stat", base, run=run_hidden)
     return r.stdout.splitlines() if r.returncode == 0 else []
 
 

@@ -12,7 +12,10 @@ rc: 0 ok, 2 review não aprovado, 3 política `pergunta`, 4 política não é `a
 import argparse
 import json
 import re
-import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden, run_visivel  # noqa: E402
 import sys
 from pathlib import Path
 
@@ -55,7 +58,7 @@ def provas_e_gates(sp_texto):
 
 def detetar_base(repo):
     """(base, candidatos): ramos remotos main/master/dev; base só se houver exatamente um."""
-    r = kf_git.run(repo, "branch", "-r", run=subprocess.run)
+    r = kf_git.run(repo, "branch", "-r", run=run_hidden)
     nomes = {l.strip().split("/", 1)[1] for l in r.stdout.splitlines() if "/" in l and "->" not in l}
     cand = [b for b in ("main", "master", "dev") if b in nomes]
     return (cand[0] if len(cand) == 1 else None), cand
@@ -144,7 +147,7 @@ def main(argv=None):
         print(f"PR não criado: base ambígua ou desconhecida {cand}, pedir ao user ou usar --base", file=sys.stderr)
         return 6
     titulo = a.titulo or frontmatter(sp, "slug") or "PR"
-    r = subprocess.run(["gh", "pr", "create", "--base", base, "--title", titulo, "--body", texto], cwd=a.repo, text=True)
+    r = run_visivel(["gh", "pr", "create", "--base", base, "--title", titulo, "--body", texto], cwd=a.repo, text=True)
     return r.returncode
 
 

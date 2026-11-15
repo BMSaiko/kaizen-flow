@@ -19,7 +19,10 @@ rc: 0 ok, 1 SP não encontrado, transição inválida, sem vaga, slug desconheci
 import argparse
 import json
 import re
-import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 from pathlib import Path
 
@@ -42,7 +45,7 @@ def section(text, prefix):
 
 def git_state():
     def run(*a):
-        r = kf_git.run(HERE.parent, *a, run=subprocess.run)
+        r = kf_git.run(HERE.parent, *a, run=run_hidden)
         return r.stdout.splitlines()
     return run("rev-parse", "--abbrev-ref", "HEAD")[:1] + run("status", "--short")
 

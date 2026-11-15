@@ -9,6 +9,10 @@ import argparse
 import json
 import os
 import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,7 +60,7 @@ def fire(event, ctx, repo=None, phase="all"):
         if phase != "all" and (phase == "pre") != blocking:
             continue
         try:
-            r = subprocess.run(h["cmd"], shell=True, cwd=repo, env=env, input=payload, text=True,
+            r = run_hidden(h["cmd"], shell=True, cwd=repo, env=env, input=payload, text=True,
                                capture_output=True, timeout=h["timeout"])
             ok, detail = r.returncode == 0, f"rc={r.returncode} {(r.stderr or r.stdout).strip()[:200]}"
         except subprocess.TimeoutExpired:

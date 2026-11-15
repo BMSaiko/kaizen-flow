@@ -13,7 +13,10 @@ import argparse
 import html
 import json
 import re
-import subprocess
+from pathlib import Path as _P
+import sys as _s
+_s.path.insert(0, str(_P(__file__).resolve().parent))
+from painel_backend import run_hidden  # noqa: E402
 import sys
 from pathlib import Path
 
@@ -80,7 +83,7 @@ def criterios(texto):
 
 
 def git(cwd, *args):
-    r = subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    r = run_hidden(["git", "-C", str(cwd), *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
