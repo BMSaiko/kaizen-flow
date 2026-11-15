@@ -10,8 +10,6 @@ rc: 0 sem problemas ou fora de um SP, 2 SP inválido
 import json
 import sys
 from pathlib import Path
-sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent))
-from sp_carregar import carregar  # noqa: E402
 
 try:
     data = json.load(sys.stdin)
@@ -24,6 +22,10 @@ if path.suffix != ".md" or "sp" not in parts or path.parent.name not in ("TODO",
     sys.exit(0)
 if not path.is_file():
     sys.exit(0)
+
+# só num SP: o import (importlib.util) fica fora do caminho quente de cada Write/Edit
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sp_carregar import carregar  # noqa: E402
 
 mod = carregar(Path(__file__).with_name("sp-validate.py"), "sp_validate", registar=False)
 errors = mod.validate(path.read_text(encoding="utf-8"), path.parent.name)
