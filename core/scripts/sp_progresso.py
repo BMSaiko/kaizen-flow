@@ -179,3 +179,61 @@ def require_doing(path):
     status = sp_list.parse_frontmatter(Path(path).read_text(encoding="utf-8")).get("status", "")
     if status.lower() not in ("doing", "todo"):
         raise HandoffError(f"modo automático só com SP em TODO ou Doing (este está em {status or 'estado desconhecido'})")
+
+
+FASE_RE = re.compile(r"^\s*(?:[-*]\s*)?fase\s*:\s*([\w-]+)", re.I | re.M)
+
+
+def _seccao(texto, titulo):
+    """Corpo das secções `## <titulo>...` (título por prefixo, pode haver várias), sem os cabeçalhos."""
+    partes, dentro = [], False
+    for linha in texto.splitlines():
+        if linha.startswith("## "):
+            dentro = linha[3:].strip().lower().startswith(titulo.lower())
+            continue
+        if dentro:
+            partes.append(linha)
+    return "\n".join(partes)
+
+
+def fase_corrente(texto, extra=""):
+    """Fase michi corrente: última linha `Fase: <nome>` de `extra` (corpo do progresso) ou de `## Progresso`; None se não há."""
+    for fonte in (extra, _seccao(texto, "Progresso")):
+        achados = FASE_RE.findall(fonte or "")
+        if achados:
+            return achados[-1].lower()
+    return None
+
+
+def tem_reflect(texto, fase):
+    """True se `## Reflect` tem uma linha `Reflect <fase>: ...` (patch ou «sem patch»)."""
+    padrao = re.compile(rf"^\s*(?:[-*]\s*)?reflect\s+{re.escape(fase)}\s*:\s*\S", re.I | re.M)
+    return bool(padrao.search(_seccao(texto, "Reflect")))
+
+
+def exigir_reflect(path, fase=None, extra=""):
+    """Recusa (HandoffError) se a fase corrente não tem linha em `## Reflect` do SP. Sem fase conhecida não há o que exigir."""
+    texto = Path(path).read_text(encoding="utf-8")
+    fase = (fase or fase_corrente(texto, extra) or "").lower() or None
+    if fase and not tem_reflect(texto, fase):
+        raise HandoffError(f"falta Reflect da fase {fase}: correr /reflect fase {Path(path).stem}")
+    return fase
+
+
+def registar_excecao_reflect(path, motivo="--sem-reflect pedido pelo user", today=None):
+    """Regista em `## Progresso` (sessão de hoje, sem apagar o que lá está) que o handoff avançou sem Reflect de fase."""
+    path = Path(path)
+    heading = f"## Progresso (sessão {today or date.today().isoformat()})"
+    linha = f"- exceção: handoff sem Reflect de fase ({motivo})."
+    texto = path.read_bytes().decode("utf-8")
+    eol = "\r\n" if "\r\n" in texto else "\n"
+    linhas = texto.split(eol)
+    if heading in linhas:
+        ini = linhas.index(heading)
+        fim = next((k for k in range(ini + 1, len(linhas)) if linhas[k].startswith("## ")), len(linhas))
+        while fim > ini + 1 and linhas[fim - 1].strip() == "":
+            fim -= 1
+        linhas.insert(fim, linha)
+        path.write_bytes(eol.join(linhas).encode("utf-8"))
+    else:
+        write(path, linha, today=today)

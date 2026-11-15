@@ -39,8 +39,9 @@ from handoff_pane import (ENTER_GAP, SEND_DELAY, SEND_GAP, HandoffError, _argvs,
                           detect_backend, enter_argv, launch_detached, pane_exists, pane_id, prompt_has_text, read_screen, run_hidden,
                           send_argv, send_comandos, send_lines, tmux_enter_argv, tmux_send_argv)
 from handoff_spawn import MAX_SPAWN, spawn  # noqa: E402,F401
-from sp_progresso import (MAX_BODY_LINES, SP_SECTION_RE, _agent_claims, check_delta, require_doing, resolve,  # noqa: E402,F401
-                          sync_program, sync_program_ready, worktree_agent, write)
+from sp_progresso import (MAX_BODY_LINES, SP_SECTION_RE, _agent_claims, check_delta, exigir_reflect, fase_corrente,  # noqa: E402,F401
+                          registar_excecao_reflect, require_doing, resolve, sync_program, sync_program_ready,
+                          tem_reflect, worktree_agent, write)
 
 sp_list = kaizen_engine.load("sp-list")
 
@@ -136,6 +137,8 @@ def main(argv=None):
     ap.add_argument("--dry-run", action="store_true", help="com --launch ou --spawn: só mostra, sem efeitos")
     ap.add_argument("--auto", action="store_true", help="com --launch: modo do context-guard, exige SP em TODO ou Doing")
     ap.add_argument("--nivel", help="com --launch: escalada de modelo, `/model` do nível (simples|default|complexo|critico) antes do /michi")
+    ap.add_argument("--fase", help="com --write/--launch: fase michi corrente (default: última linha `Fase:` do progresso)")
+    ap.add_argument("--sem-reflect", action="store_true", help="só o user: avança sem `Reflect <fase>` e regista a exceção em ## Progresso")
     ap.add_argument("--root", help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     try:
@@ -144,6 +147,18 @@ def main(argv=None):
             if not args.launch:
                 raise HandoffError("--auto só com --launch")
             require_doing(args.launch)
+        alvo = args.write or args.launch
+        excecao = False
+        if alvo:
+            extra = Path(args.file).read_text(encoding="utf-8") if args.write and args.file else ""
+            try:
+                exigir_reflect(alvo, args.fase, extra)
+            except HandoffError:
+                if not args.sem_reflect:
+                    raise
+                excecao = not args.dry_run
+            if excecao and args.launch:
+                registar_excecao_reflect(alvo)
         if args.resolve is not None:
             agent = worktree_agent()
             print(resolve(args.root, args.resolve or None, _agent_claims(agent), agent))
@@ -151,6 +166,8 @@ def main(argv=None):
             if not args.file:
                 raise HandoffError("--write exige --file")
             write(args.write, Path(args.file).read_text(encoding="utf-8"))
+            if excecao:
+                registar_excecao_reflect(args.write)
             print(f"progresso registado em {args.write}")
             nxt = sync_program(args.root, args.write)
             if nxt:

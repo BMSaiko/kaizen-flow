@@ -210,7 +210,8 @@ def hook(payload, env=None, marker_dir=None):
     event = payload.get("hook_event_name") or "UserPromptSubmit"
     sp = _bound_sp_doing(marker_dir, session_id)
     if sp:
-        action = f"corre /sp-handoff em modo automático:\nsem perguntar, com `sp-handoff.py --launch {sp} --auto`."
+        action = (f"corre `/reflect fase {Path(sp).stem}` e só depois /sp-handoff em modo automático:\n"
+                  f"sem perguntar, com `sp-handoff.py --launch {sp} --auto` (num SP, só sp-handoff; sem a linha Reflect da fase recusa).")
     else:
         action = ("corre /handoff em modo automático:\nsem perguntar, escreve o handoff e lança-o com "
                   "`handoff.py --launch <ficheiro> --auto`.")

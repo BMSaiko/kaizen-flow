@@ -53,6 +53,8 @@ Num painel de fila: sem merge nem `clean` (faz o vigia) e quem encadeia o SP seg
 
 Se aparecer `[context-guard] Contexto … >= limite`: acabar o passo em curso (nunca a meio de uma edição ou teste) e correr em modo automático (`--launch --auto`, sem perguntar) o handoff que o aviso nomear: `/sp-handoff` se a sessão correu `/michi <SP>`, `/handoff` se é conversa livre.
 
+**Passagem de sessão num SP em Doing = só `sp-handoff`** (nunca `/handoff` nem `/clear` à mão). Antes dela, `/reflect fase <SP>` escreve `Reflect <fase>: ...` em `## Reflect` do SP; sem essa linha `sp-handoff.py --write|--launch` recusa («falta Reflect da fase <fase>»). A fase vem de `--fase` ou da última linha `Fase: <nome>` de `## Progresso` (sem fase conhecida não há gate; pôr sempre `Fase:` no progresso). `--sem-reflect` é só do user e regista a exceção em `## Progresso`. `/handoff` fica para conversa livre, sem SP em Doing.
+
 | Gatilho | Modo | Regras |
 |---|---|---|
 | Fim de fase com verificação verde, SP em Doing | `/sp-handoff` manual: regista `## Progresso`, pergunta sim/não | um por fase, não por passo; nunca a meio de edição/teste; não repetir se o guard já o fez nessa fase |

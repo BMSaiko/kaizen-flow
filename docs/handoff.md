@@ -8,6 +8,8 @@ python scripts/sp-handoff.py --write PATH [--file BODY]  # log progress in the s
 python scripts/sp-handoff.py --launch PATH               # clear context and resume
 python scripts/sp-handoff.py --launch PATH --nivel complexo   # same, switching to the next model level first (/model)
 python scripts/sp-handoff.py --spawn SLUG [SLUG...]      # new pane + worktree per story, running /michi --auto
+python scripts/sp-handoff.py --write PATH --fase FASE    # refuses (rc 1) unless `## Reflect` has a `Reflect <fase>: ...` line
+python scripts/sp-handoff.py --write PATH --sem-reflect  # explicit exception, logged in `## Progresso`
 ```
 
 `--spawn` is what `sp-fila.py --concorrencia N` uses: one pane per story (at most `--max` at once), with `--dry-run` to preview and `--sem-registo` to skip writing the queue state, and `--json` to print the result as data for `sp-fila.py`.

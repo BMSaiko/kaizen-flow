@@ -50,6 +50,7 @@ Hooks `michi.*`, sessão suja, handoff, `[context-guard]` e painéis: `michi-orq
 - **Reflect por fase** em `## Reflect` do SP; **final** antes de propor o commit (skill `reflect`).
 - **Pushback do user** («está errado»): recomeçar na fase a montante, por defeito Grill (`michi-orquestracao.md` §Review restart).
 - **Commit/push/merge**: regra única em `michi-modo-auto.md` §Proibições e §Autorizações; worktree para dev em `michi-worktree-merge.md`.
+- **Passagem de sessão num SP**: só `sp-handoff` (nunca `/handoff` nem `/clear` à mão), com `Reflect <fase>` já em `## Reflect` do SP (`michi-orquestracao.md` §Contexto).
 - **Ciclo de vida** TODO → Doing → Done com `sp-move.py`; `/michi status` (`michi-lifecycle.md`).
 
 ## Style e Pitfalls

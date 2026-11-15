@@ -524,3 +524,83 @@ def test_resume_commands_com_nivel_muda_o_modelo_antes_do_michi():
         sp_handoff.resume_commands("claude", "x.md", "enorme")
     with pytest.raises(sp_handoff.HandoffError):
         sp_handoff.resume_commands("codex", "x.md", "complexo")
+
+
+# --- gate de Reflect antes do handoff ---
+
+def _sp_fase(tmp_path, reflect="", progresso="Fase: da\n", slug="r"):
+    corpo = "# Super Prompt\n\n## 1. Role\nx\n"
+    if reflect:
+        corpo += f"\n## Reflect\n\n{reflect}\n"
+    if progresso:
+        corpo += f"\n## Progresso (sessão 2026-11-14)\n\n{progresso}"
+    return make_sp(tmp_path, "atlas/sp/Doing", slug, body=corpo)
+
+
+def test_fase_corrente_le_a_ultima_linha_fase_do_progresso():
+    texto = "## Progresso (sessão a)\n\nFase: dp\n\n## Progresso (sessão b)\n\n- Fase: DA\n"
+    assert sp_handoff.fase_corrente(texto) == "da"
+    assert sp_handoff.fase_corrente("sem nada") is None
+    assert sp_handoff.fase_corrente("x", extra="fase: gates") == "gates"
+
+
+def test_tem_reflect_aceita_patch_e_sem_patch_e_ignora_outras_fases():
+    texto = "## Reflect\n\nReflect dp: sem patch\nReflect da: correu mal · patch · x.md\n"
+    assert sp_handoff.tem_reflect(texto, "da") and sp_handoff.tem_reflect(texto, "dp")
+    assert not sp_handoff.tem_reflect(texto, "gates")
+    assert not sp_handoff.tem_reflect("Reflect da: sem patch\n", "da")  # fora de ## Reflect não conta
+
+
+def test_launch_recusa_sem_reflect_da_fase(tmp_path, capsys):
+    sp = _sp_fase(tmp_path, reflect="Reflect dp: sem patch")
+    assert sp_handoff.main(["--launch", str(sp), "--auto", "--dry-run", "--pane", "3"]) == 1
+    assert "falta Reflect da fase da: correr /reflect fase r" in capsys.readouterr().err
+
+
+def test_launch_aceita_com_reflect_da_fase(tmp_path, capsys):
+    sp = _sp_fase(tmp_path, reflect="Reflect da: sem patch")
+    assert sp_handoff.main(["--launch", str(sp), "--auto", "--dry-run", "--pane", "3"]) == 0
+    assert "/clear" in capsys.readouterr().out
+
+
+def test_fase_refletida_nao_volta_a_ser_pedida(tmp_path):
+    sp = _sp_fase(tmp_path, reflect="Reflect dp: sem patch\nReflect da: sem patch", progresso="Fase: dp\n")
+    assert sp_handoff.main(["--launch", str(sp), "--dry-run", "--pane", "3"]) == 0
+
+
+def test_write_recusa_sem_reflect_e_nao_escreve(tmp_path, capsys):
+    sp = _sp_fase(tmp_path, progresso="")
+    corpo = tmp_path / "p.md"
+    corpo.write_text("Fase: gates\n- feito: x\n", encoding="utf-8")
+    antes = sp.read_bytes()
+    assert sp_handoff.main(["--write", str(sp), "--file", str(corpo)]) == 1
+    assert "falta Reflect da fase gates" in capsys.readouterr().err
+    assert sp.read_bytes() == antes
+
+
+def test_fase_explicita_vence_o_progresso(tmp_path):
+    sp = _sp_fase(tmp_path, reflect="Reflect gates: sem patch")
+    assert sp_handoff.main(["--launch", str(sp), "--fase", "gates", "--dry-run", "--pane", "3"]) == 0
+
+
+def test_sem_fase_conhecida_nao_exige_reflect(tmp_path):
+    sp = _sp_fase(tmp_path, progresso="")
+    assert sp_handoff.main(["--launch", str(sp), "--dry-run", "--pane", "3"]) == 0
+
+
+def test_sem_reflect_regista_excecao_em_progresso(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("WEZTERM_PANE", "3")
+    sp = _sp_fase(tmp_path)
+    monkeypatch.setattr(sp_handoff, "launch", lambda *a, **k: None)
+    assert sp_handoff.main(["--launch", str(sp), "--sem-reflect", "--pane", "3"]) == 0
+    texto = sp.read_text(encoding="utf-8")
+    assert "exceção: handoff sem Reflect de fase" in texto and "Fase: da" in texto
+
+
+def test_sem_reflect_no_write_mantem_o_progresso_e_a_excecao(tmp_path):
+    sp = _sp_fase(tmp_path, progresso="")
+    corpo = tmp_path / "p.md"
+    corpo.write_text("Fase: da\n- feito: x\n", encoding="utf-8")
+    assert sp_handoff.main(["--write", str(sp), "--file", str(corpo), "--sem-reflect"]) == 0
+    texto = sp.read_text(encoding="utf-8")
+    assert "- feito: x" in texto and "exceção: handoff sem Reflect de fase" in texto
