@@ -6,12 +6,12 @@ Recusa slug já existente no projeto (em qualquer pasta) e projeto inexistente.
 Nunca faz commit.
 
 Uso:
-  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--michi simples|default|complexo] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--ui] [--origem <veredicto:id|pentest:slug>] [--parent <slug>] [--depends-on <slug> ...]
+  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--michi simples|default|complexo|critico] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--ui] [--origem <veredicto:id|pentest:slug>] [--parent <slug>] [--depends-on <slug> ...]
   python -I scripts/sp-new.py --project <nome> --program <slug> --children a,b@complexo:a,c:a+b --priority P1|P2|P3
 
 `--parent <mãe>` exige que a mãe seja `kind: program` e acrescenta o filho a `children:` dela (depends_on, `state: TODO`, sem duplicar).
 `--program` cria o SP-mãe (`kind: program`, `children:`) e os filhos (`parent`, `depends_on`) em sp/TODO/.
-Em `--children`, `b@complexo` fixa o `michi_modelo` do filho (simples|default|complexo); `b:a` = b depende de a; `c:a+b` = c depende de a e b. Valida tudo antes de escrever.
+Em `--children`, `b@complexo` fixa o `michi_modelo` do filho (simples|default|complexo|critico); `b:a` = b depende de a; `c:a+b` = c depende de a e b. Valida tudo antes de escrever.
 rc: 0 criado, 1 erro
 """
 import argparse
@@ -26,7 +26,7 @@ import kaizen_engine  # noqa: E402
 import kf_git  # noqa: E402
 
 
-NIVEIS = ("simples", "default", "complexo")
+NIVEIS = ("simples", "default", "complexo", "critico")
 CONFIG_REPO = Path(__file__).resolve().parent.parent  # raiz com kaizen.config.json (testes fazem monkeypatch)
 
 
@@ -353,7 +353,7 @@ def main(argv=None):
     ap.add_argument("--horas", type=float, help="tamanho estimado: horas (sp-escalao)")
     ap.add_argument("--risco", choices=("baixo", "medio", "alto"), default="baixo", help="risco para o escalão (defeito baixo)")
     ap.add_argument("--modo", default="auto", help="modo do michi: auto|manual (defeito auto)")
-    ap.add_argument("--michi", default="default", help="nível do modelo do michi: simples|default|complexo (defeito default)")
+    ap.add_argument("--michi", default="default", help="nível do modelo do michi: simples|default|complexo|critico (defeito default)")
     ap.add_argument("--commit", help="commit: auto|pergunta|nunca (defeito do destino)")
     ap.add_argument("--push", help="push: auto|pergunta|nunca")
     ap.add_argument("--pr", help="pr: auto|pergunta|nunca")

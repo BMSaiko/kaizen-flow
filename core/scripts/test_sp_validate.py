@@ -181,7 +181,7 @@ def test_michi_modelo_e_execucao_invalidos(extra, fragment):
     assert any(fragment in e for e in sp_validate.validate(build(extra=extra), "TODO"))
 
 
-@pytest.mark.parametrize("extra", [[], ["michi_modelo: simples"], ["michi_modelo: complexo"],
+@pytest.mark.parametrize("extra", [[], ["michi_modelo: simples"], ["michi_modelo: complexo"], ["michi_modelo: critico"],
                                    ["kind: program", "execucao:"], ["kind: program", "execucao: sequencial"]])
 def test_michi_modelo_e_execucao_validos_ou_ausentes(extra):
     assert sp_validate.validate(build(extra=extra), "TODO") == []

@@ -129,3 +129,34 @@ def test_wait_prompt_desiste_sem_prompt(monkeypatch):
     monkeypatch.setattr(hs, "SPAWN_READY_S", 3)
     with pytest.raises(hp.HandoffError, match="não ficou pronto"):
         hs._wait_prompt("tmux", "%1", lambda argv, **kw: _Res("a carregar"), lambda s: None)
+
+
+def _sp(raiz, pasta, slug, nivel):
+    d = raiz / "knowledge" / "projects" / "p" / "x" / "sp" / pasta
+    d.mkdir(parents=True, exist_ok=True)
+    linhas = ["---", f"status: {pasta}", f"michi_modelo: {nivel}", "---", "# x", ""]
+    (d / f"{slug}.md").write_text(chr(10).join(linhas), encoding="utf-8")
+
+
+_CFG_NIVEIS = ('{"papeis": {"michi-exec": {"model": "claude-sonnet-5-5", "effort": "medium"},'
+               ' "michi-complexo": {"model": "claude-opus-5-5", "effort": "medium"},'
+               ' "michi-critico": {"model": "claude-fable-5-2", "effort": "low"}},'
+               ' "michi_modelo": {"default": "michi-exec", "complexo": "michi-complexo", "critico": "michi-critico"}}')
+
+
+def test_claude_cmd_usa_o_nivel_michi_do_sp_em_curso(tmp_path, monkeypatch):
+    monkeypatch.setattr(hs, "MODELOS", _cfg(tmp_path, _CFG_NIVEIS))
+    monkeypatch.setattr(hs, "RAIZ", tmp_path)
+    _sp(tmp_path, "Doing", "sp-c", "complexo")
+    _sp(tmp_path, "TODO", "sp-k", "critico")
+    assert hs._claude_cmd("sp-c") == ["claude", "--model", "claude-opus-5-5", "--effort", "medium"]
+    assert hs._claude_cmd("sp-k") == ["claude", "--model", "claude-fable-5-2", "--effort", "low"]
+    assert hs._claude_cmd("sem-sp") == ["claude", "--model", "claude-sonnet-5-5", "--effort", "medium"]
+
+
+def test_spawn_dry_run_leva_o_modelo_do_nivel_de_cada_sp(tmp_path, monkeypatch):
+    monkeypatch.setattr(hs, "MODELOS", _cfg(tmp_path, _CFG_NIVEIS))
+    monkeypatch.setattr(hs, "RAIZ", tmp_path)
+    _sp(tmp_path, "Doing", "sp-c", "complexo")
+    res = _spawn(["sp-c", "outro"], backend="tmux", run=FakeRun(), dry_run=True)
+    assert "claude-opus-5-5" in res[0]["cmd"] and "claude-sonnet-5-5" in res[1]["cmd"]

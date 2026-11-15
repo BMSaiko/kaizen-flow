@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import painel_backend  # noqa: E402
+import sp_leitura  # noqa: E402
 from handoff_pane import (ENTER_SETTLE, ENTER_TRIES, HandoffError, _argvs, _copy, detect_backend, read_screen,  # noqa: E402
                           run_hidden, send_confirmed)
 
@@ -23,19 +24,40 @@ except ImportError:  # kaizen-flow sem modelos.py: lança só `claude`
 
 MAX_SPAWN = 3
 MODELOS = modelos.DEFAULT if modelos else None  # .claude/modelos.json; os testes trocam-no
-PAPEL = "michi-exec"
+PAPEL = "michi-exec"  # defeito quando o SP não tem nível
+RAIZ = Path(__file__).resolve().parent.parent  # vault; os testes trocam-no
 SPAWN_READY_S = 40  # espera máxima pelo prompt do Claude Code num painel novo
 SPAWN_ENTER_TRIES = ENTER_TRIES
 SPAWN_SETTLE = ENTER_SETTLE
 
 
-def _claude_cmd():
-    """`claude` com o modelo/effort do papel `michi-exec`; sem config válida avisa e devolve só `claude`."""
+def _nivel_sp(slug):
+    """`michi_modelo` do SP em Doing (ou TODO) com esse slug, via `sp_leitura`; None se não houver SP ou campo."""
+    if not slug:
+        return None
+    for pasta in ("Doing", "TODO"):
+        for f in sorted((RAIZ / "knowledge" / "projects").glob(f"*/*/sp/{pasta}/{slug}.md")):
+            try:
+                return sp_leitura.ler(f)[0].get("michi_modelo") or None
+            except OSError:
+                continue
+    return None
+
+
+def _claude_cmd(slug=None):
+    """`claude` com o modelo/effort do nível `michi_modelo` do SP (`modelos.michi`); sem SP ou nível, papel `michi-exec`.
+    Sem config válida avisa e devolve só `claude`."""
     if modelos is None:
         print(f"aviso: modelos.py em falta; a lançar claude sem --model para '{PAPEL}'", file=sys.stderr)
         return ["claude"]
     try:
-        return ["claude"] + modelos.cli_args(PAPEL, MODELOS)
+        nivel = _nivel_sp(slug)
+        if nivel is None:
+            return ["claude"] + modelos.cli_args(PAPEL, MODELOS)
+        m, aviso = modelos.michi(modelos.load(MODELOS), nivel)
+        if aviso:
+            print(aviso, file=sys.stderr)
+        return ["claude", "--model", m["model"], "--effort", m["effort"]]
     except (modelos.ModelosError, OSError, AttributeError, TypeError) as exc:
         print(f"aviso: sem modelo para '{PAPEL}' ({exc}); a lançar claude sem --model", file=sys.stderr)
         return ["claude"]
@@ -71,9 +93,8 @@ def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.slee
     Sem multiplexer (clipboard) imprime, por SP, o `cd` e o comando de retoma.
     """
     backend = backend or detect_backend()[0]
-    claude = _claude_cmd()
     if dry_run:  # sem efeitos: nem worktree, nem painel, nem estado
-        return [{"slug": s, "ok": True, "painel": None, "worktree": None, "dry_run": True, "cmd": " ".join(claude)} for s in slugs[:maximo]] +                [{"slug": s, "ok": False, "painel": None, "worktree": None, "erro": f"adiado: máximo de {maximo} painéis em simultâneo"} for s in slugs[maximo:]]
+        return [{"slug": s, "ok": True, "painel": None, "worktree": None, "dry_run": True, "cmd": " ".join(_claude_cmd(s))} for s in slugs[:maximo]] +                [{"slug": s, "ok": False, "painel": None, "worktree": None, "erro": f"adiado: máximo de {maximo} painéis em simultâneo"} for s in slugs[maximo:]]
     estado_path = Path(estado_path or ESTADO)
     estado_path.parent.mkdir(parents=True, exist_ok=True)
     if registar and not estado_path.exists():
@@ -90,6 +111,7 @@ def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.slee
                      check=True, capture_output=True, text=True, encoding="utf-8").stdout.strip().splitlines()[-1]
             res["worktree"] = wt
             cmd = f"/michi --auto {slug}"
+            claude = _claude_cmd(slug)
             if backend == "clipboard":
                 print(f"{slug}: cd {wt} && {' '.join(claude)}  →  {cmd}")
             elif backend == "background":  # sem terminal: não há prompt a esperar, o comando corre direto em `claude -p`

@@ -214,7 +214,7 @@ def test_michi_nivel_invalido_resolve_default(cfg_novo, nivel):
     assert "aviso" in err
 
 
-def test_michi_effort_sempre_low(tmp_path):
+def test_michi_respeita_effort_do_papel(tmp_path):
     d = json.loads(json.dumps(NOVO))
     for p in ("michi-exec", "michi-leve", "michi-complexo"):
         d["papeis"][p]["effort"] = "high"
@@ -222,7 +222,52 @@ def test_michi_effort_sempre_low(tmp_path):
     f.write_bytes(json.dumps(d).encode())
     for nivel in ("simples", "default", "complexo"):
         rc, out, _ = run(f, "michi", nivel, "--json")
-        assert json.loads(out)["effort"] == "low"
+        assert json.loads(out)["effort"] == "high"
+    d["papeis"]["michi-exec"].pop("effort")  # sem effort no papel: defeito low, sem erro
+    f.write_bytes(json.dumps(d).encode())
+    rc, out, _ = run(f, "michi", "default", "--json")
+    assert rc == 0 and json.loads(out)["effort"] == "low"
+
+
+def test_michi_nivel_critico(tmp_path):
+    d = json.loads(json.dumps(NOVO))
+    d["papeis"]["michi-critico"] = {"model": "claude-fable-5-2", "effort": "low"}
+    d["michi_modelo"]["critico"] = "michi-critico"
+    f = tmp_path / "m.json"
+    f.write_bytes(json.dumps(d).encode())
+    rc, out, err = run(f, "michi", "critico", "--json")
+    assert rc == 0 and json.loads(out) == {"model": "claude-fable-5-2", "effort": "low"} and not err
+
+
+def test_michi_critico_sem_config_cai_no_defeito_com_aviso(cfg_novo):
+    rc, out, err = run(cfg_novo, "michi", "critico")
+    assert rc == 0 and out == "claude-sonnet-5-5" and "aviso" in err
+
+
+def test_cadeia_sem_duplicados(tmp_path):
+    d = json.loads(json.dumps(NOVO))
+    d["papeis"]["sp-autor"] = {"model": "claude-opus-5-5", "fallback": ["claude-fable-5-1", "claude-opus-5-5", "claude-fable-5-1"]}
+    f = tmp_path / "m.json"
+    f.write_bytes(json.dumps(d).encode())
+    rc, out, _ = run(f, "get", "sp-autor", "--cadeia")
+    assert rc == 0 and out.splitlines() == ["claude-opus-5-5", "claude-fable-5-1"]
+
+
+def test_id_desconhecido_avisa_com_rc_0(tmp_path):
+    d = json.loads(json.dumps(NOVO))
+    d["papeis"]["michi-exec"]["model"] = "claude-xyz-9"
+    d["aliases"] = {"opus": "claude-opus-5-5"}
+    d["conhecidos"] = ["claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-2", "claude-fable-5-1"]
+    f = tmp_path / "m.json"
+    f.write_bytes(json.dumps(d).encode())
+    rc, out, err = run(f, "list")
+    assert rc == 0 and "claude-xyz-9" in err and "michi-exec" in err
+    assert "claude-sonnet-5-5" not in err
+
+
+def test_sem_lista_conhecidos_nao_avisa(cfg_novo):
+    rc, _, err = run(cfg_novo, "list")
+    assert rc == 0 and "desconhecido" not in err
 
 
 def test_json_antigo_sem_campos_novos(cfg):
@@ -237,7 +282,10 @@ def test_json_real_do_repo():
     if not real.exists():
         pytest.skip("sem .claude/modelos.json (pacote kf)")
     d = json.loads(real.read_bytes())
-    assert d["papeis"]["michi-exec"]["effort"] == "low"
-    assert d["papeis"]["michi-complexo"] == {"model": "claude-opus-5-5", "effort": "low"}
-    assert d["michi_modelo"] == NOVO["michi_modelo"]
-    assert d["papeis"]["sp-autor"]["effort"] == "low"
+    assert d["aliases"]["fable"] == "claude-fable-5-2"
+    assert "claude-fable-5-1" not in d["papeis"]["sp-autor"]["fallback"]
+    assert d["papeis"]["revisor"]["model"] == "claude-fable-5-2"
+    assert d["papeis"]["michi-critico"]["model"] == "claude-fable-5-2"
+    assert d["michi_modelo"]["critico"] == "michi-critico"
+    assert d["papeis"]["michi-complexo"]["model"] == "claude-opus-5-5"
+    assert d["papeis"]["sp-autor"]["effort"] == "medium"
