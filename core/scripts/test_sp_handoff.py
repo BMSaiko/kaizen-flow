@@ -516,3 +516,11 @@ def test_dois_registos_em_simultaneo_nao_perdem_sessoes(tmp_path):
     [t.start() for t in ts]
     [t.join() for t in ts]
     assert sorted(json.loads(path.read_text(encoding="utf-8"))["sessoes"]) == ["a", "b", "c", "d"]
+
+
+def test_resume_commands_com_nivel_muda_o_modelo_antes_do_michi():
+    assert sp_handoff.resume_commands("claude", "x.md", "complexo") == ["/clear ", "/model claude-opus-5-5", "/michi x.md"]
+    with pytest.raises(sp_handoff.HandoffError):
+        sp_handoff.resume_commands("claude", "x.md", "enorme")
+    with pytest.raises(sp_handoff.HandoffError):
+        sp_handoff.resume_commands("codex", "x.md", "complexo")

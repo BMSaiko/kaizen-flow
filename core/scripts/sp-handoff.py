@@ -6,13 +6,14 @@ O SP nunca muda de pasta nem de `status` (para isso, `sp-move.py`). Nunca faz co
 Uso:
   python -I scripts/sp-handoff.py --resolve [slug]        # slug de um programa (SP-mãe): devolve o filho em Doing
   python -I scripts/sp-handoff.py --write <caminho> --file <progresso.md>
-  python -I scripts/sp-handoff.py --launch <caminho> [--dry-run] [--auto]
+  python -I scripts/sp-handoff.py --launch <caminho> [--dry-run] [--auto] [--nivel simples|default|complexo|critico]
   python -I scripts/sp-handoff.py --spawn <slug>... [--max N] [--backend wezterm|tmux|background|clipboard]
 
 `--launch` não abre janelas: em segundo plano, passados ~5 s (para o turno atual acabar), escreve
 `/clear` e depois `/michi <caminho>` no painel do WezTerm onde o Claude Code já corre ($WEZTERM_PANE),
 via `wezterm cli send-text`. Não faz nada fora desse painel. `--auto` (usado após o aviso do
 context-guard) recusa lançar se o SP estiver em Done; em TODO lança sem o mover (o michi da sessão nova faz `sp-move doing`).
+`--nivel` (escalada de modelo, harness claude): entre o `/clear` e o `/michi` envia `/model <modelo do nível>` (modelos.json).
 
 `--spawn` abre um painel novo por SP (worktree própria via `sb-worktree ensure`, `claude`, `/michi --auto <slug>`)
 e regista-o em `sessoes` do estado do `sp-fila`; a falha de um SP não afeta os outros (rc 1 se algum falhou).
@@ -62,16 +63,30 @@ HARNESSES = {
 }
 
 
-def resume_commands(harness, sp_path):
+def modelo_nivel(nivel):
+    """ID do modelo do nível michi (modelos.json); HandoffError se não houver modelos.py ou o nível não existir."""
+    try:
+        import modelos
+    except ImportError:
+        raise HandoffError("--nivel exige scripts/modelos.py")
+    data = modelos.load(modelos.DEFAULT)
+    if nivel not in (data.get("michi_modelo") or modelos.MICHI_DEFAULT):
+        raise HandoffError(f"nível desconhecido '{nivel}'")
+    return modelos.michi(data, nivel)[0]["model"]
+
+
+def resume_commands(harness, sp_path, nivel=None):
     if harness not in HARNESSES:
         raise HandoffError(f"harness desconhecido '{harness}' (válidos: {', '.join(HARNESSES)})")
     clear, resume = HARNESSES[harness]
-    return [clear, resume.format(sp=sp_path)]
+    if nivel and harness != "claude":
+        raise HandoffError("--nivel só com o harness claude")
+    return [clear, *([f"/model {modelo_nivel(nivel)}"] if nivel else []), resume.format(sp=sp_path)]
 
 
 def deliver_clipboard(harness, sp_path, copy=None):
     """Sem painel injetável (apps desktop): copia o comando de retoma e imprime-o. True se copiou."""
-    resume = resume_commands(harness, sp_path)[1]
+    resume = resume_commands(harness, sp_path)[-1]
     try:
         (copy or _copy)(resume)
         copied = True
@@ -82,13 +97,13 @@ def deliver_clipboard(harness, sp_path, copy=None):
 
 
 def send(sp_path, pane, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=run_hidden, sleep=time.sleep,
-         inspect=None, backend="wezterm", harness="claude", confirm=False):
-    send_comandos(resume_commands(harness, sp_path), pane, backend, delay, gap, enter_gap, run, sleep, inspect, confirm)
+         inspect=None, backend="wezterm", harness="claude", confirm=False, nivel=None):
+    send_comandos(resume_commands(harness, sp_path, nivel), pane, backend, delay, gap, enter_gap, run, sleep, inspect, confirm)
 
 
-def launch(sp_path, pane=None, backend=None, harness="claude"):
+def launch(sp_path, pane=None, backend=None, harness="claude", nivel=None):
     """Lança em segundo plano o `send`, para o /clear só chegar depois de o turno atual acabar."""
-    resume = resume_commands(harness, sp_path)[1]
+    resume = resume_commands(harness, sp_path, nivel)[-1]
     if backend is None:
         backend, found = detect_backend()
         pane = pane or found
@@ -99,7 +114,8 @@ def launch(sp_path, pane=None, backend=None, harness="claude"):
     _argvs(backend, pane)[0](pane, resume)
     if backend == "wezterm":
         pane_exists(pane)
-    return launch_detached(__file__, ["--send", str(sp_path), "--pane", str(pane), "--backend", backend, "--harness", harness])
+    return launch_detached(__file__, ["--send", str(sp_path), "--pane", str(pane), "--backend", backend, "--harness", harness,
+                                      *(["--nivel", nivel] if nivel else [])])
 
 
 def main(argv=None):
@@ -119,6 +135,7 @@ def main(argv=None):
     ap.add_argument("--harness", choices=tuple(HARNESSES), default="claude", help="comando de retoma (default: claude)")
     ap.add_argument("--dry-run", action="store_true", help="com --launch ou --spawn: só mostra, sem efeitos")
     ap.add_argument("--auto", action="store_true", help="com --launch: modo do context-guard, exige SP em TODO ou Doing")
+    ap.add_argument("--nivel", help="com --launch: escalada de modelo, `/model` do nível (simples|default|complexo|critico) antes do /michi")
     ap.add_argument("--root", help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     try:
@@ -158,21 +175,21 @@ def main(argv=None):
         elif args.send:
             backend = args.backend or "wezterm"
             send(args.send, args.pane or pane_id(), backend=backend, harness=args.harness,
-                 inspect=check_prompt if backend == "wezterm" else None, confirm=True)
+                 inspect=check_prompt if backend == "wezterm" else None, confirm=True, nivel=args.nivel)
         elif args.dry_run:
             backend, found = (args.backend, None) if args.backend else detect_backend()
             pane = args.pane or found
             if backend == "clipboard":
-                print(f"clipboard: {resume_commands(args.harness, args.launch)[1]}")
+                print(f"clipboard: {resume_commands(args.harness, args.launch, args.nivel)[-1]}")
             else:
                 pane = pane or pane_id()
                 text_argv, key_argv = _argvs(backend, pane)
-                for text in resume_commands(args.harness, args.launch):
+                for text in resume_commands(args.harness, args.launch, args.nivel):
                     print(subprocess.list2cmdline(text_argv(pane, text)))
                     print(subprocess.list2cmdline(key_argv(pane)))
         else:
-            if launch(args.launch, args.pane, args.backend, args.harness):
-                print(f"a continuar neste painel em {SEND_DELAY:.0f}s: {' e '.join(resume_commands(args.harness, args.launch))}")
+            if launch(args.launch, args.pane, args.backend, args.harness, args.nivel):
+                print(f"a continuar neste painel em {SEND_DELAY:.0f}s: {' e '.join(resume_commands(args.harness, args.launch, args.nivel))}")
     except (HandoffError, OSError) as exc:
         print(f"erro: {exc}", file=sys.stderr)
         return 1

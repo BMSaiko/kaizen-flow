@@ -22,9 +22,15 @@ def gastos(estado, custos):
     return linhas, sum(c for _, c in linhas)
 
 
+def escaladas(estado):
+    """{slug: "de → para"} das escaladas de modelo registadas pelo vigia (`sp_escalada.registar_fila`)."""
+    return {e["slug"]: f"{e.get('de')} → {e.get('para')}" for e in estado.get("escaladas") or [] if e.get("slug")}
+
+
 def render_gastos(estado, custos):
     linhas, total = gastos(estado, custos)
-    corpo = [f"  {s}: {c:.2f}" for s, c in linhas] or ["  (nenhuma sessão)"]
+    esc = escaladas(estado)  # o custo por slug já soma os dois painéis (mesmo slug); só se anota
+    corpo = [f"  {s}: {c:.2f}" + (f" (2 painéis, escalado {esc[s]})" if s in esc else "") for s, c in linhas] or ["  (nenhuma sessão)"]
     return "\n".join(["Gasto por sessão (USD equivalente API, só medição):", *corpo, f"  total: {total:.2f}"])
 
 
@@ -62,6 +68,8 @@ def relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora, custos=None,
               ("Falhas", [f"{s}: não chegou a Done (fase {sps[s][0]})" if s in (sps or {}) else f"{s}: não chegou a Done"
                           for s in estado["falhados"]]),
               ("Próximos passos", passos)]
+    if escaladas(estado):  # só com escaladas: sem elas o relatório fica igual ao de sempre
+        secoes.insert(2, ("Escaladas", [f"{s}: {x}" for s, x in escaladas(estado).items()]))
     cabeca = ["---", "type: report", "tags: [sp-fila]", f"date: {agora:%Y-%m-%d}", "---",
               f"# Fila de SPs ({agora:%Y-%m-%d %H:%M})", f"Fim: {motivo}.", f"Modo: {_modo(estado)}."]
     for cap in range(len(passos) + len(excluidos) + len(commits) + 99, 0, -1):

@@ -2,8 +2,6 @@
 name: michi
 description: Project workflow with self-evolution. Reflect, then commit.
 version: 2.6
-author: user
-license: MIT
 ---
 ## michi — orquestrador do ciclo de projeto
 
@@ -27,6 +25,8 @@ license: MIT
 | 10 | Reflect | `/reflect final` | A/B/C proposto; o user aplica | user |
 | 11 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | user |
 
+`/harden` (5), `/report` (9), `/reflect` (10) e `/commit-msg`→`/commit` (11) são skills do vault: sem elas, o passo faz-se à mão (gates com RC; `sp-report.py`; reflect em `## Reflect` do SP; commit com stage explícito).
+
 Sem `Agent`: fases na sessão principal; outra sessão = painel WezTerm (`michi-orquestracao.md`).
 
 Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_requests`, go/no-go em Decisões; `references/michi-spike.md`.
@@ -36,7 +36,7 @@ Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_reque
 ## Arranque
 
 1. `python -I scripts/sp-estado.py <slug>` (fase, passos, gates, ramo) e ler `perfil`/`max_tentativas`/`parar_se`. SP vazio = Grill, não paragem; correr sempre o Arranque todo e a «sessão suja» (`michi-orquestracao.md`) antes da fase 1. «SP não encontrado»: ramo atrás de `master` → `git merge master` e repetir.
-2. SP em TODO (p.ex. vindo de `/sp-handoff`): `python -I scripts/sp-move.py <slug> --start` (move o SP e as mães em TODO para Doing, idempotente). `python -I scripts/sb-worktree.py ensure <slug>`; editar pelo caminho absoluto da worktree; `merge` + `clean` só no fecho com o SP em Done.
+2. SP em TODO (p.ex. vindo de `/sp-handoff`): `python -I scripts/sp-move.py <slug> --start` (move o SP e as mães em TODO para Doing, idempotente). se existir `scripts/sb-worktree.py` (vault), `python -I scripts/sb-worktree.py ensure <slug>` (senão, `git worktree add`); editar pelo caminho absoluto da worktree; `merge` + `clean` só no fecho com o SP em Done.
 3. `python -I scripts/tab-title.py <slug>` e seguir nesta sessão, sem `Agent`. Painel WezTerm só com `--painel` (`michi_handoff_auto.py decide --painel`, `go <slug>`). Já dentro de um painel ou `--handed`: seguir sem relançar.
 3b. SP novo em auto: `python -I scripts/sp-aprovar.py <slug> --verificar`; rc 1 = por aprovar: recusar e dar a instrução (`sp-resumo.py`, «sim» do user, `sp-aprovar.py`).
 4. Modo: `--auto` ou `modo: auto` no frontmatter = sem `AskUserQuestion` (`modo: manual` = sem auto, sem pergunta); sem nenhum, perguntar «com/sem auto» (`michi-modo-auto.md`).

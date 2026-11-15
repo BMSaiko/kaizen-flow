@@ -59,7 +59,7 @@ Texto integral movido de `SKILL.md` (otimização de custo, SP michi-otimizacao-
    typecheck, e2e — whatever applies). *Every command and its RC must
    appear in the report.* If any gate fails, fix root cause, re-run all
    gates. Do not paper over with `|| true`.
-   **Vault/scripts:** `python -I scripts/test-fast.py` (fast, só o que o diff tocou, ~2 s) em cada fase; `... full` (~3,5 min) no fecho.
+   **Vault/scripts (só se `scripts/test-fast.py` existir):** `python -I scripts/test-fast.py` (fast, só o que o diff tocou, ~2 s) em cada fase; `... full` (~3,5 min) no fecho.
    **Gate `harden`** (após DA, antes do Report): `/harden vault` (ou o repo do SP) sobre o que a DA alterou; FAIL bloqueia o Report até corrigir a causa; o resultado vai para o Report. `skip harden` salta-o (modo auto: corre sempre, sem perguntar).
    **Gate `pentest`** (após `harden`, antes do Report e do review): `/pentest <repo do SP>` sobre o diff; achados viram SPs (`--criar-sps`) executados com prova; só passa sem achados abertos ou com decisão do user. `skip pentest` salta-o.
    **Gate `review-ciclo`** (após `pentest`, antes do PR): review só leitura com ciclo corrigir → rever (`/review-ciclo`); APROVADO segue para PR, ESCALAR (3 iterações) pede decisão ao user. `skip review` salta-o.

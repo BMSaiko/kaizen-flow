@@ -231,3 +231,9 @@ def test_manual_antigo_sem_gates_nunca_e_erro():
 def test_programa_auto_sem_gates_esta_isento():
     prog = _novo(extra=["kind: program", "children:", "  - slug: a", "    depends_on: []", "    state: TODO"])
     assert not any("gates" in e for e in sp_validate.validate(prog, folder="TODO"))
+
+
+def test_escalar_valido_e_invalido():
+    assert sp_validate.validate(build(extra=["escalar: sim"]), "TODO") == []
+    errors = sp_validate.validate(build(extra=["escalar: talvez"]), "TODO")
+    assert len(errors) == 1 and "escalar" in errors[0]

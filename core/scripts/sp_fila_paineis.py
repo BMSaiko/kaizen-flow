@@ -44,17 +44,27 @@ def nivel_sp(path):
     return n.group(1) if n else None
 
 
-def modelo_sp(path):
-    """{model, effort} do nível michi do SP (`modelos.michi`; sem nível = default)."""
+def modelo_nivel(nivel):
+    """{model, effort} de um nível michi (`modelos.michi`; vazio = default)."""
     if modelos is None:
         raise RuntimeError("modelos.py em falta: sem modelo para o painel")
-    return modelos.michi(modelos.load(MODELOS), nivel_sp(path) or "default")[0]
+    return modelos.michi(modelos.load(MODELOS), nivel or "default")[0]
+
+
+def modelo_sp(path):
+    """{model, effort} do nível michi do SP (`modelos.michi`; sem nível = default)."""
+    return modelo_nivel(nivel_sp(path))
+
+
+def comando_nivel(nivel):
+    """Comando do painel com o nível explícito: `claude --model <M> --effort <E>` (usado pela escalada)."""
+    m = modelo_nivel(nivel)
+    return ["claude", "--model", m["model"], "--effort", m["effort"]]
 
 
 def comando_painel(path):
     """Comando do painel: `claude --model <M> --effort <E>` com o modelo do SP."""
-    m = modelo_sp(path)
-    return ["claude", "--model", m["model"], "--effort", m["effort"]]
+    return comando_nivel(nivel_sp(path))
 
 
 def prompt_painel(slug, worktree):

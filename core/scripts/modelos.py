@@ -82,6 +82,20 @@ def michi(data, nivel):
     return {"model": p["model"], "effort": p.get("effort") or "low"}, aviso
 
 
+NIVEIS = ("simples", "default", "complexo", "critico")
+
+
+def proximo_nivel(nivel, data=None):
+    """Nível michi seguinte (ordem das chaves de `michi_modelo` em modelos.json; sem config, `NIVEIS`).
+    Vazio = default; último nível ou nível desconhecido -> None."""
+    ordem = list((data or {}).get("michi_modelo") or NIVEIS)
+    nivel = nivel or "default"
+    if nivel not in ordem:
+        return None
+    i = ordem.index(nivel)
+    return ordem[i + 1] if i + 1 < len(ordem) else None
+
+
 def cli_args(nome, path=DEFAULT):
     """Lista de flags para `claude` (ex.: ['--model', 'claude-sonnet-5-5', '--effort', 'medium'])."""
     p = papel(load(path), nome)

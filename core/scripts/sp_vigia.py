@@ -2,7 +2,8 @@
 
 `passo(ctx, mem)` é um tick: `done` de SP auto → merge (lock global do `sb-agent`), fecha o painel, limpa a worktree e
 lança o seguinte; SP manual, gates vermelhos ou conflito → `bloqueado` com motivo; `pergunta`/`bloqueado`/`falhou` →
-título `? `/`! `/`x ` + toast, um por transição; painel morto sem estado → `falhou`. Devolve "continua" ou "fim".
+título `? `/`! `/`x ` + toast, um por transição; painel morto sem estado → `falhou`. `falhou`/`bloqueado` por gate com
+nível de modelo acima → relançado uma vez nesse nível (`sp_escalada`), sem avançar a fila. Devolve "continua" ou "fim".
 Os efeitos vivem no `Contexto` (o real é `ContextoReal`; os testes trocam-no).
 
 Uso: módulo importado por sp-vigia.py; sem execução direta
@@ -30,7 +31,10 @@ def memoria_nova():
 def ler_memoria(path):
     dados = ler_json(path)
     try:
-        return {"avisos": dict(dados.get("avisos") or {}), "tratados": list(dados.get("tratados") or [])}
+        mem = {"avisos": dict(dados.get("avisos") or {}), "tratados": list(dados.get("tratados") or [])}
+        if dados.get("escalados"):
+            mem["escalados"] = list(dados["escalados"])
+        return mem
     except (AttributeError, TypeError, ValueError):
         return memoria_nova()
 
@@ -69,6 +73,10 @@ class Contexto:
     def nota_relatorio(self, path, texto): raise NotImplementedError
     def estado_global(self): raise NotImplementedError
     def log(self, msg): raise NotImplementedError
+
+    def escalar(self, sp):
+        """Relança o SP no nível seguinte se `sp_escalada` o pedir; {de, para, ...} ou None (sem escalada)."""
+        return None
 
 
 def _seguro(ctx, f, *a):
@@ -156,6 +164,15 @@ def _um(ctx, mem, sp):
         ctx.transitar(slug, "falhou", "painel fechou sem estado")
         sp = {**sp, "estado": "falhou", "msg": "painel fechou sem estado"}
         estado = "falhou"
+    if estado in ("falhou", "bloqueado") and slug not in mem.get("escalados", []):
+        esc = _seguro(ctx, ctx.escalar, sp)
+        if esc is not None:
+            mem.setdefault("escalados", []).append(slug)  # uma tentativa por SP, mesmo se o relançamento falhou
+        if esc and esc.get("estado", "a-correr") == "a-correr":
+            ctx.log(f"escalada {slug}: {esc.get('de')} → {esc.get('para')}")
+            _seguro(ctx, ctx.toast, f"^ {slug}: escalado {esc.get('de')} → {esc.get('para')}")
+            mem["avisos"].pop(slug, None)
+            return None
     _avisar(ctx, mem, sp)
     if estado == "falhou":
         return _seguinte(ctx, mem, slug)
@@ -366,6 +383,24 @@ class ContextoReal(Contexto):
         if rc:
             return rc, f"merge: {out}"
         return self.clean(mae)
+
+    def escalar(self, sp):
+        """Escalada de modelo (`sp_escalada`): decide pelo SP na worktree, relança o painel e regista no SP e na fila."""
+        import sp_escalada
+        path = _sp_na_worktree(sp.get("worktree"), sp["slug"])
+        if path is None or path.parent.name == "Done":
+            return None
+        decisao = sp_escalada.decidir(path.read_text(encoding="utf-8"), sp.get("estado"))
+        if decisao is None:
+            return None
+        de, para, causa = decisao
+        res = sp_escalada.relancar(sp["slug"], para, sp, self.fila, self.backend, run=self.run)
+        if res["estado"] != "a-correr":
+            self.log(f"escalada {sp['slug']} falhou: {res.get('msg')}")
+            return {"de": de, "para": para, **res}
+        sp_escalada.registar_report(path, sp_escalada.linha_report(de, para, causa))
+        _seguro(self, sp_escalada.registar_fila, self.estado_path, sp["slug"], de, para)
+        return {"de": de, "para": para, "causa": causa, **res}
 
     def toast(self, texto):
         toast_windows(texto)
