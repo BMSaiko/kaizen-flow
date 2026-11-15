@@ -2,27 +2,6 @@
 name: grill-me
 description: Entrevista implacável para afinar um plano ou design até haver entendimento partilhado; sai com a lista de decisões. Trigger: grill me, grill this, stress test this, afina o plano, fase 1 do michi.
 version: 2.0.0
-author: Matt Pocock (adapted for Hermes)
-license: MIT
-platforms:
-- linux
-- macos
-- windows
-triggers:
-- grill me
-- grill-me
-- grill this
-- stress test this
-- stress-test this
-metadata:
-  hermes:
-    tags:
-    - interview
-    - design
-    - plan
-    - decision
-    - productivity
-    category: productivity
 ---
 # Grill-me
 

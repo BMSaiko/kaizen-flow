@@ -96,6 +96,8 @@ def validate(text, folder=None):
             errors.append("merge auto exige pr auto")
         if fm.get("perfil") and fm["perfil"] not in ("cauteloso", "normal", "autonomo"):
             errors.append(f"perfil '{fm['perfil']}' inválido (cauteloso|normal|autonomo)")
+        if fm.get("escalar") and fm["escalar"] not in ("sim", "nao"):
+            errors.append(f"escalar '{fm['escalar']}' inválido (sim|nao)")
         for key in ("max_tentativas", "max_requests"):
             if key in fm and not (fm[key].isdigit() and int(fm[key]) >= 1):
                 errors.append(f"{key} '{fm[key]}' tem de ser um inteiro ≥ 1")

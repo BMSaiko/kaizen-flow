@@ -2,29 +2,6 @@
 name: swot
 description: SWOT rápido — modo decisão (go/no-go) ou otimização (pontos de alavanca)
 version: 3.0.0
-author: user
-license: MIT
-triggers:
-- swot
-- swot analysis
-- decision frame
-- optimization analysis
-- leverage points
-metadata:
-  hermes:
-    tags:
-    - workflow
-    - analysis
-    - decision
-    category: analysis
-    related_skills:
-    - brainstorm
-    - grill-me
-    - michi
-changelog:
-- '3.0.0: Formato fixo (≤4 linhas por quadrante, 1 recomendação), modos standalone/encadeado; modo otimização movido para references/optimization.md.'
-- '2.1.0: Encolhida; modelos e exemplos em references/examples.md.'
-- '2.0.0: Modo de otimização fundido no /swot.'
 ---
 # SWOT
 
