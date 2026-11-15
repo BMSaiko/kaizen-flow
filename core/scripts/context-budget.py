@@ -3,7 +3,7 @@
 
 Fontes sempre carregadas: CLAUDE.md, AGENTS.md, MEMORY.md (memória do projeto),
 descrições das skills em .claude/skills/*/SKILL.md. Limites por ficheiro avisam cedo o
-crescimento silencioso de CLAUDE.md e AGENTS.md.
+crescimento silencioso de CLAUDE.md (1 KB), AGENTS.md (7 KB) e MEMORY.md (3,5 KB).
 Uso: python -I scripts/context-budget.py
 rc: 0 dentro do limite, 1 limite ultrapassado
 """
@@ -12,10 +12,29 @@ import sys
 from pathlib import Path
 
 TOTAL_LIMIT = 15 * 1024
-FILE_LIMITS = {"CLAUDE.md": 3 * 1024, "AGENTS.md": 9 * 1024}
+FILE_LIMITS = {"CLAUDE.md": 1024, "AGENTS.md": 7 * 1024, "MEMORY.md": 3584}
 ROOT = Path(__file__).resolve().parent.parent
-MEMORY_INDEX = Path.home() / ".claude" / "projects" / re.sub(r"[^A-Za-z0-9]", "-", str(ROOT)) / "memory" / "MEMORY.md"
+WORKTREE_GITDIR = re.compile(r"gitdir:\s*(.+?)[/\\]\.git[/\\]worktrees[/\\]")
 DESCRIPTION = re.compile(r"^description:\s*(.*)$", re.MULTILINE)
+
+
+def main_root(root):
+    """Raiz do checkout principal: numa worktree `.git` é um ficheiro que aponta para ele."""
+    dotgit = Path(root) / ".git"
+    if dotgit.is_file():
+        match = WORKTREE_GITDIR.match(dotgit.read_text(encoding="utf-8", errors="replace"))
+        if match:
+            return Path(match.group(1))
+    return Path(root)
+
+
+def memory_index(root):
+    """MEMORY.md do projeto: a memória pertence ao checkout principal, não à worktree."""
+    project = re.sub(r"[^A-Za-z0-9]", "-", str(main_root(root)))
+    return Path.home() / ".claude" / "projects" / project / "memory" / "MEMORY.md"
+
+
+MEMORY_INDEX = memory_index(ROOT)
 
 
 def size(path):
