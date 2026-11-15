@@ -33,7 +33,7 @@ def test_transicao_nova_sai_uma_vez():
     mem = fv.memoria_nova()
     fv.passo(mem, leitura({"a": sp("a-correr")}))
     linhas, _ = fv.passo(mem, leitura({"a": sp("pergunta", "qual ramo?")}))
-    assert linhas == ["a: pergunta (qual ramo?) · DECISÃO DO user"]
+    assert linhas == ["a: pergunta (qual ramo?) · DECISÃO DO UTILIZADOR"]
     assert fv.passo(mem, leitura({"a": sp("pergunta", "qual ramo?")}))[0] == []
 
 
