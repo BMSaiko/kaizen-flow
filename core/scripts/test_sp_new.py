@@ -470,6 +470,8 @@ def test_michi_modelo_default_e_nivel_explicito(tmp_path):
     root = project(tmp_path)
     assert "michi_modelo: complexo\n" in sp_new.create(root, "atlas", "a", "P2", TODAY, michi="complexo").read_text(encoding="utf-8")
     assert "michi_modelo: default\n" in sp_new.create(root, "atlas", "b", "P2", TODAY).read_text(encoding="utf-8")
+    assert "michi_modelo: critico\n" in sp_new.create(root, "atlas", "d", "P2", TODAY, michi="critico").read_text(encoding="utf-8")
+    assert sp_new.parse_niveis("a,b@critico:a") == {"b": "critico"}
     with pytest.raises(sp_new.SpNewError):
         sp_new.create(root, "atlas", "c", "P2", TODAY, michi="xl")
 

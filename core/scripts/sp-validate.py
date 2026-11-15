@@ -76,8 +76,8 @@ def validate(text, folder=None):
                 errors.append(f"frontmatter sem '{field}'")
         if fm.get("modo") and fm["modo"] not in ("auto", "manual"):
             errors.append(f"modo '{fm['modo']}' inválido (auto|manual)")
-        if fm.get("michi_modelo") and fm["michi_modelo"] not in ("simples", "default", "complexo"):
-            errors.append(f"michi_modelo '{fm['michi_modelo']}' inválido (simples|default|complexo)")
+        if fm.get("michi_modelo") and fm["michi_modelo"] not in ("simples", "default", "complexo", "critico"):
+            errors.append(f"michi_modelo '{fm['michi_modelo']}' inválido (simples|default|complexo|critico)")
         if fm.get("execucao"):
             if fm["execucao"] not in ("sequencial", "paralelo"):
                 errors.append(f"execucao '{fm['execucao']}' inválido (sequencial|paralelo)")

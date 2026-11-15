@@ -2,15 +2,14 @@
   "papeis": {
     "sp-autor": {
       "model": "claude-opus-5-5",
-      "effort": "low",
+      "effort": "medium",
       "fallback": [
-        "claude-fable-5-1",
-        "claude-opus-5-5"
+        "claude-fable-5-2"
       ]
     },
     "michi-exec": {
       "model": "claude-sonnet-5-5",
-      "effort": "low"
+      "effort": "medium"
     },
     "michi-leve": {
       "model": "claude-haiku-5-5",
@@ -22,6 +21,14 @@
     },
     "michi-complexo": {
       "model": "claude-opus-5-5",
+      "effort": "medium"
+    },
+    "michi-critico": {
+      "model": "claude-fable-5-2",
+      "effort": "low"
+    },
+    "revisor": {
+      "model": "claude-fable-5-2",
       "effort": "low"
     }
   },
@@ -35,12 +42,18 @@
     "opus": "claude-opus-5-5",
     "sonnet": "claude-sonnet-5-5",
     "haiku": "claude-haiku-5-5",
-    "fable": "claude-fable-5-1",
-    "fable-5.2": "claude-fable-5-2"
+    "fable": "claude-fable-5-2"
   },
   "michi_modelo": {
     "simples": "michi-leve",
     "default": "michi-exec",
-    "complexo": "michi-complexo"
-  }
+    "complexo": "michi-complexo",
+    "critico": "michi-critico"
+  },
+  "conhecidos": [
+    "claude-fable-5-2",
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
+    "claude-haiku-5-5"
+  ]
 }

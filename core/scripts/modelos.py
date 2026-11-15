@@ -1,4 +1,4 @@
-"""Modelo/effort por papel (sp-autor, michi-exec, michi-leve): única fonte em .claude/modelos.json.
+"""Modelo/effort por papel (sp-autor, revisor, michi-*): única fonte em .claude/modelos.json.
 
 Uso: python -I scripts/modelos.py [--config F] list | get <papel> [--json|--cadeia] | michi <nivel> [--json] | args <papel>
                                   | set <papel> <modelo|alias> [--effort low|medium|high|xhigh|max]
@@ -44,12 +44,30 @@ MICHI_DEFAULT = {"simples": "michi-leve", "default": "michi-exec", "complexo": "
 def cadeia(data, nome):
     """Modelo principal do papel seguido do `fallback` (ordem de tentativa)."""
     p = papel(data, nome)
-    fb = p.get("fallback") or []
-    return [p["model"], *[m for m in fb if m != p["model"]]]
+    out = [p["model"]]
+    for m in p.get("fallback") or []:
+        if m not in out:
+            out.append(m)
+    return out
+
+
+def avisos_ids(data):
+    """Avisos (texto) por modelo de papel/fallback fora de `aliases` e de `conhecidos`; sem nenhuma das listas não avisa."""
+    validos = set((data.get("aliases") or {}).values()) | set(data.get("conhecidos") or [])
+    if not validos:
+        return []
+    out = []
+    for nome, p in data["papeis"].items():
+        if not isinstance(p, dict):
+            continue
+        for m in [p.get("model"), *(p.get("fallback") or [])]:
+            if m and m not in validos:
+                out.append(f"aviso: papel '{nome}' usa o modelo desconhecido '{m}' (não está em aliases nem em conhecidos)")
+    return out
 
 
 def michi(data, nivel):
-    """Resolve o nível do michi (simples|default|complexo) para {model, effort}; effort sempre low.
+    """Resolve o nível do michi (simples|default|complexo|critico) para {model, effort}; effort do papel (defeito low).
     Nível desconhecido ou vazio -> default; devolve (dict, aviso|None)."""
     mapa = {**MICHI_DEFAULT, **(data.get("michi_modelo") or {})}
     aviso = None
@@ -60,7 +78,8 @@ def michi(data, nivel):
     if nome not in data["papeis"]:
         aviso = f"aviso: papel '{nome}' em falta em modelos.json; a usar michi-exec"
         nome = "michi-exec"
-    return {"model": papel(data, nome)["model"], "effort": "low"}, aviso
+    p = papel(data, nome)
+    return {"model": p["model"], "effort": p.get("effort") or "low"}, aviso
 
 
 def cli_args(nome, path=DEFAULT):
@@ -168,6 +187,8 @@ def main(argv=None):
 
     try:
         data = load(ns.config)
+        for aviso in avisos_ids(data):
+            print(aviso, file=sys.stderr)
         if ns.cmd == "list":
             for nome, p in data["papeis"].items():
                 print(f"{nome:<12} {p.get('model', ''):<22} {p.get('effort', '')}")
