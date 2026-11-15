@@ -11,7 +11,7 @@ Ordem fixa: **gates → harden → pentest → review**. Cada passo só corre se
 | Node (`package.json`) | `npm run lint`, `npm run typecheck`, `npm run build`, `npm test` (só os scripts que existem) |
 | Tauri (`src-tauri/Cargo.toml`) | `cargo check --manifest-path src-tauri/Cargo.toml` + os de Node |
 | Python (`pyproject.toml`/`pytest.ini`/`setup.cfg`) | `python -m pytest -q` |
-| Vault (`scripts/context-budget.py` + `scripts/test-fast.py`) | `python -I scripts/context-budget.py`, `python -I scripts/test-fast.py` |
+| Vault (`scripts/context-budget.py` + `scripts/test-fast.py`, este se existir) | `python -I scripts/context-budget.py`, `python -I scripts/test-fast.py` |
 
 ## Execução e resumo
 
@@ -37,4 +37,4 @@ Ordem fixa: **gates → harden → pentest → review**. Cada passo só corre se
 
 ## Passos seguintes
 
-`/harden` (só leitura, FAIL bloqueia) → `/pentest` (achados viram SPs) → `/review-ciclo` (3 iterações, depois escalada). Detalhe: `michi-fases-detalhe.md` §Fase 5.
+`/harden` (só leitura, FAIL bloqueia) → `/pentest` (achados viram SPs) → `/review-ciclo` (painel `revisor` independente via `sp-revisor.py`, `--inline` só se simples/sem painéis; 3 iterações, depois escalada). Detalhe: `michi-fases-detalhe.md` §Fase 5.

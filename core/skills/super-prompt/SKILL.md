@@ -1,32 +1,7 @@
 ---
 name: super-prompt
-description: Build Super Prompt — chains brainstorm+swot+grill-me+dr
+description: Constrói um Super Prompt de 8 secções (brainstorm, SWOT, grill-me e DR mini) e guarda-o como SP. Usar para transformar uma ideia num SP pronto para o michi.
 version: 2.0.0
-author: Hermes Agent (user)
-license: MIT
-triggers:
-- super-prompt
-- super prompt
-- /super-prompt
-metadata:
-  hermes:
-    tags:
-    - prompt
-    - planning
-    - michi
-    - orchestration
-    - super-prompt
-    category: workflow
-    related_skills:
-    - michi
-    - brainstorm
-    - swot
-    - grill-me
-    - dr
-changelog:
-- '2.0.0: SKILL ≤5 KB; template, frontmatter e flags completas do sp-new.py movidos para references/super-prompt-detalhe.md.'
-- '1.2.0: encolhida (changelog antigo no git, texto repetido passado a ligações); regras mantidas.'
-- '1.1.0: validateSuperPrompt() no save, --quick, templates de grill por domínio.'
 model: claude-opus-5-5
 effort: medium
 ---

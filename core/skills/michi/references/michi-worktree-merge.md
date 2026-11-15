@@ -1,17 +1,10 @@
-# michi — Worktree → dev merge protocol
+# michi: merge da worktree para dev
 
-   **Worktree → dev merge protocol** (michi 2026-09-05, atlas cycle):
-   when the worktree's commit+push is accepted and the next step is
-   merging back to `dev`, never merge straight to dev and resolve there
-   — dev may have moved since the worktree was cut, and conflict
-   markers on dev are a 3am page. Protocol:
-   1. `git -C <parent> fetch origin dev` — see what's new on dev.
-   2. If origin/dev is ahead of the worktree's merge-base: `git -C <wt>
-      merge origin/dev` (or local `dev` if local is current).
-   3. Resolve conflicts IN THE WORKTREE — you have the full context of
-      your changes + tests + gate output; on dev you'd be debugging
-      against stale state from other features.
-   4. Re-run the gates in the worktree (the merged state is what ships).
-   5. ONLY then `git -C <parent> merge <wt-branch>` → push origin dev
-      (fast-forward if possible, else `--no-ff` for the merge-commit
-      audit trail).
+O ramo de dev pode ter andado desde que a worktree foi criada, e resolver conflitos lá é resolver sem o contexto da alteração. Por isso:
+
+1. `git -C <pai> fetch origin dev`.
+2. Se `origin/dev` está à frente da base da worktree: `git -C <wt> merge origin/dev` e resolver os conflitos na worktree, onde estão a alteração, os testes e o output dos gates.
+3. Correr os gates de novo na worktree, porque o estado depois do merge é o que segue.
+4. Só então `git -C <pai> merge <ramo-wt>` e push (fast-forward se possível, senão `--no-ff`).
+
+Com mais de um ramo longo candidato a destino, perguntar qual. Autorizações: `michi-modo-auto.md` §Autorizações.

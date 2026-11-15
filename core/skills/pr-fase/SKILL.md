@@ -1,6 +1,6 @@
 ---
 name: pr-fase
-description: Fase final do kaizen flow - abre o PR com template padrão (feito, decisões, por fazer, prova) a partir do SP, pen test e review
+description: Abre o PR com a template padrão (feito, decisões, por fazer, prova) a partir do SP, do pen test e do review. Usar na fase de PR do michi.
 version: 1.1.0
 ---
 # pr-fase

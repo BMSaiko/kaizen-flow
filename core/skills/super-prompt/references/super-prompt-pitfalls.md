@@ -1,28 +1,17 @@
-# Super-prompt — pitfalls
+# super-prompt: pitfalls
 
-Movido de `SKILL.md`; condensado em 2026-10-31 (regras todas mantidas), 13 entradas.
+Regras gerais; os casos de origem estão no arquivo de incidentes do vault (`knowledge/infra/reference/michi-incidentes.md`).
 
-1. **Objetivo vazio.** Só `/super-prompt`: nota de bloqueio, perguntar uma vez, sair. Não inventar objetivo.
-2. **Saltar fases «para poupar tempo».** Cada fase aperta a seguinte; 90 s de brainstorm poupam 30 min de retrabalho no DP.
-3. **`clarify` multi-escolha sobre factos já ditos.** «Âmbito é o fluxo de auth» no turno 1 não vira «auth ou pagamentos?» no turno 4.
-4. **Secções 4/5/8 incompletas.** Sucesso sem sinais observáveis, ou done-when sem verificação concreta, não são critérios: voltar ao grill-me nessa secção.
-5. **Guardar no caminho errado.** Usar sempre `sp-new.py` (ver SKILL.md §Onde guardar).
-6. **Auto-executar o SP na mesma sessão.** O ponto do SP é sobreviver à fronteira de sessão; fora da DA. Se o user insiste: «esta skill constrói prompts, não implementações; `/michi` é o executor».
-7. **Pivot a meio para tarefa não relacionada** (tipicamente Fases 1-3: «revê a conversa e atualiza skills», «esquece o polish, faz X», «deixa estar»). Errado: continuar às Fases 4/5 para «fechar». Certo: abortar limpo, dizer numa frase que o SP não foi guardado (e porquê) e passar ao pedido real. Nunca guardar um SP meio cozinhado (a sessão que o recebe assentaria em âmbito não validado).
-8. **Grill-me em várias rondas quando uma + defaults chega** (2026-09-04). A 1ª ronda junta TODAS as perguntas abertas (âmbito, sucesso, constrangimentos, não-objetivos, tecto, browser, evidência) num free-text com «default» para o que o user quiser saltar. Se a resposta cobre 3+ itens com «default»/escolhas explícitas, **fechar o grill-me**: sem 2ª ronda para «os últimos 1-2 pontos». Resolver desconhecidos inline no apêndice do Spec (default sensato + nota «user unaware, executor treats as gate»). Uma ronda é o teto para objetivos bem delimitados; a 2ª só se a resposta contradiz uma secção (diz A e escolhe B no mesmo turno).
-   **Padrão bake-defaults-into-question-text:** listar cada decisão aberta no texto da pergunta com o default recomendado à frente («Por defeito aplico: (1) confirms-danger FICAM modal; (2) 4 tabs pinadas; (3) …»). O user responde «confirmo todas» ou só os desvios; dizer sim custa zero. Usar com user fluente, defaults defensáveis e ≥4 itens; com user a aprender o domínio, os defaults vão como factos no Spec, não como checklist.
-9. **Guardar o SP com conteúdo hostil ao shell** (2026-09-04/05). O corpo traz backticks, `$`, `!`, aspas e caminhos Windows com espaços. Em Windows/MSYS falham, e todos se resolvem com a MESMA receita: `write_file` (passa pelo bash: `unexpected EOF while looking for matching "'`); `execute_code` com `body = """..."""` (`SyntaxError: unterminated triple-quoted string literal` ou armadilha de backslash em f-string); `A = body.append; A("…) …")` (`SyntaxError: unmatched ')'`: o kernel parseia a célula inteira antes de a correr, e um `)` desbalanceado num fragmento fecha a instrução; gatilho típico `"see step 6), \`dashboard.tsx\`.\n"`). **Receita:** lista de literais simples + `join`, sem alias de `append`:
-   ```python
-   fragments = [
-       "# Super Prompt - <slug> (<date>)\n",
-       "\n## 1. Role\n",
-       "You are ...\n",
-       # um literal por parágrafo lógico
-   ]
-   pathlib.Path(out).write_text("".join(fragments), encoding="utf-8")
-   ```
-   (a) sem strings triple-quoted para conteúdo com backticks, `<...>` ou metacaracteres; (b) sem chamadas parentesadas à volta do fragmento, só entradas nuas na lista. As mensagens de erro apontam para o wrapper bash/parser, não para o conteúdo: confiar na receita.
-10. **A forma do `clarify` é frágil e as falhas são opacas** (2026-09-05). `questions` tem de ser array de `{question, choices?, multi_select?}`. Falhas: array de strings simples → `"questions must be an array of question objects"`; `choices` como boolean/string em vez de `string[]` → `"choices field requires array of plain strings"` (o mesmo erro opaco). Caminho free-text certo: `[{question: "..."}]` sem `choices` (omitir ou `choices: null` renderizam ambos free-text). Receita one-round (Pitfall #8): uma entrada, defaults dentro da pergunta, ex.: `clarify(questions=[{"question": "Atlas — modais viram tabs dragáveis. Por defeito: (1) confirms-danger ficam modal; (2) até 4 tabs pinadas; (3) layout persiste em localStorage. Confirma ou altera."}])`. Não partir em `choices` (o user em PT-PT quer prosa, não linhas clicáveis). Multi-escolha serve só com 2-3 opções mutuamente exclusivas, lista ≤4, recomendada PRIMEIRO (a UI marca `(Recommended)`) e as opções em `choices`, nunca no texto da pergunta (prosa morta).
-11. **Time-out do `clarify` = confirmação silenciosa, não falha** (2026-09-05). `{timed_out: true}` com `responses` vazio = o user aceitou todos os defaults do texto: sem re-perguntar nem 2ª ronda (a resposta foi silêncio, não recusa). Re-perguntar só se o objetivo estava vazio (#1: nenhuma pergunta chegou a ser feita). O padrão bake-defaults torna isto seguro: o aceite silencioso fica registado.
-12. **Patch a um SP publicado com âncoras assumidas, não copiadas** (atlas-mundo-workflow-michi, 2026-09-05). Ao iterar um SP ao longo de turnos, o ficheiro muda (fases deslocam-se, frases reescrevem-se). **Obrigatório:** antes de cada `replace(old, new)`, ler os bytes exatos do ficheiro (`read_file`, depois `m.group(0)`) e usar esse literal, nunca paráfrase da memória; `txt.count(anchor) != 1` é o pré-voo barato (count==0 falha alto e poupa 3-5 células). Sem isto o `replace` não faz nada em silêncio, as asserções seguintes falham e repete-se o código 3-4 vezes (10-20 min por âncora, 3 por sessão).
-13. **O DR mini só cita infra viva no ramo base** (atlas-mundo-workflow-michi, 2026-09-05). Em §6 Seams não listar símbolos/ficheiros removidos num ciclo recente (a sessão tentaria estendê-los e falharia o typecheck): `Card`, `kops`, `viewTerminal`, rotas `w:kanban:*` já não existiam depois do strip-kanban (`58c30cb`); `run-card.mjs` foi apagado em 2026-09-05 e o SP anterior ainda o listava para reutilizar. **Obrigatório:** por cada seam de §6, `git -C <repo> ls-files --error-unmatch <nome-ou-caminho>` (ou grep em `src/` + `server/`) antes de publicar; o HEAD do ramo base é a verdade. Sem isto, o executor constrói um SP que não compila (typecheck rc=1) e gasta uma hora a rastrear a seam morta até ao SP.
+1. **Objetivo vazio.** Perguntar uma vez e sair, sem inventar objetivo.
+2. **Saltar fases.** Cada fase aperta a seguinte; o que se poupa no brainstorm paga-se em retrabalho no DP.
+3. **Escolha múltipla sobre factos já ditos.** Um facto dado no início não volta como pergunta.
+4. **Secções 4, 5 e 8 incompletas.** Sucesso sem sinal observável ou done-when sem verificação não são critérios: voltar ao grill-me nessa secção.
+5. **Caminho errado.** Criar sempre com `sp-new.py` (`SKILL.md` §Onde guardar).
+6. **Executar o SP na mesma sessão.** O SP existe para atravessar a fronteira de sessão; `/michi` é o executor.
+7. **Pivot a meio para outra tarefa.** Abortar limpo, dizer numa frase que o SP não foi guardado e passar ao pedido real; um SP meio feito levaria a sessão seguinte a assentar em âmbito não validado.
+8. **Grill-me em várias rondas.** A primeira ronda junta todas as perguntas abertas com o default à frente de cada uma; se a resposta cobre os itens, fechar. Segunda ronda só se a resposta contradiz uma secção. Com um user a aprender o domínio, os defaults vão como factos no Spec.
+9. **Conteúdo hostil ao shell** (backticks, `$`, aspas, caminhos Windows). Escrever o SP com `Write`/`Edit`, nunca por heredoc ou strings geradas no shell.
+10. **Forma da pergunta ao user.** Pergunta aberta por defeito, com os defaults no texto; escolha múltipla só com 2-3 opções exclusivas, recomendada primeiro.
+11. **Pergunta sem resposta na janela.** Equivale a aceitar os defaults escritos na pergunta; não repetir a ronda (exceto com objetivo vazio, #1).
+12. **Âncoras de patch.** Antes de cada substituição num SP que mudou entre turnos, copiar o texto exato do ficheiro e confirmar que ocorre uma só vez; uma âncora de memória falha em silêncio.
+13. **DR mini só com infra viva.** Cada seam de §6 confirma-se no ramo base (`git ls-files --error-unmatch` ou `Grep`) antes de publicar, porque um seam removido dá um SP que não compila.

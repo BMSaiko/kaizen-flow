@@ -18,7 +18,7 @@ import sp_vigia as sv  # noqa: E402
 from sp_estado_base import ErroEstado  # noqa: E402
 
 INTERVALO = 10.0
-ATENCAO = {"bloqueado": "ATENÇÃO", "falhou": "ATENÇÃO", "pergunta": "DECISÃO DO user"}
+ATENCAO = {"bloqueado": "ATENÇÃO", "falhou": "ATENÇÃO", "pergunta": "DECISÃO DO UTILIZADOR"}
 RE_MERGE = re.compile(r"^\S+ merge (\S+): (.*)$")
 RE_SEGUINTE = re.compile(r"^\S+ seguinte (\S+): (\S+)")
 RE_FIM = re.compile(r"^\S+ fila terminada:\s*(.*)$")

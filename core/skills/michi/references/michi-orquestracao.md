@@ -4,13 +4,13 @@ Regras que saíram do `SKILL.md` sem alteração de contrato. Prova, reflect por
 
 ## Kaizen hooks
 
-`kaizen-hooks.json` (ref. `knowledge/infra/reference/kaizen-hooks.md`): em cada início/fim de fase, gate falhado, commit e fecho correr `python -I scripts/kaizen_hooks.py fire michi.<phase.start|phase.end|gate.failed|commit|closed> --slug <SP> --project <p>`. rc≠0 de hook bloqueante = parar e reportar. Sem config é no-op.
+`kaizen-hooks.json` (ref. `kaizen-hooks.md` do vault, se existir): em cada início/fim de fase, gate falhado, commit e fecho correr `python -I scripts/kaizen_hooks.py fire michi.<phase.start|phase.end|gate.failed|commit|closed> --slug <SP> --project <p>`. rc≠0 de hook bloqueante = parar e reportar. Sem config é no-op.
 
 ## Arranque
 
 - **Estado:** `python -I scripts/sp-estado.py <SP>` (≤30 linhas) em vez de ler SP, lista e git à parte. Aceita o slug (não o caminho).
 - **Perfil:** ler `perfil`/`max_tentativas`/`parar_se` no arranque e na paragem (`michi-perfis.md`).
-- **Worktree:** `python -I scripts/sb-worktree.py ensure <slug>` e editar pelo caminho absoluto da worktree (o guard bloqueia o checkout principal); `sp-move`/`sp-fechar` saltam sozinhos para ela; commits por fase lá; `merge` (recusa SP fora de Done, `--force` explícito) + `clean` só no fecho.
+- **Worktree:** com `scripts/sb-worktree.py` (só no vault; noutro projeto, `git worktree add` num ramo próprio): `python -I scripts/sb-worktree.py ensure <slug>` e editar pelo caminho absoluto da worktree (o guard bloqueia o checkout principal); `sp-move`/`sp-fechar` saltam sozinhos para ela; commits por fase lá; `merge` (recusa SP fora de Done, `--force` explícito) + `clean` só no fecho.
 - **Tab:** `python -I scripts/tab-title.py <slug>` (best-effort, rc 0; imprime `/rename <slug>`). Vale para a sessão nova do `/sp-handoff`.
 - **Checkpoint/rollback:** `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate (`michi-modo-auto.md` §Paragem).
 - **Sessão suja:** se o contexto já tem conversa anterior (não veio de `/clear` nem de handoff), um só AskUserQuestion: «Limpar e iniciar o SP em sessão nova?» + modo; com «sim», `python -I scripts/sp-handoff.py --launch <caminho>` (`--auto` se escolhido) e terminar o turno. Conta como suja qualquer sessão onde já correu trabalho (SP criado ou `/michi` anterior). SP com secções vazias (sem objetivo/passos) não é «nada a fazer»: entra no Grill (fase 1), nunca parar nem saltar o Arranque (passos 2-5, incluindo esta verificação).
@@ -38,7 +38,7 @@ Build/tests/lint/typecheck/e2e aplicáveis; cada comando e RC vão para o report
 
 ## Painéis
 
-Não há sub-agentes (`Agent`): o michi e todas as fases correm na sessão principal. Outra sessão é sempre um painel WezTerm com `claude` próprio: `/sp-fila` (um painel por SP, vigia `sp-vigia.py`), `sp-autor.py` (preencher um SP) ou `--painel`. Cada painel commita na sua worktree e reporta o estado em ficheiro, nunca por mensagem:
+Não há sub-agentes (`Agent`; sítio único da regra no michi, os outros ficheiros só apontam): o michi e todas as fases correm na sessão principal. Outra sessão é sempre um painel WezTerm com `claude` próprio: `/sp-fila` (um painel por SP, vigia `sp-vigia.py`), `sp-autor.py` (preencher um SP) ou `--painel`. Cada painel commita na sua worktree e reporta o estado em ficheiro, nunca por mensagem:
 
 - `python -I scripts/sp-estado.py <slug> done|pergunta|bloqueado|falhou --msg "<texto>"` (o `sp-autor` usa a chave `sp-autor-<slug>` na fila `sp-autor`); antes de parar a meio, gravar `## Progresso` no SP.
 - O principal (ou o user) lê com `python -I scripts/sp-estado.py --listar`: `pergunta` → `AskUserQuestion` e a resposta vai ao painel pelo user; `done` → propor `sb-worktree.py merge <slug>` (automático com `commit: auto`); `bloqueado`/`falhou` → resumo ao user.

@@ -1,13 +1,11 @@
 ---
 name: michi
-description: Project workflow with self-evolution. Reflect, then commit.
-version: 2.6
-author: user
-license: MIT
+description: Orquestra o ciclo de um projeto ou SP, do grill ao commit, com gates, prova e reflect por fase. Usar para executar um SP ou levar uma ideia até ao commit.
+version: 2.7
 ---
 ## michi — orquestrador do ciclo de projeto
 
-**Fluxo:** dr → grill → dp → da → gates → pentest → review → pr → report → reflect → commit. **Regras duras:** sem auto-commit/push; prova e reflect por fase. O detalhe vive nas skills de fase e em `references/` (índice: `michi-orquestracao.md`).
+**Fluxo:** dr → grill → dp → da → gates → pentest → review → pr → report → reflect → commit. **Regras duras:** prova e reflect por fase; commit, push e merge só com autorização (§Regras transversais). Detalhe nas skills de fase e em `references/` (índice `michi-orquestracao.md`).
 
 **Help:** `/michi help|-h|?` responde só com a Usage e pára. Uso: `/michi [--auto] [<idea>|<SP>]`, `skip <fase>`, `go to DA` (`references/michi-help.md`).
 
@@ -21,13 +19,13 @@ license: MIT
 | 4 | Deep Acting | `/da` | prova por fase + `/reflect fase` | agente |
 | 5 | Gates | `sp-gates.py` · `/harden` | cada comando com RC; falha = corrigir e repetir tudo | agente |
 | 6 | Pentest | `/pentest` | sem achados abertos (ou decisão do user) | agente / user |
-| 7 | Review | `/review-ciclo` | APROVADO; ESCALAR após 3 iterações | agente / user |
+| 7 | Review | `/review-ciclo` (`sp-revisor.py`, revisor independente) | APROVADO; ESCALAR após 3 iterações | agente / user |
 | 8 | PR | `/pr-fase` | corpo pela template, respeitando `pr:` | agente |
 | 9 | Report | `/report` (`sp-report.py`) | 5 secções, «Dificuldades» não vazia | agente |
 | 10 | Reflect | `/reflect final` | A/B/C proposto; o user aplica | user |
 | 11 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | user |
 
-Sem `Agent`: fases na sessão principal; outra sessão = painel WezTerm (`michi-orquestracao.md`).
+Sem as skills `/harden`, `/report`, `/reflect` ou `/commit` (vault), o passo faz-se à mão: gates com RC, `sp-report.py`, `## Reflect` do SP, commit com stage explícito.
 
 Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_requests`, go/no-go em Decisões; `references/michi-spike.md`.
 
@@ -35,28 +33,28 @@ Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_reque
 
 ## Arranque
 
-1. `python -I scripts/sp-estado.py <slug>` (fase, passos, gates, ramo) e ler `perfil`/`max_tentativas`/`parar_se`. SP vazio = Grill, não paragem; correr sempre o Arranque todo e a «sessão suja» (`michi-orquestracao.md`) antes da fase 1. «SP não encontrado»: ramo atrás de `master` → `git merge master` e repetir.
-2. SP em TODO (p.ex. vindo de `/sp-handoff`): `python -I scripts/sp-move.py <slug> --start` (move o SP e as mães em TODO para Doing, idempotente). `python -I scripts/sb-worktree.py ensure <slug>`; editar pelo caminho absoluto da worktree; `merge` + `clean` só no fecho com o SP em Done.
+1. `python -I scripts/sp-estado.py <slug>` (fase, passos, gates, ramo) e ler `perfil`/`max_tentativas`/`parar_se`. SP vazio = Grill; correr o Arranque todo e a «sessão suja» (`michi-orquestracao.md`) antes da fase 1. «SP não encontrado»: ramo atrás de `master` → `git merge master` e repetir.
+2. SP em TODO: `python -I scripts/sp-move.py <slug> --start` (SP e mães para Doing, idempotente). `python -I scripts/sb-worktree.py ensure <slug>` se existir (senão `git worktree add`); editar pelo caminho absoluto da worktree; `merge` + `clean` só no fecho com o SP em Done.
 3. `python -I scripts/tab-title.py <slug>` e seguir nesta sessão, sem `Agent`. Painel WezTerm só com `--painel` (`michi_handoff_auto.py decide --painel`, `go <slug>`). Já dentro de um painel ou `--handed`: seguir sem relançar.
 3b. SP novo em auto: `python -I scripts/sp-aprovar.py <slug> --verificar`; rc 1 = por aprovar: recusar e dar a instrução (`sp-resumo.py`, «sim» do user, `sp-aprovar.py`).
-4. Modo: `--auto` ou `modo: auto` no frontmatter = sem `AskUserQuestion` (`modo: manual` = sem auto, sem pergunta); sem nenhum, perguntar «com/sem auto» (`michi-modo-auto.md`).
+4. Modo: `--auto` ou `modo: auto` no frontmatter = sem `AskUserQuestion` (`modo: manual` = sem auto, sem pergunta); sem nenhum, perguntar «com/sem auto».
    Se o `sp-estado` diz `execução: por escolher` (SP-mãe com filhos), mesmo em `modo: manual`, `AskUserQuestion` «sequencial ou paralelo?» (caso a caso, sem defeito) e gravar antes de lançar: `python -I scripts/sp-execucao.py <slug> sequencial|paralelo`; com `execucao:` preenchido não perguntar. Depois `/sp-fila --programa <slug>` (sequencial = um filho de cada vez; paralelo = até 3 painéis no total, com o vigia a fazer merge e avisos).
 5. Checkpoint: `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate.
 
-Hooks (`michi.<phase.start|phase.end|gate.failed|commit|closed>`), sessão suja, handoff, `[context-guard]`, painéis: `michi-orquestracao.md`.
+Hooks `michi.*`, sessão suja, handoff, `[context-guard]` e painéis: `michi-orquestracao.md`.
 
 ## Regras transversais
 
-- **Prova por fase** de entrega (código/UI) antes de fechar e do handoff, em `proofs/` (`sp-prova.py`) com caminho absoluto na resposta: `references/michi-prova.md`.
+- **Prova por fase** de entrega antes de fechar e do handoff, em `proofs/` (`sp-prova.py`), caminho absoluto na resposta (`michi-prova.md`).
 - **Reflect por fase** em `## Reflect` do SP; **final** antes de propor o commit (skill `reflect`).
-- **Pushback do user** («está errado», «wrong»…): recomeçar na fase a montante certa, por defeito Grill; ver `michi-orquestracao.md` §Review restart.
-- **Commit/push/merge**: só com confirmação do user (ou `commit|push|pr: auto` no SP); mais de um ramo longo = perguntar qual; worktree → dev em `michi-worktree-merge.md`.
-- **Ciclo de vida** TODO → Doing → Done com `sp-move.py`/`doc-move.py`; `/michi status` lista o estado (`michi-lifecycle.md`).
+- **Pushback do user** («está errado»): recomeçar na fase a montante, por defeito Grill (`michi-orquestracao.md` §Review restart).
+- **Commit/push/merge**: regra única em `michi-modo-auto.md` §Proibições e §Autorizações; worktree para dev em `michi-worktree-merge.md`.
+- **Ciclo de vida** TODO → Doing → Done com `sp-move.py`; `/michi status` (`michi-lifecycle.md`).
 
 ## Style e Pitfalls
 
-`references/michi-style.md` e `michi-pitfalls.md` (índice `michi-pitfalls-index.md`): só a relevante.
+`michi-style.md` e `michi-pitfalls.md` (índice `michi-pitfalls-index.md`): ler só a entrada relevante.
 
 ## See also
 
-`reflect` · `references/michi-skip-grill-play.md` · `scripts/skill-cut.py`
+`reflect` · `michi-skip-grill-play.md` · `scripts/skill-cut.py`

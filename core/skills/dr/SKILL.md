@@ -1,11 +1,11 @@
 ---
 name: dr
-description: 'Use when starting any Deep-Planning (DP) session or COMPLEX task requiring structured context gathering — performs systematic research across vault, codebase, and mistake logs before planning begins. Trigger: start of DP, ''research this first'', ''gather context for'', or any multi-step task where context is incomplete.'
+description: Recolhe contexto do vault, do código e dos erros passados num Research Brief com fontes. Usar antes do DP ou numa tarefa complexa com contexto incompleto (fase 2 do michi).
 version: 3.0.0
 ---
 # Deep-Research (DR)
 
-Fase 0 do DP: evidência antes de assunções. **Sem planeamento sem pesquisa**; o Analyze do DP lê o Brief, não repete a pesquisa. Detalhe (fases, template, erros, red flags, mapa de ferramentas): `references/dr-detalhe.md`.
+Fase 0 do DP: evidência antes de assunções. Planear sem pesquisa repete erros já pagos; o Analyze do DP lê o Brief, não repete a pesquisa. Detalhe (fases, template, erros, red flags, mapa de ferramentas): `references/dr-detalhe.md`.
 
 ## Quando
 
@@ -31,17 +31,11 @@ Fase 0 do DP: evidência antes de assunções. **Sem planeamento sem pesquisa**;
 5. **Temporal:** daily notes de hoje e ontem, sessões dos últimos 3 dias (feito, em curso, bloqueios).
 6. **Brief:** `knowledge/projects/<projeto>/research/YYYY-MM-DD-<tópico>-brief.md`.
 
-Fases 2-5 são independentes: chamadas paralelas na mesma resposta. Falha de uma fase = registar em Lacunas e continuar; nunca abortar o DR.
+Fases 2-5 são independentes: chamadas paralelas na mesma resposta. Falha de uma fase = registar em Lacunas e continuar; o DR não aborta por uma fase.
 
-## Orçamento e paragem
+## Paragem
 
-| Gate | Leituras | Greps/Glob |
-|---|---|---|
-| Skipped | 0 | ≤1 |
-| Delta | ≤5 | ≤4 |
-| Full | ≤15 | ≤10 |
-
-`Read` com `offset`/`limit`, nunca ficheiros inteiros. **Parar quando** (a) as 3 perguntas da Síntese têm resposta com fonte, (b) o orçamento acaba (o resto vai para Lacunas) ou (c) duas pesquisas seguidas não trazem nada novo. Registar no Brief `Orçamento: N leituras, M greps; parou porque…`.
+Parar quando (a) as 3 perguntas da Síntese têm resposta com fonte ou (b) duas pesquisas seguidas não trazem nada novo. Salvaguarda: com Delta acima de ~15 leituras ou Full acima de ~50, parar e passar o resto para Lacunas, porque o âmbito provavelmente está mal escolhido. Ler a parte relevante (`offset`/`limit`) quando o ficheiro é grande; pesquisas independentes vão em paralelo. Registar no Brief `Orçamento: N leituras, M greps; parou porque…` (campo lido pelo `dr-check.py`).
 
 ## Saída (fixa)
 

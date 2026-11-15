@@ -1,18 +1,7 @@
 ---
 name: brainstorm
-description: 'Brainstorm + SWOT: gerar ideias, depois testá-las. Saída fixa e curta.'
+description: Gera ideias e testa-as com um SWOT, com saída fixa e curta. Usar no início de uma ideia ou do super-prompt, quando há várias abordagens possíveis.
 version: 2.0.0
-author: user
-license: MIT
-changelog:
-- '2.0.0: Formato fixo (≤10 ideias de 1 linha), modos standalone/encadeado, saída pronta para --decisao.'
-- '1: Versão inicial.'
-metadata:
-  hermes:
-    tags:
-    - workflow
-    - brainstorm
-    category: brainstorm
 ---
 # Brainstorm
 

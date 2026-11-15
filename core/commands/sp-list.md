@@ -2,7 +2,7 @@
 description: Listar os Super Prompts pendentes (TODO e Doing) agrupados por programa, com estado, prioridade e idade
 version: 1.1.0
 ---
-Corre `python -I scripts/sb.py sp list $ARGUMENTS` (sem argumentos = Doing antes de TODO, P1→P3, mais antigo primeiro; aceita `--sort priority|created|status`, `--reverse`, `--project <nome>`, `--status todo|doing`, `--all`, `--flat`, `--tudo`) e mostra a saída tal como vem, em português europeu, destacando as linhas com `⚠ status≠pasta`.
+Corre `python -I scripts/sp-list.py $ARGUMENTS` (no vault, `scripts/sb.py sp list $ARGUMENTS` é equivalente) (sem argumentos = Doing antes de TODO, P1→P3, mais antigo primeiro; aceita `--sort priority|created|status`, `--reverse`, `--project <nome>`, `--status todo|doing`, `--all`, `--flat`, `--tudo`) e mostra a saída tal como vem, em português europeu, destacando as linhas com `⚠ status≠pasta`.
 
 A saída abre com `Próximo: <slug>` (primeiro SP elegível: Doing antes de TODO, P1→P3, sem dependências por cumprir, mãe `kind: program` nunca conta) e `Bloqueados (N)` com `slug ← dependência em falta` (máx. 5). Tem no máximo 40 linhas, com `… +N linhas (--tudo)` no corte; `--tudo` mostra tudo.
 
