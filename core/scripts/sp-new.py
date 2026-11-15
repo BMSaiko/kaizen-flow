@@ -121,6 +121,8 @@ def check_perfil(perfil, gates=()):
     for key in ("max_tentativas", "max_requests"):
         if key in perfil and (not isinstance(perfil[key], int) or perfil[key] < 1):
             raise SpNewError(f"{key} tem de ser um inteiro ≥ 1")
+    if "escalar" in perfil and perfil["escalar"] not in ("sim", "nao"):
+        raise SpNewError(f"escalar inválido '{perfil['escalar']}' (sim|nao)")
     bad = [x for x in perfil.get("parar_se", []) if x not in PARAR_SE]
     if bad:
         raise SpNewError(f"parar_se inválido {bad} ({'|'.join(PARAR_SE)})")
@@ -208,7 +210,7 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
     if programa:
         head.append("execucao:")
     head += [f"{k}: {auth[k]}" for k in ("commit", "push", "pr", "merge", "restricoes") if k in auth]
-    head += [f"{k}: {perfil[k]}" for k in ("perfil", "max_tentativas", "max_requests") if k in perfil]
+    head += [f"{k}: {perfil[k]}" for k in ("perfil", "max_tentativas", "max_requests", "escalar") if k in perfil]
     if "parar_se" in perfil:
         head.append(f"parar_se: [{', '.join(perfil['parar_se'])}]")
     if escopo:
@@ -368,6 +370,7 @@ def main(argv=None):
     ap.add_argument("--perfil", help="perfil de execução: cauteloso|normal|autonomo")
     ap.add_argument("--max-tentativas", type=int, help="tentativas por gate (override do perfil)")
     ap.add_argument("--max-requests", type=int, help="máximo de pedidos (override do perfil)")
+    ap.add_argument("--escalar", choices=("sim", "nao"), help="na paragem por gate, relançar uma vez no nível de modelo seguinte (defeito do perfil)")
     ap.add_argument("--parar-se", help="lista separada por vírgulas: gate-falha,ambiguidade,ficheiro-fora-de-escopo,custo")
     ap.add_argument("--escopo", help="globs permitidos, separados por vírgulas (documentação do SP)")
     ap.add_argument("--fora-de-escopo", help="globs negados, separados por vírgulas")
@@ -387,7 +390,7 @@ def main(argv=None):
                   f"{sp_escalao.comando(escalao, args.project, args.slug or 'slug', args.priority or 'P2')}", file=sys.stderr)
     args.priority = args.priority or "P2"
     auth = {"commit": args.commit, "push": args.push, "pr": args.pr, "merge": args.merge, "restricoes": args.restricoes}
-    perfil = {"perfil": args.perfil, "max_tentativas": args.max_tentativas, "max_requests": args.max_requests,
+    perfil = {"perfil": args.perfil, "max_tentativas": args.max_tentativas, "max_requests": args.max_requests, "escalar": args.escalar,
               "parar_se": [x.strip() for x in args.parar_se.split(",") if x.strip()] if args.parar_se else None}
     today = date.today()
     fs = lambda n: full_slug(args.project, n, today)  # noqa: E731

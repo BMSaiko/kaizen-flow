@@ -42,6 +42,7 @@ Frontmatter `commit`, `push`, `pr`, `merge` (`auto|pergunta|nunca`; merge só `a
 ## Paragem
 Só para quem: ação irreversível ou externa não autorizada, gate/prova falhada após 2 tentativas, ou dúvida que invalida a §3 do SP (spec). Não commita, não move para Done, regista em `## Report modo auto` reverte ao checkpoint e para.
 Checkpoint: antes da DA (ou de fase com escrita) `python -I scripts/michi-checkpoint.py save --slug <SP>`. Na paragem: `restore --slug <SP>` mostra o plano; em auto, `--apply` e regista a reversão no Report; em manual, `AskUserQuestion` antes de `--apply` (recusa se o HEAD mudou).
+Escalada de modelo (paragem por gate, `escalar: sim`, nível acima em `modelos.json`, uma só vez): na fila o vigia relança o painel no nível seguinte (`sp_escalada.py`, `- escalado: <de> → <para>` no Report); em manual, `AskUserQuestion` «Relançar em <modelo seguinte>?» e, com sim, `sp-handoff.py --launch <SP> --auto --nivel <seguinte>`. Retoma escalada (prompt «Escalada de modelo»): ler primeiro `## Paragem DA` do SP (passo, tentativas, causa) e retomar desse passo.
 
 ## Report (`## Report modo auto` no SP + resumo curto no chat)
 correu bem · correu mal · corrigido · commits (hash + assunto) · próximo passo.

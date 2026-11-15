@@ -398,3 +398,121 @@ def test_contexto_real_usa_o_estado_da_fila(tmp_path):
     c = sp_vigia.ContextoReal("fila-x", tmp_path / "v.log", backend=object())
     assert c.estado_path == fe.estado_de("fila-x")
     assert c.estado_path != fe.ESTADO
+
+
+# --- escalada de modelo (sp_escalada) ------------------------------------------------------------
+
+import pytest  # noqa: E402
+import sp_escalada  # noqa: E402
+
+PARAGEM = "## Paragem DA\n- Passo: 3.1\n- Tentativas: 2\n- Causa: teste vermelho\n- Próximo passo: rever\n"
+
+
+def _sp_texto(nivel="simples", perfil=None, escalar=None, paragem=True, escalado=False):
+    fm = ["---", "slug: a", f"michi_modelo: {nivel}"] + ([f"perfil: {perfil}"] if perfil else []) \
+        + ([f"escalar: {escalar}"] if escalar else []) + ["---", "# SP", ""]
+    corpo = (PARAGEM if paragem else "") + ("## Report modo auto\n- escalado: simples → default\n" if escalado else "")
+    return "\n".join(fm) + corpo
+
+
+@pytest.mark.parametrize("perfil,escalar,nivel,estado,paragem,esperado", [
+    (None, None, "simples", "falhou", True, ("simples", "default")),
+    ("normal", None, "default", "bloqueado", True, ("default", "complexo")),
+    ("autonomo", None, "complexo", "falhou", True, ("complexo", "critico")),
+    ("cauteloso", None, "simples", "falhou", True, None),
+    ("cauteloso", "sim", "simples", "falhou", True, ("simples", "default")),
+    ("normal", "nao", "simples", "falhou", True, None),
+    (None, None, "critico", "falhou", True, None),
+    (None, None, "simples", "falhou", False, None),
+    (None, None, "simples", "pergunta", True, None),
+    (None, None, "simples", "done", True, None),
+])
+def test_decidir_tabela_perfil_nivel_causa(perfil, escalar, nivel, estado, paragem, esperado):
+    r = sp_escalada.decidir(_sp_texto(nivel, perfil, escalar, paragem), estado)
+    assert (r[:2] if r else None) == esperado
+    if r:
+        assert r[2] == "teste vermelho"
+
+
+def test_decidir_uma_so_escalada():
+    assert sp_escalada.decidir(_sp_texto(escalado=True), "falhou") is None
+
+
+def test_deve_escalar_puro():
+    base = {"estado": "falhou", "paragem": "x", "escalado": False, "seguinte": "default"}
+    assert sp_escalada.deve_escalar({}, base)
+    assert not sp_escalada.deve_escalar({}, {**base, "seguinte": None})
+    assert not sp_escalada.deve_escalar({"perfil": "cauteloso"}, base)
+
+
+def test_causa_paragem_ultima_secao():
+    t = "## Paragem DA\n- Causa: velha\n## Outra\n" + PARAGEM
+    assert sp_escalada.causa_paragem(t) == "teste vermelho" and sp_escalada.causa_paragem("# nada") is None
+
+
+def test_registar_report_cria_ou_acrescenta_e_mantem_eol(tmp_path):
+    p = tmp_path / "a.md"
+    p.write_bytes(b"# SP\r\n")
+    sp_escalada.registar_report(p, "- escalado: x")
+    assert p.read_bytes() == b"# SP\r\n\r\n## Report modo auto\r\n\r\n- escalado: x\r\n"
+    p.write_bytes(b"# SP\n## Report modo auto\n- feito\n\n## Reflect\n- r\n")
+    sp_escalada.registar_report(p, "- escalado: y")
+    assert p.read_bytes() == b"# SP\n## Report modo auto\n- feito\n- escalado: y\n\n## Reflect\n- r\n"
+
+
+def test_relancar_abre_painel_no_nivel_seguinte_na_mesma_vaga():
+    from sp_fila_testlib import PainelFalso
+    import sp_painel_estado as pe
+    fila = pe.criar_fila(None)
+    pe.registar(fila, "esc-a", worktree="/wt/esc-a", pane="7")
+    pe.transitar("esc-a", "a-correr", fila=fila)
+    pe.transitar("esc-a", "falhou", msg="gate", fila=fila)
+    painel = PainelFalso()
+    painel.enviar = lambda pane, texto: painel.enviados.append((pane, texto)) or True
+    res = sp_escalada.relancar("esc-a", "complexo", {"pane": "7", "worktree": "/wt/esc-a"}, fila, painel)
+    assert res["estado"] == "a-correr" and res["modelo"] == "claude-opus-5-5"
+    assert painel.fechados == ["7"] and painel.abertos[0][1] == "/wt/esc-a"
+    assert painel.abertos[0][0][:3] == ["claude", "--model", "claude-opus-5-5"]
+    assert "## Paragem DA" in painel.enviados[0][1] and "/michi --auto esc-a" in painel.enviados[0][1]
+    reg = pe.ler(fila, "esc-a")
+    assert reg["estado"] == "a-correr" and reg["modelo"] == "claude-opus-5-5"
+
+
+def test_vigia_escalada_relanca_sem_avancar_a_fila():
+    class CtxEsc(Ctx):
+        def escalar(self, sp):
+            self.chamadas.append(("escalar", sp["slug"]))
+            self.sps[sp["slug"]]["estado"] = "a-correr"
+            return {"de": "simples", "para": "default", "estado": "a-correr"}
+    ctx, mem = CtxEsc({"a": {"estado": "falhou"}}), sp_vigia.memoria_nova()
+    sp_vigia.passo(ctx, mem)
+    assert nomes(ctx) == ["escalar"] and mem["escalados"] == ["a"]
+    assert any("escalado simples → default" in t for t in ctx.toasts)
+    ctx.sps["a"]["estado"] = "falhou"  # falha de novo no nível novo: a fila avança como hoje
+    sp_vigia.passo(ctx, mem)
+    assert nomes(ctx) == ["escalar", "seguinte"]
+
+
+def test_vigia_sem_escalada_comportamento_de_sempre():
+    ctx, mem = Ctx({"a": {"estado": "falhou"}}), sp_vigia.memoria_nova()
+    sp_vigia.passo(ctx, mem)
+    assert nomes(ctx) == ["seguinte"] and "escalados" not in mem
+
+
+def test_contexto_real_escala_uma_vez_e_regista(tmp_path, monkeypatch):
+    wt = tmp_path / "wt"
+    sp = wt / "knowledge" / "p" / "sp" / "Doing" / "a.md"
+    sp.parent.mkdir(parents=True)
+    sp.write_text(_sp_texto("default"), encoding="utf-8")
+    estado = tmp_path / "estado.json"
+    estado.write_text('{"usados": 0}', encoding="utf-8")
+    ctx = sp_vigia.ContextoReal.__new__(sp_vigia.ContextoReal)
+    ctx.fila, ctx.backend, ctx.run, ctx.estado_path, ctx.log_path = "f", None, None, estado, tmp_path / "v.log"
+    chamadas = []
+    monkeypatch.setattr(sp_escalada, "relancar", lambda *a, **k: chamadas.append(a[:2]) or {"estado": "a-correr", "pane": "9"})
+    r = ctx.escalar({"slug": "a", "worktree": str(wt), "estado": "bloqueado"})
+    assert r["de"] == "default" and r["para"] == "complexo" and chamadas == [("a", "complexo")]
+    assert "- escalado: default → complexo" in sp.read_text(encoding="utf-8")
+    import json
+    assert json.loads(estado.read_text(encoding="utf-8"))["escaladas"] == [{"slug": "a", "de": "default", "para": "complexo"}]
+    assert ctx.escalar({"slug": "a", "worktree": str(wt), "estado": "falhou"}) is None

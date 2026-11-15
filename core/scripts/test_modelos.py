@@ -289,3 +289,18 @@ def test_json_real_do_repo():
     assert d["michi_modelo"]["critico"] == "michi-critico"
     assert d["papeis"]["michi-complexo"]["model"] == "claude-opus-5-5"
     assert d["papeis"]["sp-autor"]["effort"] == "medium"
+
+
+def test_proximo_nivel_ordem_da_config():
+    mod = carregar(SCRIPT, "modelos_nivel", registar=False, fresco=True)
+    data = mod.load(mod.DEFAULT)
+    assert [mod.proximo_nivel(n, data) for n in ("simples", "default", "complexo", "critico")] == [
+        "default", "complexo", "critico", None]
+    assert mod.proximo_nivel("", data) == "complexo" and mod.proximo_nivel(None) == "complexo"
+    assert mod.proximo_nivel("inexistente", data) is None
+
+
+def test_proximo_nivel_segue_a_ordem_de_michi_modelo():
+    mod = carregar(SCRIPT, "modelos_nivel2", registar=False, fresco=True)
+    data = {"michi_modelo": {"default": "michi-exec", "simples": "michi-leve"}}
+    assert mod.proximo_nivel("default", data) == "simples" and mod.proximo_nivel("simples", data) is None

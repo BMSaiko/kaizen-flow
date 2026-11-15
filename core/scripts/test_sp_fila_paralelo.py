@@ -522,3 +522,19 @@ def test_mae_com_um_so_filho_fecha_no_fim(tmp_path):
     out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), t, slug="a")
     assert out["acao"] == "fim" and out["fechar_mae"] == "mae"
     assert Path(out["relatorio"]).is_file()
+
+
+def test_relatorio_e_gastos_listam_escaladas(tmp_path):
+    import sp_fila_relatorio as fr
+    estado = {"inicio": "2026-11-15T00:00:00", "feitos": ["a"], "falhados": [], "sessoes": {},
+              "escaladas": [{"slug": "a", "de": "simples", "para": "default"}]}
+    path = fr.relatorio(estado, [], [], "fila vazia", tmp_path, lambda *a, **k: type("R", (), {"stdout": "", "returncode": 0})(),
+                        datetime(2026, 11, 15, 12, 0), {"a": 1.5})
+    texto = path.read_text(encoding="utf-8")
+    assert "## Escaladas\n- a: simples → default" in texto
+    assert fr.render_gastos(estado, {"a": 1.5}).splitlines()[1] == "  a: 1.50 (2 painéis, escalado simples → default)"
+
+
+def test_relatorio_sem_escaladas_nao_muda():
+    import sp_fila_relatorio as fr
+    assert fr.escaladas({}) == {} and "escalado" not in fr.render_gastos({"feitos": ["a"]}, {"a": 1.0})

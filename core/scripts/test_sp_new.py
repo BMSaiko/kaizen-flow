@@ -616,3 +616,12 @@ def test_resolver_auth_herda_do_metodo(tmp_path, monkeypatch):
     assert (out["commit"], out["push"], out["pr"]) == ("auto", "auto", "auto")
     out = sp_new.resolver_auth("atlas", {"pr": "nunca"})
     assert out["pr"] == "nunca" and out["merge"] == "nunca"
+
+
+def test_cli_escalar(tmp_path):
+    root = project(tmp_path)
+    assert sp_new.main(["--project", "atlas", "--slug", "abc", "--priority", "P2", "--root", str(root), "--escalar", "nao"]) == 0
+    text = next((root / "atlas/sp/TODO").glob("atlas-abc-*.md")).read_text(encoding="utf-8")
+    assert "\nescalar: nao\n" in text and not [e for e in sp_validate.validate(text, "TODO") if "escalar" in e]
+    with pytest.raises(sp_new.SpNewError):
+        sp_new.create(root, "atlas", "xyz", "P2", TODAY, perfil={"escalar": "talvez"})
