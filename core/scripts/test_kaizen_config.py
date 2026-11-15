@@ -39,3 +39,40 @@ def test_scripts_use_config_root(tmp_path, monkeypatch):
     (tmp_path / "kaizen.config.json").write_text(json.dumps({"spRoot": "a/b", "docsRoot": "a/c"}))
     assert sp_list.default_root(tmp_path) == tmp_path / "a/b"
     assert doc_list.default_root(tmp_path) == tmp_path / "a/c"
+
+
+def _dev(tmp_path, **kw):
+    (tmp_path / "kaizen.config.json").write_text(json.dumps({"desenvolvimento": kw}))
+
+
+def test_desenvolvimento_defaults_por_metodo(tmp_path):
+    assert cfg.desenvolvimento(tmp_path) is None
+    _dev(tmp_path, metodo="worktree-pr")
+    d = cfg.desenvolvimento(tmp_path)
+    assert (d["commit"], d["push"], d["pr"]) == ("auto", "auto", "auto")
+    assert d["pr_vigia"] is True and d["pr_merge"] == "auto-se-verde"
+    assert d["ramo_principal"] == "main" and d["merge_estrategia"] == "squash"
+    _dev(tmp_path, metodo="worktree-merge")
+    d = cfg.desenvolvimento(tmp_path)
+    assert (d["commit"], d["push"], d["pr"]) == ("auto", "nunca", "nunca")
+    _dev(tmp_path, metodo="direto")
+    d = cfg.desenvolvimento(tmp_path)
+    assert (d["commit"], d["push"], d["pr"]) == ("pergunta",) * 3
+
+
+def test_desenvolvimento_invalido_ou_sobreposto(tmp_path):
+    _dev(tmp_path, metodo="x")
+    assert cfg.desenvolvimento(tmp_path) is None
+    _dev(tmp_path, metodo="worktree-pr", push="lixo", pr="pergunta", merge_estrategia="rebase")
+    d = cfg.desenvolvimento(tmp_path)
+    assert d["push"] == "auto" and d["pr"] == "pergunta" and d["merge_estrategia"] == "rebase"
+
+
+def test_guarda_ramo_principal(tmp_path):
+    _dev(tmp_path, metodo="worktree-pr")
+    assert cfg.metodo_autorizacoes(tmp_path, "agent/x") == {"commit": "auto", "push": "auto", "pr": "auto"}
+    assert cfg.metodo_autorizacoes(tmp_path, "main") == {"commit": "pergunta", "push": "pergunta", "pr": "pergunta"}
+    assert cfg.metodo_autorizacoes(tmp_path, "master")["commit"] == "pergunta"
+    assert cfg.metodo_autorizacoes(tmp_path, "") ["push"] == "pergunta"
+    (tmp_path / "kaizen.config.json").write_text("{}")
+    assert cfg.metodo_autorizacoes(tmp_path, "agent/x") is None

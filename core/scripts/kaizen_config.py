@@ -1,6 +1,6 @@
 """Lê `kaizen.config.json` na raiz do repo; sem ficheiro ou chave, devolve o defeito.
 
-Chaves: `spRoot` (raiz dos SPs) e `docsRoot` (raiz dos DR/DP), relativas à raiz do repo.
+Chaves: `spRoot` (raiz dos SPs) e `docsRoot` (raiz dos DR/DP), relativas à raiz do repo; `desenvolvimento` (método do projeto).
 
 Uso: módulo importado pelos scripts sp-* e doc_ops; sem execução direta
 rc: n/a
@@ -96,3 +96,55 @@ def destino(repo, project):
 def autorizacoes(repo, project):
     """Autorizações commit/push/pr/merge por defeito do destino do `project` (cópia)."""
     return dict(DESTINOS_DEFEITO[destino(repo, project)])
+
+
+# Método de desenvolvimento do projeto (chave `desenvolvimento`).
+METODOS = {
+    "worktree-pr": {"commit": "auto", "push": "auto", "pr": "auto", "pr_vigia": True,
+                    "pr_merge": "auto-se-verde"},
+    "worktree-merge": {"commit": "auto", "push": "nunca", "pr": "nunca", "pr_vigia": False,
+                       "pr_merge": "nunca"},
+    "direto": {"commit": "pergunta", "push": "pergunta", "pr": "pergunta", "pr_vigia": False,
+               "pr_merge": "pergunta"},
+}
+AUTH_VALORES = ("auto", "pergunta", "nunca")
+PR_MERGE_VALORES = ("auto-se-verde", "pergunta", "nunca")
+MERGE_ESTRATEGIAS = ("squash", "merge", "rebase")
+
+
+def desenvolvimento(repo):
+    """Método do projeto já resolvido (defeitos do método + sobreposições válidas) ou None sem método válido."""
+    raw = _read(repo).get("desenvolvimento")
+    if not isinstance(raw, dict) or raw.get("metodo") not in METODOS:
+        return None
+    out = {"metodo": raw["metodo"], "ramo_principal": "main", "merge_estrategia": "squash",
+           **METODOS[raw["metodo"]]}
+    rp = raw.get("ramo_principal")
+    if isinstance(rp, str) and rp.strip():
+        out["ramo_principal"] = rp.strip()
+    for k in ("commit", "push", "pr"):
+        if raw.get(k) in AUTH_VALORES:
+            out[k] = raw[k]
+    if isinstance(raw.get("pr_vigia"), bool):
+        out["pr_vigia"] = raw["pr_vigia"]
+    if raw.get("pr_merge") in PR_MERGE_VALORES:
+        out["pr_merge"] = raw["pr_merge"]
+    if raw.get("merge_estrategia") in MERGE_ESTRATEGIAS:
+        out["merge_estrategia"] = raw["merge_estrategia"]
+    return out
+
+
+def metodo_autorizacoes(repo, ramo):
+    """Autorizações commit/push/pr do método, ou None sem método.
+
+    Guarda: com `ramo` igual ao `ramo_principal` (ou master/main) os `auto` voltam a `pergunta`.
+    """
+    d = desenvolvimento(repo)
+    if d is None:
+        return None
+    no_principal = not ramo or ramo in (d["ramo_principal"], "main", "master")
+    out = {}
+    for k in ("commit", "push", "pr"):
+        v = d[k]
+        out[k] = "pergunta" if v == "auto" and no_principal else v
+    return out

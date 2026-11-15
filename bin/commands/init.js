@@ -95,7 +95,26 @@ function writeTestCmd(dest) {
   return cmd;
 }
 
-function init(target, harness = "claude") {
+const METODOS = ["worktree-pr", "worktree-merge", "direto"];
+
+// grava desenvolvimento.metodo em kaizen.config.json: nunca sobrescreve um método existente nem uma config ilegível
+function writeMetodo(dest, metodo) {
+  const file = path.join(dest, "kaizen.config.json");
+  let cfg = {};
+  if (fs.existsSync(file)) {
+    try { cfg = JSON.parse(fs.readFileSync(file, "utf8").replace(/^﻿/, "")); } catch (e) { return null; }
+    if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) return null;
+  }
+  const cur = cfg.desenvolvimento;
+  if (cur !== undefined && (!cur || typeof cur !== "object" || Array.isArray(cur))) return null;
+  if (cur?.metodo !== undefined) return null;
+  cfg.desenvolvimento = { ...cur, metodo };
+  fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
+  return metodo;
+}
+
+function init(target, harness = "claude", metodo) {
+  if (metodo !== undefined && !METODOS.includes(metodo)) throw new Error(`método desconhecido: ${metodo} (${METODOS.join("|")})`);
   const adapter = ADAPTERS[harness];
   if (!adapter) throw new Error(`harness desconhecido: ${harness} (${Object.keys(ADAPTERS).join("|")})`);
   const dest = path.resolve(target || ".");
@@ -113,8 +132,12 @@ function init(target, harness = "claude") {
   for (const d of ["sp", "dr", "dp"]) for (const s of ["TODO", "Doing", "Done"]) fs.mkdirSync(path.join(d === "sp" ? spRoot : docsRoot, "_default", d, s), { recursive: true });
   const testCmd = writeTestCmd(dest);
   if (testCmd) console.log(`test.cmd detetado: ${testCmd} (editável em kaizen.config.json)`);
+  if (metodo) {
+    if (writeMetodo(dest, metodo)) console.log(`desenvolvimento.metodo: ${metodo} (kaizen.config.json)`);
+    else console.log("desenvolvimento.metodo mantido: já definido ou kaizen.config.json ilegível");
+  }
   console.log(`init (${harness}): ${n} peças copiadas para ${dest}`);
   return n;
 }
 
-module.exports = { init, readSettings, configDir };
+module.exports = { init, readSettings, configDir, METODOS };

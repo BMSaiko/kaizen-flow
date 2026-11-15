@@ -125,3 +125,21 @@ test("doctor --harness codex: hook ligado, ausente e sem config", () => {
   fs.writeFileSync(cfg, "[hooks]\ncommand = \"python -I scripts/context-guard.py\"\n");
   assert.match(out(), /context hook: ligado/);
 });
+
+test("init --metodo grava desenvolvimento.metodo e não sobrescreve", () => {
+  const d = tmp();
+  const r = spawnSync("node", [KZ, "init", d, "--harness", "agents-md", "--metodo", "worktree-pr"], { encoding: "utf8" });
+  assert.strictEqual(r.status, 0);
+  const cfg = () => JSON.parse(fs.readFileSync(path.join(d, "kaizen.config.json"), "utf8"));
+  assert.strictEqual(cfg().desenvolvimento.metodo, "worktree-pr");
+  spawnSync("node", [KZ, "init", d, "--harness", "agents-md", "--metodo", "direto"], { encoding: "utf8" });
+  assert.strictEqual(cfg().desenvolvimento.metodo, "worktree-pr");
+});
+
+test("init sem --metodo não escreve a chave; método inválido falha", () => {
+  const d = tmp();
+  assert.strictEqual(init(d).status, 0);
+  assert.ok(!has(d, "kaizen.config.json") || !("desenvolvimento" in JSON.parse(fs.readFileSync(path.join(d, "kaizen.config.json"), "utf8"))));
+  const r = spawnSync("node", [KZ, "init", tmp(), "--harness", "agents-md", "--metodo", "x"], { encoding: "utf8" });
+  assert.notStrictEqual(r.status, 0);
+});

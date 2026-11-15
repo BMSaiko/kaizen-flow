@@ -604,3 +604,13 @@ def test_create_ui_e_origem(tmp_path):
     p = sp_new.create(tmp_path, "proj", "x", "P2", date(2026, 11, 13), ui=True, origem="veredicto:abc")
     texto = p.read_text(encoding="utf-8")
     assert "ui: sim" in texto and "origem: veredicto:abc" in texto and "## Esboço" in texto
+
+
+def test_resolver_auth_herda_do_metodo(tmp_path, monkeypatch):
+    import json
+    (tmp_path / "kaizen.config.json").write_text(json.dumps({"desenvolvimento": {"metodo": "worktree-pr"}}))
+    monkeypatch.setattr(sp_new, "CONFIG_REPO", tmp_path)
+    out = sp_new.resolver_auth("atlas", {})
+    assert (out["commit"], out["push"], out["pr"]) == ("auto", "auto", "auto")
+    out = sp_new.resolver_auth("atlas", {"pr": "nunca"})
+    assert out["pr"] == "nunca" and out["merge"] == "nunca"

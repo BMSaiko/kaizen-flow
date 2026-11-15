@@ -95,3 +95,14 @@ def test_relocate_tracked_uses_git_mv(tmp_path):
     ke.relocate(src, tmp_path / "Doing" / "a.md")
     status = _git(tmp_path, "status", "--porcelain").stdout
     assert status.strip() == "A  Doing/a.md"  # git mv deixa o destino em stage; rename simples dava «??»
+
+
+def test_precedencia_sp_metodo_pergunta(tmp_path):
+    import json
+    (tmp_path / "kaizen.config.json").write_text(json.dumps({"desenvolvimento": {"metodo": "worktree-pr"}}))
+    assert ke.precisa_perguntar({}, "commit", tmp_path, "agent/x") is False
+    assert ke.precisa_perguntar({"push": "pergunta"}, "push", tmp_path, "agent/x") is True
+    assert ke.precisa_perguntar({}, "pr", tmp_path, "main") is True
+    assert ke.precisa_perguntar({"pr": "auto"}, "pr", tmp_path, "main") is False
+    assert ke.precisa_perguntar({}, "commit") is True
+    assert ke.precisa_perguntar({}, "merge", tmp_path, "agent/x") is True

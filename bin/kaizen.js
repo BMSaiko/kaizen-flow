@@ -17,9 +17,12 @@ const fi = argv.indexOf("--fix");
 const fix = fi >= 0 && !!argv.splice(fi, 1);
 const ci = argv.indexOf("--codex-config");
 const codexConfig = ci >= 0 ? argv.splice(ci, 2)[1] : undefined;
+const mi = argv.indexOf("--metodo");
+const metodo = mi >= 0 ? argv.splice(mi, 2)[1] : undefined;
+if (mi >= 0 && !metodo) { console.error("erro: --metodo requer um de worktree-pr|worktree-merge|direto"); process.exit(1); }
 const [cmd, arg] = argv;
 const cmds = {
-  init: () => init(arg, harness),
+  init: () => init(arg, harness, metodo),
   sync: () => require("./commands/sync.js").run(argv),
   usage: () => process.exit(usage("usage", argv.slice(1))),
   report: () => process.exit(usage("report", argv.slice(1))),
@@ -30,7 +33,7 @@ const cmds = {
   term: () => process.exit(require("./commands/term.js").run(argv.slice(1))),
 };
 if (!Object.hasOwn(cmds, cmd)) {
-  console.log(`kaizen <init [repo] [--harness ${Object.keys(ADAPTERS).join("|")}] | doctor [repo] [--harness h] [--fix] | status [repo] | usage [flags] | report [--week YYYY-WNN] [flags] | audit [dir] | sync [--check|--stamp] | term <ls|fila|michi|limpar|orq> | demo [--keep]>`);
+  console.log(`kaizen <init [repo] [--metodo worktree-pr|worktree-merge|direto] [--harness ${Object.keys(ADAPTERS).join("|")}] | doctor [repo] [--harness h] [--fix] | status [repo] | usage [flags] | report [--week YYYY-WNN] [flags] | audit [dir] | sync [--check|--stamp] | term <ls|fila|michi|limpar|orq> | demo [--keep]>`);
   process.exit(cmd ? 1 : 0);
 }
 try {
