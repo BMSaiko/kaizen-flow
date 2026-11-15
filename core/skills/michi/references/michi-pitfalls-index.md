@@ -1,37 +1,37 @@
-# michi — índice de pitfalls
+# michi: índice de pitfalls
 
 ## Pitfalls
 
-Texto integral em `references/michi-pitfalls.md` (30 entradas, numeradas como abaixo). Ler só a entrada relevante.
+Texto em `references/michi-pitfalls.md`, com a mesma numeração. Ler só a entrada relevante.
 
-1. Treating `/michi` as a single-shot: the user may want to pause at any
-2. Re-asking the user a fact they already gave you
-3. `/michi skip grill` + vague large-scope instruction
-4. Interruption mid-DA leaves the on-disk state 80% done, 0% committed (michi 2026-09-04, atlas polish-A recovery
-5. Banner-sectioned single-file split > N-file split when class-name families overlap heavily
-6. `/michi` + "no questions, do all phases" is a bounded auto-pilot, not infinite licence (michi 2026-09-04, atla
-7. "Bug report" ≠ "the thing to fix". Ask for the actual error string before DR/DA (Atlas michi cycle, 2026-09-03
-8. When michi is loaded but the cycle is hijacked mid-stream by an ops request, Reflect still owes the user a fri
-9. Reflect is a stop point, not a segue (atlas backend refactor, 2026-09-02)
-10. Per-phase commit cadence in a multi-phase DA is a real workflow (atlas backend refactor, 2026-09-02)
-11. Refactor clusters: commit EACH new file before moving to the next, not at end-of-DA (atlas wrapper-replacement
-14. Post-child work (cleanup, merge, push) must be detached from the orchestrator's event loop (atlas wrapper-repl
-15. "Faz um ajuste" to a signed-off plan means: respect the why, not just the what (atlas backend refactor, 2026-0
-16. Post-DA correction list is a phase, not a restart (atlas main-chat michi, 2026-09-04)
-17. Numbered-correction list is a contract, parse it as one (atlas main-chat michi, 2026-09-04)
-20. Pre-DA state gate: snapshot `git status` + `git branch --show-current` + `git log -1` before any edit (hermes-
-21. `git checkout <other-branch>` aborts on uncommitted changes
-22. Junctions/symlinks do NOT auto-propagate from parent to worktree (atlas strip-kanban cycle, 2026-09-05)
-23. Fast-forward merge when the WT is 1 commit ahead of dev and parent is clean (atlas strip-kanban cycle, 2026-09
-25. Worktree → dev: pull first, merge INTO the worktree, resolve there, THEN merge to dev
-26. Fecho com push + merge: fast-forward quando `origin/<ramo>` == base (portfolio-docs-audit, 2026-10-17)
-27. Python em modo texto no Windows: CRLF e `\n` escapado (dev-workflow-escalar-programas, 2026-10-18)
-28. "Duplicada" num SP de inventário: ler o corpo antes de remover (dev-workflow-refactorizar-inventario, 2026-10-18)
-29. MCP numa worktree nova: verificar com `claude -p --mcp-config` (vault-mcp-uso-maximo, 2026-10-27)
-30. Gates sobre repo externo: `cd` no comando (kaizen-sync-igual-ao-vault, 2026-10-27)
-31. Código com escapes: `Edit`, nunca Python por heredoc no Bash (usage-todas-diarias, 2026-11-02)
-32. Comandos `!`: sintaxe bash, barras normais (wt-clean-base-inexistente, 2026-11-04)
-33. Endurecer um recurso: listar todos os pontos de entrada antes de corrigir (endurecer-todos-pontos-de-entrada, 2026-11-07)
-34. Peça nova no pacote K: listar em `SCRIPT_NAMES` e validar com `git status` (sync-apaga-peca-nao-listada, 2026-11-08)
-35. Correr `kaizen audit .` em cada fase que toca testes ou docs (audit-so-no-fim, 2026-11-09)
-36. Testes do pacote K: correr o script em-processo, não por subprocesso (kf-cobertura-subprocesso, 2026-11-10)
+1. Tratar `/michi` como one-shot
+2. Voltar a perguntar um facto já dado
+3. Skip grill com âmbito vago, e gates
+4. Interrupção a meio da DA
+5. Dividir um ficheiro grande
+6. Auto-piloto e worktrees
+7. «X não funciona»: pedir o erro
+8. Ciclo desviado por um pedido de ops
+9. Reflect é ponto de paragem
+10. Cadência de commit por fase
+11. Clusters de refactor
+14. Pós-processamento do filho
+15. Ajuste a um plano aprovado
+16. Lista de correções depois da DA
+17. Lista numerada é contrato
+20. Estado antes da DA
+21. Checkout com alterações (ver 6)
+22. Junctions e symlinks em worktrees
+23. Fast-forward de uma worktree
+25. Worktree para o ramo de dev
+26. Fecho com push e merge
+27. Python em modo texto no Windows
+28. Skill «duplicada»
+29. MCP numa worktree nova
+30. Gates sobre repo externo
+31. Código com escapes
+32. Comandos para o user correr com `!`
+33. Endurecer um recurso
+34. Peça nova no pacote K
+35. Audit do kaizen-flow
+36. Testes do pacote K

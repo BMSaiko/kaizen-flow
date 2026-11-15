@@ -1,6 +1,6 @@
 ---
 name: swot
-description: SWOT rápido — modo decisão (go/no-go) ou otimização (pontos de alavanca)
+description: Faz um SWOT rápido em modo decisão (go/no-go) ou otimização (pontos de alavanca). Usar para decidir ou para melhorar um sistema ou processo.
 version: 3.0.0
 ---
 # SWOT

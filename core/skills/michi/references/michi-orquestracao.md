@@ -38,7 +38,7 @@ Build/tests/lint/typecheck/e2e aplicáveis; cada comando e RC vão para o report
 
 ## Painéis
 
-Não há sub-agentes (`Agent`): o michi e todas as fases correm na sessão principal. Outra sessão é sempre um painel WezTerm com `claude` próprio: `/sp-fila` (um painel por SP, vigia `sp-vigia.py`), `sp-autor.py` (preencher um SP) ou `--painel`. Cada painel commita na sua worktree e reporta o estado em ficheiro, nunca por mensagem:
+Não há sub-agentes (`Agent`; sítio único da regra no michi, os outros ficheiros só apontam): o michi e todas as fases correm na sessão principal. Outra sessão é sempre um painel WezTerm com `claude` próprio: `/sp-fila` (um painel por SP, vigia `sp-vigia.py`), `sp-autor.py` (preencher um SP) ou `--painel`. Cada painel commita na sua worktree e reporta o estado em ficheiro, nunca por mensagem:
 
 - `python -I scripts/sp-estado.py <slug> done|pergunta|bloqueado|falhou --msg "<texto>"` (o `sp-autor` usa a chave `sp-autor-<slug>` na fila `sp-autor`); antes de parar a meio, gravar `## Progresso` no SP.
 - O principal (ou o user) lê com `python -I scripts/sp-estado.py --listar`: `pergunta` → `AskUserQuestion` e a resposta vai ao painel pelo user; `done` → propor `sb-worktree.py merge <slug>` (automático com `commit: auto`); `bloqueado`/`falhou` → resumo ao user.

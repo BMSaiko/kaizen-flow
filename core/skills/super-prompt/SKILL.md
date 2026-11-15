@@ -1,6 +1,6 @@
 ---
 name: super-prompt
-description: Build Super Prompt — chains brainstorm+swot+grill-me+dr
+description: Constrói um Super Prompt de 8 secções (brainstorm, SWOT, grill-me e DR mini) e guarda-o como SP. Usar para transformar uma ideia num SP pronto para o michi.
 version: 2.0.0
 model: claude-opus-5-5
 effort: medium

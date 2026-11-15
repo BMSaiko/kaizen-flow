@@ -37,4 +37,4 @@ Ordem fixa: **gates → harden → pentest → review**. Cada passo só corre se
 
 ## Passos seguintes
 
-`/harden` (só leitura, FAIL bloqueia) → `/pentest` (achados viram SPs) → `/review-ciclo` (3 iterações, depois escalada). Detalhe: `michi-fases-detalhe.md` §Fase 5.
+`/harden` (só leitura, FAIL bloqueia) → `/pentest` (achados viram SPs) → `/review-ciclo` (painel `revisor` independente via `sp-revisor.py`, `--inline` só se simples/sem painéis; 3 iterações, depois escalada). Detalhe: `michi-fases-detalhe.md` §Fase 5.

@@ -6,6 +6,7 @@
 python scripts/sp-handoff.py --resolve [SLUG]            # find the story in Doing
 python scripts/sp-handoff.py --write PATH [--file BODY]  # log progress in the story
 python scripts/sp-handoff.py --launch PATH               # clear context and resume
+python scripts/sp-handoff.py --launch PATH --nivel complexo   # same, switching to the next model level first (/model)
 python scripts/sp-handoff.py --spawn SLUG [SLUG...]      # new pane + worktree per story, running /michi --auto
 ```
 

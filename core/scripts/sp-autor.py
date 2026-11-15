@@ -75,14 +75,14 @@ def _fila(root):
     return pe.criar_fila(FILA, root=root)
 
 
-def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sleep, rotulo=PAPEL, prompt_fn=None, foco=False):
-    """Abre o painel (`rotulo` dá chave e título; `prompt_fn(sp, semente)` substitui o prompt do sp-autor; `foco` ativa-o); devolve {estado: a-correr|pendente|falhou, chave, pane, modelo, msg}."""
+def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sleep, rotulo=PAPEL, prompt_fn=None, foco=False, cmd=None):
+    """Abre o painel (`rotulo` dá chave e título; `prompt_fn(sp, semente)` substitui o prompt do sp-autor; `foco` ativa-o; `cmd` substitui o comando do papel sp-autor); devolve {estado: a-correr|pendente|falhou, chave, pane, modelo, msg}."""
     sp, semente = Path(sp), Path(semente)
     if not sp.is_file():
         raise SpAutorErro(f"SP inexistente: {sp}")
     if not semente.is_file():
         raise SpAutorErro(f"semente inexistente: {semente}")
-    cmd = comando()
+    cmd = cmd or comando()
     k, modelo = chave(slug_de(sp), rotulo), cmd[2]
     res = {"estado": None, "chave": k, "pane": None, "modelo": modelo, "msg": None}
     fila = _fila(estado_root)

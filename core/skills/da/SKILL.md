@@ -1,6 +1,6 @@
 ---
 name: da
-description: "Use when executing an approved Deep-Planning (DP) plan or any COMPLEX standalone task. Provides per-step verification, failure escalation with time-boxing, checkpoint/resume, and structured rollback."
+description: "Executa um plano DP aprovado passo a passo, com evidência por passo, escalada de falhas por tentativas e rc, checkpoint e rollback. Usar na fase 4 do michi ou numa tarefa complexa."
 version: 3.0.0
 ---
 # Deep Acting (DA)
@@ -21,20 +21,20 @@ Executa um plano DP aprovado fase a fase. **Sem «feito» sem evidência (RC/out
 
 ## Loop por passo
 
-Anunciar → executar → verificar (reler o ficheiro alterado, menor teste) → `[OK] Step N.M — <o quê> | Evidence: <RC/output>`. Reportar nas fronteiras de fase. Cada fase fecha com o seu `Gate` e um teste de integração que cubra as fases anteriores (saltá-lo é a causa nº1 de falhas tardias), prova (`michi-prova.md`) e `/reflect fase`.
+Anunciar → executar → verificar (reler o ficheiro alterado, menor teste) → `[OK] Step N.M — <o quê> | Evidence: <RC/output>`. Reportar nas fronteiras de fase. Cada fase fecha com o seu `Gate` e um teste de integração que cubra as fases anteriores (sem ele, as falhas entre fases só aparecem no fim), prova (`michi-prova.md`) e `/reflect fase`.
 
 ## Falha de gate
 
 `python -I scripts/da-stop.py <SP> --passo N.M --tentativas K --causa "<texto>" --proximo "<texto>"`:
 
-- rc 0: tentar de novo com abordagem diferente (nunca repetir às cegas); time-box 3 min de debug por tentativa.
+- rc 0: nova tentativa com outra hipótese, registada na `--causa`; repetir o mesmo comando sem mudar nada não conta como tentativa.
 - rc 1: **parar**. O relatório fixo `## Paragem DA` (Passo, Tentativas, Causa, Próximo passo) vai para `## Report modo auto` do SP. Reverter: `michi-checkpoint.py restore` (`michi-modo-auto.md` §Paragem). Não commita nem move para Done (`michi-modo-auto.md` §Paragem).
 
 Outros `parar_se` do perfil (ambiguidade, ficheiro fora de escopo, custo) também param, com o mesmo relatório.
 
 ## Refresh de contexto
 
-A cada 10 passos, antes de nova fase e após uma paragem: reler o plano do disco, `git status` e os ficheiros alterados (o contexto é um snapshot).
+Antes de nova fase, após uma paragem e sempre que o plano possa ter mudado: reler o plano do disco, `git status` e os ficheiros alterados (o contexto é um snapshot).
 
 ## Feito quando
 
