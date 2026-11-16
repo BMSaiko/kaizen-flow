@@ -10,13 +10,14 @@ Ficheiros (junto da worktree, ignorados pelo git):
 Passo com «inicio» sem «fim»/«revertido» = interrompido: idempotente repete, não idempotente reverte
 (rollback de ficheiros por michi-checkpoint.py). Estado corrompido vai para `<ficheiro>.corrupt-<ts>`
 (nunca se apaga) e reconstrói-se do git + `phase:` do SP. Fecho da consola conta como Ctrl+C.
+rc: 0 ok; 128+sinal se interrompido (Ctrl+C, fecho da consola)
 """
 import argparse
 import json
 import os
 import re
 import signal
-import subprocess
+import subprocess  # só para SubprocessError; correr processos é com painel_backend
 import sys
 import threading
 from dataclasses import asdict, dataclass, field
@@ -25,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sp_disco  # noqa: E402
+import painel_backend  # noqa: E402
 
 RETRY_S = 2.0  # rename com retry curto contra antivírus/leitor (Windows)
 EVENTOS = ("inicio", "fim", "revertido")
@@ -226,7 +228,7 @@ def _frontmatter_fase(sp_path):
 
 def _git(raiz, *args):
     try:
-        r = subprocess.run(["git", "-C", str(raiz), *args], capture_output=True, text=True, timeout=5)
+        r = painel_backend.run_hidden(["git", "-C", str(raiz), *args], capture_output=True, text=True, timeout=5)
     except (OSError, subprocess.SubprocessError):
         return None
     return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
