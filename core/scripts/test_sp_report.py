@@ -92,3 +92,93 @@ def test_report_mostra_aviso_na_seccao_alterado():
     out = sp_report.gerar(SP, "exemplo", ["a | 1 +"], None, atras=2)
     assert out.split("## Alterado\n")[1].startswith("AVISO: a worktree está 2 commit(s)")
     assert "AVISO" not in sp_report.gerar(SP, "exemplo", ["a | 1 +"], None)
+
+
+def test_provas_aceita_prova_de_done():
+    txt = SP.replace("## Prova\n", "## Prova de done\n")
+    assert "proofs/exemplo.txt" in sp_report.gerar(txt, "exemplo", diff_stat=STAT)
+
+
+def _git_repo(path, ramo="main"):
+    import subprocess
+    path.mkdir(parents=True, exist_ok=True)
+    g = ["git", "-C", str(path), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(["git", "init", "-q", "-b", ramo, str(path)], check=True)
+    (path / "a.txt").write_text("1\n", encoding="utf-8")
+    subprocess.run(g + ["add", "a.txt"], check=True)
+    subprocess.run(g + ["commit", "-qm", "base"], check=True)
+    subprocess.run(g + ["checkout", "-qb", "sp/x"], check=True)
+    (path / "novo.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(g + ["add", "novo.py"], check=True)
+    subprocess.run(g + ["commit", "-qm", "sp"], check=True)
+    return path
+
+
+def test_repo_alvo_vem_do_cwd_dos_gates(tmp_path):
+    ext = _git_repo(tmp_path / "ext")
+    gates = [{"cmd": "a", "cwd": "."}, {"cmd": "b", "cwd": str(ext / "sub")}, {"cmd": "c", "cwd": str(ext)}]
+    (ext / "sub").mkdir()
+    assert sp_report.repo_alvo(gates, sp_report.HERE.parent) == ext.resolve()
+    assert sp_report.repo_alvo([{"cmd": "a", "cwd": "."}], sp_report.HERE.parent) is None
+    assert sp_report.repo_alvo([{"cmd": "a", "cwd": str(tmp_path / "nada")}], sp_report.HERE.parent) is None
+
+
+def test_main_alterado_usa_o_repo_externo(tmp_path, capsys):
+    ext = _git_repo(tmp_path / "ext")
+    sp = tmp_path / "sp.md"
+    sp.write_text(SP.replace("    timeout: 120\n", f"    cwd: {ext}\n"), encoding="utf-8")
+    sp_report.main([str(sp)])
+    out = capsys.readouterr().out
+    alterado = out.split("## Alterado\n")[1].split("## Verificado")[0]
+    assert f"repo: {ext.resolve()} (base main...HEAD)" in alterado
+    assert "novo.py" in alterado and "scripts/" not in alterado
+
+
+def test_alterado_externo_ignora_commits_novos_da_base(tmp_path, capsys):
+    import subprocess
+    ext = _git_repo(tmp_path / "ext")
+    g = ["git", "-C", str(ext), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(g + ["checkout", "-q", "main"], check=True)
+    (ext / "alheio.txt").write_text("y\n", encoding="utf-8")
+    subprocess.run(g + ["add", "alheio.txt"], check=True)
+    subprocess.run(g + ["commit", "-qm", "alheio"], check=True)
+    subprocess.run(g + ["checkout", "-q", "sp/x"], check=True)
+    sp = tmp_path / "sp.md"
+    sp.write_text(SP.replace("    timeout: 120\n", f"    cwd: {ext}\n"), encoding="utf-8")
+    sp_report.main([str(sp)])
+    alterado = capsys.readouterr().out.split("## Alterado\n")[1].split("## Verificado")[0]
+    assert "novo.py" in alterado and "alheio.txt" not in alterado
+
+
+def test_repo_alvo_ignora_worktree_do_proprio_vault(tmp_path):
+    import subprocess
+    vault = _git_repo(tmp_path / "vault")
+    wt = tmp_path / "wt"
+    subprocess.run(["git", "-C", str(vault), "worktree", "add", "-q", "-b", "agent/y", str(wt)], check=True)
+    assert sp_report.repo_alvo([{"cmd": "a", "cwd": str(vault)}], wt) is None
+    assert sp_report.repo_alvo([{"cmd": "a", "cwd": str(wt)}], vault) is None
+
+
+def _vault_sps(tmp_path, *slugs):
+    sp_list = carregar(Path(__file__).with_name("sp-list.py"), "sp_list_t", fresco=True)
+    d = tmp_path / "knowledge" / "projects" / "kaizen" / "kaizen" / "demo" / "sp" / "Doing"
+    d.mkdir(parents=True)
+    for s in slugs:
+        (d / f"{s}.md").write_text(f"---\nstatus: Doing\nslug: {s}\nproject: demo\n---\n# SP\n", encoding="utf-8")
+    return sp_list
+
+
+def test_resolver_slug_e_projeto_nas_tres_formas(tmp_path):
+    sp_list = _vault_sps(tmp_path, "demo-x-2026-11-01")
+    for project in (None, "demo", "kaizen/demo"):
+        for ref in ("demo-x-2026-11-01", "demo-x"):
+            caminho, slug, raiz = sp_report.resolver(ref, project, [tmp_path], sp_list)
+            assert slug == "demo-x-2026-11-01" and caminho.is_file() and raiz == tmp_path, (ref, project)
+    caminho, msg, _ = sp_report.resolver("demo-x", "kaizen/outro", [tmp_path], sp_list)
+    assert caminho is None and msg.startswith("SP não encontrado")
+
+
+def test_resolver_slug_sem_data_ambiguo(tmp_path):
+    sp_list = _vault_sps(tmp_path, "demo-x-2026-11-01", "demo-x-2026-11-05")
+    caminho, msg, _ = sp_report.resolver("demo-x", None, [tmp_path], sp_list)
+    assert caminho is None and msg.startswith("SP ambíguo")

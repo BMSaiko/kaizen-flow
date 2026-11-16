@@ -305,3 +305,44 @@ def test_sem_prova_nao_dispensa_docs(root):
     novo_doing(root, slug, OK_CMD, docs=None)
     rc, out, err = fechar(root, slug)  # com --sem-prova "teste"
     assert rc == 1 and "Docs" in out + err and _doing(root, slug)
+
+
+@pytest.mark.parametrize("linha", ["- Reflect DA: sem patch", "* Reflect final: causa X", "  - Reflect DP: ok"])
+def test_avisos_aceita_reflect_em_lista(linha):
+    txt = f"## Prova de done\nfast 2 s\n\n## Reflect\n{linha}\n"
+    assert _mod().avisos(txt) == []
+
+
+def test_avisos_reflect_no_meio_da_frase_nao_conta():
+    txt = "## Prova de done\nfast 2 s\n\n## Reflect\n- falta o Reflect DA\n"
+    assert len(_mod().avisos(txt)) == 1
+
+
+def _sp_aninhado(tmp_path, status="Doing"):
+    d = tmp_path / "kaizen" / PROJECT / "sp" / status
+    d.mkdir(parents=True)
+    (d / f"{PROJECT}-x-2026-11-01.md").write_text(
+        f"---\nstatus: {status}\nslug: {PROJECT}-x-2026-11-01\nproject: {PROJECT}\npriority: P3\n---\n# SP\n",
+        encoding="utf-8")
+
+
+@pytest.mark.parametrize("project", [None, PROJECT, f"kaizen/{PROJECT}"])
+@pytest.mark.parametrize("ref", [f"{PROJECT}-x-2026-11-01", f"{PROJECT}-x"])
+def test_find_doing_resolve_projeto_aninhado_e_slug_sem_data(tmp_path, project, ref):
+    _sp_aninhado(tmp_path)
+    sp = _mod().find_doing(tmp_path, ref, project)
+    assert sp.slug == f"{PROJECT}-x-2026-11-01"
+
+
+def test_find_doing_projeto_errado_nao_encontra(tmp_path):
+    _sp_aninhado(tmp_path)
+    m = _mod()
+    with pytest.raises(m.FecharError):
+        m.find_doing(tmp_path, f"{PROJECT}-x-2026-11-01", "kaizen/outro")
+
+
+def test_fecha_com_slug_sem_data(root):
+    novo_doing(root, fs("curto"), f'"{sys.executable}" -c "import sys; sys.exit(0)"')
+    rc, out, err = fechar(root, f"{PROJECT}-curto")
+    assert rc == 0, out + err
+    assert list((root / "vault" / PROJECT / "sp" / "Done").glob(f"{fs('curto')}.md"))

@@ -58,7 +58,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-024 | Watcher about to merge a story with red gates or a conflict | the story is blocked with the reason; no merge | testes-falha-90 | `core/scripts/test_sp_vigia.py::test_gates_vermelhos_ou_conflito_bloqueiam_com_motivo` |
 | EC-025 | Story branch is behind the main branch | `sp-estado.py` warns and says to merge the main branch first | preflight-erros-ux | `core/scripts/test_sp_estado.py::test_avisa_ramo_atras_de_master` |
 | EC-026 | Worktree to clean is still in use by a process | the clean is retried instead of leaving a half-removed worktree | resume-orfaos | `core/scripts/test_sp_vigia.py::test_clean_repete_enquanto_worktree_em_uso` |
-| EC-027 | Story left in Doing with no live pane (orphan) | it is listed as a resume candidate | resume-orfaos | `core/scripts/test_kf_term_limpar.py::test_candidatos_so_doing_sem_painel_vivo_e_nao_mae` |
+| EC-027 | Story left in Doing with no live pane (orphan) | it is listed as a resume candidate | resume-orfaos | `core/scripts/test_sp_resume.py::test_candidatos_so_orfaos_fora_de_done_ec027` |
 | EC-028 | Cleanup finds a dirty worktree | the worktree and its pane are never closed | resume-orfaos | `core/scripts/test_kf_term_limpar.py::test_planear_nunca_fecha_vivo_ativo_nem_worktree_suja_nem_proprio` |
 | EC-029 | Leftover files in a finished worktree include a secret | the watcher refuses to commit them | testes-falha-90 | `core/scripts/test_sp_vigia.py::test_arrumar_worktree_recusa_segredos` |
 | EC-030 | A stale copy of the story is left in TODO after it is closed | closing removes the copy | resume-orfaos | `core/scripts/test_sp_move.py::test_copia_em_todo_e_removida_ao_fechar` |
@@ -84,7 +84,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-040 | Two writers update the queue state at the same time | no record is lost | testes-falha-90 | `core/scripts/test_sp_fila_estado.py::test_dois_escritores_simultaneos_nao_perdem_registos` |
 | EC-041 | Lock file held by a dead process | the lock is recovered | testes-falha-90 | `core/scripts/test_sp_disco.py::test_bloqueio_recupera_lock_de_dono_morto` |
 | EC-042 | Lock file held by a live process | the lock is never stolen | testes-falha-90 | `core/scripts/test_sp_disco.py::test_bloqueio_nunca_apaga_lock_de_dono_vivo` |
-| EC-043 | Two panes or agents start the same story | the second claim is refused | resume-orfaos | `core/scripts/test_sp_move.py::test_doing_num_worktree_falha_se_outro_agente_reclamou` |
+| EC-043 | Two panes or agents start the same story | the second claim is refused | resume-orfaos | `core/scripts/test_sp_resume.py::test_segundo_painel_recebe_ec043_com_dono` |
 | EC-044 | Two queues want the merge lock | one merges, the other waits for the next tick | testes-falha-90 | `core/scripts/test_sp_vigia.py::test_duas_filas_disputam_o_lock_de_merge` |
 | EC-045 | Queue state JSON is corrupted | clear error and the file is not deleted | testes-falha-90 | `core/scripts/test_sp_fila_estado.py::test_estado_corrompido_da_erro_claro_e_nao_apaga` |
 | EC-046 | Workflow hooks config is corrupted | the config is ignored and the action goes on | testes-falha-90 | `core/scripts/test_kaizen_hooks.py::test_config_corrompida_ignorada` |

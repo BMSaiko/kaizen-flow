@@ -270,3 +270,40 @@ def test_cli_dry_run_mostra_o_plano(sp, tmp_path, modelos_json, capsys):
 def test_cli_help_corre():
     r = subprocess.run([sys.executable, "-I", str(SCRIPTS / "sp-revisor.py"), "--help"], capture_output=True, text=True, encoding="utf-8")
     assert r.returncode == 0 and "--achados" in r.stdout and "--esperar" in r.stdout and "--inline" in r.stdout
+
+
+def test_cwd_externo_prompt_e_tools_usam_caminhos_absolutos_do_vault(sp, tmp_path, modelos_json, capsys):
+    """Painel com --cwd num repo externo: `scripts/...` relativo não existe lá e `python` sem regra fica à espera."""
+    externo = tmp_path / "repo-externo"
+    externo.mkdir()
+    ach = tmp_path / "a.md"
+    rc = sr.main(["--sp", str(sp), "--base", "main", "--achados", str(ach), "--dry-run",
+                  "--modelos", str(modelos_json), "--cwd", str(externo)], diff=diff_stub)
+    out = capsys.readouterr().out
+    autor, estado = (SCRIPTS / "sp-autor.py").as_posix(), (SCRIPTS / "sp-estado.py").as_posix()
+    assert rc == 0
+    assert f"python -I {autor} --consume" in out and f"python -I {estado} revisor-" in out
+    assert "python -I scripts/" not in out
+    cmd, _ = sr.comando("claude-sonnet-5-5", ach, modelos_json)
+    permitidas = cmd[cmd.index("--allowedTools") + 1 : cmd.index("--disallowedTools")]
+    pythons = [t for t in permitidas if t.startswith("Bash(python")]
+    assert pythons == [f"Bash(python -I {autor}:*)", f"Bash(python -I {estado}:*)"]
+    assert "Bash(python:*)" not in permitidas and "Bash(python -I:*)" not in permitidas
+
+
+def test_py_poe_aspas_em_caminho_com_espacos(tmp_path):
+    assert sr._py("sp-autor.py", "C:/Meu Vault/scripts") == 'python -I "C:/Meu Vault/scripts/sp-autor.py"'
+    assert sr._py("sp-autor.py", "C:/vault/scripts") == "python -I C:/vault/scripts/sp-autor.py"
+
+
+@pytest.mark.parametrize("anterior", ["done", "falhou", "bloqueado"])
+def test_lancar_segunda_iteracao_reabre_depois_de_terminar(sp, tmp_path, modelos_json, anterior):
+    """Re-review: o estado da iteração anterior não pode impedir o painel novo nem dar um `done` falso ao --esperar."""
+    root = tmp_path / "estado"
+    k = "revisor-proj-algo-2026-11-11"
+    sr.lancar(sp, "master", tmp_path / "ach.md", FakeBackend(), cwd=tmp_path, estado_root=root, diff=diff_stub, sleep=lambda s: None)
+    pe.transitar(k, anterior, msg="iteração 1", root=root)
+    b = FakeBackend()
+    res = sr.lancar(sp, "master", tmp_path / "ach.md", b, cwd=tmp_path, estado_root=root, diff=diff_stub, sleep=lambda s: None)
+    assert res["estado"] == "a-correr" and len(b.abertos) == 1
+    assert pe.ler(pe.procurar(k, root=root), k, root=root)["estado"] == "a-correr"
