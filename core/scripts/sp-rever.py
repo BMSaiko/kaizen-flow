@@ -100,7 +100,10 @@ def _estado_de(dados, slug):
 def _provas(caminho, slug):
     if not SLUG.match(slug):
         raise ValueError("slug inválido")
-    pasta = Path(caminho).parent.parent / "proofs" / slug
+    base = (Path(caminho).parent.parent / "proofs").resolve()
+    pasta = (base / slug).resolve()
+    if pasta.parent != base:
+        raise ValueError("slug inválido")
     try:
         d = json.loads((pasta / "provas.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
