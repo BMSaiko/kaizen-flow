@@ -383,3 +383,33 @@ def test_envelhecer_aviso_salta_com_flag_ou_root_explicito(tmp_path, capsys, mon
     args.sem_envelhecer = False
     assert sp_list.envelhecer_aviso(args, True) == 0
     assert capsys.readouterr().out == ""
+
+
+def test_cor_do_terminal_nao_entra_nos_testes_mas_force_color_explicito_pinta(tmp_path, capsys, monkeypatch):
+    """O terminal desta máquina exporta FORCE_COLOR: o conftest limpa-o (o gate corre com FORCE_COLOR=1 para o provar);
+    pedido explícito continua a dar cor (decisão: corrigir os testes, não o sp-list)."""
+    import os
+    assert "FORCE_COLOR" not in os.environ and "NO_COLOR" not in os.environ
+    program(tmp_path)
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    assert sp_list.main(["--root", str(tmp_path)]) == 0
+    assert "\x1b[" in capsys.readouterr().out
+
+
+def test_encontrar_slug_sem_data_exato_primeiro_e_projeto_por_pastas(tmp_path):
+    make_sp(tmp_path, "kaizen/kf/sp/TODO", "kf-x-2026-11-01", project="kf")
+    make_sp(tmp_path, "kaizen/kf/sp/Done", "kf-x-2026-11-05", project="kf")
+    make_sp(tmp_path, "atlas/sp/TODO", "kf-x", project="atlas")
+    sps = sp_list.collect(tmp_path, include_done=True)
+    assert [s.slug for s in sp_list.encontrar(sps, "kf-x")] == ["kf-x"]
+    assert sorted(s.slug for s in sp_list.encontrar(sps, "kf-x", "kaizen/kf")) == ["kf-x-2026-11-01", "kf-x-2026-11-05"]
+    assert [s.slug for s in sp_list.encontrar(sps, "kf-x-2026-11-05.md", "kf")] == ["kf-x-2026-11-05"]
+    assert sp_list.encontrar(sps, "kf-x-2026-11-01", "kaizen/outro") == []
+
+
+def test_encontrar_nunca_casa_datas_diferentes(tmp_path):
+    make_sp(tmp_path, "kf/sp/TODO", "kf-x-2026-11-01", project="kf")
+    make_sp(tmp_path, "kf/sp/TODO", "kf-y", project="kf")
+    sps = sp_list.collect(tmp_path, include_done=True)
+    assert sp_list.encontrar(sps, "kf-x-2026-11-02") == []
+    assert [s.slug for s in sp_list.encontrar(sps, "kf-y-2026-11-02.md")] == ["kf-y"]  # ficheiro datado, slug sem data

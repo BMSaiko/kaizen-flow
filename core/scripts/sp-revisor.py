@@ -37,6 +37,18 @@ PAPEL = "revisor"
 RC_TIMEOUT = 3
 FORMATO = "[bloqueante|menor] ficheiro:linha descrição | verificar: como confirmar a correção"
 LEITURA = ["Read", "Grep", "Glob", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)", "Bash(git status:*)"]
+SCRIPTS = Path(__file__).resolve().parent
+
+
+def _py(script, scripts=None):
+    """`python -I <vault>/scripts/<script>` com caminho absoluto: o painel pode correr num repo externo (`--cwd`).
+    Caminho com espaços vai entre aspas (o prompt e a regra `Bash(...)` usam a mesma forma)."""
+    caminho = (Path(scripts or SCRIPTS) / script).as_posix()
+    return f'python -I "{caminho}"' if " " in caminho else f"python -I {caminho}"
+
+
+# só estes dois scripts do vault (consumir a semente, gravar o estado); o painel continua só de leitura
+SCRIPTS_PAINEL = [f"Bash({_py('sp-autor.py')}:*)", f"Bash({_py('sp-estado.py')}:*)"]
 
 
 class RevisorErro(Exception):
@@ -79,7 +91,7 @@ def comando(exec_modelo, achados, path=None):
         else:
             aviso = f"aviso: cadeia do revisor só tem {escolhido}, igual ao executor: review não independente"
     p = modelos.papel(data, PAPEL)
-    permitidas = [*LEITURA, f"Edit({Path(achados).resolve()})"]  # a regra Edit(path) cobre Write; Write(path) não casa
+    permitidas = [*LEITURA, *SCRIPTS_PAINEL, f"Edit({Path(achados).resolve()})"]  # a regra Edit(path) cobre Write; Write(path) não casa
     return (["claude", "--model", escolhido, "--effort", p.get("effort", "low"),
              "--allowedTools", *permitidas, "--disallowedTools", "NotebookEdit"], aviso)
 
@@ -116,11 +128,27 @@ def semente(sp, base, cwd, diff=None, checklist_tipo="codigo", rever_so=None):
 def prompt(sp, semente_path, achados):
     """Prompt numa só linha (o Enter submete-o)."""
     slug = slug_de(sp)
-    return (f"És o painel revisor de {slug}. Primeiro corre `python -I scripts/sp-autor.py --consume \"{semente_path}\"` "
+    return (f"És o painel revisor de {slug}. Primeiro corre `{_py('sp-autor.py')} --consume \"{semente_path}\"` "
             "(semente: critérios, diff e formato; lida e apagada). Revê o diff só em leitura e escreve os achados, uma linha cada, "
             f"em {achados} (ficheiro vazio se não houver nenhum); não corrijas código, sem commit, sem abrir outros painéis. "
-            f"No fim corre `python -I scripts/sp-estado.py {_autor.chave(slug, PAPEL)} done --msg '<N bloqueantes, M menores>'` "
+            f"No fim corre `{_py('sp-estado.py')} {_autor.chave(slug, PAPEL)} done --msg '<N bloqueantes, M menores>'` "
             "(ou bloqueado/falhou com o motivo) e fecha este painel com `wezterm cli kill-pane --pane-id $WEZTERM_PANE` (não uses /quit).")
+
+
+def _rearmar(slug, estado_root=None):
+    """Iteração nova do review: o painel `revisor-<slug>` da anterior (done/falhou/bloqueado) volta a `pendente`
+    pelas transições válidas, para o painel novo arrancar e o `--esperar` não ler o `done` antigo."""
+    k = _autor.chave(slug, PAPEL)
+    try:
+        fila = pe.procurar(k, root=estado_root)
+        atual = pe.ler(fila, k, root=estado_root)["estado"]
+    except pe.ErroEstado:
+        return
+    if atual == "done":
+        pe.transitar(k, "bloqueado", msg="nova iteração do review", fila=fila, root=estado_root)
+        atual = "bloqueado"
+    if atual in ("bloqueado", "falhou"):
+        pe.transitar(k, "pendente", msg="nova iteração do review", fila=fila, root=estado_root)
 
 
 def lancar(sp, base, achados, backend, cwd, estado_root=None, run=None, sleep=time.sleep, diff=None,
@@ -134,6 +162,7 @@ def lancar(sp, base, achados, backend, cwd, estado_root=None, run=None, sleep=ti
     sem = achados.with_name(f"{achados.stem}.semente.md")
     sem.write_text(semente(sp, base, cwd, diff, checklist_tipo, rever_so), encoding="utf-8")
     achados.unlink(missing_ok=True)
+    _rearmar(slug_de(sp), estado_root)
     res = _autor.lancar(sp, sem, backend, cwd, estado_root=estado_root, run=run, sleep=sleep, rotulo=PAPEL,
                         prompt_fn=lambda s, p: prompt(s, p, achados), cmd=cmd)
     if res["estado"] != "a-correr":

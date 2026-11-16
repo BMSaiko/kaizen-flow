@@ -55,14 +55,12 @@ def estado(ref, root=None, project=None, git_lines=None, atras=None):
     sp_gates = kaizen_engine.load("sp-gates")
     root = Path(root) if root else sp_list.default_root()
     sps = sp_list.collect(root, include_done=True)
-    alvo = None
     p = Path(ref)
-    ref = sp_list.normalize_ref(root, ref)
-    for sp in sps:
-        if (p.suffix == ".md" and sp.path.resolve() == p.resolve()) or sp.slug == ref:
-            if project is None or sp.project == project:
-                alvo = sp
-                break
+    por_caminho = [sp for sp in sps if p.suffix == ".md" and sp.path.resolve() == p.resolve()]
+    achados = por_caminho or sp_list.encontrar(sps, ref, project)
+    if len(achados) > 1:
+        return f"SP ambíguo: {ref} ({', '.join(f'{s.slug} [{s.project}]' for s in achados)}); usar o slug completo ou --project"
+    alvo = achados[0] if achados else None
     if alvo is None:
         return f"SP não encontrado: {ref}"
     text = alvo.path.read_text(encoding="utf-8")

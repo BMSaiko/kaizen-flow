@@ -35,3 +35,4 @@ Texto em `references/michi-pitfalls.md`, com a mesma numeração. Ler só a entr
 34. Peça nova no pacote K
 35. Audit do kaizen-flow
 36. Testes do pacote K
+37. git pelo PowerShell

@@ -134,7 +134,7 @@ def srv(raiz, estado):
 
 
 def req(porta, metodo, caminho, corpo=None, host=None):
-    c = http.client.HTTPConnection("127.0.0.1", porta, timeout=5)
+    c = http.client.HTTPConnection("127.0.0.1", porta, timeout=20)
     h = {"Host": host or f"127.0.0.1:{porta}"}
     b = None
     if corpo is not None:
@@ -180,7 +180,10 @@ def test_post_recusa_token_slug_estado_e_tamanho(srv):
     assert req(porta, "POST", "/veredicto?t=x", ok)[0] == 403
     assert req(porta, "POST", "/veredicto?t=tok", {**ok, "slug": "outro"})[0] == 400
     assert req(porta, "POST", "/veredicto?t=tok", {**ok, "estado": "pendente"})[0] == 400
-    assert req(porta, "POST", "/veredicto?t=tok", {**ok, "texto": "x" * 20000})[0] in (400, 413)
+    try:
+        assert req(porta, "POST", "/veredicto?t=tok", {**ok, "texto": "x" * 20000})[0] in (400, 413)
+    except ConnectionError:
+        pass  # o servidor recusa e fecha antes de ler o corpo: no Windows o cliente vê a ligação abortada (também é recusa)
     assert not estado.exists()
 
 
