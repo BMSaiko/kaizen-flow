@@ -116,3 +116,25 @@ def test_michi_e_execucao_na_mae(tmp_path):
     assert "michi: default" in filho and "execução" not in filho
     (d / "mae-2026-10-26.md").write_text(mae_txt.replace("kind: program\n", "kind: program\nexecucao: paralelo\n"), encoding="utf-8")
     assert "execução: paralelo" in sp_estado.estado("mae", root=tmp_path, git_lines=["master"])
+
+
+def _aninhado(tmp_path, slug, folder="Doing"):
+    d = tmp_path / "kaizen" / "demo" / "sp" / folder
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{slug}.md").write_text(SP.format(st=folder, slug=slug), encoding="utf-8")
+
+
+def test_resolve_projeto_aninhado_e_slug_sem_data(tmp_path):
+    _aninhado(tmp_path, "alvo-2026-11-01")
+    for project in (None, "demo", "kaizen/demo"):
+        for ref in ("alvo-2026-11-01", "alvo"):
+            out = sp_estado.estado(ref, root=tmp_path, project=project, git_lines=["master"])
+            assert out.startswith("alvo-2026-11-01 · Doing"), (ref, project, out)
+    assert "não encontrado" in sp_estado.estado("alvo", root=tmp_path, project="kaizen/outro", git_lines=["master"])
+
+
+def test_slug_sem_data_ambiguo(tmp_path):
+    _aninhado(tmp_path, "alvo-2026-11-01")
+    _aninhado(tmp_path, "alvo-2026-11-05", "TODO")
+    out = sp_estado.estado("alvo", root=tmp_path, git_lines=["master"])
+    assert out.startswith("SP ambíguo") and "alvo-2026-11-01" in out and "alvo-2026-11-05" in out

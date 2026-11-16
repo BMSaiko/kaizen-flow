@@ -43,8 +43,7 @@ class FecharError(Exception):
 
 
 def find_doing(root, slug, project=None):
-    found = [sp for sp in sp_list.collect(root, include_done=True)
-             if sp.slug == slug and (not project or sp.project == project)]
+    found = sp_list.encontrar(sp_list.collect(root, include_done=True), slug, project)
     if not found:
         raise FecharError(f"SP '{slug}' não encontrado; ver scripts/sp-list.py")
     if len(found) > 1:
@@ -119,7 +118,7 @@ def avisos(sp_text):
     out = []
     if not body("Prova de done").strip():
         out.append("FALTA: sem '## Prova de done' no SP (registar a prova como cliente final)")
-    if not re.search(r"^Reflect \S", body("Reflect"), re.M):
+    if not re.search(r"^[ \t]*(?:[-*][ \t]+)?Reflect \S", body("Reflect"), re.M):
         out.append("FALTA: sem linhas 'Reflect <fase>:' no SP (correr /reflect fase|final)")
     return out
 
@@ -258,6 +257,7 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
     """Corre o fecho. Devolve (rc, linhas)."""
     t_total = time.monotonic()
     sp = find_doing(root, slug, project)
+    slug = sp.slug  # o resto (sp_move, seguinte, COMMIT) usa o slug completo, não o `ref` curto
     lines = []
     rc, text, resultados = passo("gates", run_gates, sp)
     lines.append(text)

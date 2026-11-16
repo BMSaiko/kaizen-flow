@@ -131,19 +131,16 @@ def bloqueio(path, espera=15.0):
                 time.sleep(0.02)
 
 
-def guardar(path, estado, retry_s=None):
-    """Escrita atómica: ficheiro temporário + os.replace (um leitor nunca vê JSON a meio).
-
-    `retry_s=None` mantém o retry de 500 x 20 ms; um número limita o retry a esse total em segundos."""
+def guardar(path, estado):
+    """Escrita atómica: ficheiro temporário + os.replace (um leitor nunca vê JSON a meio)."""
     tmp = Path(f"{path}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(estado, ensure_ascii=False, indent=1), encoding="utf-8")
-    limite = None if retry_s is None else time.monotonic() + retry_s
     for tentativa in range(500):
         try:
             os.replace(tmp, path)
             return
         except PermissionError:  # Windows: um leitor sem bloqueio (painel, vigia) tem o destino aberto
-            if tentativa == 499 or (limite is not None and time.monotonic() >= limite):
+            if tentativa == 499:
                 raise
             time.sleep(0.02)
 

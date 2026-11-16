@@ -113,6 +113,28 @@ def collect(root, include_done=False):
     return sps
 
 
+def projeto_ok(sp, project):
+    """`project` vazio, igual ao `project:` do SP, ou caminho de pastas do projeto (`kaizen/kaizenflow`)."""
+    if not project:
+        return True
+    project = project.replace("\\", "/").strip("/")
+    return sp.project == project or f"/{project}/sp/" in "/" + sp.path.as_posix()
+
+
+def encontrar(sps, ref, project=None):
+    """SPs de `sps` para `ref` (slug, nome do ficheiro com .md, ou slug sem a data) e `project`.
+    Correspondência exata primeiro; depois o nome do ficheiro sem a data (slug sem data no frontmatter);
+    só um `ref` sem data casa com slugs datados. Nunca casa datas diferentes."""
+    base = re.sub(r"\.md$", "", Path(ref).name)
+    def sem_data(s):
+        return re.sub(r"-\d{4}-\d{2}-\d{2}$", "", s)
+    ok = [sp for sp in sps if projeto_ok(sp, project)]
+    exatos = [sp for sp in ok if sp.slug in (ref, base)]
+    if exatos:
+        return exatos
+    return [sp for sp in ok if sp.slug == sem_data(base) or (sem_data(base) == base and sem_data(sp.slug) == base)]
+
+
 def normalize_ref(root, ref):
     """Aceita o slug ou o nome do ficheiro (com .md e/ou data AAAA-MM-DD) e devolve o slug."""
     sps = collect(root, include_done=True)
