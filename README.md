@@ -138,7 +138,8 @@ If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the blo
 
 | Doc | Contents |
 |---|---|
-| [Use cases](docs/use-cases.md) | "I want to..." recipes for install, usage, stories and handoff |
+| [Use cases](docs/use-cases.md) | "I want to..." recipes for install, usage, stories and handoff, numbered `UC-NNN` |
+| [Edge cases](docs/edge-cases.md) | numbered `EC-NNN` catalog of interruptions, crashes and broken state, each linked to its test; coverage with `kaizen catalog` |
 | [Term keys](docs/term.md) | Optional WezTerm shortcuts for `kaizen term` (menu and F2 table) |
 | [Commands](docs/commands.md) | every `kaizen` command, option and workflow script |
 | [Agent commands](docs/agent-commands.md) | `/sp`, `/michi`, `/sp-handoff`, `/sp-fila`, `/pentest`, `/review-ciclo`, `/pr-fase` and the michi cycle |

@@ -9,6 +9,7 @@ kaizen status [repo]                  # pending SPs
 kaizen usage [--days N | --since YYYY-MM-DD] [--source claude,codex] [--top N]
 kaizen report [--week YYYY-WNN] [--out DIR] [--print]
 kaizen audit [dir]                    # fails if personal data leaks into the repo
+kaizen catalog [render] [--check] [--json] [--no-run]  # edge case / use case coverage
 kaizen demo [--keep]                  # runs the SP cycle in a temp repo
 kaizen term ls [--json] [--fila X]|fila|michi|limpar|retomar|orq  # terminal panes
 ```
@@ -31,6 +32,11 @@ kaizen term ls [--json] [--fila X]|fila|michi|limpar|retomar|orq  # terminal pan
 | | `--print` | Print instead of writing a file. |
 | | `--source`, `--prices`, `--repo`, `--claude-root`, `--codex-root` | Same as `usage`. |
 | `kaizen audit [dir]` | | Scans for personal data (names, local paths, wikilinks). rc 1 on any hit. |
+| `kaizen catalog` | | Runs the tests linked in `docs/catalogo.json` and prints covered/total for edge cases (`EC-NNN`) and use cases (`UC-NNN`). rc 0 only at EC >= 0.9 and UC = 1.0. Run from the repo root. |
+| | `--check` | Validates the catalog (unique IDs, no gaps, no empty category, linked test files exist) and that `docs/edge-cases.md` and `docs/use-cases.md` match it. rc 1 on any problem. |
+| | `render` | Regenerates `docs/edge-cases.md` and `docs/use-cases.md` from the catalog. |
+| | `--json`, `--no-run` | Machine-readable report; count linked tests without running them. |
+| | `--file F`, `--root DIR` | Other catalog file or repo root (default `docs/catalogo.json` under `.`). |
 | `kaizen demo` | `--keep` | Runs the whole cycle in a temp git repo: `init`, `sp-new` (gate `node --version`), `sp-move doing`, `sp-gates`, `sp-move done`, `sp-report`. The folder is deleted at the end unless `--keep`. Recording in `docs/assets/demo.cast`. |
 | `kaizen term <sub>` | `ls`, `fila`, `michi`, `limpar`, `retomar`, `orq` | Drives WezTerm panes through `scripts/painel_backend.py` and `scripts/wez.py`: `ls` lists SPs with pane, michi phase, state and queue (see below), `fila` picks a program and runs its SP queue in a new pane, `michi` picks a SP and launches its michi in a new pane (both: see `kaizen term fila|michi` below). `limpar` closes orphan panes and state (dry-run unless `--apply`), `retomar` reopens the pane of a Doing SP that has none (both: see `kaizen term limpar` and `retomar` below). `orq` opens the orchestrator pane (see `kaizen term orq` below). Optional WezTerm keys: [term.md](term.md). |
 | `kaizen sync` | `--check`, `--stamp` | Maintainers only: refreshes `core/` from the author's vault. `--check` verifies without writing, `--stamp` stamps the build. Not needed by users. |
