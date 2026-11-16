@@ -6,6 +6,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 ## [Unreleased]
 
 ### Added
+- `kaizen catalog [render|--check|--json|--no-run]`: catálogo numerado de edge cases (`EC-NNN`, 7 categorias) e use cases (`UC-NNN`) em `docs/catalogo.json`, cada um ligado ao teste que o cobre; gera `docs/edge-cases.md` e a coluna `ID` de `docs/use-cases.md` e mede a fração coberta (rc 0 só com EC ≥ 0,9 e UC = 1,0). Linha de base: EC 0,73, UC 0,65.
 - `kaizen demo [--keep]`: corre o ciclo SP (init, sp-new, Doing, gates, Done, report) numa pasta temporária; gravação em `docs/assets/demo.cast`.
 - Adapters `opencode`, `cursor` e `gemini` em `kaizen init/doctor --harness` (o `gemini` converte os comandos para `.gemini/commands/*.toml` e anuncia-se em `GEMINI.md`).
 - `context-guard.py` mede rollouts do Codex (`event_msg/token_count`); `KAIZEN_CONTEXT_LIMIT` (alias `CLAUDE_CONTEXT_LIMIT`); sem `transcript_path` usa o rollout mais recente em `KAIZEN_CODEX_ROOT`. `kaizen doctor --harness codex` diz se o hook está ligado (`--codex-config`).

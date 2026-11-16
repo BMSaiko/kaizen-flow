@@ -42,10 +42,15 @@ def _ref(ref):
     return caminho, nome
 
 
-def _nome_existe(ficheiro, nome):
+def _nome_existe(ficheiro, nome, classe=None):
+    """Python: função de topo (sem classe) ou método dentro do corpo de `classe`, para o node id do pytest existir."""
     texto = ficheiro.read_text(encoding="utf-8", errors="replace")
     if ficheiro.suffix == ".py":
-        return re.search(r"^\s*(?:async\s+)?def\s+" + re.escape(nome) + r"\s*\(", texto, re.M) is not None
+        definicao = r"(?:async\s+)?def\s+" + re.escape(nome) + r"\s*\("
+        if classe is None:
+            return re.search(r"^" + definicao, texto, re.M) is not None
+        m = re.search(r"^class\s+" + re.escape(classe) + r"\b[^\n]*:\s*\n((?:[ \t]+[^\n]*\n|[ \t]*\n)*)", texto + "\n", re.M)
+        return m is not None and re.search(r"^[ \t]+" + definicao, m.group(1), re.M) is not None
     return any(q + nome + q in texto for q in ('"', "'", "`"))
 
 
@@ -101,7 +106,7 @@ def problemas(cat, root):
                     probs.append(f"{iid}: teste '{teste}' fora da forma caminho/relativo.py|.js::nome")
                 elif not (root / r[0]).is_file():
                     probs.append(f"{iid}: ficheiro de teste inexistente {r[0]}")
-                elif not _nome_existe(root / r[0], r[1]):
+                elif not _nome_existe(root / r[0], r[1], (teste.split("::")[1:-1] or [None])[-1]):
                     probs.append(f"{iid}: teste '{r[1]}' não existe em {r[0]}")
     for cid in ids_cat:
         if not any(isinstance(e, dict) and e.get("categoria") == cid for e in cat.get("edge_cases") or []):

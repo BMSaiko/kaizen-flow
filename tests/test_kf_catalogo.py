@@ -91,6 +91,15 @@ def test_teste_metodo_de_classe_e_aceite(repo):
     assert kc.problemas(cat, repo) == []
 
 
+def test_metodo_sem_classe_ou_funcao_com_classe_e_recusado(repo):
+    # o pytest não acha o node id e aborta a chamada única: todos os EC Python ficariam a vermelho
+    cat = base()
+    cat["edge_cases"][0]["teste"] = "tests/test_a.py::test_m"
+    assert any("test_m" in p for p in kc.problemas(cat, repo))
+    cat["edge_cases"][0]["teste"] = "tests/test_a.py::K::test_um"
+    assert any("test_um" in p for p in kc.problemas(cat, repo))
+
+
 @pytest.mark.parametrize("ref", ["/abs/test_a.py::test_um", "../fora.py::test_um", "tests/test_a.py", "tests/test_a.txt::x"])
 def test_referencia_de_teste_invalida(repo, ref):
     cat = base()
