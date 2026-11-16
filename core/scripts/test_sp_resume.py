@@ -146,3 +146,62 @@ def test_ponto_de_retoma_nunca_repete_passo_fechado(tmp_path_factory, seq):
     est = sp_journal.estado(raiz, SLUG)
     assert sorted(a["passo"] for a in ponto["abertos"]) == sorted(est.interrompidos)
     assert ponto["acao"] == est.acao
+
+
+def test_so_fins_retoma_na_fase_seguinte_ec001(tmp_path):
+    _passos(tmp_path, SLUG, [("dp", "dp", "inicio"), ("dp", "dp", "fim")])
+    ponto = SR.ponto_de_retoma(tmp_path, SLUG)
+    assert ponto["abertos"] == [] and ponto["fase"] == "da"
+
+
+def test_commit_concluido_nao_retoma_ec001(tmp_path):
+    _passos(tmp_path, SLUG, [("commit", "commit", "inicio"), ("commit", "commit", "fim")])
+    assert SR.ponto_de_retoma(tmp_path, SLUG)["fase"] == "concluido"
+
+
+def test_revertido_nao_ressuscita_lock_orfao_ec027(tmp_path):
+    sp_disco.escrever_lock_sp(tmp_path, SLUG, {"pid": None, "painel": "p1", "ts": 1.0, "hb": time.time() - 99999})
+    sp_journal.inicio(tmp_path, SLUG, "da", "p1")
+    sp_journal.revertido(tmp_path, SLUG, "da", "p1")
+    assert sp_disco.dono(tmp_path, SLUG)["estado"] == "orfao"
+
+
+def test_unlock_de_outro_painel_nao_liberta_ec043(tmp_path):
+    assert SR.main(["--raiz", str(tmp_path), SLUG, "--lock", "--painel", "p1"]) == 0
+    assert SR.main(["--raiz", str(tmp_path), SLUG, "--unlock", "--painel", "p2"]) == 0
+    assert sp_disco.dono(tmp_path, SLUG)["estado"] == "vivo"
+
+
+def test_ec043_mostra_idade_do_heartbeat_e_unlock(tmp_path):
+    sp_disco.tomar_lock(tmp_path, SLUG, "painel-7", pid=None)
+    rc, texto = SR.resume(tmp_path, SLUG)
+    assert rc == 1 and "heartbeat há" in texto and "--unlock" in texto
+
+
+def test_restart_de_slug_inexistente_rc1_sem_criar_pastas(tmp_path):
+    rc, _ = SR.resume(tmp_path, "nao-existe", restart=True, confirmar=lambda: True)
+    assert rc == 1 and not (tmp_path / ".kaizen" / "estado" / "arquivo").exists()
+
+
+@pytest.mark.parametrize("mau", ["../x", "a/b", "a" + chr(92) + "b", ".."])
+def test_slug_com_separadores_rc2(tmp_path, mau):
+    assert SR.resume(tmp_path, mau)[0] == 2
+
+
+def test_fecho_a_meio_com_lock_tomado_liberta_e_fica_candidato_ec057(tmp_path):
+    codigo = (
+        "import sys, os, time; sys.path.insert(0, sys.argv[1]); import sp_disco, sp_journal;"
+        "r=sys.argv[2]; sp_journal.inicio(r, sys.argv[3], 'da', 'p1'); sp_disco.tomar_lock(r, sys.argv[3], 'pf');"
+        "sp_journal.instalar_sinais(r, sys.argv[3]); print('pronto', flush=True); time.sleep(60)"
+    )
+    sc = str(Path(__file__).resolve().parent)
+    filho = subprocess.Popen([sys.executable, "-c", codigo, sc, str(tmp_path), SLUG], stdout=subprocess.PIPE, text=True)
+    try:
+        assert filho.stdout.readline().strip() == "pronto"
+        assert sp_disco.dono(tmp_path, SLUG)["estado"] == "vivo"
+        os.kill(filho.pid, __import__("signal").SIGTERM)
+        filho.wait(10)
+    finally:
+        filho.kill()
+    assert sp_disco.dono(tmp_path, SLUG)["estado"] in ("livre", "orfao")  # Windows: SIGTERM = TerminateProcess, o handler nao corre; o pid morto da orfao
+    assert SR.candidatos(tmp_path) == [SLUG]

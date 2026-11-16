@@ -30,8 +30,13 @@ def _slugs_com_estado(raiz):
     return sorted(p.name[: -len(".json")] for p in pasta.glob("*.json") if not p.name.endswith(".lock.json"))
 
 
+def _slugs_em_done(raiz):
+    """Nomes dos SPs em Done (um só glob para todos os slugs)."""
+    return {p.stem for p in Path(raiz).glob("knowledge/projects/**/sp/Done/*.md")}
+
+
 def _em_done(raiz, slug):
-    return any(Path(raiz).glob(f"knowledge/projects/**/sp/Done/{slug}.md"))
+    return slug in _slugs_em_done(raiz)
 
 
 def _eventos(raiz, slug):
@@ -57,7 +62,23 @@ def _abertos(eventos):
 
 def candidatos(raiz):
     """Slugs interrompidos: estado em disco, lock não vivo, SP fora de Done."""
-    return [s for s in _slugs_com_estado(raiz) if sp_disco.dono(raiz, s)["estado"] != "vivo" and not _em_done(raiz, s)]
+    cands = [s for s in _slugs_com_estado(raiz) if sp_disco.dono(raiz, s)["estado"] != "vivo"]
+    if not cands:
+        return []
+    feitos = _slugs_em_done(raiz)
+    return [s for s in cands if s not in feitos]
+
+
+def _fase_de_retoma(abertos, ultimo):
+    """Primeira fase aberta; sem abertos, a seguinte à do último «fim» (fase concluída não se repete); commit = «concluido»."""
+    if abertos:
+        return abertos[0][0]
+    if not ultimo:
+        return FASES[0]
+    if ultimo["fase"] not in FASES:
+        return ultimo["fase"]
+    i = FASES.index(ultimo["fase"])
+    return FASES[i + 1] if i + 1 < len(FASES) else "concluido"
 
 
 def ponto_de_retoma(raiz, slug):
@@ -72,7 +93,7 @@ def ponto_de_retoma(raiz, slug):
         "ultimo_fim": {"fase": ultimo["fase"], "passo": ultimo["passo"]} if ultimo else None,
         "abertos": [{"fase": f, "passo": p, "idempotente": i} for f, p, i in abertos],
         "acao": acao,
-        "fase": abertos[0][0] if abertos else (ultimo["fase"] if ultimo else FASES[0]),
+        "fase": _fase_de_retoma(abertos, ultimo),
     }
 
 
@@ -82,6 +103,8 @@ def _msg(o_que, porque, guardado, proximo, ec):
 
 def _arquivar(raiz, slug):
     estado_p, jp = sp_journal.caminhos(raiz, slug)
+    if not estado_p.exists() and not jp.exists():
+        return None
     destino = Path(raiz) / ".kaizen" / "estado" / "arquivo" / f"{slug}-{time.strftime('%Y%m%dT%H%M%S')}-{time.time_ns() % 10**6:06d}"
     destino.mkdir(parents=True, exist_ok=True)
     for p in (estado_p, jp):
@@ -90,23 +113,32 @@ def _arquivar(raiz, slug):
     return destino
 
 
-def resume(raiz, slug, from_fase=None, restart=False, confirmar=None, painel=None):
+def _msg_ocupado(slug, d):
+    idade = f", último heartbeat há {int(time.time() - d['hb'])} s" if isinstance(d.get("hb"), (int, float)) else ""
+    return _msg(
+        f"SP {slug} já está em curso no painel {d.get('painel') or '?'} (pid {d.get('pid')}{idade})",
+        "um SP só admite um dono vivo",
+        "intacto",
+        f"esperar, ou se o painel já não existe `python -I scripts/sp-resume.py {slug} --unlock` e `kaizen resume {slug}`",
+        "EC-043",
+    )
+
+
+def resume(raiz, slug, from_fase=None, restart=False, confirmar=None):
     """Devolve (rc, mensagem). `confirmar` é um callable sem argumentos (True = confirmado)."""
+    if not slug or slug in (".", "..") or any(c in slug for c in ("/", chr(92), ":")):
+        return 2, f"slug inválido «{slug}»"
     if from_fase is not None and from_fase not in FASES:
         return 2, f"fase inválida «{from_fase}»; fases válidas: {', '.join(FASES)}"
     d = sp_disco.dono(raiz, slug)
     if d["estado"] == "vivo":
-        return 1, _msg(
-            f"SP {slug} já está em curso no painel {d.get('painel') or '?'} (pid {d.get('pid')})",
-            "um SP só admite um dono vivo",
-            "intacto",
-            f"esperar ou fechar esse painel e correr `kaizen resume {slug}`",
-            "EC-043",
-        )
+        return 1, _msg_ocupado(slug, d)
     if restart:
         if confirmar is None or not confirmar():
             return 1, f"--restart não confirmado: nada alterado (EC-001). Confirmar com `kaizen resume {slug} --restart --sim`."
         destino = _arquivar(raiz, slug)
+        if destino is None:
+            return 1, f"SP {slug} sem estado a arquivar: nada alterado (EC-001)"
         return 0, f"recomeçado do início em {FASES[0]}; estado anterior arquivado em {destino} (UC-032)"
     ponto = ponto_de_retoma(raiz, slug)
     fase = ponto["fase"]
@@ -155,12 +187,12 @@ def main(argv=None):
         try:
             sp_disco.tomar_lock(a.raiz, a.slug, a.painel, pid=None)
         except sp_disco.LockOcupado as e:
-            print(resume(a.raiz, a.slug)[1], file=sys.stderr)
+            print(_msg_ocupado(a.slug, e.dono), file=sys.stderr)
             return 1
         print(f"lock de {a.slug} tomado")
         return 0
     if a.unlock:
-        print("lock libertado" if sp_disco.libertar_lock(a.raiz, a.slug, pid=None) else "sem lock próprio a libertar")
+        print("lock libertado" if sp_disco.libertar_lock(a.raiz, a.slug, pid=None, painel=a.painel) else "sem lock próprio a libertar")
         return 0
     slug = a.slug
     if not slug:
@@ -174,7 +206,7 @@ def main(argv=None):
                 print(f"  {c}")
             return 2
         slug = cands[0]
-    rc, texto = resume(a.raiz, slug, a.from_fase, a.restart, (lambda: True) if a.sim else _perguntar, a.painel)
+    rc, texto = resume(a.raiz, slug, a.from_fase, a.restart, (lambda: True) if a.sim else _perguntar)
     print(texto, file=sys.stderr if rc else sys.stdout)
     return rc
 

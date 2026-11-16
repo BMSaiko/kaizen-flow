@@ -12,6 +12,8 @@ Regras que saíram do `SKILL.md` sem alteração de contrato. Prova, reflect por
 - **Perfil:** ler `perfil`/`max_tentativas`/`parar_se` no arranque e na paragem (`michi-perfis.md`).
 - **Worktree:** com `scripts/sb-worktree.py` (só no vault; noutro projeto, `git worktree add` num ramo próprio): `python -I scripts/sb-worktree.py ensure <slug>` e editar pelo caminho absoluto da worktree (o guard bloqueia o checkout principal); `sp-move`/`sp-fechar` saltam sozinhos para ela; commits por fase lá; `merge` (recusa SP fora de Done, `--force` explícito) + `clean` só no fecho.
 - **Tab:** `python -I scripts/tab-title.py <slug>` (best-effort, rc 0; imprime `/rename <slug>`). Vale para a sessão nova do `/sp-handoff`.
+- **Fila:** SP-mãe com filhos, ou filho com `parent:`: em manual `AskUserQuestion` «Iniciar a fila do programa?»; Sim → `/sp-fila --programa <mãe>`. Em auto ou fila não pergunta.
+- **Lock do SP:** depois do `--start`, `python -I scripts/sp-resume.py <slug> --lock --painel <painel>`; rc 1 = EC-043 (outro painel é dono): recusar e mostrar a mensagem. No fecho, na paragem final ou no handoff: `python -I scripts/sp-resume.py <slug> --unlock --painel <painel>`. Painel morto: `kaizen resume <slug>` ou `--unlock`.
 - **Checkpoint/rollback:** `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate (`michi-modo-auto.md` §Paragem).
 - **Sessão suja:** se o contexto já tem conversa anterior (não veio de `/clear` nem de handoff), um só AskUserQuestion: «Limpar e iniciar o SP em sessão nova?» + modo; com «sim», `python -I scripts/sp-handoff.py --launch <caminho>` (`--auto` se escolhido) e terminar o turno. Conta como suja qualquer sessão onde já correu trabalho (SP criado ou `/michi` anterior). SP com secções vazias (sem objetivo/passos) não é «nada a fazer»: entra no Grill (fase 1), nunca parar nem saltar o Arranque (passos 2-5, incluindo esta verificação).
 - O user pode parar após qualquer passo (`/stop`) e retomar (`/resume` ou novo `/michi` no mesmo contexto).
@@ -77,3 +79,8 @@ Autorizações `commit`/`push`/`pr`/`restricoes` do frontmatter mandam (`michi-m
 ## Ciclo de vida
 
 DR/DP/SP movem-se TODO → Doing → Done com `sp-move.py`/`doc-move.py`; `/michi status` lista o estado. Scripts, tabela de eventos e `status`: `michi-lifecycle.md`.
+
+## Fases sem skill e Spike
+
+- Sem a skill de um passo (`/harden`, `/report`, `/reflect`, `/commit`), faz-se à mão: gates com RC, `sp-report.py`, `## Reflect`, commit com stage explícito.
+- Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_requests`, go/no-go em Decisões; `references/michi-spike.md`.

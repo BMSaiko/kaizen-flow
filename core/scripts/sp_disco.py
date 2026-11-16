@@ -204,8 +204,14 @@ class LockSp:
         self._parar = threading.Event()
         self._thread = None
 
-    def heartbeat(self):
+    def heartbeat(self, forcar=False):
+        """Renova o lock; se já não for o dono (outro painel o tomou) não escreve e devolve False."""
+        if not forcar:
+            atual = ler_json(caminho_lock_sp(self.raiz, self.slug))
+            if not (isinstance(atual, dict) and atual.get("pid") == self.pid and atual.get("ts") == self.ts):
+                return False
         escrever_lock_sp(self.raiz, self.slug, {"pid": self.pid, "painel": self.painel, "ts": self.ts, "hb": time.time()})
+        return True
 
     def iniciar_heartbeat(self, intervalo=HEARTBEAT_S):
         def corre():
@@ -245,28 +251,47 @@ def tomar_lock(raiz, slug, painel=None, pid="eu"):
         if d["estado"] == "corrompido":
             _quarentena_lock(p)
         lk = LockSp(raiz, slug, painel, os.getpid() if pid == "eu" else pid)
-        lk.heartbeat()
+        lk.heartbeat(forcar=True)
     return lk
 
 
-def libertar_lock(raiz, slug, pid="eu"):
-    """Apaga o lock se for do `pid` (este processo por defeito; `None` = sem processo); True se apagou."""
+def libertar_lock(raiz, slug, pid="eu", painel=None):
+    """Apaga o lock se for do `pid` (este processo por defeito; `None` = sem processo); True se apagou.
+
+    Com `painel`, só apaga se o lock for desse painel. Lock sem chave `pid` (ilegível) vai para `.corrupt-*`, nunca é apagado."""
     p = caminho_lock_sp(raiz, slug)
     dono_pid = os.getpid() if pid == "eu" else pid
+    if not p.exists():
+        return False
     with bloqueio(p):
         atual = ler_json(p)
-        if isinstance(atual, dict) and atual.get("pid") == dono_pid:
+        if atual is None and not p.exists():
+            return False
+        if not isinstance(atual, dict) or "pid" not in atual:
+            _quarentena_lock(p)
+            return False
+        if atual.get("pid") == dono_pid and (painel is None or atual.get("painel") == painel):
             p.unlink(missing_ok=True)
             return True
     return False
 
 
 def renovar_lock(raiz, slug):
-    """Renova o heartbeat de um lock vivo (mantém pid/painel); no-op sem lock. Chamado a cada evento do journal."""
-    d = ler_json(caminho_lock_sp(raiz, slug))
-    if isinstance(d, dict) and isinstance(d.get("hb"), (int, float)):
+    """Renova o heartbeat de um lock vivo sem recriar nem ressuscitar órfãos; chamado a cada evento do journal.
+
+    Só renova se o dono for «vivo» e o pid for do processo atual ou o lock for sem processo (michi por CLI)."""
+    p = caminho_lock_sp(raiz, slug)
+    if not p.exists():
+        return False
+    with bloqueio(p):
+        if dono(raiz, slug)["estado"] != "vivo":
+            return False
+        d = ler_json(p)
+        if not isinstance(d, dict) or d.get("pid") not in (None, os.getpid()):
+            return False
         d["hb"] = time.time()
         escrever_lock_sp(raiz, slug, d)
+    return True
 
 
 @contextmanager

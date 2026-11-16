@@ -155,3 +155,66 @@ def test_lock_sem_pid_so_expira_pelo_silencio_do_heartbeat(tmp_path):
     assert sp_disco.libertar_lock(tmp_path, "sp-a", pid=None) is True
     assert sp_disco.dono(tmp_path, "sp-a")["estado"] == "livre"
     assert lk.pid is None
+
+
+def test_renovar_lock_so_de_dono_vivo_e_proprio_ec027(tmp_path):
+    assert sp_disco.renovar_lock(tmp_path, "x") is False  # sem lock: nunca recria
+    assert not sp_disco.caminho_lock_sp(tmp_path, "x").exists()
+    sp_disco.escrever_lock_sp(tmp_path, "x", {"pid": os.getpid() + 1, "painel": "p", "ts": 1.0, "hb": time.time()})
+    antes = sp_disco.ler_json(sp_disco.caminho_lock_sp(tmp_path, "x"))["hb"]
+    assert sp_disco.renovar_lock(tmp_path, "x") is False  # pid alheio
+    assert sp_disco.ler_json(sp_disco.caminho_lock_sp(tmp_path, "x"))["hb"] == antes
+
+
+def test_heartbeat_do_dono_antigo_nao_pisa_o_novo(tmp_path):
+    antigo = sp_disco.tomar_lock(tmp_path, "x", "p1", pid=None)
+    sp_disco.escrever_lock_sp(tmp_path, "x", {"pid": None, "painel": "p2", "ts": antigo.ts + 1, "hb": time.time()})
+    assert antigo.heartbeat() is False
+    assert sp_disco.ler_json(sp_disco.caminho_lock_sp(tmp_path, "x"))["painel"] == "p2"
+
+
+def test_libertar_lock_sem_chave_pid_vai_para_quarentena(tmp_path):
+    p = sp_disco.caminho_lock_sp(tmp_path, "x")
+    p.parent.mkdir(parents=True)
+    p.write_text("{}", encoding="utf-8")
+    assert sp_disco.libertar_lock(tmp_path, "x", pid=None) is False
+    assert not p.exists() and list(p.parent.glob("*.corrupt-*"))
+
+
+def test_tomar_e_heartbeat_menos_de_200ms(tmp_path):
+    t = time.perf_counter()
+    lk = sp_disco.tomar_lock(tmp_path, "x", "p")
+    lk.heartbeat()
+    assert time.perf_counter() - t < 0.2
+
+
+def test_maquina_de_estados_do_lock_no_maximo_um_dono_vivo(tmp_path_factory):
+    from hypothesis import HealthCheck, given, settings
+    from hypothesis import strategies as st
+
+    @settings(max_examples=40, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @given(st.lists(st.sampled_from(["tomar", "libertar", "renovar", "expirar"]), max_size=15))
+    def corre(ops):
+        raiz = tmp_path_factory.mktemp("m")
+        donos = 0
+        for op in ops:
+            if op == "tomar":
+                try:
+                    sp_disco.tomar_lock(raiz, "x", "p", pid=None)
+                    donos += 1
+                except sp_disco.LockOcupado:
+                    assert sp_disco.dono(raiz, "x")["estado"] == "vivo"
+            elif op == "libertar":
+                sp_disco.libertar_lock(raiz, "x", pid=None)
+            elif op == "renovar":
+                sp_disco.renovar_lock(raiz, "x")
+            else:
+                d = sp_disco.ler_json(sp_disco.caminho_lock_sp(raiz, "x"))
+                if isinstance(d, dict):
+                    d["hb"] = time.time() - 99999
+                    sp_disco.escrever_lock_sp(raiz, "x", d)
+            assert sp_disco.dono(raiz, "x")["estado"] in ("livre", "vivo", "orfao")
+            assert len(list(sp_disco.caminho_lock_sp(raiz, "x").parent.glob("x.lock.json"))) <= 1
+        assert donos >= 0
+
+    corre()
