@@ -41,6 +41,7 @@ Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_reque
 4. Modo: `--auto` ou `modo: auto` no frontmatter = sem `AskUserQuestion` (`modo: manual` = sem auto, sem pergunta); sem nenhum, perguntar «com/sem auto».
    Se o `sp-estado` diz `execução: por escolher` (SP-mãe com filhos), mesmo em `modo: manual`, `AskUserQuestion` «sequencial ou paralelo?» (caso a caso, sem defeito) e gravar antes de lançar: `python -I scripts/sp-execucao.py <slug> sequencial|paralelo`; com `execucao:` preenchido não perguntar. Depois `/sp-fila --programa <slug>` (sequencial = um filho de cada vez; paralelo = até 3 painéis no total, com o vigia a fazer merge e avisos).
 5. Checkpoint: `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate.
+6. Journal: em cada fase `python -I scripts/sp_journal.py inicio --slug <slug> --fase <fase> --passo <fase>` e no fim `fim` (`estado` só l�; a retoma é do resume-orfaos).
 
 Hooks `michi.*`, sessão suja, handoff, `[context-guard]` e painéis: `michi-orquestracao.md`.
 

@@ -10,3 +10,13 @@ Every failure of an `sp-*.py` script (an exception or a non-zero exit code) is a
 - **Best effort:** a failed write never breaks the script; message, stdout and exit code are unchanged.
 
 Wire a script with `sys.exit(kf_errlog.executar("<name>", main))` in its `__main__` block (see `sp-move.py`).
+
+## Phase checkpoint and journal
+
+`core/scripts/sp_journal.py` keeps durable per-SP state so an interrupted run can resume (`kaizen resume` reads it).
+
+- **Files:** `<worktree>/.kaizen/estado/<slug>.json` (atomic checkpoint, `sp_disco.guardar`) and `<slug>.journal.jsonl` (append-only, one JSON event per line: `ts`, `pid`, `fase`, `passo`, `evento` = `inicio|fim|revertido`, `idempotente`; fsync per event). Both are git-ignored.
+- **Interrupted step:** an `inicio` without `fim` is reported by `estado` with `acao: repetir` (idempotent) or `reverter` (restore with `michi-checkpoint.py`).
+- **Truncated last line:** ignored with a warning and repaired before the next append.
+- **Corrupt state:** the file moves to `<file>.corrupt-<ts>` (never deleted, never overwritten) and the state is rebuilt from git and the SP `phase:`; the user confirms.
+- **Signals:** SIGINT, SIGBREAK and console close (`CTRL_CLOSE_EVENT`) write `interrompido: true` and re-raise within 1 s.
