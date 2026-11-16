@@ -100,9 +100,13 @@ def _estado_de(dados, slug):
 def _provas(caminho, slug):
     if not SLUG.match(slug):
         raise ValueError("slug inválido")
-    pasta = Path(caminho).parent.parent / "proofs" / slug
+    base = os.path.realpath(os.path.join(os.path.dirname(os.path.dirname(str(caminho))), "proofs"))
+    alvo = os.path.realpath(os.path.join(base, slug))
+    if not alvo.startswith(base + os.sep):
+        raise ValueError("slug inválido")
+    pasta = Path(alvo)
     try:
-        d = json.loads((pasta / "provas.json").read_text(encoding="utf-8"))
+        d = json.loads(Path(alvo, "provas.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}, pasta
     return (d if isinstance(d, dict) else {}), pasta
