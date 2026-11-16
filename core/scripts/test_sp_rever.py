@@ -65,6 +65,19 @@ def test_cartao_le_provas_e_cai_para_minimo(raiz, estado):
     assert b["provas"] == {}
 
 
+def test_provas_recusa_slug_que_foge_do_pacote(tmp_path):
+    sp = tmp_path / "proj" / "sp" / "Done" / "x.md"
+    for mau in ("..", "../x", "a/b", "a\b"):
+        with pytest.raises(ValueError):
+            sr._provas(sp, mau)
+
+
+def test_provas_slug_valido_aponta_para_proofs(tmp_path):
+    sp = tmp_path / "proj" / "sp" / "Done" / "x.md"
+    d, pasta = sr._provas(sp, "ok-1")
+    assert d == {} and pasta.name == "ok-1" and pasta.parent.name == "proofs"
+
+
 def test_gravar_veredicto_valida(raiz, estado):
     with pytest.raises(ValueError):
         sr.gravar_veredicto("a-2026-11-13", "talvez", "", estado, raiz=raiz)
