@@ -9,7 +9,7 @@
   "bugs": { "url": "https://github.com/BMSaiko/kaizen-flow/issues" },
   "keywords": ["kaizen", "workflow", "claude-code", "codex", "agents", "user-stories", "cli"],
   "bin": { "kaizen": "bin/kaizen.js" },
-  "files": ["bin", "core", "adapters", "usage", "README.md", "LICENSE"],
+  "files": ["bin", "core", "adapters", "usage", "catalog", "README.md", "LICENSE"],
   "scripts": { "test": "node bin/run-tests.js" },
   "engines": { "node": ">=18" },
   "coverageThreshold": { "js": { "lines": 70 }, "python": { "lines": 90 } },

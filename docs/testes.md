@@ -39,6 +39,16 @@ Regra de subida:
 - Nunca desce sem justificação escrita no PR.
 - Verificar a falha: pôr um limiar acima do medido (p.ex. 99) e confirmar que `KAIZEN_COVERAGE=1 npm test` sai com erro.
 
+## Catálogo EC/UC e limiar 0,9
+
+Além da cobertura de linhas, o workflow mede a cobertura de casos: `docs/catalogo.json` é a fonte única dos edge cases (`EC-NNN`, por categoria) e dos use cases (`UC-NNN`); `docs/edge-cases.md` e `docs/use-cases.md` são gerados a partir dele (`kaizen catalog render`).
+
+- Cada entrada tem `teste` = `caminho::[Classe::]nome` ou `por cobrir`. Um caso só conta como coberto se o teste existir e passar (pytest: não falha nem é saltado; Node: `# pass` ≥ 1 e `# fail` 0).
+- `kaizen catalog --check`: valida a estrutura (IDs únicos e sem buracos, categorias com casos, testes existentes) e que os `.md` estão em dia; rc 1 em qualquer problema.
+- `kaizen catalog` (report): corre os testes ligados e imprime cobertos/total; rc 0 só com EC ≥ 0,9 e UC = 1,0 (`limiar` no JSON). `--json` para máquinas, `--no-run` conta os testes ligados sem os correr.
+- Para cobrir um caso: escrever o teste, trocar `por cobrir` pelo nome real em `docs/catalogo.json`, correr `kaizen catalog render` e `kaizen catalog --check`.
+- Linha de base (2026-11-16): EC 43/59 (0,73), UC 22/34 (0,65); rc 1 até os filhos do programa de retoma fecharem os casos em falta.
+
 ## Correr localmente
 
 ```
