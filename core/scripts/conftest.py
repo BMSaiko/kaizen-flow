@@ -32,6 +32,14 @@ def pytest_collection_modifyitems(items):
 
 
 @pytest.fixture(autouse=True)
+def _sem_cor_do_terminal(monkeypatch):
+    """FORCE_COLOR/NO_COLOR do terminal (o desta máquina exporta FORCE_COLOR) não entram nos testes;
+    quem testa a cor define-os com `monkeypatch.setenv`."""
+    monkeypatch.delenv("FORCE_COLOR", raising=False)
+    monkeypatch.delenv("NO_COLOR", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _sem_custos_reais(monkeypatch):
     """`sp_fila_execucao._custos` lê os transcripts reais (~13 s); nos testes devolve {} (quem precisa passa `custo_fn`)."""
     try:

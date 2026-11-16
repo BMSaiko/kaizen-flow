@@ -113,7 +113,8 @@ Regras gerais tiradas de incidentes reais. O relato de cada um (projeto, data, n
 
 ## 30. Gates sobre repo externo
 
-- `sp-gates.py` corre no vault: cada `cmd` sobre outro repo começa com `cd <repo> &&`.
+- `sp-gates.py` corre no vault: cada gate sobre outro repo leva `cwd: <worktree externa>` (ou `cd <repo> &&` no `cmd`).
+- Com `cwd` absoluto num repo git fora do vault, o `sp-report.py` mostra o diff desse repo (base `main`/`master` dele) e o `sp-revisor.py --cwd <repo>` chama os scripts do vault por caminho absoluto.
 
 ## 31. Código com escapes
 
@@ -138,3 +139,7 @@ Regras gerais tiradas de incidentes reais. O relato de cada um (projeto, data, n
 ## 36. Testes do pacote K
 
 - Chamar `main(argv)` em-processo, porque a cobertura não conta subprocessos.
+
+## 37. git pelo PowerShell
+
+- `error: cannot spawn sh` (push pede Username; hook `cannot spawn .githooks/pre-commit`): o PATH só tem `Git\mingw64\bin`, sem pasta com `sh.exe`. Correção durável (o user corre): acrescentar `C:\Program Files\Git\bin` ao PATH do utilizador e abrir shell nova; até lá, git pelo Git Bash.
