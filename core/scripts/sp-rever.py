@@ -467,15 +467,26 @@ def _definir_handler():
         def _json(self, code, obj):
             self._resp(code, json.dumps(obj, ensure_ascii=False))
 
+        def _drenar(self):
+            """Lê e deita fora o corpo pendente (até MAX_CORPO): recusar sem o ler faz o Windows enviar RST ao cliente."""
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                return
+            if 0 < n <= MAX_CORPO:
+                self.rfile.read(n)
+
         def _autorizado(self):
             s = self.server
             self.server.pedido = time.time()
             porta = s.server_address[1]
             if self.headers.get("Host") not in (f"127.0.0.1:{porta}", f"localhost:{porta}"):
+                self._drenar()
                 self._json(403, {"erro": "host"})
                 return False
             t = (re.search(r"[?&]t=([^&]*)", self.path) or [None, ""])[1]
             if not hmac.compare_digest(t.encode(), s.token.encode()):
+                self._drenar()
                 self._json(403, {"erro": "token"})
                 return False
             return True

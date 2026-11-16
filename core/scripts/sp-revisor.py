@@ -170,8 +170,8 @@ def lancar(sp, base, achados, backend, cwd, estado_root=None, run=None, sleep=ti
     return {**res, "aviso": aviso}
 
 
-def esperar(slug, timeout=900, intervalo=5, estado_root=None, sleep=time.sleep, agora=time.monotonic):
-    """Bloqueia até `revisor-<slug>` ficar final. 0 done · 1 bloqueado/falhou/desconhecido · RC_TIMEOUT."""
+def esperar_estado(slug, timeout=900, intervalo=5, estado_root=None, sleep=time.sleep, agora=time.monotonic):
+    """Como `esperar`, mas devolve `(rc, ultimo_estado)`; estado `None` = painel sem registo."""
     k, limite = _autor.chave(slug, PAPEL), agora() + timeout
     while True:
         try:
@@ -179,12 +179,17 @@ def esperar(slug, timeout=900, intervalo=5, estado_root=None, sleep=time.sleep, 
         except pe.ErroEstado:
             e = None
         if e == "done":
-            return 0
+            return 0, e
         if e in ("bloqueado", "falhou"):
-            return 1
+            return 1, e
         if agora() >= limite:
-            return RC_TIMEOUT
+            return RC_TIMEOUT, e
         sleep(intervalo)
+
+
+def esperar(slug, timeout=900, intervalo=5, estado_root=None, sleep=time.sleep, agora=time.monotonic):
+    """Bloqueia até `revisor-<slug>` ficar final. 0 done · 1 bloqueado/falhou/desconhecido · RC_TIMEOUT."""
+    return esperar_estado(slug, timeout, intervalo, estado_root, sleep, agora)[0]
 
 
 def main(argv=None, diff=None):
@@ -207,8 +212,9 @@ def main(argv=None, diff=None):
         MODELOS = Path(args.modelos)
     try:
         if args.esperar:
-            rc = esperar(slug_de(args.sp), args.timeout)
-            print({0: "revisor done", 1: "revisor bloqueado ou falhou", RC_TIMEOUT: f"timeout ({args.timeout}s)"}[rc])
+            rc, estado = esperar_estado(slug_de(args.sp), args.timeout)
+            print({0: "revisor done", 1: "revisor bloqueado ou falhou",
+                   RC_TIMEOUT: f"timeout ({args.timeout}s, ultimo estado: {estado or 'desconhecido'})"}[rc])
             return rc
         if not args.achados:
             ap.error("indicar --achados (ou --esperar)")

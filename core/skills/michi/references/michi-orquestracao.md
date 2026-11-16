@@ -77,3 +77,8 @@ Autorizações `commit`/`push`/`pr`/`restricoes` do frontmatter mandam (`michi-m
 ## Ciclo de vida
 
 DR/DP/SP movem-se TODO → Doing → Done com `sp-move.py`/`doc-move.py`; `/michi status` lista o estado. Scripts, tabela de eventos e `status`: `michi-lifecycle.md`.
+
+## Fases sem skill e Spike
+
+- Sem a skill de um passo (`/harden`, `/report`, `/reflect`, `/commit`), faz-se à mão: gates com RC, `sp-report.py`, `## Reflect`, commit com stage explícito.
+- Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_requests`, go/no-go em Decisões; `references/michi-spike.md`.
