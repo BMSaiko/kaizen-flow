@@ -237,6 +237,19 @@ def test_esperar_timeout_rc_proprio(tmp_path):
     assert rc == sr.RC_TIMEOUT and rc not in (0, 1, 2)
 
 
+def test_esperar_estado_timeout_diz_ultimo_estado(tmp_path):
+    root = _estado(tmp_path, "a-correr")
+    relogio = iter(range(0, 1000, 10))
+    rc, e = sr.esperar_estado("x", timeout=30, estado_root=root, sleep=lambda s: None, agora=lambda: next(relogio))
+    assert (rc, e) == (sr.RC_TIMEOUT, "a-correr")
+
+
+def test_esperar_estado_timeout_sem_registo(tmp_path):
+    relogio = iter(range(0, 1000, 10))
+    rc, e = sr.esperar_estado("x", timeout=30, estado_root=tmp_path / "vazio", sleep=lambda s: None, agora=lambda: next(relogio))
+    assert (rc, e) == (sr.RC_TIMEOUT, None)
+
+
 # --- inline -------------------------------------------------------------------
 
 
