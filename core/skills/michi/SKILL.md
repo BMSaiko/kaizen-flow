@@ -34,14 +34,14 @@ Sem a skill de um passo, faz-se à mão; fase **2b Spike** (só com `spike: ince
 
 1. `python -I scripts/sp-estado.py <slug>` e ler `perfil`/`max_tentativas`/`parar_se`. SP vazio = Grill; correr o Arranque todo e a «sessão suja» (`michi-orquestracao.md`) antes da fase 1. «SP não encontrado»: ramo atrás de `master` → `git merge master` e repetir.
 2. SP em TODO: `python -I scripts/sp-move.py <slug> --start` (SP e mães para Doing). `python -I scripts/sb-worktree.py ensure <slug>` se existir (senão `git worktree add`); editar pelo caminho absoluto da worktree; `merge` + `clean` só no fecho com o SP em Done.
-3. `python -I scripts/tab-title.py <slug>` e seguir nesta sessão, sem `Agent`. Painel WezTerm só com `--painel`. Já dentro de um painel ou `--handed`: seguir sem relançar.
+3. `python -I scripts/tab-title.py <slug>` e seguir nesta sessão, sem `Agent`. Painel WezTerm só com `--painel` (`michi_handoff_auto.py decide --painel`, `go <slug>`). Já dentro de um painel ou `--handed`: seguir sem relançar.
 3b. SP novo em auto: `python -I scripts/sp-aprovar.py <slug> --verificar`; rc 1 = por aprovar: recusar e dar a instrução (`sp-resumo.py`, «sim» do user, `sp-aprovar.py`).
 4. Modo: `--auto` ou `modo: auto` no frontmatter = sem `AskUserQuestion` (`modo: manual` = sem auto, sem pergunta); sem nenhum, perguntar «com/sem auto».
    Se o `sp-estado` diz `execução: por escolher` (SP-mãe com filhos), mesmo em `modo: manual`, `AskUserQuestion` «sequencial ou paralelo?» (caso a caso, sem defeito) e gravar antes de lançar: `python -I scripts/sp-execucao.py <slug> sequencial|paralelo`; com `execucao:` preenchido não perguntar. Depois `/sp-fila --programa <slug>` (paralelo: até 3 painéis, o vigia faz merge e avisos).
 5. Checkpoint: `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate.
-6. Journal: em cada fase `python -I scripts/sp_journal.py inicio --slug <slug> --fase <fase> --passo <fase>` e no fim `fim` (`estado` só lê; a retoma é do resume-orfaos).
+6. Journal: em cada fase `python -I scripts/sp_journal.py inicio --slug <slug> --fase <fase> --passo <fase>` e no fim `fim`.
 
-Hooks, sessão suja, handoff, painéis: `michi-orquestracao.md`.
+Hooks, sessão suja, handoff, `[context-guard]`, painéis: `michi-orquestracao.md`.
 
 ## Regras transversais
 
