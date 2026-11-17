@@ -7,7 +7,6 @@ ficam lá); sem worktree cria-a primeiro com `sb-worktree ensure`.
 Uso: módulo importado por sp-move.py e sp-fechar.py (`redirect`); sem execução direta
 rc: 2 se não for possível criar a worktree do SP
 """
-import subprocess
 import sys as _s, pathlib as _p
 _s.path.insert(0, str(_p.Path(__file__).resolve().parent))
 from painel_backend import run_hidden, run_visivel  # noqa: E402

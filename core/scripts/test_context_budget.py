@@ -1,5 +1,4 @@
 """Testes de scripts/context-budget.py (ficheiros temporários)."""
-import sys
 from pathlib import Path
 from sp_carregar import carregar  # noqa: E402
 

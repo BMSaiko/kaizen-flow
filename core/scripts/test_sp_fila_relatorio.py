@@ -1,5 +1,4 @@
 """Testes de scripts/sp-fila.py: relatório final e gastos."""
-import json
 from datetime import datetime
 from pathlib import Path
 from sp_fila_testlib import (

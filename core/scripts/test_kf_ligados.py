@@ -1,9 +1,7 @@
 """Fecho vs kaizen-flow: um SP que altera ficheiros ligados ao pacote não fecha com a cópia desatualizada."""
-import os
 import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest

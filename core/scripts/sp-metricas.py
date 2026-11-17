@@ -18,7 +18,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import kaizen_engine  # noqa: E402
 import sp_indice  # noqa: E402
 sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent))
 from sp_carregar import carregar  # noqa: E402

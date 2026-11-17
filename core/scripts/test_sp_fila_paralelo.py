@@ -6,7 +6,6 @@ from pathlib import Path
 from sp_fila_testlib import (
     sp_fila,
     make_sp,
-    slugs,
     _runner,
     _estado,
     PainelFalso,

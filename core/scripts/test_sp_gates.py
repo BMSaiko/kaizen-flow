@@ -112,7 +112,7 @@ def test_parse_gates_le_inputs():
 def test_cache_hit_miss_e_invalidacao(tmp_path):
     (tmp_path / "f.txt").write_text("1", encoding="utf-8")
     cache = tmp_path / "c.json"
-    g = [_gate(tmp_path, f'python -c "print(1)"', ["f.txt"])]
+    g = [_gate(tmp_path, 'python -c "print(1)"', ["f.txt"])]
     r1 = sp_gates.run(g, cache_path=cache)          # miss: corre
     assert r1[0]["rc"] == 0 and not r1[0].get("cached")
     r2 = sp_gates.run(g, cache_path=cache)          # hit: não corre

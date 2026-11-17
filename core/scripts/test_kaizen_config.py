@@ -1,5 +1,4 @@
 import json
-import sys
 from pathlib import Path
 from sp_carregar import carregar  # noqa: E402
 

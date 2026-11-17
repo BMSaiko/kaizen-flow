@@ -117,7 +117,7 @@ def semente(sp, base, cwd, diff=None, checklist_tipo="codigo", rever_so=None):
     return "\n".join([
         f"# Review independente de {slug_de(sp)}", "",
         "Só lês: nunca corrijas, não faças commit, não edites nada. As correções são do executor.",
-        f"Critérios: bloqueante = bug, regressão, falha de segurança ou teste em falta; menor = estilo e nomes.", "",
+        "Critérios: bloqueante = bug, regressão, falha de segurança ou teste em falta; menor = estilo e nomes.", "",
         secoes, "",
         f"## Diff (`git diff {base}...HEAD --stat`)", stat or "(vazio)", "", escopo, "",
         f"## Checklist ({checklist_tipo})", checklist(checklist_tipo), "",

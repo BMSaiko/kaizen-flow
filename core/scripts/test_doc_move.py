@@ -1,5 +1,4 @@
 """Testes de scripts/doc-move.py e doc-list.py (fixtures temporárias)."""
-import sys
 from pathlib import Path
 
 import pytest

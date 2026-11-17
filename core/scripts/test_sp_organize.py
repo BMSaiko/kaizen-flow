@@ -1,5 +1,4 @@
 """Testes de scripts/sp-organize.py (FS em diretório temporário)."""
-import sys
 from pathlib import Path
 from sp_carregar import carregar  # noqa: E402
 

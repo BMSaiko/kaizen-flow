@@ -13,7 +13,6 @@ rc: 0 fechado, 1 verificação falhou (SP continua em Doing), 2 gates inválidos
 """
 import argparse
 import re
-import subprocess
 import sys as _s, pathlib as _p
 _s.path.insert(0, str(_p.Path(__file__).resolve().parent))
 from painel_backend import run_hidden  # noqa: E402

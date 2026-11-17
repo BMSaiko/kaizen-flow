@@ -1,8 +1,6 @@
 """Testes de sp-provas.py: montar, validar, diagrama SVG, fecho bloqueado e corpo do PR."""
 import json
-import re
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest

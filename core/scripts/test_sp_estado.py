@@ -1,5 +1,4 @@
 """Testes de scripts/sp-estado.py (estado de um SP numa só leitura)."""
-import sys
 from pathlib import Path
 from sp_carregar import carregar  # noqa: E402
 

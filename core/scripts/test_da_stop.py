@@ -1,5 +1,4 @@
 """Testes de scripts/da-stop.py: tentativas por perfil e relatório de paragem."""
-import sys
 from pathlib import Path
 from sp_carregar import carregar  # noqa: E402
 

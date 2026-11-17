@@ -1,5 +1,4 @@
 """Testes de scripts/sp-escalao.py."""
-import sys
 from pathlib import Path
 
 import pytest
