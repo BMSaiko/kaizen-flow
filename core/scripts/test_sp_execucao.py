@@ -1,5 +1,4 @@
 """Testes de scripts/sp-execucao.py (grava/lê execucao: da mãe, em bytes)."""
-import sys
 from pathlib import Path
 
 import pytest

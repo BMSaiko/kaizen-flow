@@ -1,6 +1,5 @@
 """Testes de scripts/sp-list.py (fixtures em ficheiros temporários)."""
 import dataclasses
-import sys
 from pathlib import Path
 from sp_carregar import carregar  # noqa: E402
 

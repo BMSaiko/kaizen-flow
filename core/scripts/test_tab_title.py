@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import subprocess
-import sys
 import unittest
 from unittest import mock
 from pathlib import Path

@@ -5,7 +5,6 @@ Os scripts `sp-*` importam isto em vez de repetirem parsers e `importlib`.
 Uso: módulo importado pelos scripts sp-* (`kaizen_engine.load(nome)`); sem execução direta
 rc: n/a
 """
-import re
 from pathlib import Path as _P
 import sys as _s
 _s.path.insert(0, str(_P(__file__).resolve().parent))

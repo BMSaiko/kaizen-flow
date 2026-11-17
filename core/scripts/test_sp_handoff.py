@@ -1,6 +1,5 @@
 """Testes de scripts/sp-handoff.py (fixtures em ficheiros temporários)."""
 import json
-import sys
 from pathlib import Path
 
 import pytest

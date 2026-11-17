@@ -1,5 +1,4 @@
 """Testes de scripts/sp-move.py (fixtures em ficheiros temporários)."""
-import sys
 from pathlib import Path
 
 import pytest

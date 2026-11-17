@@ -1,6 +1,5 @@
 """Testes de scripts/michi-checkpoint.py (repo git temporário)."""
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest

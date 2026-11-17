@@ -9,7 +9,6 @@ Uso:
 rc: 0 completo, 1 falta matéria ou SP em falta
 """
 import argparse
-import re
 import sys
 from pathlib import Path
 

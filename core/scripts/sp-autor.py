@@ -4,14 +4,18 @@ O painel abre `claude --model <M> --effort <E>` (papel `sp-autor` de `.claude/mo
 título `sp-autor <slug>` e um prompt numa linha: ler a semente com `--consume` (imprime e só depois apaga, como o
 `/handoff`), preencher o SP pela skill `super-prompt` §Gerar, gravar `done` com `sp-estado.py sp-autor-<slug>` e
 fechar. Conta para o teto global de painéis (`sp_painel_estado.MAX_PARALELO`); sem vaga fica `pendente` e nada abre.
-A sessão que pediu fica livre: segue com `sp-estado.py --listar` ou o vigia.
+A sessão que pediu fica livre: segue com `sp-estado.py --listar` ou o vigia. Ao lançar guarda-se o título da tab de
+origem (`origem_titulo`, mais `origem_pane` como pista); o painel corre `--avisar <slug>` antes do `done` e a origem
+recebe uma linha com o caminho do SP (resolvida pelo título; origem ausente = só registo, rc 0).
 
 Uso:
   python -I scripts/sp-autor.py --sp <SP.md vazio> --semente <ficheiro> [--cwd <pasta>] [--backend auto|wezterm|tmux] [--dry-run]
   python -I scripts/sp-autor.py --consume <semente>
+  python -I scripts/sp-autor.py --avisar <slug> [--sp <SP.md>] [--backend auto|wezterm|tmux]
 rc: 0 painel aberto (ou dry-run / consume ok) · 1 erro · 2 sem vaga (pendente)
 """
 import argparse
+import os
 import sys
 import time
 from pathlib import Path
@@ -56,6 +60,7 @@ def prompt(sp, semente):
     return (f"És o painel sp-autor de {slug}. Primeiro corre `python -I scripts/sp-autor.py --consume \"{semente}\"` "
             f"(semente: decisões e contexto; lida e apagada). Preenche as 8 secções de {sp} pela skill super-prompt §Gerar, "
             "sem fazer o trabalho do SP, sem commit, sem abrir outros painéis. No fim corre "
+            f"`python -I scripts/sp-autor.py --avisar {slug} --sp \"{sp}\"` (avisa o painel que te lançou; se falhar segue) e depois "
             f"`python -I scripts/sp-estado.py {chave(slug)} done --msg '<resumo numa linha>'` "
             f"(ou bloqueado/falhou com o motivo) e fecha este painel com `wezterm cli kill-pane --pane-id $WEZTERM_PANE` (não uses /quit).")
 
@@ -75,8 +80,47 @@ def _fila(root):
     return pe.criar_fila(FILA, root=root)
 
 
-def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sleep, rotulo=PAPEL, prompt_fn=None, foco=False, cmd=None):
-    """Abre o painel (`rotulo` dá chave e título; `prompt_fn(sp, semente)` substitui o prompt do sp-autor; `foco` ativa-o; `cmd` substitui o comando do papel sp-autor); devolve {estado: a-correr|pendente|falhou, chave, pane, modelo, msg}."""
+def origem_atual(backend, env=None):
+    """(título da tab, pane-id) do painel de `$WEZTERM_PANE`/`$TMUX_PANE`; (None, None) sem variável, (None, id) sem título. Nunca levanta."""
+    env = os.environ if env is None else env
+    pane = env.get("WEZTERM_PANE") or env.get("TMUX_PANE")
+    if not pane:
+        return None, None
+    try:
+        return backend.titulos().get(str(pane)), str(pane)
+    except Exception:  # noqa: BLE001 — a origem é um extra, nunca impede o lançamento
+        return None, str(pane)
+
+
+def _linha(texto):
+    return " ".join(str(texto).split())
+
+
+def avisar(slug, backend, sp=None, estado_root=None, rotulo=PAPEL):
+    """Envia ao painel de origem (pelo título guardado ao lançar; o pane-id só confirma) uma linha a dizer que o SP está pronto.
+    Devolve `enviado` ou `origem-ausente` (nada enviado, `aviso` no estado). Nunca envia a outro painel nem ao próprio."""
+    k = chave(slug, rotulo)
+    fila = pe.procurar(k, root=estado_root)
+    st = pe.ler(fila, k, root=estado_root)
+    alvo = st.get("origem_titulo")
+    destino = None
+    if alvo:
+        proprio = str(st.get("pane") or "")
+        cand = sorted(p for p, t in backend.titulos().items() if t == alvo and str(p) != proprio)
+        pista = st.get("origem_pane")
+        destino = pista if pista in cand else (cand[0] if cand else None)
+    if destino is not None:
+        caminho = _linha(sp) if sp else f"vault, SP {slug}"
+        msg = f"[sp-autor] SP {_linha(slug)} preenchido: {caminho}. Próximo: sp-resumo.py {_linha(slug)} e aprovação (super-prompt §Gerar 3-5)."
+        if backend.enviar(destino, msg):
+            pe.registar(fila, k, root=estado_root, aviso="enviado")
+            return "enviado"
+    pe.registar(fila, k, root=estado_root, aviso="aviso: origem ausente")
+    return "origem-ausente"
+
+
+def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sleep, rotulo=PAPEL, prompt_fn=None, foco=False, cmd=None, origem=None):
+    """Abre o painel (`rotulo` dá chave e título; `prompt_fn(sp, semente)` substitui o prompt do sp-autor; `foco` ativa-o; `cmd` substitui o comando do papel sp-autor; `origem` = (título, pane) de quem lança, do ambiente se None); devolve {estado: a-correr|pendente|falhou, chave, pane, modelo, msg}."""
     sp, semente = Path(sp), Path(semente)
     if not sp.is_file():
         raise SpAutorErro(f"SP inexistente: {sp}")
@@ -86,7 +130,8 @@ def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sle
     k, modelo = chave(slug_de(sp), rotulo), cmd[2]
     res = {"estado": None, "chave": k, "pane": None, "modelo": modelo, "msg": None}
     fila = _fila(estado_root)
-    pe.registar(fila, k, root=estado_root, modelo=modelo, worktree=str(cwd))
+    o_titulo, o_pane = origem if origem is not None else origem_atual(backend)
+    pe.registar(fila, k, root=estado_root, modelo=modelo, worktree=str(cwd), origem_titulo=o_titulo, origem_pane=o_pane)
     if not pe.reclamar_vaga(k, fila=fila, root=estado_root, modelo=modelo):
         return {**res, "estado": "pendente", "msg": f"sem vaga: {pe.MAX_PARALELO} painéis ativos no total"}
     pane = None
@@ -116,6 +161,7 @@ def main(argv=None):
     ap.add_argument("--sp", help="SP vazio (.md) a preencher")
     ap.add_argument("--semente", help="ficheiro efémero com decisões e contexto (o painel lê e apaga)")
     ap.add_argument("--consume", metavar="SEMENTE", help="imprime a semente e apaga-a (usado pelo painel)")
+    ap.add_argument("--avisar", metavar="SLUG", help="avisa o painel que lançou o sp-autor (usado pelo painel; rc 0 mesmo sem origem)")
     ap.add_argument("--cwd", default=str(Path(__file__).resolve().parent.parent), help="pasta do painel (defeito: o repo)")
     ap.add_argument("--backend", default="auto", help="auto|wezterm|tmux")
     ap.add_argument("--modelos", help="modelos.json alternativo")
@@ -124,6 +170,13 @@ def main(argv=None):
     global MODELOS
     if args.modelos:
         MODELOS = Path(args.modelos)
+    if args.avisar:
+        try:
+            import painel_backend
+            print(f"{chave(args.avisar)} · aviso · {avisar(args.avisar, painel_backend.escolher(args.backend), sp=args.sp)}")
+        except Exception as e:  # noqa: BLE001 — falhar a avisar nunca muda o resultado do sp-autor
+            print(f"aviso falhou (ignorado): {e}", file=sys.stderr)
+        return 0
     try:
         if args.consume:
             consume(args.consume)

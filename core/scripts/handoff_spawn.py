@@ -3,7 +3,6 @@
 Uso: módulo importado por sp-handoff.py (`--spawn`); sem execução direta
 rc: n/a
 """
-import os
 import subprocess
 import sys
 import time

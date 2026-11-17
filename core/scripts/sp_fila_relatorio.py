@@ -6,11 +6,9 @@ rc: n/a
 from pathlib import Path
 import re
 import sys
-from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kf_git  # noqa: E402
-import kaizen_engine  # noqa: E402
 from sp_fila_estado import REPO
 
 

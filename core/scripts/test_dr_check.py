@@ -1,5 +1,4 @@
 """Testes de scripts/dr-check.py: 3 casos (pequena, média, vaga) + falhas."""
-import sys
 from pathlib import Path
 from sp_carregar import carregar  # noqa: E402
 

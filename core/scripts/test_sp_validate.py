@@ -1,5 +1,4 @@
 """Testes de scripts/sp-validate.py (fixtures em ficheiros temporários)."""
-import sys
 from pathlib import Path
 
 import pytest

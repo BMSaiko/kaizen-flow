@@ -1,6 +1,5 @@
 """Testes de doc-list.py (listar DRs/DPs por estado)."""
 import os
-import sys
 import time
 from pathlib import Path
 from sp_carregar import carregar  # noqa: E402

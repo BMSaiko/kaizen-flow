@@ -9,7 +9,6 @@ Os efeitos vivem no `Contexto` (o real é `ContextoReal`; os testes trocam-no).
 Uso: módulo importado por sp-vigia.py; sem execução direta
 rc: sem execução direta"""
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path

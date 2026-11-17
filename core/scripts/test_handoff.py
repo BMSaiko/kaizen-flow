@@ -1,6 +1,5 @@
 """Testes de scripts/handoff.py (ficheiros temporários; nada fala com o WezTerm)."""
 import os
-import sys
 import time
 from datetime import datetime
 from pathlib import Path

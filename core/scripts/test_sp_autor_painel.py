@@ -149,3 +149,106 @@ def test_cli_dry_run_mostra_o_plano(modelos_json, sp_vazio, tmp_path, monkeypatc
 def test_cli_help_corre():
     r = subprocess.run([sys.executable, "-I", str(SCRIPTS / "sp-autor.py"), "--help"], capture_output=True, text=True, encoding="utf-8")
     assert r.returncode == 0 and "--semente" in r.stdout
+
+
+# --- aviso ao painel de origem ---------------------------------------------------------------
+
+SLUG = "proj-algo-2026-11-11"
+K = f"sp-autor-{SLUG}"
+
+
+def _estado(root):
+    return pe.ler(pe.procurar(K, root=root), K, root=root)
+
+
+def test_lancar_grava_a_origem_pelo_titulo(modelos_json, sp_vazio, tmp_path):
+    b = FakeBackend()
+    b.titulos_postos["7"] = "michi proj"
+    root = tmp_path / "estado"
+    sa.lancar(sp_vazio, _semente(tmp_path), b, cwd=tmp_path, estado_root=root, sleep=lambda s: None, origem=("michi proj", "7"))
+    st = _estado(root)
+    assert st["origem_titulo"] == "michi proj" and st["origem_pane"] == "7"
+
+
+def test_origem_atual_le_o_ambiente(modelos_json):
+    b = FakeBackend()
+    b.titulos_postos["7"] = "michi proj"
+    assert sa.origem_atual(b, env={"WEZTERM_PANE": "7"}) == ("michi proj", "7")
+    assert sa.origem_atual(b, env={"TMUX_PANE": "7"}) == ("michi proj", "7")
+    assert sa.origem_atual(b, env={}) == (None, None)
+    assert sa.origem_atual(b, env={"WEZTERM_PANE": "9"}) == (None, "9")  # sem título
+
+
+def test_lancar_sem_origem_grava_null_e_nao_falha(modelos_json, sp_vazio, tmp_path, monkeypatch):
+    monkeypatch.delenv("WEZTERM_PANE", raising=False)
+    monkeypatch.delenv("TMUX_PANE", raising=False)
+    root = tmp_path / "estado"
+    res = sa.lancar(sp_vazio, _semente(tmp_path), FakeBackend(), cwd=tmp_path, estado_root=root, sleep=lambda s: None)
+    assert res["estado"] == "a-correr"
+    assert _estado(root)["origem_titulo"] is None
+
+
+def _lancado(modelos_json, sp_vazio, tmp_path, origem=("michi proj", "7")):
+    b = FakeBackend()
+    b.titulos_postos["7"] = "michi proj"
+    root = tmp_path / "estado"
+    sa.lancar(sp_vazio, _semente(tmp_path), b, cwd=tmp_path, estado_root=root, sleep=lambda s: None, origem=origem)
+    b.enviados.clear()
+    return b, root
+
+
+def test_avisar_envia_uma_linha_ao_painel_certo(modelos_json, sp_vazio, tmp_path):
+    b, root = _lancado(modelos_json, sp_vazio, tmp_path)
+    assert sa.avisar(SLUG, b, sp=sp_vazio, estado_root=root) == "enviado"
+    (pane, texto), = b.enviados
+    assert pane == "7" and "\n" not in texto
+    assert texto == (f"[sp-autor] SP {SLUG} preenchido: {sp_vazio}. Próximo: sp-resumo.py {SLUG} e aprovação (super-prompt §Gerar 3-5).")
+    assert _estado(root)["aviso"] == "enviado"
+
+
+def test_avisar_resolve_pelo_titulo_se_o_pane_mudou(modelos_json, sp_vazio, tmp_path):
+    b, root = _lancado(modelos_json, sp_vazio, tmp_path)
+    del b.titulos_postos["7"]
+    b.titulos_postos["12"] = "michi proj"  # a origem foi movida para outro pane-id
+    assert sa.avisar(SLUG, b, sp=sp_vazio, estado_root=root) == "enviado"
+    assert b.enviados[0][0] == "12"
+
+
+def test_avisar_pane_reaproveitado_com_outro_titulo_nao_envia(modelos_json, sp_vazio, tmp_path):
+    b, root = _lancado(modelos_json, sp_vazio, tmp_path)
+    b.titulos_postos["7"] = "outra coisa"
+    assert sa.avisar(SLUG, b, sp=sp_vazio, estado_root=root) == "origem-ausente"
+    assert b.enviados == []
+    assert "origem ausente" in _estado(root)["aviso"]
+
+
+def test_avisar_sem_origem_titulo_nao_envia(modelos_json, sp_vazio, tmp_path):
+    b, root = _lancado(modelos_json, sp_vazio, tmp_path, origem=(None, None))
+    assert sa.avisar(SLUG, b, estado_root=root) == "origem-ausente"
+    assert b.enviados == [] and "origem ausente" in _estado(root)["aviso"]
+
+
+def test_avisar_painel_morto_nao_envia(modelos_json, sp_vazio, tmp_path):
+    b, root = _lancado(modelos_json, sp_vazio, tmp_path)
+    del b.titulos_postos["7"]
+    assert sa.avisar(SLUG, b, estado_root=root) == "origem-ausente" and b.enviados == []
+
+
+def test_avisar_nunca_envia_ao_proprio_painel(modelos_json, sp_vazio, tmp_path):
+    b, root = _lancado(modelos_json, sp_vazio, tmp_path, origem=("sp-autor " + SLUG, "p1"))
+    assert sa.avisar(SLUG, b, sp=sp_vazio, estado_root=root) == "origem-ausente" and b.enviados == []
+
+
+def test_prompt_manda_avisar_antes_do_done(sp_vazio, tmp_path):
+    t = sa.prompt(sp_vazio, _semente(tmp_path))
+    assert f"--avisar {SLUG}" in t and t.index("--avisar") < t.index("sp-estado.py")
+
+
+def test_cli_dry_run_mostra_o_avisar(modelos_json, sp_vazio, tmp_path, capsys):
+    rc = sa.main(["--sp", str(sp_vazio), "--semente", str(_semente(tmp_path)), "--dry-run", "--modelos", str(modelos_json)])
+    assert rc == 0 and "--avisar" in capsys.readouterr().out
+
+
+def test_cli_avisar_rc0_mesmo_sem_estado(tmp_path, monkeypatch):
+    monkeypatch.setattr(sa.pe, "raiz", lambda root=None: tmp_path / "vazio")
+    assert sa.main(["--avisar", "nao-existe", "--backend", "wezterm"]) == 0
