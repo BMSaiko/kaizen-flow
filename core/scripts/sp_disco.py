@@ -8,11 +8,15 @@ rc: n/a
 """
 import json
 import os
+import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
 
 LOCK_VELHO_S = 60  # um bloqueio mais antigo, sem pid legível, é de uma sessão morta
+HEARTBEAT_S = 15  # intervalo do heartbeat do lock de SP
+HEARTBEAT_VELHO_S = 90  # heartbeat mais antigo = dono preso ou pid reutilizado (órfão)
+HEARTBEAT_SEM_PID_S = 1800  # lock sem pid (michi por CLI: cada fase renova) só expira após este silêncio
 
 
 def pid_vivo(pid):
@@ -154,3 +158,150 @@ def ler_json(path, defeito=None):
         return json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return defeito
+
+
+# --- lock exclusivo por SP (retoma/órfãos): `<raiz>/.kaizen/estado/<slug>.lock.json` com pid, painel e heartbeat ---
+
+class LockOcupado(Exception):
+    """O SP já tem um dono vivo; `dono` é o dict de `dono()` (pid, painel, hb)."""
+
+    def __init__(self, slug, dono):
+        self.slug, self.dono = slug, dono
+        super().__init__(f"SP {slug} em curso no painel {dono.get('painel') or '?'} (pid {dono.get('pid')})")
+
+
+def caminho_lock_sp(raiz, slug):
+    return Path(raiz) / ".kaizen" / "estado" / f"{slug}.lock.json"
+
+
+def escrever_lock_sp(raiz, slug, dados):
+    p = caminho_lock_sp(raiz, slug)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    guardar(p, dados, retry_s=2.0)
+
+
+def dono(raiz, slug, agora=None):
+    """Estado do lock do SP: `livre`, `vivo`, `orfao` (pid morto ou heartbeat antigo) ou `corrompido`; mais pid/painel/hb."""
+    p = caminho_lock_sp(raiz, slug)
+    if not p.exists():
+        return {"estado": "livre"}
+    d = ler_json(p)
+    if not isinstance(d, dict) or not (d.get("pid") is None or isinstance(d.get("pid"), int)) or not isinstance(d.get("hb"), (int, float)):
+        return {"estado": "corrompido"}
+    agora = time.time() if agora is None else agora
+    if d["pid"] is None:  # dono sem processo próprio: só o silêncio do heartbeat o dá por morto
+        vivo = agora - d["hb"] <= HEARTBEAT_SEM_PID_S
+    else:
+        vivo = pid_vivo(d["pid"]) and agora - d["hb"] <= HEARTBEAT_VELHO_S
+    return {"estado": "vivo" if vivo else "orfao", "pid": d["pid"], "painel": d.get("painel"), "hb": d["hb"], "ts": d.get("ts")}
+
+
+class LockSp:
+    """Lock de SP em posse deste processo; `heartbeat()` renova, `iniciar_heartbeat()` renova em thread."""
+
+    def __init__(self, raiz, slug, painel, pid=None):
+        self.raiz, self.slug, self.painel, self.pid, self.ts = raiz, slug, painel, pid, time.time()
+        self._parar = threading.Event()
+        self._thread = None
+
+    def heartbeat(self, forcar=False):
+        """Renova o lock; se já não for o dono (outro painel o tomou) não escreve e devolve False."""
+        if not forcar:
+            atual = ler_json(caminho_lock_sp(self.raiz, self.slug))
+            if not (isinstance(atual, dict) and atual.get("pid") == self.pid and atual.get("ts") == self.ts):
+                return False
+        escrever_lock_sp(self.raiz, self.slug, {"pid": self.pid, "painel": self.painel, "ts": self.ts, "hb": time.time()})
+        return True
+
+    def iniciar_heartbeat(self, intervalo=HEARTBEAT_S):
+        def corre():
+            while not self._parar.wait(intervalo):
+                try:
+                    self.heartbeat()
+                except OSError:
+                    pass
+        self._thread = threading.Thread(target=corre, daemon=True)
+        self._thread.start()
+
+    def parar(self):
+        self._parar.set()
+        if self._thread:
+            self._thread.join(2)
+
+
+def _quarentena_lock(p):
+    carimbo = time.strftime("%Y%m%dT%H%M%S") + f"{time.time_ns() % 10**9:09d}"
+    destino = p.with_name(f"{p.name}.corrupt-{carimbo}")
+    os.replace(p, destino)
+    return destino
+
+
+def tomar_lock(raiz, slug, painel=None, pid="eu"):
+    """Toma o lock do SP ou levanta `LockOcupado` (dono vivo). Órfão é tomado; ilegível vai para `.corrupt-*` (nunca apagado).
+
+    `pid="eu"` = este processo; `None` = dono sem processo próprio (michi por CLI).
+    A tomada corre sob `bloqueio` para duas tentativas não se pisarem; o lock em si é lido sem bloqueio (escrita atómica)."""
+    p = caminho_lock_sp(raiz, slug)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    painel = painel or os.environ.get("WEZTERM_PANE") or f"pid{os.getpid()}"
+    with bloqueio(p):
+        d = dono(raiz, slug)
+        if d["estado"] == "vivo":
+            raise LockOcupado(slug, d)
+        if d["estado"] == "corrompido":
+            _quarentena_lock(p)
+        lk = LockSp(raiz, slug, painel, os.getpid() if pid == "eu" else pid)
+        lk.heartbeat(forcar=True)
+    return lk
+
+
+def libertar_lock(raiz, slug, pid="eu", painel=None):
+    """Apaga o lock se for do `pid` (este processo por defeito; `None` = sem processo); True se apagou.
+
+    Com `painel`, só apaga se o lock for desse painel. Lock sem chave `pid` (ilegível) vai para `.corrupt-*`, nunca é apagado."""
+    p = caminho_lock_sp(raiz, slug)
+    dono_pid = os.getpid() if pid == "eu" else pid
+    if not p.exists():
+        return False
+    with bloqueio(p):
+        atual = ler_json(p)
+        if atual is None and not p.exists():
+            return False
+        if not isinstance(atual, dict) or "pid" not in atual:
+            _quarentena_lock(p)
+            return False
+        if atual.get("pid") == dono_pid and (painel is None or atual.get("painel") == painel):
+            p.unlink(missing_ok=True)
+            return True
+    return False
+
+
+def renovar_lock(raiz, slug):
+    """Renova o heartbeat de um lock vivo sem recriar nem ressuscitar órfãos; chamado a cada evento do journal.
+
+    Só renova se o dono for «vivo» e o pid for do processo atual ou o lock for sem processo (michi por CLI)."""
+    p = caminho_lock_sp(raiz, slug)
+    if not p.exists():
+        return False
+    with bloqueio(p):
+        if dono(raiz, slug)["estado"] != "vivo":
+            return False
+        d = ler_json(p)
+        if not isinstance(d, dict) or d.get("pid") not in (None, os.getpid()):
+            return False
+        d["hb"] = time.time()
+        escrever_lock_sp(raiz, slug, d)
+    return True
+
+
+@contextmanager
+def lock_sp(raiz, slug, painel=None, heartbeat=False):
+    """`tomar_lock` como contexto: liberta à saída; `heartbeat=True` renova numa thread."""
+    lk = tomar_lock(raiz, slug, painel)
+    if heartbeat:
+        lk.iniciar_heartbeat()
+    try:
+        yield lk
+    finally:
+        lk.parar()
+        libertar_lock(raiz, slug)

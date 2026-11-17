@@ -106,7 +106,14 @@ def _uma_linha(texto):
     return " ".join("".join(c if c.isprintable() else " " for c in str(texto)).split())
 
 
-def listar(root=None, em_json=False, todas=False):
+def interrompidos(raiz=None):
+    """SPs órfãos (estado em disco sem lock vivo, fora de Done) da worktree `raiz` (cwd), com o comando de retoma (EC-027)."""
+    sr = kaizen_engine.load("sp-resume")
+    raiz = raiz or "."
+    return [{"slug": s, "estado": "interrompido", "proximo": f"kaizen resume {s}"} for s in sr.candidatos(raiz)]
+
+
+def listar(root=None, em_json=False, todas=False, raiz_sp=None):
     """Filas e SPs pelo nome, com as vagas livres do teto global. O pane nunca sai: o utilizador vê o slug.
 
     Árvores já terminadas (todos os SPs em done/falhou) ficam de fora, a não ser com `todas`."""
@@ -114,13 +121,16 @@ def listar(root=None, em_json=False, todas=False):
     if not todas:
         filas = [f for f in filas if f.get("erro") or not f["sps"]
                  or any(sp["estado"] not in sp_painel_estado.FINAIS for sp in f["sps"])]
+    orfaos = interrompidos(raiz_sp)
     livres, teto = sp_painel_estado.vagas_livres(root), sp_painel_estado.MAX_PARALELO
     if em_json:
         limpas = [{**f, "sps": [{k: v for k, v in sp.items() if k != "pane"} for sp in f["sps"]]} for f in filas]
-        return json.dumps({"vagas_livres": livres, "max": teto, "filas": limpas}, ensure_ascii=False, indent=1)
-    if not filas:
+        return json.dumps({"vagas_livres": livres, "max": teto, "filas": limpas, "interrompidos": orfaos}, ensure_ascii=False, indent=1)
+    if not filas and not orfaos:
         return f"sem filas · vagas livres {livres}/{teto}"
     out = [f"vagas livres {livres}/{teto}"]
+    for o in orfaos:
+        out.append(f"{o['slug']} · {o['estado']} · {o['proximo']}")
     for f in filas:
         out.append(f"{f['fila']} · {f.get('modo') or '-'} · {len(f['sps'])} SPs" + (f" · {f['erro']}" if f.get("erro") else ""))
         for sp in f["sps"]:

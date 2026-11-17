@@ -138,6 +138,10 @@ def _acrescentar(raiz, slug, fase, passo, evento, idempotente):
         f.write(json.dumps(linha, ensure_ascii=True).encode("ascii") + b"\n")
         f.flush()
         os.fsync(f.fileno())
+    try:
+        sp_disco.renovar_lock(raiz, slug)  # cada evento é sinal de vida do dono (michi por CLI)
+    except (OSError, TimeoutError):
+        pass  # o heartbeat nunca parte a API do journal: o evento já está gravado
 
 
 def inicio(raiz, slug, fase, passo, idempotente=True):
@@ -271,12 +275,16 @@ def estado(raiz, slug, sp_path=None):
 
 
 def _ao_interromper(raiz, slug):
-    """Grava `interrompido: true` com a fase/passo correntes; True se gravou."""
+    """Grava `interrompido: true` com a fase/passo correntes e liberta o lock deste processo; True se gravou."""
     fase, passo = _ATUAL.get(_chave(raiz, slug), (None, None))
     try:
         gravar_checkpoint(raiz, slug, fase, passo, extra={"interrompido": True})
     except OSError:
         return False
+    try:
+        sp_disco.libertar_lock(raiz, slug)  # só apaga se for deste pid: o SP fica logo candidato a `kaizen resume`
+    except (OSError, TimeoutError):
+        pass
     return True
 
 

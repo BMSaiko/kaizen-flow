@@ -138,3 +138,16 @@ def test_slug_sem_data_ambiguo(tmp_path):
     _aninhado(tmp_path, "alvo-2026-11-05", "TODO")
     out = sp_estado.estado("alvo", root=tmp_path, git_lines=["master"])
     assert out.startswith("SP ambíguo") and "alvo-2026-11-01" in out and "alvo-2026-11-05" in out
+
+
+def test_listar_mostra_orfaos_como_interrompido_ec027(tmp_path):
+    import json
+    import sp_journal
+
+    sp_journal.inicio(tmp_path, "sp-orfao", "da", "p1")
+    fila = tmp_path / "filas"
+    texto = sp_estado.listar(str(fila), raiz_sp=str(tmp_path))
+    assert "sp-orfao · interrompido · kaizen resume sp-orfao" in texto
+    dados = json.loads(sp_estado.listar(str(fila), em_json=True, raiz_sp=str(tmp_path)))
+    assert dados["interrompidos"] == [{"slug": "sp-orfao", "estado": "interrompido", "proximo": "kaizen resume sp-orfao"}]
+    assert "interrompido" not in sp_estado.listar(str(fila), raiz_sp=str(tmp_path / "vazio"))

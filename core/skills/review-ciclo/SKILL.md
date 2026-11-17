@@ -8,7 +8,7 @@ version: 1.2.0
 Depois do `pentest`, antes do PR. Quem implementou não se revê: um painel `revisor` (só leitura, modelo ≠ executor, critérios de `code-review`) escreve os achados, uma linha cada: `[bloqueante|menor] ficheiro:linha descrição | verificar: como confirmar`.
 
 1. `python -I scripts/sp-revisor.py --sp <SP> --base <ref> --achados <f> [--checklist codigo|ui|docs] [--rever-so F...]`
-2. `sp-revisor.py --sp <SP> --esperar [--timeout 900]` (rc 0 done, 1 falhou, 3 timeout; no 1º rc 2 = sem vaga)
+2. `sp-revisor.py --sp <SP> --esperar [--timeout 900]` (rc 0 done, 1 falhou, 2 sem vaga; 3 timeout, a mensagem traz o último estado: reesperar uma vez, depois `--inline` e registar «review não independente» em `## Review` e no Report)
 3. `python -I scripts/review_ciclo.py <estado.json> --achados <f> [--max 3] [--ficheiros F... --raiz <d>] [--criar-sps --project <p>]`
 
 `--inline` (automático com `michi_modelo: simples` ou sem painéis): review na própria sessão, registar no Report «review não independente».

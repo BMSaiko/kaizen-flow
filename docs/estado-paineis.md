@@ -24,4 +24,6 @@ O slug vem de `KAIZEN_SLUG` ou do ramo `agent/<slug>` (casa por prefixo, o ramo 
 - Claude Code: `kaizen init` regista os três hooks (`adapters/claude`).
 - Outros harness: sem hooks equivalentes verificados; ligar `kf_painel_hook.py` ao evento de fim de turno e de notificação, com o mesmo JSON no stdin (`hook_event_name`), e usar `get-text` do WezTerm só como apoio.
 
+Um SP em Doing sem painel vivo e com `fim` em falta no journal aparece em `sp-estado.py --listar` como `interrompido`, com o comando `kaizen resume <slug>`; o lock por SP (`sp_disco.tomar_lock`, heartbeat) recusa um segundo painel e põe lock corrompido em quarentena `.corrupt-<ts>`.
+
 Estado de fase por SP (checkpoint e journal em `.kaizen/estado/`, quarentena `.corrupt-<ts>`): ver «Phase checkpoint and journal» em [error-log.md](error-log.md).

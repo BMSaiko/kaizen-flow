@@ -35,8 +35,8 @@ Each use case links to the test that runs it end to end, or `por cobrir`. Edge c
 | UC-027 | Move to a fresh context mid-story | `/sp-handoff` | resume command injected in the pane, or copied to the clipboard | `core/scripts/test_sp_handoff.py::test_main_write_sincroniza_o_mae` |
 | UC-028 | Choose how a program's children run | `sp-execucao.py <parent> sequencial\|paralelo` | sets `execucao:` on the parent story; `/michi` and `/sp-fila` read it | `core/scripts/test_sp_execucao.py::test_sem_valor_por_escolher_e_depois_grava` |
 | UC-029 | Measure edge case and use case coverage | `kaizen catalog` (`--check`, `render`, `--json`) | covered/total for EC and UC; rc 0 only at EC >= 0.9 and UC = 1.0 | `tests/catalog.test.js::kaizen catalog --check valida o catálogo do repo` |
-| UC-030 | Resume a story after a crash, Ctrl+C or closed pane | `kaizen resume <story>` | continues from the last journaled phase and step | `por cobrir` |
-| UC-031 | Resume from a chosen phase | `kaizen resume <story> --from <phase>` | earlier phases kept, the run restarts at that phase | `por cobrir` |
-| UC-032 | Throw away a broken run and start the story again | `kaizen resume <story> --restart` | journal reset, story back to its first phase, files kept | `por cobrir` |
+| UC-030 | Resume a story after a crash, Ctrl+C or closed pane | `kaizen resume <story>` | continues from the last journaled phase and step | `core/scripts/test_sp_resume.py::test_um_candidato_retoma_ec001` |
+| UC-031 | Resume from a chosen phase | `kaizen resume <story> --from <phase>` | earlier phases kept, the run restarts at that phase | `core/scripts/test_sp_resume.py::test_from_fase_reverte_abertos_a_partir_dela` |
+| UC-032 | Throw away a broken run and start the story again | `kaizen resume <story> --restart` | journal reset, story back to its first phase, files kept | `core/scripts/test_sp_resume.py::test_restart_confirmado_arquiva_sem_apagar_uc032` |
 | UC-033 | Run a whole program from its parent | `/sp-fila --programa <parent>` | children run in the parent's `execucao:` order; the parent closes after the last one | `por cobrir` |
 | UC-034 | Continue a program from a child already started | `/sp-fila --programa <parent>` with a child in Doing | the running child is resumed, not relaunched; the rest follow | `por cobrir` |
