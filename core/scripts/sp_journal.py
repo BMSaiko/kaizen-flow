@@ -138,7 +138,10 @@ def _acrescentar(raiz, slug, fase, passo, evento, idempotente):
         f.write(json.dumps(linha, ensure_ascii=True).encode("ascii") + b"\n")
         f.flush()
         os.fsync(f.fileno())
-    sp_disco.renovar_lock(raiz, slug)  # cada evento é sinal de vida do dono (michi por CLI)
+    try:
+        sp_disco.renovar_lock(raiz, slug)  # cada evento é sinal de vida do dono (michi por CLI)
+    except (OSError, TimeoutError):
+        pass  # o heartbeat nunca parte a API do journal: o evento já está gravado
 
 
 def inicio(raiz, slug, fase, passo, idempotente=True):

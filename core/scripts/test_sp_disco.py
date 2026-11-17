@@ -188,33 +188,34 @@ def test_tomar_e_heartbeat_menos_de_200ms(tmp_path):
     assert time.perf_counter() - t < 0.2
 
 
-def test_maquina_de_estados_do_lock_no_maximo_um_dono_vivo(tmp_path_factory):
+def test_maquina_de_estados_do_lock_contra_modelo_de_referencia(tmp_path_factory):
     from hypothesis import HealthCheck, given, settings
     from hypothesis import strategies as st
 
-    @settings(max_examples=40, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=60, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
     @given(st.lists(st.sampled_from(["tomar", "libertar", "renovar", "expirar"]), max_size=15))
     def corre(ops):
         raiz = tmp_path_factory.mktemp("m")
-        donos = 0
+        modelo = "livre"  # livre | vivo | orfao
         for op in ops:
             if op == "tomar":
-                try:
+                if modelo == "vivo":
+                    with pytest.raises(sp_disco.LockOcupado):
+                        sp_disco.tomar_lock(raiz, "x", "p", pid=None)
+                else:
                     sp_disco.tomar_lock(raiz, "x", "p", pid=None)
-                    donos += 1
-                except sp_disco.LockOcupado:
-                    assert sp_disco.dono(raiz, "x")["estado"] == "vivo"
+                    modelo = "vivo"
             elif op == "libertar":
                 sp_disco.libertar_lock(raiz, "x", pid=None)
+                modelo = "livre"
             elif op == "renovar":
-                sp_disco.renovar_lock(raiz, "x")
-            else:
+                assert sp_disco.renovar_lock(raiz, "x") is (modelo == "vivo")  # orfao nunca ressuscita
+            elif modelo != "livre":
                 d = sp_disco.ler_json(sp_disco.caminho_lock_sp(raiz, "x"))
-                if isinstance(d, dict):
-                    d["hb"] = time.time() - 99999
-                    sp_disco.escrever_lock_sp(raiz, "x", d)
-            assert sp_disco.dono(raiz, "x")["estado"] in ("livre", "vivo", "orfao")
-            assert len(list(sp_disco.caminho_lock_sp(raiz, "x").parent.glob("x.lock.json"))) <= 1
-        assert donos >= 0
+                d["hb"] = time.time() - 99999
+                sp_disco.escrever_lock_sp(raiz, "x", d)
+                modelo = "orfao"
+            assert sp_disco.dono(raiz, "x")["estado"] == modelo
+            assert len(list(sp_disco.caminho_lock_sp(raiz, "x").parent.glob("x.lock.json"))) == (modelo != "livre")
 
     corre()

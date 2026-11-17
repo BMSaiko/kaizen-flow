@@ -124,12 +124,18 @@ def _msg_ocupado(slug, d):
     )
 
 
+def _slug_valido(slug):
+    return bool(slug) and slug not in (".", "..") and not any(c in slug for c in ("/", chr(92), ":"))
+
+
 def resume(raiz, slug, from_fase=None, restart=False, confirmar=None):
     """Devolve (rc, mensagem). `confirmar` é um callable sem argumentos (True = confirmado)."""
-    if not slug or slug in (".", "..") or any(c in slug for c in ("/", chr(92), ":")):
+    if not _slug_valido(slug):
         return 2, f"slug inválido «{slug}»"
     if from_fase is not None and from_fase not in FASES:
         return 2, f"fase inválida «{from_fase}»; fases válidas: {', '.join(FASES)}"
+    if restart and from_fase is not None:
+        return 2, "--restart e --from não se combinam: --restart recomeça sempre em grill"
     d = sp_disco.dono(raiz, slug)
     if d["estado"] == "vivo":
         return 1, _msg_ocupado(slug, d)
@@ -140,6 +146,11 @@ def resume(raiz, slug, from_fase=None, restart=False, confirmar=None):
         if destino is None:
             return 1, f"SP {slug} sem estado a arquivar: nada alterado (EC-001)"
         return 0, f"recomeçado do início em {FASES[0]}; estado anterior arquivado em {destino} (UC-032)"
+    estado_p, jp = sp_journal.caminhos(raiz, slug)
+    if not estado_p.exists() and not jp.exists():
+        return 1, f"SP {slug} sem estado a retomar: nada alterado (EC-001)"
+    if _em_done(raiz, slug):
+        return 1, f"SP {slug} já está em Done: nada a retomar (EC-001)"
     ponto = ponto_de_retoma(raiz, slug)
     fase = ponto["fase"]
     if from_fase is not None:
@@ -148,6 +159,7 @@ def resume(raiz, slug, from_fase=None, restart=False, confirmar=None):
             if a["fase"] in FASES and FASES.index(a["fase"]) >= idx:
                 sp_journal.revertido(raiz, slug, a["fase"], a["passo"])
         fase = from_fase
+        antes = [f"{a['fase']}/{a['passo']}" for a in ponto["abertos"] if a["fase"] in FASES and FASES.index(a["fase"]) < idx]
         ponto = ponto_de_retoma(raiz, slug)
     ult = ponto["ultimo_fim"]
     texto = f"retomar {slug} em {fase}; último passo concluído: {ult['fase'] + '/' + ult['passo'] if ult else 'nenhum'}"
@@ -160,6 +172,8 @@ def resume(raiz, slug, from_fase=None, restart=False, confirmar=None):
                 f"; reverter antes de repetir: {nomes} — plano: "
                 f"`python -I scripts/michi-checkpoint.py restore --slug {slug}` (sem --apply só mostra)"
             )
+    if from_fase is not None and antes:
+        texto += f"; atenção: passos abertos em fases anteriores ficam por fechar: {', '.join(antes)}"
     return 0, texto + " (EC-001, EC-027, UC-031)"
 
 
@@ -183,6 +197,9 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if (a.lock or a.unlock) and not a.slug:
         ap.error("--lock/--unlock precisam de <slug>")
+    if (a.lock or a.unlock) and not _slug_valido(a.slug):
+        print(f"slug inválido «{a.slug}»", file=sys.stderr)
+        return 2
     if a.lock:
         try:
             sp_disco.tomar_lock(a.raiz, a.slug, a.painel, pid=None)

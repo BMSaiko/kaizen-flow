@@ -139,6 +139,8 @@ def test_decisao_de_retoma_menos_de_2s(tmp_path):
 
 @settings(max_examples=40, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(st.lists(st.tuples(st.sampled_from(["dp", "da", "gates"]), st.sampled_from(["p1", "p2", "p3"]), st.sampled_from(["inicio", "fim"])), max_size=12))
+
+
 def test_ponto_de_retoma_nunca_repete_passo_fechado(tmp_path_factory, seq):
     raiz = tmp_path_factory.mktemp("h")
     _passos(raiz, SLUG, seq)
@@ -184,6 +186,8 @@ def test_restart_de_slug_inexistente_rc1_sem_criar_pastas(tmp_path):
 
 
 @pytest.mark.parametrize("mau", ["../x", "a/b", "a" + chr(92) + "b", ".."])
+
+
 def test_slug_com_separadores_rc2(tmp_path, mau):
     assert SR.resume(tmp_path, mau)[0] == 2
 
@@ -192,16 +196,56 @@ def test_fecho_a_meio_com_lock_tomado_liberta_e_fica_candidato_ec057(tmp_path):
     codigo = (
         "import sys, os, time; sys.path.insert(0, sys.argv[1]); import sp_disco, sp_journal;"
         "r=sys.argv[2]; sp_journal.inicio(r, sys.argv[3], 'da', 'p1'); sp_disco.tomar_lock(r, sys.argv[3], 'pf');"
-        "sp_journal.instalar_sinais(r, sys.argv[3]); print('pronto', flush=True); time.sleep(60)"
+        "sp_journal.instalar_sinais(r, sys.argv[3]); print('pronto', flush=True); [time.sleep(0.05) for _ in range(1200)]"
     )
     sc = str(Path(__file__).resolve().parent)
-    filho = subprocess.Popen([sys.executable, "-c", codigo, sc, str(tmp_path), SLUG], stdout=subprocess.PIPE, text=True)
+    import signal
+
+    win = os.name == "nt"  # Windows: CTRL_BREAK_EVENT corre o handler SIGBREAK (SIGTERM seria TerminateProcess, sem handler)
+    filho = subprocess.Popen([sys.executable, "-c", codigo, sc, str(tmp_path), SLUG], stdout=subprocess.PIPE, text=True,
+                             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if win else 0)
     try:
         assert filho.stdout.readline().strip() == "pronto"
         assert sp_disco.dono(tmp_path, SLUG)["estado"] == "vivo"
-        os.kill(filho.pid, __import__("signal").SIGTERM)
+        os.kill(filho.pid, signal.CTRL_BREAK_EVENT if win else signal.SIGTERM)
         filho.wait(10)
     finally:
         filho.kill()
-    assert sp_disco.dono(tmp_path, SLUG)["estado"] in ("livre", "orfao")  # Windows: SIGTERM = TerminateProcess, o handler nao corre; o pid morto da orfao
+    assert sp_disco.dono(tmp_path, SLUG)["estado"] == "livre"
+    assert sp_journal.estado(tmp_path, SLUG).interrompido is True
     assert SR.candidatos(tmp_path) == [SLUG]
+
+
+def test_from_em_slug_sem_estado_rc1_sem_tocar_no_journal(tmp_path):
+    rc, _ = SR.resume(tmp_path, "nao-existe", from_fase="dp")
+    assert rc == 1 and not (tmp_path / ".kaizen").exists()
+
+
+@pytest.mark.parametrize("mau", ["../x", "a/b", ".."])
+
+
+@pytest.mark.parametrize("flag", ["--lock", "--unlock"])
+
+
+def test_lock_unlock_slug_invalido_rc2_sem_ficheiros(tmp_path, mau, flag):
+    assert SR.main([mau, flag, "--raiz", str(tmp_path)]) == 2
+    assert not list(tmp_path.rglob("*.lock.json"))
+
+
+def test_renovar_lock_a_falhar_nao_parte_o_journal(tmp_path, monkeypatch):
+    def rebenta(*a, **k):
+        raise PermissionError("antivirus")
+    monkeypatch.setattr(sp_disco, "renovar_lock", rebenta)
+    sp_journal.inicio(tmp_path, SLUG, "da", "p1")
+    sp_journal.fim(tmp_path, SLUG, "da", "p1")
+    assert [e["evento"] for e in SR._eventos(tmp_path, SLUG)] == ["inicio", "fim"]
+
+
+def test_restart_com_from_rc2(tmp_path):
+    assert SR.resume(tmp_path, SLUG, from_fase="dp", restart=True, confirmar=lambda: True)[0] == 2
+
+
+def test_from_avisa_de_passos_abertos_em_fases_anteriores(tmp_path):
+    sp_journal.inicio(tmp_path, SLUG, "dp", "p1")
+    rc, texto = SR.resume(tmp_path, SLUG, from_fase="da")
+    assert rc == 0 and "dp/p1" in texto
