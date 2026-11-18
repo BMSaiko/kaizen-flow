@@ -31,7 +31,6 @@ import subprocess
 from pathlib import Path as _P
 import sys as _s
 _s.path.insert(0, str(_P(__file__).resolve().parent))
-from painel_backend import run_hidden  # noqa: E402
 import sys
 import time
 from pathlib import Path

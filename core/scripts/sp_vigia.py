@@ -292,7 +292,10 @@ def modo_do_sp(path):
 
 
 def toast_windows(texto, run=subprocess.Popen):
-    """Balão do Windows por PowerShell `NotifyIcon` (spike 2026-11-11); processo destacado, sem esperar."""
+    """Balão do Windows por PowerShell `NotifyIcon` (spike 2026-11-11); no Linux, `notify-send`. Processo destacado, sem esperar."""
+    if sys.platform != "win32":
+        return popen_sem_janela(["notify-send", "-a", "sp-fila", "sp-fila", str(texto)[:200]], run=run,
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     t = str(texto).replace("'", "''")[:200]
     ps = ("Add-Type -AssemblyName System.Windows.Forms; $n=New-Object System.Windows.Forms.NotifyIcon; "
           "$n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; "
