@@ -196,6 +196,7 @@ def test_plano_dry_run_sem_efeitos(ambiente):
     assert not ambiente.estado.exists()
     linhas = fp.render_dry_run(plano)
     assert "a · claude-opus-5-5 · " in linhas and "pane" not in linhas
+    assert plano[0]["workspace"] and f"· workspace {plano[0]['workspace']}" in linhas
 
 
 def test_worktree_prevista_parte_do_checkout_principal_mesmo_dentro_de_uma_worktree(tmp_path):

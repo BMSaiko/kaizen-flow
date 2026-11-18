@@ -1,6 +1,6 @@
 """Lê `kaizen.config.json` na raiz do repo; sem ficheiro ou chave, devolve o defeito.
 
-Chaves: `spRoot` (raiz dos SPs) e `docsRoot` (raiz dos DR/DP), relativas à raiz do repo; `desenvolvimento` (método do projeto).
+Chaves: `spRoot` (raiz dos SPs) e `docsRoot` (raiz dos DR/DP), relativas à raiz do repo; `desenvolvimento` (método do projeto); `herdr` ({maxPanesPorTab, workspacePorProjeto}).
 
 Uso: módulo importado pelos scripts sp-* e doc_ops; sem execução direta
 rc: n/a
@@ -43,6 +43,18 @@ def painel_backend(repo):
     """Backend dos painéis do modo paralelo (`painelBackend`): auto, wezterm, tmux ou background; inválido = auto."""
     v = _read(repo).get("painelBackend", "auto")
     return v if v in PAINEL_BACKENDS else "auto"
+
+
+HERDR_DEFEITO = {"maxPanesPorTab": 2, "workspacePorProjeto": True}
+
+
+def herdr(repo):
+    """Config do backend herdr (`herdr.maxPanesPorTab` inteiro >= 1, `herdr.workspacePorProjeto` bool); inválido ou ausente = defeito."""
+    raw = _read(repo).get("herdr")
+    raw = raw if isinstance(raw, dict) else {}
+    n, w = raw.get("maxPanesPorTab"), raw.get("workspacePorProjeto")
+    return {"maxPanesPorTab": n if isinstance(n, int) and not isinstance(n, bool) and n >= 1 else HERDR_DEFEITO["maxPanesPorTab"],
+            "workspacePorProjeto": w if isinstance(w, bool) else HERDR_DEFEITO["workspacePorProjeto"]}
 
 
 HOOKS_NAME = "kaizen-hooks.json"

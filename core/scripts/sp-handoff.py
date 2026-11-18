@@ -179,7 +179,8 @@ def main(argv=None):
             falhou = False
             nome = args.backend
             if nome is None:  # sem --backend: `painelBackend` da config manda; sem backend utilizável, a deteção antiga
-                esc = painel_backend.escolher(kaizen_engine.load("kaizen_config").painel_backend(Path.cwd()))
+                kc = kaizen_engine.load("kaizen_config")
+                esc = painel_backend.escolher(kc.painel_backend(Path.cwd()), herdr=kc.herdr(Path.cwd()))
                 nome = esc.nome if esc else None
             resultados = spawn(args.spawn, nome, args.max, registar=not args.sem_registo, dry_run=args.dry_run)
             if args.json:

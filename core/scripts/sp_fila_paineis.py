@@ -242,11 +242,13 @@ def plano_dry_run(alvos, maximo=None):
             modelo = modelo_sp(alvo.path)["model"]
         except Exception as e:  # noqa: BLE001
             modelo = f"? ({e})"
-        plano.append({"slug": alvo.slug, "modelo": modelo, "worktree": worktree_prevista(alvo.slug)})
+        plano.append({"slug": alvo.slug, "modelo": modelo, "worktree": worktree_prevista(alvo.slug),
+                      "workspace": raiz_principal(REPO).name})  # herdr: workspace = repo principal da worktree (HerdrBackend._workspace_para)
     return plano
 
 
 def render_dry_run(plano):
-    """Uma linha por SP: `slug · modelo · worktree`, ou `slug · pendente (sem vaga)`."""
-    return "\n".join(f"{p['slug']} · pendente (sem vaga)" if p.get("pendente") else f"{p['slug']} · {p['modelo']} · {p['worktree']}"
+    """Uma linha por SP: `slug · modelo · worktree · workspace <repo>`, ou `slug · pendente (sem vaga)`."""
+    return "\n".join(f"{p['slug']} · pendente (sem vaga)" if p.get("pendente")
+                     else f"{p['slug']} · {p['modelo']} · {p['worktree']} · workspace {p.get('workspace', '?')}"
                      for p in plano)

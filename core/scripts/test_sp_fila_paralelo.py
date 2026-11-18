@@ -113,7 +113,7 @@ def test_dry_run_com_concorrencia_imprime_slug_modelo_worktree(tmp_path, capsys)
     out = capsys.readouterr().out
     assert rc == 0 and not (tmp_path / "e.json").exists()
     linhas = [ln for ln in out.splitlines() if ln.startswith(("a · ", "b · "))]
-    assert len(linhas) == 2 and all(ln.count(" · ") == 2 for ln in linhas)
+    assert len(linhas) == 2 and all(ln.count(" · ") == 3 and " · workspace " in ln for ln in linhas)
     assert "sb-a" in linhas[0] and "claude-" in linhas[0]
 
 

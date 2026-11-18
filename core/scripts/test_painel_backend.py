@@ -332,7 +332,8 @@ def test_herdr_abrir_fora_do_herdr_cria_tab(monkeypatch):
     chamadas = []
     b = pb.HerdrBackend(_run(_herdr, chamadas))
     assert b.abrir(["claude"], "/w") == "w2:p1"
-    assert chamadas[0] == ["herdr", "tab", "create", "--cwd", "/w", "--no-focus"]  # sem origem não consulta a lista
+    assert ["herdr", "tab", "create", "--cwd", "/w", "--no-focus"] in chamadas  # herdr sem workspace utilizável: comportamento anterior
+    assert not any(c[1:3] == ["pane", "list"] for c in chamadas)  # sem origem não consulta os panes
 
 
 def test_herdr_sem_id_levanta(monkeypatch):
@@ -393,3 +394,108 @@ def test_tmux_abrir_divide_o_painel_de_origem(monkeypatch):
     b = pb.TmuxBackend(_run("%9\n", chamadas))
     assert b.abrir(["claude"], "/w") == "%9"
     assert chamadas[0] == ["tmux", "split-window", "-d", "-P", "-F", "#{pane_id}", "-t", "%3", "-c", "/w", "claude"]
+
+
+# --- workspace herdr por projeto ---------------------------------------------------------------
+
+def _repo_git(tmp_path):
+    import subprocess as sp
+    raiz = tmp_path / "projx"
+    raiz.mkdir()
+    sp.run(["git", "init", "-q", str(raiz)], check=True)
+    sp.run(["git", "-C", str(raiz), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "i"], check=True)
+    return raiz
+
+
+def _herdr_ws(workspaces, panes):
+    def f(argv):
+        if argv[1:3] == ["workspace", "list"]:
+            return json.dumps({"result": {"workspaces": workspaces}})
+        if argv[1:3] == ["workspace", "create"]:
+            return json.dumps({"result": {"workspace": {"workspace_id": "w7"}, "root_pane": {"pane_id": "w7:p1"}}})
+        if argv[1:3] == ["pane", "list"]:
+            return json.dumps({"result": {"panes": panes}})
+        if argv[1:3] == ["tab", "create"]:
+            return json.dumps({"result": {"root_pane": {"pane_id": "w5:p8"}}})
+        if argv[1:3] == ["pane", "split"]:
+            return json.dumps({"result": {"pane": {"pane_id": "w5:p9"}}})
+        return "{}"
+    return f
+
+
+def test_herdr_workspace_novo_para_repo_sem_workspace(monkeypatch, tmp_path):
+    raiz = _repo_git(tmp_path)
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    chamadas = []
+    b = pb.HerdrBackend(_run(_herdr_ws([], []), chamadas))
+    assert b.abrir(["claude"], str(raiz)) == "w7:p1"
+    assert ["herdr", "workspace", "create", "--cwd", str(raiz), "--label", "projx", "--no-focus"] in chamadas
+    assert chamadas[-1] == ["herdr", "pane", "run", "w7:p1", "exec claude"]
+
+
+def test_herdr_workspace_existente_e_reutilizado(monkeypatch, tmp_path):
+    raiz = _repo_git(tmp_path)
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    chamadas = []
+    b = pb.HerdrBackend(_run(_herdr_ws([{"workspace_id": "w5", "label": "projx"}], []), chamadas))
+    assert b.abrir(["claude"], str(raiz)) == "w5:p8"
+    assert not any(c[1:3] == ["workspace", "create"] for c in chamadas)
+    assert ["herdr", "tab", "create", "--workspace", "w5", "--cwd", str(raiz), "--no-focus"] in chamadas
+
+
+def test_herdr_worktree_usa_o_workspace_do_repo_principal(monkeypatch, tmp_path):
+    import subprocess as sp
+    raiz = _repo_git(tmp_path)
+    wt = tmp_path / "wt-projx"
+    sp.run(["git", "-C", str(raiz), "worktree", "add", "-q", "-b", "agent/x", str(wt)], check=True)
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    chamadas = []
+    b = pb.HerdrBackend(_run(_herdr_ws([{"workspace_id": "w5", "label": "projx"}], []), chamadas))
+    assert b.abrir(["claude"], str(wt)) == "w5:p8"
+    assert not any(c[1:3] == ["workspace", "create"] for c in chamadas)
+    assert ["herdr", "tab", "create", "--workspace", "w5", "--cwd", str(wt), "--no-focus"] in chamadas
+
+
+def test_herdr_origem_noutro_workspace_nunca_divide(monkeypatch, tmp_path):
+    raiz = _repo_git(tmp_path)
+    monkeypatch.setenv("HERDR_PANE_ID", "w1:p1")
+    panes = [{"pane_id": "w1:p1", "tab_id": "w1:t1", "workspace_id": "w1"}]  # origem sozinha na tab, mas noutro workspace
+    chamadas = []
+    b = pb.HerdrBackend(_run(_herdr_ws([{"workspace_id": "w5", "label": "projx"}], panes), chamadas))
+    assert b.abrir(["claude"], str(raiz)) == "w5:p8"
+    assert not any(c[1:3] == ["pane", "split"] for c in chamadas)
+
+
+def test_herdr_origem_no_workspace_do_projeto_divide(monkeypatch, tmp_path):
+    raiz = _repo_git(tmp_path)
+    monkeypatch.setenv("HERDR_PANE_ID", "w5:p1")
+    panes = [{"pane_id": "w5:p1", "tab_id": "w5:t1", "workspace_id": "w5"}]
+    chamadas = []
+    b = pb.HerdrBackend(_run(_herdr_ws([{"workspace_id": "w5", "label": "projx"}], panes), chamadas))
+    assert b.abrir(["claude"], str(raiz)) == "w5:p9"
+
+
+def test_herdr_origem_no_workspace_do_projeto_tab_cheia_cria_tab(monkeypatch, tmp_path):
+    raiz = _repo_git(tmp_path)
+    monkeypatch.setenv("HERDR_PANE_ID", "w5:p1")
+    panes = [{"pane_id": "w5:p1", "tab_id": "w5:t1", "workspace_id": "w5"}, {"pane_id": "w5:p2", "tab_id": "w5:t1", "workspace_id": "w5"}]
+    chamadas = []
+    b = pb.HerdrBackend(_run(_herdr_ws([{"workspace_id": "w5", "label": "projx"}], panes), chamadas))
+    assert b.abrir(["claude"], str(raiz)) == "w5:p8"
+    assert not any(c[1:3] == ["pane", "split"] for c in chamadas)
+
+
+def test_herdr_max_panes_configuravel(monkeypatch):
+    monkeypatch.setenv("HERDR_PANE_ID", "w1:p1")
+    panes = [{"pane_id": "w1:p1", "tab_id": "w1:t1", "workspace_id": "w1"},
+             {"pane_id": "w1:p3", "tab_id": "w1:t1", "workspace_id": "w1"}]
+    chamadas = []
+    b = pb.por_nome("herdr", _run(_herdr_com(panes), chamadas), herdr={"maxPanesPorTab": 3, "workspacePorProjeto": False})
+    assert (b.max_panes, b.workspace_por_projeto) == (3, False)
+    assert b.abrir(["claude"], "/w") == "w1:p9"  # 2 panes < 3: divide
+    assert not any(c[1:3] == ["workspace", "list"] for c in chamadas)  # sem workspace por projeto
+
+
+def test_herdr_defeitos_sem_config():
+    b = pb.por_nome("herdr", _run("{}", []))
+    assert (b.max_panes, b.workspace_por_projeto) == (2, True)
