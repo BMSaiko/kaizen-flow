@@ -62,7 +62,8 @@ def prompt(sp, semente):
             "sem fazer o trabalho do SP, sem commit, sem abrir outros painéis. No fim corre "
             f"`python -I scripts/sp-autor.py --avisar {slug} --sp \"{sp}\"` (avisa o painel que te lançou; se falhar segue) e depois "
             f"`python -I scripts/sp-estado.py {chave(slug)} done --msg '<resumo numa linha>'` "
-            f"(ou bloqueado/falhou com o motivo) e fecha este painel com `wezterm cli kill-pane --pane-id $WEZTERM_PANE` (não uses /quit).")
+            f"(ou bloqueado/falhou com o motivo) e fecha este painel com "
+            f"`python -I scripts/sp-autor.py --fechar {slug}` (backend ativo: herdr, wezterm ou tmux; não uses /quit).")
 
 
 def consume(path, out=print):
@@ -118,6 +119,22 @@ def avisar(slug, backend, sp=None, estado_root=None, rotulo=PAPEL):
     return "origem-ausente"
 
 
+def fechar(slug, backend, estado_root=None, rotulo=PAPEL, env=None):
+    """Fecha o painel do papel pelo backend ativo (herdr/wezterm/tmux): pane guardado no estado ao lançar, senão o atual.
+    Devolve o id fechado ou None (nada a fechar)."""
+    k = chave(slug, rotulo)
+    try:
+        pane = pe.ler(pe.procurar(k, root=estado_root), k, root=estado_root).get("pane")
+    except pe.ErroEstado:
+        pane = None
+    if not pane:
+        pane = painel_backend.painel_atual(env)[1]
+    if not pane:
+        return None
+    backend.fechar(str(pane))
+    return str(pane)
+
+
 def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sleep, rotulo=PAPEL, prompt_fn=None, foco=False, cmd=None, origem=None):
     """Abre o painel (`rotulo` dá chave e título; `prompt_fn(sp, semente)` substitui o prompt do sp-autor; `foco` ativa-o; `cmd` substitui o comando do papel sp-autor; `origem` = (título, pane) de quem lança, do ambiente se None); devolve {estado: a-correr|pendente|falhou, chave, pane, modelo, msg}."""
     sp, semente = Path(sp), Path(semente)
@@ -161,6 +178,8 @@ def main(argv=None):
     ap.add_argument("--semente", help="ficheiro efémero com decisões e contexto (o painel lê e apaga)")
     ap.add_argument("--consume", metavar="SEMENTE", help="imprime a semente e apaga-a (usado pelo painel)")
     ap.add_argument("--avisar", metavar="SLUG", help="avisa o painel que lançou o sp-autor (usado pelo painel; rc 0 mesmo sem origem)")
+    ap.add_argument("--fechar", metavar="SLUG", help="fecha o painel do papel pelo backend ativo (usado pelo painel no fim)")
+    ap.add_argument("--papel", default=PAPEL, help="papel do painel a fechar (sp-autor|revisor)")
     ap.add_argument("--cwd", default=str(Path(__file__).resolve().parent.parent), help="pasta do painel (defeito: o repo)")
     ap.add_argument("--backend", default="auto", help="auto|wezterm|tmux")
     ap.add_argument("--modelos", help="modelos.json alternativo")
@@ -169,6 +188,13 @@ def main(argv=None):
     global MODELOS
     if args.modelos:
         MODELOS = Path(args.modelos)
+    if args.fechar:
+        try:
+            print(f"{chave(args.fechar, args.papel)} · fechar · {fechar(args.fechar, painel_backend.escolher(args.backend), rotulo=args.papel) or 'nada'}")
+        except Exception as e:  # noqa: BLE001
+            print(f"erro a fechar: {e}", file=sys.stderr)
+            return 1
+        return 0
     if args.avisar:
         try:
             import painel_backend

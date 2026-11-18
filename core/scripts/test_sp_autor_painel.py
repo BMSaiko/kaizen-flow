@@ -252,3 +252,22 @@ def test_cli_dry_run_mostra_o_avisar(modelos_json, sp_vazio, tmp_path, capsys):
 def test_cli_avisar_rc0_mesmo_sem_estado(tmp_path, monkeypatch):
     monkeypatch.setattr(sa.pe, "raiz", lambda root=None: tmp_path / "vazio")
     assert sa.main(["--avisar", "nao-existe", "--backend", "wezterm"]) == 0
+
+
+def test_prompt_fecha_pelo_backend_e_nao_pelo_wezterm(sp_vazio):
+    t = sa.prompt(sp_vazio, Path("s.md"))
+    assert "sp-autor.py --fechar proj-algo-2026-11-11" in t and "kill-pane" not in t
+
+
+def test_fechar_usa_o_pane_do_estado(modelos_json, sp_vazio, tmp_path):
+    b, root = FakeBackend(), tmp_path / "estado"
+    sa.lancar(sp_vazio, _semente(tmp_path), b, cwd=tmp_path, estado_root=root, sleep=lambda s: None)
+    assert sa.fechar("proj-algo-2026-11-11", b, estado_root=root, env={}) == "p1"
+    assert b.fechados == ["p1"]
+
+
+def test_fechar_sem_estado_usa_o_painel_atual(tmp_path, monkeypatch):
+    b = FakeBackend()
+    monkeypatch.setattr(sa.painel_backend, "painel_atual", lambda env=None: ("herdr", "w3:pX"))
+    assert sa.fechar("nao-existe", b, estado_root=tmp_path / "e") == "w3:pX"
+    assert b.fechados == ["w3:pX"]
