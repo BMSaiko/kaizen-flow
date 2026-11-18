@@ -58,8 +58,8 @@ def run_visivel(*args, **kwargs):
     return subprocess.run(*args, **kwargs)
 
 def enviar_prompt(backend, pane, texto, run, sleep):
-    """Único envio de um prompt a um painel: WezTerm/tmux esperam o prompt `❯` e enviam com Enter confirmado; os outros pela `enviar`."""
-    if backend.nome in ("wezterm", "tmux"):
+    """Único envio de um prompt a um painel: WezTerm/tmux/herdr esperam o prompt `❯` e enviam com Enter confirmado; os outros pela `enviar`."""
+    if backend.nome in ("wezterm", "tmux", "herdr"):
         import handoff_spawn  # tarde: só para painéis reais
         handoff_spawn._wait_prompt(backend.nome, pane, run, sleep)
         handoff_spawn._send_line(backend.nome, pane, texto, run, sleep)
@@ -293,8 +293,8 @@ class HerdrBackend(_Multiplexer):
     def enviar(self, id, texto):
         if str(id) not in self.listar():
             return False
-        self.run(["herdr", "pane", "send-text", str(id), texto], capture_output=True, text=True, encoding="utf-8")
-        self.run(["herdr", "pane", "send-keys", str(id), "Enter"], capture_output=True, text=True, encoding="utf-8")
+        import handoff_spawn  # Enter confirmado: logo a seguir ao send-text o Claude Code trata-o como paste e perde-o
+        handoff_spawn._send_line("herdr", str(id), texto, self.run, time.sleep)
         return True
 
 

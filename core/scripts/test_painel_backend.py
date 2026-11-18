@@ -313,9 +313,19 @@ def test_herdr_sem_id_levanta(monkeypatch):
         b.abrir(["claude"], "/w")
 
 
-def test_herdr_listar_titulos_foco_enviar_fechar():
-    chamadas = []
-    b = pb.HerdrBackend(_run(_herdr, chamadas))
+def test_herdr_listar_titulos_foco_enviar_fechar(monkeypatch):
+    monkeypatch.setattr(pb.time, "sleep", lambda s: None)
+    chamadas, ecra = [], {"txt": "❯ "}
+
+    def herdr(argv):
+        if argv[1:3] == ["pane", "send-text"]:
+            ecra["txt"] = "❯ " + argv[4]
+        elif argv[1:3] == ["pane", "send-keys"]:
+            ecra["txt"] = "❯ "
+        elif argv[1:3] == ["pane", "read"]:
+            return ecra["txt"]
+        return _herdr(argv)
+    b = pb.HerdrBackend(_run(herdr, chamadas))
     assert b.listar() == {"w1:p1": "/work/wt", "w1:p2": "/work/outro"}
     assert b.titulos() == {"w1:p1": "sb"}
     assert b.estado("w1:p2") == "vivo" and b.estado("w9:p9") == "morto"
@@ -324,6 +334,7 @@ def test_herdr_listar_titulos_foco_enviar_fechar():
     assert b.enviar("w1:p1", "/michi a") is True
     assert ["herdr", "pane", "send-text", "w1:p1", "/michi a"] in chamadas
     assert ["herdr", "pane", "send-keys", "w1:p1", "Enter"] in chamadas
+    assert chamadas.index(["herdr", "pane", "send-keys", "w1:p1", "Enter"]) > chamadas.index(["herdr", "pane", "read", "w1:p1", "--source", "visible"])
     assert b.enviar("w9:p9", "x") is False
     assert b.fechar("w1:p1") is True and ["herdr", "pane", "close", "w1:p1"] in chamadas
     assert b.fechar("w9:p9") is False
