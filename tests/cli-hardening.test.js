@@ -84,7 +84,7 @@ const semPreflight = !fs.existsSync(PREFLIGHT) && "core/scripts/sp-preflight.py 
 test("preflight fora de git sai rc 2 no formato EC", { skip: semPreflight }, () => {
   const r = run("preflight", "--repo", tmp());
   assert.strictEqual(r.status, 2);
-  assert.match(r.stderr, EC4);
+  assert.match(r.stderr.replace(/\r\n/g, "\n"), EC4);  // Windows escreve \r\n
 });
 
 test("preflight propaga rc 1 e lista cada problema com EC sem alterar nada", { skip: semPreflight }, () => {
