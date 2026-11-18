@@ -42,14 +42,14 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 
 | ID | Trigger | Expected | Owner | Test |
 |---|---|---|---|---|
-| EC-016 | Model quota or rate limit hit mid-phase | the story is left `bloqueado` with the cause; `kaizen resume` continues once the quota is back | preflight-erros-ux | `por cobrir` |
-| EC-017 | Network down during push or PR creation | the step is recorded as pending with the command to retry; nothing is marked done | preflight-erros-ux | `por cobrir` |
+| EC-016 | Model quota or rate limit hit mid-phase | the story is left `bloqueado` with the cause; `kaizen resume` continues once the quota is back | preflight-erros-ux | `core/scripts/test_sp_vigia.py::test_quota_no_ecra_parado_bloqueia_com_motivo_e_retoma_em` |
+| EC-017 | Network down during push or PR creation | the step is recorded as pending with the command to retry; nothing is marked done | preflight-erros-ux | `core/scripts/test_sp_resume.py::test_pausa_de_rede_usa_ec017` |
 | EC-018 | A PR check errors on the hosting API | the check name and URL are shown | preflight-erros-ux | `core/scripts/test_pr_watch.py::Classify::test_erro_mostra_nome_e_url` |
 | EC-019 | Model session or context runs out mid-phase | the phase is journaled before the handoff; the fresh session resumes from it | checkpoint-journal | `core/scripts/test_sp_journal.py::test_ec_019_fase_gravada_antes_do_handoff` |
 | EC-020 | A session ends before done and the story allows escalation | the story is relaunched once at the next model level, in the same slot | resume-orfaos | `core/scripts/test_sp_vigia.py::test_decidir_uma_so_escalada` |
 | EC-021 | The Enter sent to a new pane is lost and the prompt is not submitted | Enter is resent a bounded number of times, then the launch is marked as error | resume-orfaos | `core/scripts/test_handoff_spawn.py::test_enter_perdido_esgota_tentativas_e_fica_em_erro` |
 | EC-022 | Author pane launched but the prompt never submits (`falhou`) after the ephemeral seed was deleted | the seed is kept until the session has read it, so the launch can be retried | resume-orfaos | `por cobrir` |
-| EC-066 | Model login or session expired (`/login`, OAuth token expired) | the story is left `bloqueado` with the cause and no automatic resume time; the message says to log in and run `kaizen resume` | preflight-erros-ux | `por cobrir` |
+| EC-066 | Model login or session expired (`/login`, OAuth token expired) | the story is left `bloqueado` with the cause and no automatic resume time; the message says to log in and run `kaizen resume` | preflight-erros-ux | `core/scripts/test_sp_vigia.py::test_sessao_expirada_bloqueia_sem_retoma_automatica` |
 
 ## Git and worktree (conflict, wrong branch, dirty or orphan)
 
@@ -63,12 +63,12 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-028 | Cleanup finds a dirty worktree | the worktree and its pane are never closed | resume-orfaos | `core/scripts/test_kf_term_limpar.py::test_planear_nunca_fecha_vivo_ativo_nem_worktree_suja_nem_proprio` |
 | EC-029 | Leftover files in a finished worktree include a secret | the watcher refuses to commit them | testes-falha-90 | `core/scripts/test_sp_vigia.py::test_arrumar_worktree_recusa_segredos` |
 | EC-030 | A stale copy of the story is left in TODO after it is closed | closing removes the copy | resume-orfaos | `core/scripts/test_sp_move.py::test_copia_em_todo_e_removida_ao_fechar` |
-| EC-031 | Agent starts writing while the main checkout is not on the main branch | a preflight refuses and prints the command that fixes it | preflight-erros-ux | `por cobrir` |
-| EC-060 | Story worktree has uncommitted changes when a run starts | the preflight lists the dirty files with EC-060 and proposes `git stash push -u -m <tag>`; nothing is changed without `--fix` and confirmation | preflight-erros-ux | `por cobrir` |
-| EC-061 | Worktree is on a branch that is not `agent/<slug>` (or the story's branch) | the preflight reports the current and expected branch with EC-061 and proposes `git checkout <branch>` | preflight-erros-ux | `por cobrir` |
-| EC-062 | The story's worktree is missing | the preflight reports EC-062 and proposes the command that creates it; no state is touched | preflight-erros-ux | `por cobrir` |
-| EC-063 | A worktree is registered but its folder is gone (prunable) | the preflight reports EC-063 and proposes `git worktree prune`; never `worktree remove --force` | preflight-erros-ux | `por cobrir` |
-| EC-064 | A merge, rebase or cherry-pick is half done in the worktree | the preflight reports EC-064 and suggests `--continue`/`--abort` without running them | preflight-erros-ux | `por cobrir` |
+| EC-031 | Agent starts writing while the main checkout is not on the main branch | a preflight refuses and prints the command that fixes it | preflight-erros-ux | `core/scripts/test_sp_preflight.py::test_checkout_principal_fora_do_ramo_principal_ec031` |
+| EC-060 | Story worktree has uncommitted changes when a run starts | the preflight lists the dirty files with EC-060 and proposes `git stash push -u -m <tag>`; nothing is changed without `--fix` and confirmation | preflight-erros-ux | `core/scripts/test_sp_preflight.py::test_arvore_suja_ec060_lista_ficheiros_sem_alterar` |
+| EC-061 | Worktree is on a branch that is not `agent/<slug>` (or the story's branch) | the preflight reports the current and expected branch with EC-061 and proposes `git checkout <branch>` | preflight-erros-ux | `core/scripts/test_sp_preflight.py::test_ramo_errado_ec061` |
+| EC-062 | The story's worktree is missing | the preflight reports EC-062 and proposes the command that creates it; no state is touched | preflight-erros-ux | `core/scripts/test_sp_preflight.py::test_worktree_em_falta_ec062` |
+| EC-063 | A worktree is registered but its folder is gone (prunable) | the preflight reports EC-063 and proposes `git worktree prune`; never `worktree remove --force` | preflight-erros-ux | `core/scripts/test_sp_preflight.py::test_worktree_por_limpar_ec063` |
+| EC-064 | A merge, rebase or cherry-pick is half done in the worktree | the preflight reports EC-064 and suggests `--continue`/`--abort` without running them | preflight-erros-ux | `core/scripts/test_sp_preflight.py::test_merge_a_meio_ec064_so_sugere` |
 
 ## Terminal crashed or machine off
 
@@ -82,8 +82,8 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-037 | Multiplexer times out when listing panes | a warning, and the list is shown with liveness unknown | preflight-erros-ux | `core/scripts/test_kf_term_ls.py::test_backend_timeout_avisa_e_lista` |
 | EC-038 | Queue state left by a run that died (reboot) | the stale queue is refused and abandoning it is offered | resume-orfaos | `core/scripts/test_sp_fila_estado.py::test_fila_obsoleta_recusa_e_propoe_abandonar` |
 | EC-039 | Watcher pid file left behind by a crash | stopping with a dead pid only deletes the file | resume-orfaos | `core/scripts/test_sp_vigia.py::test_parar_pid_morto_so_apaga` |
-| EC-065 | `git` or Python is not on PATH | the preflight reports EC-065 with what is missing and how to install it; rc 1 | preflight-erros-ux | `por cobrir` |
-| EC-068 | Kaizen pieces missing from a project (skills, scripts, AGENTS.md block, hooks) | `kaizen doctor` reports them in one EC-068 message with rc 1 and proposes `kaizen doctor --fix`; nothing is overwritten | preflight-erros-ux | `por cobrir` |
+| EC-065 | `git` or Python is not on PATH | the preflight reports EC-065 with what is missing and how to install it; rc 1 | preflight-erros-ux | `core/scripts/test_sp_preflight.py::test_git_ausente_ec065` |
+| EC-068 | Kaizen pieces missing from a project (skills, scripts, AGENTS.md block, hooks) | `kaizen doctor` reports them in one EC-068 message with rc 1 and proposes `kaizen doctor --fix`; nothing is overwritten | preflight-erros-ux | `tests/cli-hardening.test.js::doctor com peças em falta lista-as numa mensagem EC-068 e propõe --fix` |
 
 ## Concurrency and corrupted state
 
@@ -100,7 +100,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-048 | `--seguinte` arrives while a story is still being launched | the same story is not launched twice | testes-falha-90 | `core/scripts/test_sp_fila_paralelo.py::test_seguinte_durante_o_lancamento_nao_relanca_o_mesmo_sp` |
 | EC-049 | A second watcher is started for the same queue | it is refused | testes-falha-90 | `core/scripts/test_sp_vigia.py::test_cli_recusa_segundo_vigia` |
 | EC-050 | Phase journal missing or corrupted at resume | resume falls back to the last valid entry and says which one | checkpoint-journal | `core/scripts/test_sp_journal.py::test_ec_050_linha_do_meio_invalida_vai_para_quarentena` |
-| EC-067 | Invalid request to a kaizen command or to the queue state (unknown slug or folder, invalid transition or phase, wrong option) | refused without writing; the message (EC format) says what is valid and the next command | preflight-erros-ux | `por cobrir` |
+| EC-067 | Invalid request to a kaizen command or to the queue state (unknown slug or folder, invalid transition or phase, wrong option) | refused without writing; the message (EC format) says what is valid and the next command | preflight-erros-ux | `core/scripts/test_sp_estado.py::test_recusas_do_estado_no_formato_ec` |
 
 ## Windows (atomic rename, CRLF, paths, console close)
 
