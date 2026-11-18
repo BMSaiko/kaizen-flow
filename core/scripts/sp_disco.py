@@ -243,7 +243,8 @@ def tomar_lock(raiz, slug, painel=None, pid="eu"):
     A tomada corre sob `bloqueio` para duas tentativas não se pisarem; o lock em si é lido sem bloqueio (escrita atómica)."""
     p = caminho_lock_sp(raiz, slug)
     p.parent.mkdir(parents=True, exist_ok=True)
-    painel = painel or os.environ.get("WEZTERM_PANE") or f"pid{os.getpid()}"
+    painel = (painel or os.environ.get("HERDR_PANE_ID") or os.environ.get("WEZTERM_PANE") or os.environ.get("TMUX_PANE")
+              or f"pid{os.getpid()}")
     with bloqueio(p):
         d = dono(raiz, slug)
         if d["estado"] == "vivo":

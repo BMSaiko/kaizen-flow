@@ -36,7 +36,7 @@ def docs_root(repo):
     return Path(repo) / _read(repo).get("docsRoot", DEFAULT_DOCS_ROOT)
 
 
-PAINEL_BACKENDS = ("auto", "wezterm", "tmux", "background")
+PAINEL_BACKENDS = ("auto", "wezterm", "tmux", "herdr", "background")
 
 
 def painel_backend(repo):

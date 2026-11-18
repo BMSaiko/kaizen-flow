@@ -166,3 +166,10 @@ def test_run_hidden_wezterm_rc_erro_vira_handoff_error(monkeypatch):
     monkeypatch.setattr(hp.subprocess, "run", fake_run)
     with pytest.raises(hp.HandoffError, match="inacessível"):
         hp.run_hidden(["wezterm", "cli", "list"], check=True)
+
+
+def test_detect_backend_herdr():
+    assert hp.detect_backend({"HERDR_PANE_ID": "w1:p1", "WEZTERM_PANE": "1"}) == ("herdr", "w1:p1")
+    send, enter = hp._argvs("herdr", "w1:p1")
+    assert send("w1:p1", "/michi x") == ["herdr", "pane", "send-text", "w1:p1", "/michi x"]
+    assert enter("w1:p1") == ["herdr", "pane", "send-keys", "w1:p1", "Enter"]

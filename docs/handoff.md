@@ -34,7 +34,7 @@ python scripts/handoff.py --consume PATH                     # print the handoff
 
 Codex context guard: wire `python -I scripts/context-guard.py` as a hook in your Codex `config.toml` (syntax to verify on your version); `kaizen doctor --harness codex` reports `ligado` or `degradado`. Test it by hand with `--transcript <rollout.jsonl>`.
 
-Extra options: `--harness claude|codex`, `--backend wezterm|tmux|clipboard`, `--pane ID`, `--dry-run` (print the commands, execute nothing), `--auto` (no questions; needs a story in Doing).
+Extra options: `--harness claude|codex`, `--backend wezterm|tmux|herdr|clipboard`, `--pane ID`, `--dry-run` (print the commands, execute nothing), `--auto` (no questions; needs a story in Doing).
 
 ## Backends
 
@@ -48,7 +48,7 @@ The handoff reuses the terminal where the agent already runs and opens no new wi
 
 Resume command per harness: `/clear` then `/michi <story path>` in Claude Code; the Codex equivalent (`/new`, assumed; verify on your version) then a text instruction to run michi on the story.
 
-**Codex: the handoff must work before the install counts as complete.** If the handoff does not work in Codex (`/new` missing or different, no tmux/WezTerm, resume prompt not pasted), Codex must fix it first: find the new-conversation command of the installed version, adjust the setup (prompts, config, or the clipboard backend) and re-test with `python -I scripts/sp-handoff.py --launch <sp.md> --harness codex --dry-run`. Only then confirm the install as complete (`kaizen doctor --harness codex` exits 0 and the handoff works).
+**Codex: the handoff must work before the install counts as complete.** If the handoff does not work in Codex (`/new` missing or different, no tmux/WezTerm/herdr, resume prompt not pasted), Codex must fix it first: find the new-conversation command of the installed version, adjust the setup (prompts, config, or the clipboard backend) and re-test with `python -I scripts/sp-handoff.py --launch <sp.md> --harness codex --dry-run`. Only then confirm the install as complete (`kaizen doctor --harness codex` exits 0 and the handoff works).
 
 `kaizen doctor` prints the detected mode: `handoff: cli (wezterm|tmux)` or `handoff: app (clipboard)`.
 

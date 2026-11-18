@@ -11,6 +11,7 @@ rc: n/a
 import abc
 import json
 import os
+import shlex
 import shutil
 import signal
 import subprocess
@@ -27,7 +28,9 @@ try:
 except (RuntimeError, KeyError):  # ambiente sem HOME (hooks com env mínimo)
     _HOME = Path(".")
 ESTADO_DIR = _HOME / ".claude" / "sp-fila-paineis"
-NOMES = ("wezterm", "tmux", "background")
+NOMES = ("wezterm", "tmux", "herdr", "background")
+# variável que o multiplexer define dentro de cada painel; a ordem é a da deteção automática
+VARIAVEIS = {"herdr": "HERDR_PANE_ID", "wezterm": "WEZTERM_PANE", "tmux": "TMUX_PANE"}
 SEM_COR = ("NO_COLOR", "FORCE_COLOR")  # variáveis que os painéis do --spawn não devem herdar
 LOG_LINHAS = 80 # `ecra` do backend background: cauda do log
 
@@ -187,7 +190,9 @@ class TmuxBackend(_Multiplexer):
     nome = "tmux"
 
     def abrir(self, cmd, cwd):
-        return self._out(["tmux", "split-window", "-d", "-P", "-F", "#{pane_id}", "-c", str(cwd), *cmd]).strip()
+        # -t: divide o painel do agente que lança (sem -t o tmux precisa de um cliente ligado)
+        alvo = ["-t", os.environ["TMUX_PANE"]] if os.environ.get("TMUX_PANE") else []
+        return self._out(["tmux", "split-window", "-d", "-P", "-F", "#{pane_id}", *alvo, "-c", str(cwd), *cmd]).strip()
 
     def listar(self):
         try:
@@ -225,6 +230,81 @@ class TmuxBackend(_Multiplexer):
             return self.run(["tmux", "capture-pane", "-p", "-t", str(id)], capture_output=True, text=True, encoding="utf-8").stdout
         except (OSError, subprocess.SubprocessError):
             return ""
+
+
+class HerdrBackend(_Multiplexer):
+    """herdr (https://github.com/herdrdev/herdr): painéis pela CLI `herdr pane ...` (saída JSON)."""
+    nome = "herdr"
+
+    def _json(self, argv):
+        try:
+            d = json.loads(self.run(["herdr", *argv], capture_output=True, text=True, encoding="utf-8").stdout or "{}")
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return {}
+        return d.get("result") or {}
+
+    def _paineis(self):
+        return self._json(["pane", "list"]).get("panes") or []
+
+    def abrir(self, cmd, cwd):
+        origem = os.environ.get("HERDR_PANE_ID")
+        if origem:  # painel novo à direita do agente que lança, sem lhe roubar o foco
+            res = self._json(["pane", "split", origem, "--direction", "right", "--cwd", str(cwd), "--no-focus"])
+            pane = (res.get("pane") or {}).get("pane_id")
+        else:  # fora do herdr: tab nova no workspace ativo
+            res = self._json(["tab", "create", "--cwd", str(cwd), "--no-focus"])
+            pane = (res.get("root_pane") or {}).get("pane_id")
+        if not pane:
+            raise BackendError("herdr não devolveu o id do painel novo (o servidor está a correr? `herdr status`)")
+        # `exec`: o painel fecha quando o comando acaba, como no tmux split-window
+        self._out(["herdr", "pane", "run", pane, "exec " + shlex.join(str(c) for c in cmd)])
+        return pane
+
+    def listar(self):
+        return {p["pane_id"]: p.get("cwd") for p in self._paineis() if p.get("pane_id")}
+
+    def titulo(self, id, texto):
+        self.run(["herdr", "pane", "rename", str(id), texto], capture_output=True, text=True, encoding="utf-8")
+        return True
+
+    def titulos(self):
+        return {p["pane_id"]: p["label"] for p in self._paineis() if p.get("label")}
+
+    def foco(self, id):
+        tab = next((p.get("tab_id") for p in self._paineis() if p.get("pane_id") == str(id)), None)
+        if not tab:
+            return False
+        self.run(["herdr", "tab", "focus", tab], capture_output=True, text=True, encoding="utf-8")
+        return True
+
+    def fechar(self, id):
+        if str(id) not in self.listar():
+            return False
+        self.run(["herdr", "pane", "close", str(id)], capture_output=True, text=True, encoding="utf-8")
+        return True
+
+    def ecra(self, id):
+        try:
+            return self.run(["herdr", "pane", "read", str(id), "--source", "visible"], capture_output=True, text=True,
+                            encoding="utf-8").stdout
+        except (OSError, subprocess.SubprocessError):
+            return ""
+
+    def enviar(self, id, texto):
+        if str(id) not in self.listar():
+            return False
+        self.run(["herdr", "pane", "send-text", str(id), texto], capture_output=True, text=True, encoding="utf-8")
+        self.run(["herdr", "pane", "send-keys", str(id), "Enter"], capture_output=True, text=True, encoding="utf-8")
+        return True
+
+
+def painel_atual(env=None):
+    """(backend, id) do painel onde este processo corre (herdr, WezTerm ou tmux); (None, None) fora de painéis."""
+    env = os.environ if env is None else env
+    for nome, var in VARIAVEIS.items():
+        if env.get(var):
+            return nome, env[var]
+    return None, None
 
 
 def _arranque_sistema():
@@ -378,7 +458,7 @@ def _disponivel(nome, env, which, fixo=False):
     Com `fixo` (nome pedido na config) basta o executável; o background não precisa de nenhum."""
     if nome == "background":
         return True
-    variavel = {"wezterm": "WEZTERM_PANE", "tmux": "TMUX_PANE"}[nome]
+    variavel = VARIAVEIS[nome]
     return which(nome) is not None and (fixo or bool(env.get(variavel)))
 
 
@@ -388,6 +468,8 @@ def por_nome(nome, run=run_hidden, estado_dir=None):
         return WeztermBackend(run)
     if nome == "tmux":
         return TmuxBackend(run)
+    if nome == "herdr":
+        return HerdrBackend(run)
     if nome == "background":
         return BackgroundBackend(estado_dir)
     raise BackendError(f"backend desconhecido: {nome!r} (válidos: {', '.join(NOMES)})")
@@ -397,12 +479,12 @@ def escolher(config="auto", env=None, which=shutil.which, run=run_hidden, estado
     """Backend a usar ou None.
 
     `config` vem de `painelBackend`: um nome fixo manda (None se estiver indisponível); `auto` deteta o multiplexer
-    onde o agente corre (WezTerm, depois tmux). O background nunca é automático: tem de ser pedido na config.
+    onde o agente corre (herdr, depois WezTerm, depois tmux). O background nunca é automático: tem de ser pedido na config.
     """
     env = os.environ if env is None else env
     if config in NOMES:
         return por_nome(config, run, estado_dir) if _disponivel(config, env, which, fixo=True) else None
-    for nome in ("wezterm", "tmux"):
+    for nome in VARIAVEIS:
         if _disponivel(nome, env, which):
             return por_nome(nome, run, estado_dir)
     return None
@@ -411,7 +493,7 @@ def escolher(config="auto", env=None, which=shutil.which, run=run_hidden, estado
 def falta(config="auto", env=None, which=shutil.which):
     """Mensagem de uma linha: o que falta para haver backend (para o aviso do fallback sequencial)."""
     env = os.environ if env is None else env
-    if config in ("wezterm", "tmux"):
+    if config in VARIAVEIS:
         return f"painelBackend={config} mas o executável `{config}` não está no PATH"
-    return ("sem backend de painéis: correr dentro do WezTerm ou de uma sessão tmux, ou pôr "
+    return ("sem backend de painéis: correr dentro do herdr, do WezTerm ou de uma sessão tmux, ou pôr "
             '`"painelBackend": "background"` no kaizen.config.json (processos sem terminal gráfico)')

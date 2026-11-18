@@ -48,7 +48,7 @@ from sp_progresso import (MAX_BODY_LINES, SP_SECTION_RE, _agent_claims, check_de
 
 sp_list = kaizen_engine.load("sp-list")
 
-BACKENDS = ("wezterm", "tmux", "clipboard", "background")
+BACKENDS = ("wezterm", "tmux", "herdr", "clipboard", "background")
 
 
 def sp_root_for(agent, cwd=None, run=run_hidden):
@@ -134,7 +134,7 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="com --spawn: imprime o resultado como JSON (uma lista de {slug, ok, painel, worktree}) para o sp-fila")
     ap.add_argument("--max", type=int, default=MAX_SPAWN, help=f"com --spawn: painéis em simultâneo (default {MAX_SPAWN})")
     ap.add_argument("--file", help="ficheiro com o corpo do progresso (com --write)")
-    ap.add_argument("--pane", help="painel do multiplexer (default: $WEZTERM_PANE ou $TMUX_PANE)")
+    ap.add_argument("--pane", help="painel do multiplexer (default: $HERDR_PANE_ID, $WEZTERM_PANE ou $TMUX_PANE)")
     ap.add_argument("--backend", choices=BACKENDS, help="default: deteção automática; sem painel, clipboard")
     ap.add_argument("--harness", choices=tuple(HARNESSES), default="claude", help="comando de retoma (default: claude)")
     ap.add_argument("--dry-run", action="store_true", help="com --launch ou --spawn: só mostra, sem efeitos")

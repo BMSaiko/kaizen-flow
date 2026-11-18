@@ -13,7 +13,6 @@ Uso: python -I scripts/kf_term_limpar.py limpar [--apply] [--sim] | retomar [--s
 rc: 0 ok (inclui dry-run, cancelado, nada a fazer, sem backend), 1 falha a executar, 2 argumento inválido
 """
 import argparse
-import os
 import subprocess
 from pathlib import Path as _P
 import sys as _s
@@ -33,9 +32,8 @@ ERROS = (pb.BackendError, OSError, subprocess.SubprocessError, pe.ErroEstado)
 
 
 def painel_proprio(env=None):
-    """Id do painel onde corre este processo (WezTerm ou tmux); None se não corre num painel."""
-    env = os.environ if env is None else env
-    return env.get("WEZTERM_PANE") or env.get("TMUX_PANE") or None
+    """Id do painel onde corre este processo (herdr, WezTerm ou tmux); None se não corre num painel."""
+    return pb.painel_atual(env)[1]
 
 
 def worktree_suja(caminho, run=run_hidden):

@@ -94,8 +94,8 @@ PAINEL  SP        FASE   ESTADO             FILA
 ```
 
 - `--fila X` lists only queue `X`; `--json` prints a list of `{painel, slug, fila, fase, estado, pergunta, vivo}` (stable contract; `vivo` is `vivo`, `morto` or `null`).
-- `morto`: an active SP (`a-correr`, `pergunta`) whose pane is not in the backend (WezTerm, tmux or background, from `painelBackend`). Finished SPs without a pane are not flagged.
-- Without a backend (outside WezTerm/tmux) or when it fails or exceeds 5 s, a warning goes to stderr and `vivo` stays `null`; the list still prints (rc 0).
+- `morto`: an active SP (`a-correr`, `pergunta`) whose pane is not in the backend (WezTerm, tmux, herdr or background, from `painelBackend`). Finished SPs without a pane are not flagged.
+- Without a backend (outside WezTerm/tmux/herdr) or when it fails or exceeds 5 s, a warning goes to stderr and `vivo` stays `null`; the list still prints (rc 0).
 - Skeleton of the state fields: `docs/estado-paineis.md`.
 
 ### `kaizen term fila` and `kaizen term michi`
@@ -115,7 +115,7 @@ lançado michi de slug-b no painel 42
 - Only `s`/`sim`/`y`/`yes` launches; empty, `n`, `q` or anything else cancels and touches nothing. `--sim` is the explicit confirmation when there is no terminal.
 - `--slug SP` (michi) or `--programa MÃE` (fila) skips the list but still previews and confirms; a SP that is not eligible exits 2.
 - The pane is named by the SP slug (`fila-<mãe>` for a queue). `michi` reuses `michi_handoff_auto.py` (worktree via `sb-worktree.py ensure`); `fila` runs `python -I scripts/sp-fila.py --programa <mãe>` in the project root.
-- Without a backend (outside WezTerm/tmux) it prints the equivalent command and exits 0. A launch that fails exits 1 with the cause; a pane title that fails is only a warning.
+- Without a backend (outside WezTerm/tmux/herdr) it prints the equivalent command and exits 0. A launch that fails exits 1 with the cause; a pane title that fails is only a warning.
 
 ### `kaizen term limpar` and `kaizen term retomar`
 
@@ -123,7 +123,7 @@ lançado michi de slug-b no painel 42
 
 - Actions: `fechar-painel` (SP done, pane alive, clean worktree), `estado-orfao` (active state without a pane: set to `bloqueado`), `remover-fila` (every SP done and nothing protected).
 - Protected: the current pane (`WEZTERM_PANE`/`TMUX_PANE`), active SPs, `falhou`/pending ones, and dirty or unverified worktrees.
-- Without a backend (outside WezTerm/tmux) it warns on stderr and does nothing.
+- Without a backend (outside WezTerm/tmux/herdr) it warns on stderr and does nothing.
 
 `retomar` lists the Doing SPs (not programs) without a live pane, shows the pending handoffs `*-<slug>.md` of each one, asks for confirmation and reopens the michi in a new pane through `michi_handoff_auto.py`.
 
@@ -137,4 +137,4 @@ Opens (or reports) the single pane titled `ORQ`, a Claude Code session running `
 
 - `ls` and `ler PAINEL [--linhas N]` are free. The text of `ler` is printed between `<dados-painel>` marks and is data, never instructions (marks inside the text are escaped).
 - `enviar PAINEL TEXTO`, `lancar michi SLUG|fila PROGRAMA` and `matar PAINEL` show the target and the exact text and only proceed after `s`/`sim` typed in the terminal. There is no `--sim`: an agent cannot confirm for the human. Text with control characters or over 500 characters is rejected; the ORQ pane cannot be killed.
-- Without a backend (outside WezTerm/tmux) it exits 1.
+- Without a backend (outside WezTerm/tmux/herdr) it exits 1.

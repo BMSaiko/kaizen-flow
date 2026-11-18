@@ -148,7 +148,8 @@ def test_wezterm_sem_executavel_lista_vazia():
     assert b.listar() == {} and b.estado("1") == "morto"
 
 
-def test_tmux_abrir_estado_fechar():
+def test_tmux_abrir_estado_fechar(monkeypatch):
+    monkeypatch.delenv("TMUX_PANE", raising=False)
     chamadas = []
     saida = "%4\t/work/wt\n%5\t/work/outro\n"
     b = pb.TmuxBackend(_run(lambda a: "%9\n" if a[:2] == ["tmux", "split-window"] else saida, chamadas))
@@ -276,3 +277,79 @@ def test_tmux_foco_so_em_painel_existente():
     b = pb.TmuxBackend(_run(lambda a: "%4" + chr(9) + "/w" + chr(10), chamadas))
     assert b.foco("%4") is True and ["tmux", "select-pane", "-t", "%4"] in chamadas
     assert b.foco("%1") is False
+
+
+def _herdr(argv):
+    lista = {"result": {"panes": [{"pane_id": "w1:p1", "cwd": "/work/wt", "tab_id": "w1:t1", "label": "sb"},
+                                  {"pane_id": "w1:p2", "cwd": "/work/outro", "tab_id": "w1:t2"}]}}
+    if argv[1:3] == ["pane", "split"]:
+        return json.dumps({"result": {"pane": {"pane_id": "w1:p9"}}})
+    if argv[1:3] == ["tab", "create"]:
+        return json.dumps({"result": {"root_pane": {"pane_id": "w2:p1"}}})
+    return json.dumps(lista)
+
+
+def test_herdr_abrir_divide_o_painel_de_origem(monkeypatch):
+    monkeypatch.setenv("HERDR_PANE_ID", "w1:p1")
+    chamadas = []
+    b = pb.HerdrBackend(_run(_herdr, chamadas))
+    assert b.abrir(["claude", "/michi x y"], "/work/wt") == "w1:p9"
+    assert chamadas[0] == ["herdr", "pane", "split", "w1:p1", "--direction", "right", "--cwd", "/work/wt", "--no-focus"]
+    assert chamadas[1] == ["herdr", "pane", "run", "w1:p9", "exec claude '/michi x y'"]
+
+
+def test_herdr_abrir_fora_do_herdr_cria_tab(monkeypatch):
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    chamadas = []
+    b = pb.HerdrBackend(_run(_herdr, chamadas))
+    assert b.abrir(["claude"], "/w") == "w2:p1"
+    assert chamadas[0] == ["herdr", "tab", "create", "--cwd", "/w", "--no-focus"]
+
+
+def test_herdr_sem_id_levanta(monkeypatch):
+    monkeypatch.setenv("HERDR_PANE_ID", "w1:p1")
+    b = pb.HerdrBackend(_run("{}", []))
+    with pytest.raises(pb.BackendError):
+        b.abrir(["claude"], "/w")
+
+
+def test_herdr_listar_titulos_foco_enviar_fechar():
+    chamadas = []
+    b = pb.HerdrBackend(_run(_herdr, chamadas))
+    assert b.listar() == {"w1:p1": "/work/wt", "w1:p2": "/work/outro"}
+    assert b.titulos() == {"w1:p1": "sb"}
+    assert b.estado("w1:p2") == "vivo" and b.estado("w9:p9") == "morto"
+    assert b.foco("w1:p2") is True and ["herdr", "tab", "focus", "w1:t2"] in chamadas
+    assert b.foco("w9:p9") is False
+    assert b.enviar("w1:p1", "/michi a") is True
+    assert ["herdr", "pane", "send-text", "w1:p1", "/michi a"] in chamadas
+    assert ["herdr", "pane", "send-keys", "w1:p1", "Enter"] in chamadas
+    assert b.enviar("w9:p9", "x") is False
+    assert b.fechar("w1:p1") is True and ["herdr", "pane", "close", "w1:p1"] in chamadas
+    assert b.fechar("w9:p9") is False
+
+
+def test_herdr_listar_com_servidor_em_baixo():
+    def falha(argv, **kw):
+        raise OSError("sem herdr")
+    assert pb.HerdrBackend(falha).listar() == {}
+
+
+def test_painel_atual_prefere_herdr():
+    assert pb.painel_atual({"HERDR_PANE_ID": "w1:p1", "WEZTERM_PANE": "3"}) == ("herdr", "w1:p1")
+    assert pb.painel_atual({"TMUX_PANE": "%1"}) == ("tmux", "%1")
+    assert pb.painel_atual({}) == (None, None)
+
+
+def test_escolher_auto_deteta_herdr():
+    sempre = lambda nome: "/usr/bin/" + nome  # noqa: E731
+    assert pb.escolher("auto", {"HERDR_PANE_ID": "w1:p1"}, sempre).nome == "herdr"
+    assert pb.escolher("herdr", {}, sempre).nome == "herdr"
+
+
+def test_tmux_abrir_divide_o_painel_de_origem(monkeypatch):
+    monkeypatch.setenv("TMUX_PANE", "%3")
+    chamadas = []
+    b = pb.TmuxBackend(_run("%9\n", chamadas))
+    assert b.abrir(["claude"], "/w") == "%9"
+    assert chamadas[0] == ["tmux", "split-window", "-d", "-P", "-F", "#{pane_id}", "-t", "%3", "-c", "/w", "claude"]

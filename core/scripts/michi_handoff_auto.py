@@ -9,7 +9,6 @@ Uso: python -I scripts/michi_handoff_auto.py decide --sessao <modelo> [--context
 rc: decide 0 (imprime `subagent|handoff|ficar <motivo>`); go 0 ok, 1 falhou (painel antigo intacto)
 """
 import argparse
-import os
 import subprocess
 import sys
 import time
@@ -62,7 +61,7 @@ def comando(slug, auto=False):
 
 
 def _origem():
-    return os.environ.get("WEZTERM_PANE") or os.environ.get("TMUX_PANE")
+    return painel_backend.painel_atual()[1]
 
 
 def _spawn_real(backend, run=run_hidden):
@@ -106,7 +105,7 @@ def main(argv=None):
         print(f"{estado} {motivo}")
         return 0
     nome = detect_backend()[0]
-    if nome not in ("wezterm", "tmux"):
+    if nome not in painel_backend.VARIAVEIS:
         print(f"sem painel interativo ({nome}): ficar nesta sessão", file=sys.stderr)
         return 1
     backend = painel_backend.por_nome(nome, run_hidden)

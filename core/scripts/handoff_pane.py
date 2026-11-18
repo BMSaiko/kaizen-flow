@@ -41,14 +41,14 @@ def run_cli(*args, **kwargs):
     if argv[:2] == ["wezterm", "cli"] and "--no-auto-start" not in argv:
         # Sem GUI acessível, o wezterm cli arranca um mux-server que herda o pipe e deixa o run pendurado.
         argv.insert(2, "--no-auto-start")
-    if argv[:1] in (["wezterm"], ["tmux"]):
+    if argv[:1] in (["wezterm"], ["tmux"], ["herdr"]):
         kwargs.setdefault("timeout", CLI_TIMEOUT)
     try:
         return run_hidden_base(argv, *args[1:], **kwargs)
     except subprocess.TimeoutExpired as exc:
         raise HandoffError(f"{' '.join(argv[:3])} não respondeu em {exc.timeout:.0f}s") from exc
     except subprocess.CalledProcessError as exc:
-        if argv[:1] not in (["wezterm"], ["tmux"]):
+        if argv[:1] not in (["wezterm"], ["tmux"], ["herdr"]):
             raise
         raise HandoffError(f"{argv[0]} inacessível ({' '.join(argv[:4])}, rc={exc.returncode}): "
                            "abre a sessão nova à mão com o /michi impresso") from exc
@@ -136,8 +136,10 @@ def check_prompt(pane, run=run_hidden):
         raise HandoffError(f"o prompt do painel {pane} tem texto por enviar: handoff abortado para não o corromper")
 
 def detect_backend(env=None):
-    """(backend, painel): wezterm ou tmux se o agente corre num painel; senão clipboard (apps desktop)."""
+    """(backend, painel): herdr, wezterm ou tmux se o agente corre num painel; senão clipboard (apps desktop)."""
     env = os.environ if env is None else env
+    if env.get("HERDR_PANE_ID"):
+        return "herdr", env["HERDR_PANE_ID"]
     if env.get("WEZTERM_PANE"):
         return "wezterm", env["WEZTERM_PANE"]
     if env.get("TMUX_PANE"):
@@ -155,11 +157,23 @@ def tmux_enter_argv(pane):
     return ["tmux", "send-keys", "-t", str(pane), "Enter"]
 
 
+def herdr_send_argv(pane, text):
+    if any(ch in text for ch in "\r\n\x1b"):
+        raise HandoffError("texto com caracteres de controlo")
+    return ["herdr", "pane", "send-text", str(pane), text]
+
+
+def herdr_enter_argv(pane):
+    return ["herdr", "pane", "send-keys", str(pane), "Enter"]
+
+
 def _argvs(backend, pane):
     if backend == "wezterm":
         return send_argv, enter_argv
     if backend == "tmux":
         return tmux_send_argv, tmux_enter_argv
+    if backend == "herdr":
+        return herdr_send_argv, herdr_enter_argv
     raise HandoffError(f"backend '{backend}' não envia para painéis")
 
 
@@ -175,9 +189,10 @@ def _copy(text):
 
 
 def read_screen(backend, pane, run=run_hidden):
-    """Texto do ecrã do painel (`wezterm cli get-text` ou `tmux capture-pane`)."""
-    argv = (["wezterm", "cli", "get-text", "--pane-id", str(pane)] if backend == "wezterm"
-            else ["tmux", "capture-pane", "-p", "-t", str(pane)])
+    """Texto do ecrã do painel (`wezterm cli get-text`, `tmux capture-pane` ou `herdr pane read`)."""
+    argv = {"wezterm": ["wezterm", "cli", "get-text", "--pane-id", str(pane)],
+            "herdr": ["herdr", "pane", "read", str(pane), "--source", "visible"]}.get(
+        backend, ["tmux", "capture-pane", "-p", "-t", str(pane)])
     return run(argv, check=True, capture_output=True, text=True, encoding="utf-8").stdout
 
 

@@ -15,7 +15,6 @@ Uso:
 rc: 0 painel aberto (ou dry-run / consume ok) · 1 erro · 2 sem vaga (pendente)
 """
 import argparse
-import os
 import sys
 import time
 from pathlib import Path
@@ -24,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import modelos  # noqa: E402
 from handoff_pane import consume_ficheiro  # noqa: E402
 from painel_backend import enviar_prompt  # noqa: E402
+import painel_backend  # noqa: E402
 import sp_painel_estado as pe  # noqa: E402
 
 MODELOS = modelos.DEFAULT  # os testes trocam-no
@@ -81,9 +81,8 @@ def _fila(root):
 
 
 def origem_atual(backend, env=None):
-    """(título da tab, pane-id) do painel de `$WEZTERM_PANE`/`$TMUX_PANE`; (None, None) sem variável, (None, id) sem título. Nunca levanta."""
-    env = os.environ if env is None else env
-    pane = env.get("WEZTERM_PANE") or env.get("TMUX_PANE")
+    """(título da tab, pane-id) do painel de `$HERDR_PANE_ID`/`$WEZTERM_PANE`/`$TMUX_PANE`; (None, None) sem variável, (None, id) sem título. Nunca levanta."""
+    pane = painel_backend.painel_atual(env)[1]
     if not pane:
         return None, None
     try:
