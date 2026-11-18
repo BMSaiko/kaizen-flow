@@ -229,6 +229,84 @@ test("sem manifesto, peça do vault diferente do core conta como edição local"
   assert.match(r.stderr, /editado no vault: \.claude\/commands\/sp\.md/);
 });
 
+// órfã: peça registada no manifesto que o core/ já não gera, com o ficheiro ainda no vault
+function withOrphan(content = "velho\n", recorded = content) {
+  const ctx = synced();
+  assert.strictEqual(ctx.kzr("--to-vault").status, 0);
+  const rel = "scripts/sp-velho.py";
+  put(ctx.v, rel, content);
+  const mf = path.join(ctx.v, ".kaizen-sync.json");
+  const m = JSON.parse(fs.readFileSync(mf, "utf8"));
+  m[rel] = require("../bin/sync.js").sha(Buffer.from(recorded));
+  fs.writeFileSync(mf, JSON.stringify(m, null, 2) + "\n");
+  const manifest = () => JSON.parse(fs.readFileSync(mf, "utf8"));
+  return { ...ctx, rel, f: path.join(ctx.v, rel), manifest };
+}
+
+test("--to-vault --check lista a órfã como remover:, conta-a e sai 1 sem apagar", () => {
+  const { kzr, f, rel, manifest } = withOrphan();
+  const r = kzr("--to-vault", "--check");
+  assert.strictEqual(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, new RegExp(`remover: ${rel.replace(/[.\/]/g, "\\$&")}`));
+  assert.match(r.stdout, /1 remoç/);
+  assert.ok(fs.existsSync(f));
+  assert.ok(manifest()[rel]);
+});
+
+test("--to-vault apaga a órfã não editada e tira-a do manifesto", () => {
+  const { kzr, f, rel, manifest } = withOrphan();
+  const r = kzr("--to-vault");
+  assert.strictEqual(r.status, 0, r.stdout + r.stderr);
+  assert.ok(!fs.existsSync(f));
+  assert.ok(!(rel in manifest()));
+  assert.match(r.stdout, /1 removid/);
+});
+
+test("--to-vault recusa órfã editada no vault sem apagar nem escrever; --force apaga", () => {
+  const { v, kzr, f, rel, manifest } = withOrphan("# editado\n", "velho\n");
+  put(v, ".claude/skills/michi/SKILL.md", "outra coisa");
+  const before = fs.readFileSync(path.join(v, ".kaizen-sync.json"), "utf8");
+  const r = kzr("--to-vault");
+  assert.notStrictEqual(r.status, 0);
+  assert.match(r.stderr, new RegExp(`editado no vault: ${rel.replace(/[.\/]/g, "\\$&")}`));
+  assert.ok(fs.existsSync(f));
+  assert.strictEqual(fs.readFileSync(path.join(v, ".claude/skills/michi/SKILL.md"), "utf8"), "outra coisa");
+  assert.strictEqual(fs.readFileSync(path.join(v, ".kaizen-sync.json"), "utf8"), before);
+  assert.strictEqual(kzr("--to-vault", "--force").status, 0);
+  assert.ok(!fs.existsSync(f));
+  assert.ok(!(rel in manifest()));
+});
+
+test("entrada do manifesto sem ficheiro no vault sai do manifesto sem erro nem remoção", () => {
+  const { kzr, f, rel, manifest } = withOrphan();
+  fs.rmSync(f);
+  const c = kzr("--to-vault", "--check");
+  assert.strictEqual(c.status, 0, c.stdout + c.stderr);
+  assert.doesNotMatch(c.stdout, /remover:/);
+  const r = kzr("--to-vault");
+  assert.strictEqual(r.status, 0, r.stdout + r.stderr);
+  assert.ok(!(rel in manifest()));
+  assert.match(r.stdout, /0 removid/);
+});
+
+test("manifesto com caminho para fora do vault não apaga nada fora dele", () => {
+  const { v, kzr } = synced();
+  assert.strictEqual(kzr("--to-vault").status, 0);
+  const outside = path.join(path.dirname(v), `fora-${path.basename(v)}.txt`);
+  fs.writeFileSync(outside, "fora\n");
+  const mf = path.join(v, ".kaizen-sync.json");
+  const m = JSON.parse(fs.readFileSync(mf, "utf8"));
+  const sha = require("../bin/sync.js").sha;
+  m[`../${path.basename(outside)}`] = sha(Buffer.from("fora\n"));
+  m[outside] = sha(Buffer.from("fora\n"));
+  fs.writeFileSync(mf, JSON.stringify(m, null, 2) + "\n");
+  const r = kzr("--to-vault");
+  assert.strictEqual(r.status, 0, r.stdout + r.stderr);
+  assert.ok(fs.existsSync(outside));
+  assert.match(r.stderr, /inválid/);
+  fs.rmSync(outside);
+});
+
 test("sync sem sentido falha e pede --to-vault ou --from-vault", () => {
   const { kzr } = synced();
   const r = kzr();
