@@ -37,8 +37,8 @@ def test_conflito_rc12(tmp_path):
 
 def test_review_pedida_nao_faz_merge(tmp_path):
     d = pr(review="REVIEW_REQUIRED", checks=[ok()])
-    rc, _, m = pr_fechar.fechar("7", repo(tmp_path), watch_fn=lambda p, r: 0,
-                                fetch_fn=lambda p, r: d, merge_fn=lambda *a: (0, ""))[0], None, None
+    rc = pr_fechar.fechar("7", repo(tmp_path), watch_fn=lambda p, r: 0,
+                          fetch_fn=lambda p, r: d, merge_fn=lambda *a: (0, ""))[0]
     assert rc == 11
 
 

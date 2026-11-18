@@ -10,7 +10,6 @@ Ponto de retoma = passo seguinte ao último «fim» do journal (EC-001); passos 
 ou revertem (plano do `michi-checkpoint.py restore`, sem --apply). `--restart` arquiva (nunca apaga) o estado (UC-032).
 """
 import argparse
-import os
 import shutil
 import sys
 import time

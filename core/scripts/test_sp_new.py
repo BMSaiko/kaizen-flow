@@ -388,7 +388,7 @@ def test_link_parent_preserva_crlf(tmp_path):
 
 
 def test_recusa_slug_existente_em_master(tmp_path):
-    root = project(tmp_path)
+    project(tmp_path)
     master = ["knowledge/projects/atlas/sp/TODO/dup-2026-11-07.md"]
     with pytest.raises(sp_new.SpNewError, match="master"):
         sp_new.check_master("atlas", "dup", master)
