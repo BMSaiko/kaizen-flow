@@ -247,7 +247,7 @@ test("--to-vault --check lista a órfã como remover:, conta-a e sai 1 sem apaga
   const { kzr, f, rel, manifest } = withOrphan();
   const r = kzr("--to-vault", "--check");
   assert.strictEqual(r.status, 1, r.stdout + r.stderr);
-  assert.match(r.stdout, new RegExp(`remover: ${rel.replace(/[.\/]/g, "\\$&")}`));
+  assert.ok(r.stdout.includes(`remover: ${rel}`), r.stdout);
   assert.match(r.stdout, /1 remoç/);
   assert.ok(fs.existsSync(f));
   assert.ok(manifest()[rel]);
@@ -268,7 +268,7 @@ test("--to-vault recusa órfã editada no vault sem apagar nem escrever; --force
   const before = fs.readFileSync(path.join(v, ".kaizen-sync.json"), "utf8");
   const r = kzr("--to-vault");
   assert.notStrictEqual(r.status, 0);
-  assert.match(r.stderr, new RegExp(`editado no vault: ${rel.replace(/[.\/]/g, "\\$&")}`));
+  assert.ok(r.stderr.includes(`editado no vault: ${rel}`), r.stderr);
   assert.ok(fs.existsSync(f));
   assert.strictEqual(fs.readFileSync(path.join(v, ".claude/skills/michi/SKILL.md"), "utf8"), "outra coisa");
   assert.strictEqual(fs.readFileSync(path.join(v, ".kaizen-sync.json"), "utf8"), before);
