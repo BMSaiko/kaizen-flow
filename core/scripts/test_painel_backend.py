@@ -280,8 +280,8 @@ def test_tmux_foco_so_em_painel_existente():
 
 
 def _herdr(argv):
-    lista = {"result": {"panes": [{"pane_id": "w1:p1", "cwd": "/work/wt", "tab_id": "w1:t1", "label": "sb"},
-                                  {"pane_id": "w1:p2", "cwd": "/work/outro", "tab_id": "w1:t2"}]}}
+    lista = {"result": {"panes": [{"pane_id": "w1:p1", "cwd": "/work/wt", "tab_id": "w1:t1", "workspace_id": "w1", "label": "sb"},
+                                  {"pane_id": "w1:p2", "cwd": "/work/outro", "tab_id": "w1:t2", "workspace_id": "w1"}]}}
     if argv[1:3] == ["pane", "split"]:
         return json.dumps({"result": {"pane": {"pane_id": "w1:p9"}}})
     if argv[1:3] == ["tab", "create"]:
@@ -294,8 +294,37 @@ def test_herdr_abrir_divide_o_painel_de_origem(monkeypatch):
     chamadas = []
     b = pb.HerdrBackend(_run(_herdr, chamadas))
     assert b.abrir(["claude", "/michi x y"], "/work/wt") == "w1:p9"
-    assert chamadas[0] == ["herdr", "pane", "split", "w1:p1", "--direction", "right", "--cwd", "/work/wt", "--no-focus"]
-    assert chamadas[1] == ["herdr", "pane", "run", "w1:p9", "exec claude '/michi x y'"]
+    assert chamadas[-2] == ["herdr", "pane", "split", "w1:p1", "--direction", "right", "--cwd", "/work/wt", "--no-focus"]
+    assert chamadas[-1] == ["herdr", "pane", "run", "w1:p9", "exec claude '/michi x y'"]
+
+
+def _herdr_com(panes):
+    def f(argv):
+        if argv[1:3] == ["pane", "list"]:
+            return json.dumps({"result": {"panes": panes}})
+        return _herdr(argv)
+    return f
+
+
+def test_herdr_abrir_tab_cheia_cria_tab_no_workspace_da_origem(monkeypatch):
+    monkeypatch.setenv("HERDR_PANE_ID", "w1:p1")
+    panes = [{"pane_id": "w1:p1", "tab_id": "w1:t1", "workspace_id": "w1"},
+             {"pane_id": "w1:p3", "tab_id": "w1:t1", "workspace_id": "w1"},
+             {"pane_id": "w1:p2", "tab_id": "w1:t2", "workspace_id": "w1"}]
+    chamadas = []
+    b = pb.HerdrBackend(_run(_herdr_com(panes), chamadas))
+    assert b.abrir(["claude"], "/w") == "w2:p1"
+    assert chamadas[-2] == ["herdr", "tab", "create", "--workspace", "w1", "--cwd", "/w", "--no-focus"]
+    assert not any(c[1:3] == ["pane", "split"] for c in chamadas)
+
+
+def test_herdr_abrir_lista_vazia_cria_tab_sem_split(monkeypatch):
+    monkeypatch.setenv("HERDR_PANE_ID", "w1:p1")
+    chamadas = []
+    b = pb.HerdrBackend(_run(_herdr_com([]), chamadas))
+    assert b.abrir(["claude"], "/w") == "w2:p1"
+    assert ["herdr", "tab", "create", "--cwd", "/w", "--no-focus"] in chamadas
+    assert not any(c[1:3] == ["pane", "split"] for c in chamadas)
 
 
 def test_herdr_abrir_fora_do_herdr_cria_tab(monkeypatch):
@@ -303,7 +332,7 @@ def test_herdr_abrir_fora_do_herdr_cria_tab(monkeypatch):
     chamadas = []
     b = pb.HerdrBackend(_run(_herdr, chamadas))
     assert b.abrir(["claude"], "/w") == "w2:p1"
-    assert chamadas[0] == ["herdr", "tab", "create", "--cwd", "/w", "--no-focus"]
+    assert chamadas[0] == ["herdr", "tab", "create", "--cwd", "/w", "--no-focus"]  # sem origem não consulta a lista
 
 
 def test_herdr_sem_id_levanta(monkeypatch):

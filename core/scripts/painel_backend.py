@@ -232,8 +232,15 @@ class TmuxBackend(_Multiplexer):
             return ""
 
 
+MAX_PANES_TAB = 2
+
+
 class HerdrBackend(_Multiplexer):
-    """herdr (https://github.com/herdrdev/herdr): painéis pela CLI `herdr pane ...` (saída JSON)."""
+    """herdr (https://github.com/herdrdev/herdr): painéis pela CLI `herdr pane ...` (saída JSON).
+
+    Layout: no máximo MAX_PANES_TAB panes por tab. `abrir` divide à direita só se a tab do pane de origem
+    (HERDR_PANE_ID) tem menos que isso; senão cria tab nova no workspace da origem. Origem ausente ou
+    não listada (servidor em baixo): tab nova, nunca split às cegas."""
     nome = "herdr"
 
     def _json(self, argv):
@@ -246,13 +253,22 @@ class HerdrBackend(_Multiplexer):
     def _paineis(self):
         return self._json(["pane", "list"]).get("panes") or []
 
+    def _panes_da_tab(self, origem):
+        """(nº de panes na tab do pane `origem`, workspace) ou (None, None) se a origem não aparece em `pane list`."""
+        paineis = self._paineis()
+        o = next((p for p in paineis if p.get("pane_id") == origem), None)
+        if not o or not o.get("tab_id"):
+            return None, None
+        return sum(1 for p in paineis if p.get("tab_id") == o["tab_id"]), o.get("workspace_id")
+
     def abrir(self, cmd, cwd):
         origem = os.environ.get("HERDR_PANE_ID")
-        if origem:  # painel novo à direita do agente que lança, sem lhe roubar o foco
+        n, ws = self._panes_da_tab(origem) if origem else (None, None)
+        if n is not None and n < MAX_PANES_TAB:  # painel novo à direita do agente que lança, sem lhe roubar o foco
             res = self._json(["pane", "split", origem, "--direction", "right", "--cwd", str(cwd), "--no-focus"])
             pane = (res.get("pane") or {}).get("pane_id")
-        else:  # fora do herdr: tab nova no workspace ativo
-            res = self._json(["tab", "create", "--cwd", str(cwd), "--no-focus"])
+        else:  # tab cheia, origem desconhecida ou fora do herdr: tab nova (no workspace da origem, se conhecido)
+            res = self._json(["tab", "create", *(["--workspace", ws] if ws else []), "--cwd", str(cwd), "--no-focus"])
             pane = (res.get("root_pane") or {}).get("pane_id")
         if not pane:
             raise BackendError("herdr não devolveu o id do painel novo (o servidor está a correr? `herdr status`)")

@@ -115,6 +115,7 @@ lançado michi de slug-b no painel 42
 - Only `s`/`sim`/`y`/`yes` launches; empty, `n`, `q` or anything else cancels and touches nothing. `--sim` is the explicit confirmation when there is no terminal.
 - `--slug SP` (michi) or `--programa MÃE` (fila) skips the list but still previews and confirms; a SP that is not eligible exits 2.
 - The pane is named by the SP slug (`fila-<mãe>` for a queue). `michi` reuses `michi_handoff_auto.py` (worktree via `sb-worktree.py ensure`); `fila` runs `python -I scripts/sp-fila.py --programa <mãe>` in the project root.
+- herdr keeps at most 2 panes per tab: the new pane splits to the right only when the launching tab has 1 pane, otherwise it opens in a new tab of the same workspace.
 - Without a backend (outside WezTerm/tmux/herdr) it prints the equivalent command and exits 0. A launch that fails exits 1 with the cause; a pane title that fails is only a warning.
 
 ### `kaizen term limpar` and `kaizen term retomar`
