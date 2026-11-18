@@ -429,7 +429,10 @@ def test_herdr_workspace_novo_para_repo_sem_workspace(monkeypatch, tmp_path):
     chamadas = []
     b = pb.HerdrBackend(_run(_herdr_ws([], []), chamadas))
     assert b.abrir(["claude"], str(raiz)) == "w7:p1"
-    assert ["herdr", "workspace", "create", "--cwd", str(raiz), "--label", "projx", "--no-focus"] in chamadas
+    # a raiz vem do `git rev-parse` (no Windows com `/`): comparar sem depender do separador
+    criar = [c for c in chamadas if c[1:3] == ["workspace", "create"]]
+    assert len(criar) == 1 and criar[0][3] == "--cwd" and Path(criar[0][4]) == Path(raiz)
+    assert criar[0][5:] == ["--label", "projx", "--no-focus"]
     assert chamadas[-1] == ["herdr", "pane", "run", "w7:p1", "exec claude"]
 
 
