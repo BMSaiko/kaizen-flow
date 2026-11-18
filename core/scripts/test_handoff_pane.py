@@ -173,3 +173,12 @@ def test_detect_backend_herdr():
     send, enter = hp._argvs("herdr", "w1:p1")
     assert send("w1:p1", "/michi x") == ["herdr", "pane", "send-text", "w1:p1", "/michi x"]
     assert enter("w1:p1") == ["herdr", "pane", "send-keys", "w1:p1", "Enter"]
+
+
+def test_text_arrived_prompt_longo_quebrado_sem_linha_do_prompt():
+    import handoff_pane as hp
+    texto = "/michi teste " + "palavra " * 60
+    ecra = "\n".join(["  palavra"] * 12 + ["────────", "  ⏵⏵ auto mode"])
+    assert hp.text_arrived(ecra, texto) is True
+    assert hp.text_arrived("❯ \n────", texto) is False
+    assert hp.text_arrived("❯ /michi x", "/michi x") is True

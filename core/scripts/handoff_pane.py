@@ -129,6 +129,14 @@ def prompt_has_text(screen):
     return bool(lines) and bool(lines[-1].lstrip()[1:].strip())
 
 
+def text_arrived(screen, text):
+    """True se `text` já está no prompt: a linha `❯` tem texto, ou (prompt longo num painel estreito, `❯` fora do ecrã) o fim do texto aparece no ecrã."""
+    if prompt_has_text(screen):
+        return True
+    cauda = "".join(text.split())[-24:]
+    return bool(cauda) and cauda in "".join(screen.split())
+
+
 def check_prompt(pane, run=run_hidden):
     screen = run(["wezterm", "cli", "get-text", "--pane-id", str(pane)], check=True,
                  capture_output=True, text=True, encoding="utf-8").stdout
@@ -206,7 +214,7 @@ def send_confirmed(pane, text, text_argv, key_argv, screen, run=run_hidden, slee
     for _ in range(tries):
         run(text_argv(pane, text), check=True)
         sleep(enter_gap)
-        if prompt_has_text(screen(pane)):
+        if text_arrived(screen(pane), text):
             break
         sleep(settle)
     else:
