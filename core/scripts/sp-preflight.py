@@ -35,9 +35,9 @@ _ESTADOS_GIT = (("MERGE_HEAD", "merge"), ("rebase-merge", "rebase"), ("rebase-ap
 
 
 class ErroUso(Exception):
-    def __init__(self, msg, ec=None):
+    def __init__(self, msg, ec, porque, proximo):
         super().__init__(msg)
-        self.ec = ec
+        self.ec, self.porque, self.proximo = ec, porque, proximo
 
 
 @dataclass
@@ -133,14 +133,16 @@ def _orfaos(alvo):
 def diagnosticar(slug=None, repo=".", ramo=None, ignorar_orfao=False, which=shutil.which):
     """Lista de Problema (vazia = limpo). Só lê: nenhum comando que altere o repo corre aqui."""
     if slug is not None and not _slug_valido(slug):
-        raise ErroUso(f"slug inválido «{slug}»")
+        raise ErroUso(f"slug inválido «{slug}»", "EC-067", "o slug é o nome do SP, sem `/`, `\\`, `:` nem espaços",
+                      "`kaizen preflight <slug>` com o slug do SP (`sp-list.py`)")
     probs = _ferramentas(which)
     if any("git" in p.oque for p in probs):
         return probs
     repo = Path(repo)
     top = _git(repo, "rev-parse", "--show-toplevel") if repo.is_dir() else None
     if top is None or top.returncode != 0:
-        raise ErroUso(f"{repo} não é um repositório git", ec="EC-062")
+        raise ErroUso(f"{repo} não é um repositório git", "EC-062", "o pré-voo corre dentro de um repositório ou worktree git",
+                      "correr na pasta do projeto ou passar `--repo <pasta>`")
     top = top.stdout.strip()
     wts = worktrees(repo)
     principal = wts[0]["path"] if wts else top
@@ -284,11 +286,7 @@ def main(argv=None):
     try:
         probs = diagnosticar(a.slug, a.repo, a.ramo, a.sem_orfao)
     except ErroUso as e:
-        if e.ec:
-            print(kf_erros.erro(e.ec, str(e), "o pré-voo corre dentro de um repositório ou worktree git",
-                                NADA, "correr na pasta do projeto ou passar `--repo <pasta>`"), file=sys.stderr)
-        else:
-            print(f"sp-preflight: {e}", file=sys.stderr)
+        print(kf_erros.erro(e.ec, str(e), e.porque, NADA, e.proximo), file=sys.stderr)
         return 2
     probs.sort(key=lambda p: p.nivel != "erro")
     ms = int((time.perf_counter() - t0) * 1000)

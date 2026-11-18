@@ -177,6 +177,12 @@ def test_slug_invalido_erro_de_uso(repo):
         pf.diagnosticar("../x", repo=repo)
 
 
+def test_slug_invalido_cli_no_formato_ec067(repo, capsys):
+    assert pf.main(["../x", "--repo", str(repo)]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("EC-067 O quê: slug inválido") and "  Próximo: " in err
+
+
 # --- correção -----------------------------------------------------------------
 
 def test_corrigir_sem_confirmacao_nao_faz_nada(repo):

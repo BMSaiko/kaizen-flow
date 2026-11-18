@@ -159,6 +159,7 @@ def test_sessao_expirada_sem_retoma_automatica(texto):
 @pytest.mark.parametrize("texto", [
     "", "Traceback ... KeyError: 'x'", "rc=1", "3 testes falharam (rate de sucesso 90%)",
     "a quota do disco está a 50%", "commit 4290abc", "Gerei 429 linhas de código",
+    "Context limit reached · /compact or /clear to continue", "Error: max turns limit reached",
 ])
 def test_falha_generica_nao_e_classificada(texto):
     assert _cls(texto) is None

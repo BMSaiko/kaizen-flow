@@ -118,7 +118,9 @@ def ecs_do_catalogo(path=None):
 # --- classificador -----------------------------------------------------------
 
 _QUOTA = re.compile(
-    r"usage limit|limit reached|rate[ _-]?limit|too many requests|overloaded|insufficient_quota|quota exceeded"
+    # «limit reached» só com qualificador de quota ou com hora de reset: «Context/max turns limit reached» não é quota
+    r"usage limit|\b(?:5-hour|weekly|session|daily|opus|sonnet)\s+limit reached"
+    r"|limit reached[^\n]{0,40}\b(?:resets?|try again)|limit reached\|\d{9,11}|rate[ _-]?limit|too many requests|overloaded|insufficient_quota|quota exceeded"
     r"|exceeded your current quota|hit your (?:usage )?limit|\b(?:error|status|http|code)\b[^\n]{0,30}\b(?:429|529)\b",
     re.I,
 )
