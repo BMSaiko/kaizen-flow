@@ -75,3 +75,12 @@ def test_guarda_ramo_principal(tmp_path):
     assert cfg.metodo_autorizacoes(tmp_path, "") ["push"] == "pergunta"
     (tmp_path / "kaizen.config.json").write_text("{}")
     assert cfg.metodo_autorizacoes(tmp_path, "agent/x") is None
+
+
+def test_herdr_defeitos_e_valores(tmp_path):
+    import kaizen_config as kc
+    assert kc.herdr(tmp_path) == {"maxPanesPorTab": 2, "workspacePorProjeto": True}
+    (tmp_path / "kaizen.config.json").write_text('{"herdr": {"maxPanesPorTab": 3, "workspacePorProjeto": false}}', encoding="utf-8")
+    assert kc.herdr(tmp_path) == {"maxPanesPorTab": 3, "workspacePorProjeto": False}
+    (tmp_path / "kaizen.config.json").write_text('{"herdr": {"maxPanesPorTab": 0, "workspacePorProjeto": "x"}}', encoding="utf-8")
+    assert kc.herdr(tmp_path) == {"maxPanesPorTab": 2, "workspacePorProjeto": True}

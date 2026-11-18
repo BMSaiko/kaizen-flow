@@ -43,6 +43,12 @@ from sp_fila_estado import estado_de  # noqa: E402
 import sp_fila_execucao  # noqa: E402
 import sp_fila_paineis  # noqa: E402
 import sp_vigia  # noqa: E402
+import kf_erros  # noqa: E402
+
+
+def _erro(ec, oque, porque, estado, proximo):
+    """Recusa no formato único (kf_erros): EC · o quê · porquê · estado guardado · próximo comando."""
+    print(kf_erros.erro(ec, oque, porque, estado, proximo), file=sys.stderr)
 
 MAX_PARALELO = 3  # teto de painéis michi abertos em simultâneo, somando todas as filas (paralelo e `--concorrencia`)
 MODOS = ("sequencial", "paralelo")
@@ -70,7 +76,8 @@ def _ler_ou_erro(path):
     try:
         return ler(path)
     except ValueError as e:
-        print(f"erro: estado da fila ilegível ({path}): {e}; `--parar` abandona e apaga-o", file=sys.stderr)
+        _erro("EC-045", f"estado da fila ilegível ({path}): {e}", "o JSON da fila está truncado ou corrompido",
+              "ficheiro intacto (nada adivinhado)", "`sp-fila.py --parar` abandona e apaga-o")
         return None
 
 
@@ -95,6 +102,24 @@ def fila_obsoleta(atual, items, agora, limite_min=OBSOLETA_MIN):
     return f"arrancada há {int(idade)} min (limite {limite_min}) e nenhum SP em Doing ({len(sessoes)} sessão(ões) registada(s))"
 
 
+def _limpar_paineis(fid):
+    """A fila de painéis da corrida também sai (vagas livres, `sp-estado.py --listar` limpo); o vigia primeiro:
+    não pode agir sobre uma fila a meio de ser apagada, nem sobre a fila nova que reutilize o mesmo id."""
+    if not fid:
+        return
+    try:
+        pid = sp_vigia.parar(sp_vigia.caminhos(sp_fila_paineis.pe.raiz() / fid)[0],
+                             sp_fila_paineis.pe.pid_vivo, sp_vigia.matar_pid)
+        if pid:
+            print(f"vigia {pid} terminado")
+    except Exception as e:  # noqa: BLE001
+        print(f"aviso: vigia de {fid} não terminado: {e}", file=sys.stderr)
+    try:
+        sp_fila_paineis.pe.remover_fila(fid)
+    except Exception as e:  # noqa: BLE001
+        print(f"aviso: fila de painéis {fid} não removida: {e}", file=sys.stderr)
+
+
 def abandonar_obsoleta(estado, atual, motivo, args, entrada=input, tty=None):
     """Propõe abandonar a fila obsoleta e, confirmado, apaga o estado. True = abandonada."""
     print(f"fila obsoleta ({estado}): {motivo}", file=sys.stderr)
@@ -106,8 +131,10 @@ def abandonar_obsoleta(estado, atual, motivo, args, entrada=input, tty=None):
         except EOFError:
             ok = False
     if not ok:
-        print("erro: fila obsoleta por abandonar; repetir com `--abandonar-obsoleta` (ou `--parar`)", file=sys.stderr)
+        _erro("EC-038", "fila obsoleta por abandonar", motivo, "fila intacta",
+              "repetir com `--abandonar-obsoleta` (ou `--parar`)")
         return False
+    _limpar_paineis((atual or {}).get("fila_paineis"))  # sem isto o vigia velho fecha a fila nova com o mesmo id
     estado.unlink(missing_ok=True)
     print("fila obsoleta abandonada")
     return True
@@ -164,10 +191,12 @@ def main(argv=None):
         elif args.seguinte or args.gastos or args.parar:
             estado = sp_fila_estado.localizar(args.slug) or estado
     if args.concorrencia is not None and args.concorrencia < 1:
-        print(f"erro: --concorrencia exige N >= 1 (recebido {args.concorrencia}); sem a opção a fila corre em série", file=sys.stderr)
+        _erro("EC-067", f"--concorrencia exige N >= 1 (recebido {args.concorrencia})", "sem a opção a fila corre em série",
+              "nada alterado", f"repetir com `--concorrencia 1..{MAX_PARALELO}` ou sem a opção")
         return 1
     if args.concorrencia is not None and args.concorrencia > MAX_PARALELO:
-        print(f"erro: --concorrencia máx. {MAX_PARALELO} painéis em simultâneo (recebido {args.concorrencia})", file=sys.stderr)
+        _erro("EC-067", f"--concorrencia máx. {MAX_PARALELO} painéis em simultâneo (recebido {args.concorrencia})",
+              "o teto de painéis é global a todas as filas", "nada alterado", f"repetir com `--concorrencia {MAX_PARALELO}`")
         return 1
 
     if args.ajuda:
@@ -181,18 +210,7 @@ def main(argv=None):
                 fid = ler(estado).get("fila_paineis")
         except ValueError:  # corrompido: abandonar na mesma
             pass
-        if fid:  # a fila de painéis desta corrida também sai (vagas livres, `sp-estado.py --listar` limpo)
-            try:  # o vigia primeiro: não pode agir sobre uma fila a meio de ser apagada
-                pid = sp_vigia.parar(sp_vigia.caminhos(sp_fila_paineis.pe.raiz() / fid)[0],
-                                     sp_fila_paineis.pe.pid_vivo, sp_vigia.matar_pid)
-                if pid:
-                    print(f"vigia {pid} terminado")
-            except Exception as e:  # noqa: BLE001
-                print(f"aviso: vigia de {fid} não terminado: {e}", file=sys.stderr)
-            try:
-                sp_fila_paineis.pe.remover_fila(fid)
-            except Exception as e:  # noqa: BLE001
-                print(f"aviso: fila de painéis {fid} não removida: {e}", file=sys.stderr)
+        _limpar_paineis(fid)
         estado.unlink(missing_ok=True)
         print("fila abandonada")
         return 0
@@ -200,7 +218,8 @@ def main(argv=None):
         if not estado.exists() and estado.with_name("ultima.json").exists():
             estado = estado.with_name("ultima.json")  # fila já terminada: os gastos ficam consultáveis
         if not estado.exists():
-            print("erro: sem fila em curso", file=sys.stderr)
+            _erro("EC-067", "sem fila em curso", "não há estado de fila nem a última fila terminada", "nada alterado",
+                  "arrancar com `sp-fila.py`")
             return 1
         atual = _ler_ou_erro(estado)
         if atual is None:
@@ -212,7 +231,8 @@ def main(argv=None):
     if args.programa:
         mae = next(((sp, fm) for sp, fm in items if sp.slug == args.programa), None)
         if mae is None:
-            print(f"erro: SP-mãe desconhecido: {args.programa}", file=sys.stderr)
+            _erro("EC-067", f"SP-mãe desconhecido: {args.programa}", "nenhum SP em TODO/Doing tem esse slug", "nada alterado",
+                  "`sp-list.py` para ver os slugs")
             return 1
         args.projeto = mae[0].project
         items = load(args.root, args.projeto)
@@ -220,7 +240,9 @@ def main(argv=None):
     if mae and not args.dry_run and not args.seguinte:  # o modo é da mãe (`execucao:`), nunca escolhido pela fila
         modo = str(mae[1].get("execucao") or "").strip()
         if modo not in MODOS:
-            print(f"erro: modo por escolher: sp-execucao.py {args.programa} sequencial|paralelo", file=sys.stderr)
+            _erro("EC-067", f"modo por escolher: sp-execucao.py {args.programa} sequencial|paralelo",
+                  "o modo da fila é da mãe (`execucao:`), nunca escolhido pela fila", "nada alterado",
+                  f"`python -I scripts/sp-execucao.py {args.programa} sequencial|paralelo`")
             return 1
         args.concorrencia = 1 if modo == "sequencial" else min(args.concorrencia or MAX_PARALELO, MAX_PARALELO)
         args.max = max_dado
@@ -236,7 +258,8 @@ def main(argv=None):
         return 0
     if args.seguinte:
         if not estado.exists():
-            print("erro: sem fila em curso (arrancar com `sp-fila.py`)", file=sys.stderr)
+            _erro("EC-067", "sem fila em curso", "`--seguinte` só continua uma fila arrancada", "nada alterado",
+                  "arrancar com `sp-fila.py`")
             return 1
     else:
         if estado.exists():
@@ -254,10 +277,12 @@ def main(argv=None):
                 print(_resumo_antigo(estado, args), file=sys.stderr)
             except ValueError:
                 pass
-            print(f"erro: fila já em curso ({estado}); `--seguinte` continua, `--parar` abandona", file=sys.stderr)
+            _erro("EC-067", f"fila já em curso ({estado})", "só há uma fila por estado", "fila em curso intacta",
+                  "`--seguinte` continua, `--parar` abandona")
             return 1
         if args.concorrencia and sp_fila_execucao._backend_defeito() is None:
-            print(f"erro: {sp_fila_execucao.falta_backend()}", file=sys.stderr)
+            _erro("EC-036", sp_fila_execucao.falta_backend(), "a fila em paralelo abre painéis num multiplexador",
+                  "nenhum estado criado", "instalar/abrir o WezTerm, tmux ou herdr, ou correr sem `--concorrencia`")
             return 1
         estado.parent.mkdir(parents=True, exist_ok=True)
         fm = mae[1] if mae else {}
@@ -273,13 +298,15 @@ def main(argv=None):
     try:
         out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug)
     except (IntegracaoPendente, SlugObrigatorio) as e:
-        print(f"erro: {e}", file=sys.stderr)
+        _erro("EC-067", str(e), "o pedido à fila não pode avançar assim", "estado da fila intacto",
+              "seguir a indicação acima e repetir `--seguinte`")
         return 1
     except ValueError as e:  # estado ilegível (JSON truncado/corrompido): não adivinhar, o user decide
-        print(f"erro: estado da fila ilegível ({estado}): {e}; `--parar` abandona e apaga-o", file=sys.stderr)
+        _erro("EC-045", f"estado da fila ilegível ({estado}): {e}", "o JSON da fila está truncado ou corrompido",
+              "ficheiro intacto (nada adivinhado)", "`sp-fila.py --parar` abandona e apaga-o")
         return 1
     except TimeoutError as e:  # lock preso: o estado fica intacto (sem «fila vazia» nem falhados); repetir `--seguinte --slug`
-        print(f"erro: {e}; o estado não foi alterado, repetir `--seguinte`", file=sys.stderr)
+        _erro("EC-042", str(e), "outro processo tem o lock da fila", "o estado não foi alterado", "repetir `--seguinte`")
         return 1
     if out["acao"] == "espera":
         print(f"a aguardar · {', '.join(out['sessoes'])}")

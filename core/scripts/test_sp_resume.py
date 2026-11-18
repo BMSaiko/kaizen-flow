@@ -110,7 +110,7 @@ def test_segundo_painel_recebe_ec043_com_dono(tmp_path):
         rc, texto = SR.resume(tmp_path, SLUG)
     finally:
         sp_disco.libertar_lock(tmp_path, SLUG)
-    assert rc == 1 and "EC-043" in texto and "painel-7" in texto and texto.count("·") >= 3
+    assert rc == 1 and "EC-043" in texto and "painel-7" in texto and texto.startswith("EC-043 O quê: ") and "\n  Próximo: " in texto
 
 
 def test_lock_unlock_cli_ec043(tmp_path, capsys):
@@ -249,3 +249,82 @@ def test_from_avisa_de_passos_abertos_em_fases_anteriores(tmp_path):
     sp_journal.inicio(tmp_path, SLUG, "dp", "p1")
     rc, texto = SR.resume(tmp_path, SLUG, from_fase="da")
     assert rc == 0 and "dp/p1" in texto
+
+
+# --- pausa por quota/rede (preflight-erros-ux, EC-016/017) e formato EC -------------------
+
+from datetime import datetime as _dt  # noqa: E402
+
+import sp_painel_estado as _pe  # noqa: E402
+
+
+def _pausado(root, motivo="EC-016 quota/limite de uso do modelo: usage limit", retoma="2026-11-18T15:00:00"):
+    _pe.criar_fila("f1", root=root, ordem=[SLUG])
+    _pe.registar("f1", SLUG, root=root, pane="1")
+    _pe.transitar(SLUG, "a-correr", fila="f1", root=root)
+    _pe.transitar(SLUG, "bloqueado", msg="pausa", fila="f1", root=root, motivo=motivo, retoma_em=retoma)
+
+
+def test_pausa_por_quota_recusa_antes_de_retoma_em_ec016(tmp_path):
+    _passos(tmp_path, SLUG, [("dp", "p1", "inicio"), ("dp", "p1", "fim")])
+    _pausado(tmp_path / "filas")
+    rc, texto = SR.resume(tmp_path, SLUG, agora=_dt(2026, 11, 18, 14, 0), painel_root=tmp_path / "filas")
+    assert rc == 1 and texto.startswith(f"EC-016 O quê: SP {SLUG} em pausa até 2026-11-18T15:00:00")
+    assert "Estado guardado: checkpoint e journal intactos" in texto and f"kaizen resume {SLUG}" in texto
+    rc, texto = SR.resume(tmp_path, SLUG, agora=_dt(2026, 11, 18, 15, 0, 1), painel_root=tmp_path / "filas")
+    assert rc == 0 and "retomar" in texto
+
+
+def test_pausa_de_rede_usa_ec017(tmp_path):
+    _passos(tmp_path, SLUG, [("dp", "p1", "inicio")])
+    _pausado(tmp_path / "filas", motivo="EC-017 rede indisponível: ECONNRESET")
+    rc, texto = SR.resume(tmp_path, SLUG, agora=_dt(2026, 11, 18, 14, 0), painel_root=tmp_path / "filas")
+    assert rc == 1 and texto.startswith("EC-017 ")
+
+
+def test_sessao_expirada_sem_retoma_em_deixa_retomar(tmp_path):
+    _passos(tmp_path, SLUG, [("dp", "p1", "inicio")])
+    _pausado(tmp_path / "filas", motivo="EC-066 sessão/login do modelo expirado", retoma=None)
+    rc, _ = SR.resume(tmp_path, SLUG, agora=_dt(2026, 11, 18, 14, 0), painel_root=tmp_path / "filas")
+    assert rc == 0
+
+
+def test_bloqueio_que_nao_e_pausa_nao_trava_o_resume(tmp_path):
+    _passos(tmp_path, SLUG, [("dp", "p1", "inicio")])
+    _pausado(tmp_path / "filas", motivo="gate vermelho", retoma="2099-01-01T00:00:00")
+    rc, _ = SR.resume(tmp_path, SLUG, agora=_dt(2026, 11, 18, 14, 0), painel_root=tmp_path / "filas")
+    assert rc == 0
+
+
+@pytest.mark.parametrize("args,ec", [
+    (dict(slug="a/b"), "EC-067"), (dict(slug=SLUG, from_fase="x"), "EC-067"),
+    (dict(slug=SLUG, restart=True, from_fase="dp"), "EC-067"), (dict(slug=SLUG), "EC-050"),
+    (dict(slug=SLUG, restart=True, confirmar=lambda: False), "EC-006"),
+])
+def test_recusas_no_formato_de_4_partes(tmp_path, args, ec):
+    import kf_erros
+    rc, texto = SR.resume(raiz=tmp_path, painel_root=tmp_path / "filas", **args)
+    lido = kf_erros.ler(texto)
+    assert rc in (1, 2) and lido is not None and lido.ec == ec
+
+
+def test_main_corre_o_pre_voo_so_como_aviso(tmp_path, capsys, monkeypatch):
+    _passos(tmp_path, SLUG, [("dp", "p1", "inicio")])
+    chamado = {}
+
+    class PF:
+        @staticmethod
+        def diagnosticar(slug, repo, ignorar_orfao):
+            chamado.update(slug=slug, ignorar=ignorar_orfao)
+            import kf_erros
+
+            class P:
+                def texto(self):
+                    return kf_erros.erro("EC-060", "árvore suja", "x", "nada alterado", "y")
+            return [P()]
+
+    import sp_carregar
+    monkeypatch.setattr(sp_carregar, "carregar", lambda *a, **k: PF)
+    assert SR.main([SLUG, "--raiz", str(tmp_path)]) == 0
+    err = capsys.readouterr().err
+    assert chamado == {"slug": SLUG, "ignorar": True} and "aviso do pré-voo:\nEC-060 O quê: árvore suja" in err

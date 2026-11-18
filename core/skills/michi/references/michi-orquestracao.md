@@ -9,6 +9,7 @@ Regras que saíram do `SKILL.md` sem alteração de contrato. Prova, reflect por
 ## Arranque
 
 - **Estado:** `python -I scripts/sp-estado.py <SP>` (≤30 linhas) em vez de ler SP, lista e git à parte. Aceita o slug (não o caminho).
+- **Pré-voo:** `python -I scripts/sp-preflight.py <slug> --sem-orfao` (`kaizen preflight`; <2 s, só lê). rc 0 = seguir. Problemas no formato EC (o quê · porquê · estado guardado · próximo): nível `aviso` (árvore suja EC-060, atrás do principal EC-025, worktree por limpar EC-063) segue e menciona no report; nível `erro` (EC-031/061/062/064/065): manual = mostrar a mensagem e `AskUserQuestion` (corrigir com o comando sugerido, ou parar); auto ou fila = parar como `bloqueado` com o EC no `--msg`. `--fix` só pelo user no terminal (pede confirmação a cada comando; nunca apaga).
 - **Perfil:** ler `perfil`/`max_tentativas`/`parar_se` no arranque e na paragem (`michi-perfis.md`).
 - **Worktree:** com `scripts/sb-worktree.py` (só no vault; noutro projeto, `git worktree add` num ramo próprio): `python -I scripts/sb-worktree.py ensure <slug>` e editar pelo caminho absoluto da worktree (o guard bloqueia o checkout principal); `sp-move`/`sp-fechar` saltam sozinhos para ela; commits por fase lá; `merge` (recusa SP fora de Done, `--force` explícito) + `clean` só no fecho.
 - **Tab:** `python -I scripts/tab-title.py <slug>` (best-effort, rc 0; imprime `/rename <slug>`). Vale para a sessão nova do `/sp-handoff`.

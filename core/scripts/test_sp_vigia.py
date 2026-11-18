@@ -516,3 +516,142 @@ def test_contexto_real_escala_uma_vez_e_regista(tmp_path, monkeypatch):
     import json
     assert json.loads(estado.read_text(encoding="utf-8"))["escaladas"] == [{"slug": "a", "de": "default", "para": "complexo"}]
     assert ctx.escalar({"slug": "a", "worktree": str(wt), "estado": "falhou"}) is None
+
+
+# --- pausa por quota/rede/sessão (preflight-erros-ux, EC-016/017/066) -----------------
+
+from datetime import datetime as _dt  # noqa: E402
+
+QUOTA = "trabalho...\n✻ a pensar\nClaude usage limit reached. Your limit will reset at 3pm (Europe/Lisbon).\n> "
+
+
+class BackendEcra(Backend):
+    def __init__(self, ecras, mortos=(), envio_ok=True):
+        super().__init__(mortos)
+        self.ecras, self.enviados, self.envio_ok = ecras, [], envio_ok
+
+    def ecra(self, pane):
+        v = self.ecras.get(pane, "")
+        return v.pop(0) if isinstance(v, list) else v
+
+    def enviar(self, pane, texto):
+        self.enviados.append((pane, texto))
+        return self.envio_ok
+
+
+class CtxPausa(Ctx):
+    def __init__(self, *a, agora=None, **kw):
+        super().__init__(*a, **kw)
+        self._agora = agora or _dt(2026, 11, 18, 10, 0, 0)
+        self.escaladas = []
+
+    def agora(self):
+        return self._agora
+
+    def pausar(self, slug, msg, motivo, retoma_em):
+        self.chamadas.append(("pausar", slug, motivo, retoma_em))
+        self.sps[slug].update(estado="bloqueado", msg=msg, motivo=motivo, retoma_em=retoma_em)
+
+    def retomar(self, slug, msg):
+        self.chamadas.append(("retomar", slug))
+        self.sps[slug].update(estado="a-correr", msg=msg, motivo=None, retoma_em=None)
+
+    def escalar(self, sp):
+        self.escaladas.append(sp["slug"])
+        return None
+
+
+def test_quota_no_ecra_parado_bloqueia_com_motivo_e_retoma_em():
+    ctx = CtxPausa({"a": {"estado": "a-correr"}}, backend=BackendEcra({"p-a": QUOTA}))
+    mem = sp_vigia.memoria_nova()
+    sp_vigia.passo(ctx, mem)
+    assert ctx.sps["a"]["estado"] == "a-correr"  # 1.º tick: ainda não se sabe se o ecrã está parado
+    sp_vigia.passo(ctx, mem)
+    sp = ctx.sps["a"]
+    assert sp["estado"] == "bloqueado" and sp["motivo"].startswith("EC-016") and sp["retoma_em"] == "2026-11-18T15:00:00"
+    assert "retoma automática às 2026-11-18T15:00:00" in sp["msg"]
+    assert ctx.backend.titulos["p-a"].startswith("! ")
+    sp_vigia.passo(ctx, mem)
+    assert ctx.escaladas == []  # pausa de quota não escala de modelo
+
+
+def test_ecra_a_mexer_com_texto_de_quota_nao_bloqueia():
+    ctx = CtxPausa({"a": {"estado": "a-correr"}}, backend=BackendEcra({"p-a": [QUOTA, QUOTA + "\nmais uma linha", QUOTA]}))
+    mem = sp_vigia.memoria_nova()
+    for _ in range(3):
+        sp_vigia.passo(ctx, mem)
+    assert ctx.sps["a"]["estado"] == "a-correr"
+
+
+def test_ecra_normal_parado_nao_bloqueia():
+    ctx = CtxPausa({"a": {"estado": "a-correr"}}, backend=BackendEcra({"p-a": "> a pensar\n"}))
+    mem = sp_vigia.memoria_nova()
+    sp_vigia.passo(ctx, mem)
+    sp_vigia.passo(ctx, mem)
+    assert ctx.sps["a"]["estado"] == "a-correr"
+
+
+def test_sessao_expirada_bloqueia_sem_retoma_automatica():
+    ctx = CtxPausa({"a": {"estado": "a-correr"}}, backend=BackendEcra({"p-a": "OAuth token has expired · Please run /login\n> "}))
+    mem = sp_vigia.memoria_nova()
+    sp_vigia.passo(ctx, mem)
+    sp_vigia.passo(ctx, mem)
+    sp = ctx.sps["a"]
+    assert sp["estado"] == "bloqueado" and sp["motivo"].startswith("EC-066") and sp["retoma_em"] is None
+    assert "kaizen resume a" in sp["msg"]
+    ctx._agora = _dt(2026, 11, 20)
+    sp_vigia.passo(ctx, mem)
+    assert ctx.sps["a"]["estado"] == "bloqueado" and ctx.backend.enviados == []
+
+
+def test_retoma_so_depois_de_retoma_em_e_envia_continua():
+    sps = {"a": {"estado": "bloqueado", "motivo": "EC-016 quota", "retoma_em": "2026-11-18T15:00:00", "msg": "x"}}
+    ctx = CtxPausa(sps, backend=BackendEcra({}), agora=_dt(2026, 11, 18, 14, 59))
+    mem = sp_vigia.memoria_nova()
+    sp_vigia.passo(ctx, mem)
+    assert ctx.sps["a"]["estado"] == "bloqueado" and ctx.backend.enviados == []
+    ctx._agora = _dt(2026, 11, 18, 15, 0, 1)
+    sp_vigia.passo(ctx, mem)
+    assert ctx.sps["a"]["estado"] == "a-correr" and ctx.backend.enviados == [("p-a", "continua")]
+    assert ctx.sps["a"]["retoma_em"] is None
+
+
+def test_retoma_com_envio_falhado_volta_a_pausa_com_hora_nova():
+    sps = {"a": {"estado": "bloqueado", "motivo": "EC-017 rede", "retoma_em": "2026-11-18T09:00:00", "msg": "x"}}
+    ctx = CtxPausa(sps, backend=BackendEcra({}, envio_ok=False))
+    sp_vigia.passo(ctx, sp_vigia.memoria_nova())
+    sp = ctx.sps["a"]
+    assert sp["estado"] == "bloqueado" and sp["retoma_em"] == "2026-11-18T10:30:00"
+
+
+def test_retoma_com_painel_morto_fica_para_o_kaizen_resume():
+    sps = {"a": {"estado": "bloqueado", "motivo": "EC-016 quota", "retoma_em": "2026-11-18T09:00:00"}}
+    ctx = CtxPausa(sps, backend=BackendEcra({}, mortos=("p-a",)))
+    sp_vigia.passo(ctx, sp_vigia.memoria_nova())
+    assert ctx.sps["a"]["estado"] == "bloqueado" and ctx.backend.enviados == []
+
+
+def test_bloqueado_sem_pausa_continua_a_escalar():
+    ctx = CtxPausa({"a": {"estado": "bloqueado", "msg": "gate"}}, backend=BackendEcra({}))
+    sp_vigia.passo(ctx, sp_vigia.memoria_nova())
+    assert ctx.escaladas == ["a"]
+
+
+def test_contexto_real_grava_motivo_e_retoma_em(tmp_path):
+    import sp_painel_estado as pe
+    pe.criar_fila("f1", root=tmp_path, ordem=["a"])
+    pe.registar("f1", "a", root=tmp_path, pane="1")
+    pe.transitar("a", "a-correr", fila="f1", root=tmp_path)
+    ctx = sp_vigia.ContextoReal.__new__(sp_vigia.ContextoReal)
+    ctx.pe, ctx.fila = pe, "f1"
+    orig = pe.transitar
+    try:
+        pe.transitar = lambda *a, **kw: orig(*a, root=tmp_path, **kw)
+        ctx.pausar("a", "msg", "EC-016 quota", "2026-11-18T15:00:00")
+        sp = pe.ler("f1", "a", root=tmp_path)
+        assert sp["estado"] == "bloqueado" and sp["motivo"] == "EC-016 quota" and sp["retoma_em"] == "2026-11-18T15:00:00"
+        ctx.retomar("a", "ok")
+        sp = pe.ler("f1", "a", root=tmp_path)
+        assert sp["estado"] == "a-correr" and sp["motivo"] is None and sp["retoma_em"] is None
+    finally:
+        pe.transitar = orig

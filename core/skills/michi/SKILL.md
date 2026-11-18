@@ -32,7 +32,7 @@ Sem a skill de um passo, faz-se à mão; fase **2b Spike** (só com `spike: ince
 
 ## Arranque
 
-1. `python -I scripts/sp-estado.py <slug>` e ler `perfil`/`max_tentativas`/`parar_se`. SP vazio = Grill; correr o Arranque todo e a «sessão suja» (`michi-orquestracao.md`) antes da fase 1. «SP não encontrado»: ramo atrás de `master` → `git merge master` e repetir.
+1. `python -I scripts/sp-estado.py <slug>`, pré-voo e ler `perfil`/`max_tentativas`/`parar_se`. SP vazio = Grill; correr o Arranque todo e a «sessão suja» (`michi-orquestracao.md`) antes da fase 1. «SP não encontrado»: ramo atrás de `master` → `git merge master` e repetir.
 2. SP em TODO: `python -I scripts/sp-move.py <slug> --start` (SP e mães para Doing). `python -I scripts/sb-worktree.py ensure <slug>` se existir (senão `git worktree add`); editar pelo caminho absoluto da worktree; `merge` + `clean` só no fecho com o SP em Done.
 3. `python -I scripts/tab-title.py <slug>` e seguir nesta sessão, sem `Agent`. Painel WezTerm só com `--painel`. Já dentro de um painel ou `--handed`: seguir sem relançar.
 3b. SP novo em auto: `python -I scripts/sp-aprovar.py <slug> --verificar`; rc 1 = por aprovar: recusar e dar a instrução (`sp-resumo.py`, «sim» do user, `sp-aprovar.py`).

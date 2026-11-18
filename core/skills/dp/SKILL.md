@@ -39,5 +39,5 @@ Research Brief em `knowledge/projects/<projeto>/research/` não vazio, com baixa
 ## Notas
 
 - Planos nunca se commitam (são de trabalho; o que fica é o SP).
-- Código dos projetos em `~\Documents\code\<projeto>`; execução: skill DA.
+- Código dos projetos em `<code_root>/<projeto>`; execução: skill DA.
 - Mapa de ferramentas em `references/plano-template.md`.

@@ -112,7 +112,7 @@ Todos: cada fase com `[OK]` em cada passo; relatório final com tudo verde; inte
 
 ## Referência rápida
 
-Loop: anunciar, escolher, executar, checkpoint, verificar, reportar. Escalada por tentativas e rc (`da-stop.py`). Código em `~\Documents\projetcs\<projeto>\`. No fim: plano `DONE`, checkpoint apagado, LFS feito.
+Loop: anunciar, escolher, executar, checkpoint, verificar, reportar. Escalada por tentativas e rc (`da-stop.py`). Código em `<code_root>/<projeto>/`. No fim: plano `DONE`, checkpoint apagado, LFS feito.
 
 ## Adaptação Claude Code (the agent)
 
