@@ -270,6 +270,14 @@ class HerdrBackend(_Multiplexer):
         return sum(1 for p in paineis if p.get("tab_id") == o["tab_id"]), o.get("workspace_id")
 
     @staticmethod
+    def _repo_do_projeto(projeto):
+        """Repo de código do `projeto` (campo `project:` do SP): `<SB_CODE_ROOT, defeito ~/Documents/code>/<projeto>` se for um diretório; senão None (workspace do repo de `cwd`, o vault)."""
+        if not projeto or "/" in projeto or projeto.startswith("."):
+            return None
+        raiz = Path(os.environ.get("SB_CODE_ROOT", "").strip() or "~/Documents/code").expanduser() / projeto
+        return str(raiz) if raiz.is_dir() else None
+
+    @staticmethod
     def _raiz_repo(cwd):
         """Raiz do repo principal de `cwd` (uma worktree resolve para o checkout principal via --git-common-dir); None fora de um repo."""
         try:
@@ -282,11 +290,11 @@ class HerdrBackend(_Multiplexer):
             return None
         return os.path.dirname(comum.rstrip("/")) if os.path.basename(comum.rstrip("/")) == ".git" else comum
 
-    def _workspace_para(self, cwd):
+    def _workspace_para(self, cwd, projeto=None):
         """(workspace_id, root_pane ou None) do projeto de `cwd`: reutiliza o workspace com label = nome do repo
         (`workspace list`) ou cria-o (`workspace create --cwd <raiz> --label <nome>`, devolvendo o root pane novo).
         (None, None) se o herdr não responde: `abrir` cai no comportamento anterior."""
-        raiz = self._raiz_repo(cwd) or str(cwd)
+        raiz = self._repo_do_projeto(projeto) or self._raiz_repo(cwd) or str(cwd)
         nome = os.path.basename(raiz.rstrip("/")) or raiz
         ws = next((w.get("workspace_id") for w in self._json(["workspace", "list"]).get("workspaces") or []
                    if w.get("label") == nome and w.get("workspace_id")), None)
@@ -295,10 +303,10 @@ class HerdrBackend(_Multiplexer):
         res = self._json(["workspace", "create", "--cwd", raiz, "--label", nome, "--no-focus"])
         return (res.get("workspace") or {}).get("workspace_id"), (res.get("root_pane") or {}).get("pane_id")
 
-    def abrir(self, cmd, cwd):
+    def abrir(self, cmd, cwd, projeto=None):
         origem = os.environ.get("HERDR_PANE_ID")
         n, ws_origem = self._panes_da_tab(origem) if origem else (None, None)
-        ws, pane = self._workspace_para(cwd) if self.workspace_por_projeto else (None, None)
+        ws, pane = self._workspace_para(cwd, projeto) if self.workspace_por_projeto else (None, None)
         if pane:  # workspace acabado de criar: o seu root pane é o painel novo
             pass
         elif n is not None and n < self.max_panes and (ws is None or ws == ws_origem):  # só divide dentro do workspace do projeto
@@ -514,6 +522,13 @@ def _disponivel(nome, env, which, fixo=False):
         return True
     variavel = VARIAVEIS[nome]
     return which(nome) is not None and (fixo or bool(env.get(variavel)))
+
+
+def abrir_painel(backend, cmd, cwd, projeto=None):
+    """`backend.abrir`; só o herdr usa o `projeto` (workspace do repo de código do projeto)."""
+    if isinstance(backend, HerdrBackend):
+        return backend.abrir(cmd, cwd, projeto=projeto)
+    return backend.abrir(cmd, cwd)
 
 
 def por_nome(nome, run=run_hidden, estado_dir=None, herdr=None):

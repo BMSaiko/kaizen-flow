@@ -499,3 +499,26 @@ def test_herdr_max_panes_configuravel(monkeypatch):
 def test_herdr_defeitos_sem_config():
     b = pb.por_nome("herdr", _run("{}", []))
     assert (b.max_panes, b.workspace_por_projeto) == (2, True)
+
+
+def test_herdr_workspace_do_projeto_usa_repo_de_codigo(monkeypatch, tmp_path):
+    (tmp_path / "meuproj").mkdir()
+    monkeypatch.setenv("SB_CODE_ROOT", str(tmp_path))
+    monkeypatch.setenv("HERDR_PANE_ID", "w1:p1")
+    chamadas = []
+
+    def f(argv):
+        if argv[1:3] == ["workspace", "list"]:
+            return json.dumps({"result": {"workspaces": []}})
+        if argv[1:3] == ["workspace", "create"]:
+            return json.dumps({"result": {"workspace": {"workspace_id": "w7"}, "root_pane": {"pane_id": "w7:p1"}}})
+        return _herdr(argv)
+    b = pb.HerdrBackend(_run(f, chamadas))
+    assert pb.abrir_painel(b, ["claude"], "/wt/x", "meuproj") == "w7:p1"
+    assert ["herdr", "workspace", "create", "--cwd", str(tmp_path / "meuproj"), "--label", "meuproj", "--no-focus"] in chamadas
+
+
+def test_herdr_projeto_sem_repo_de_codigo_cai_no_vault(monkeypatch, tmp_path):
+    monkeypatch.setenv("SB_CODE_ROOT", str(tmp_path))
+    assert pb.HerdrBackend._repo_do_projeto("inexistente") is None
+    assert pb.HerdrBackend._repo_do_projeto("../x") is None

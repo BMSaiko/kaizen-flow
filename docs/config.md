@@ -23,6 +23,7 @@ Optional, in the project root. Without it the defaults below apply. `init` only 
 | `prices` | bundled `usage/prices.json` | cost calculation |
 | `test.cmd` | detected by `init` | command that runs the target project's tests (see below) |
 | `painelBackend` | `auto` | `sp-handoff --spawn`: where the new session runs (see below) |
+| `herdr` | `{"maxPanesPorTab": 2, "workspacePorProjeto": true}` | herdr backend layout (see below) |
 | `desenvolvimento` | none | development method: default authorisations and PR closing (see below) |
 | `userName` | `user` | name the scripts' warnings use for you; empty or non-string falls back to `user` |
 
@@ -103,3 +104,14 @@ Where `sp-handoff --spawn` opens the new session (`sp-fila --concorrencia N` and
 | `background` | no terminal: each session is a detached `claude -p "/michi --auto <slug>"` process with its log in `~/.claude/sp-fila-paineis/<pid>.log`; the state is the PID |
 
 `background` is never picked by `auto`; set it explicitly. With no usable backend, `sp-fila --concorrencia` prints a one-line warning saying what is missing and runs the queue sequentially. Any other value falls back to `auto`.
+
+### `herdr`
+
+Layout of the herdr backend (herdr is also picked by `auto`, before WezTerm and tmux):
+
+| Key | Default | Behaviour |
+|---|---|---|
+| `maxPanesPorTab` | `2` | a new pane splits to the right only while the launching tab has fewer panes than this; otherwise it opens in a new tab |
+| `workspacePorProjeto` | `true` | each repo gets one herdr workspace (label = repo name, reused if it exists, created otherwise); a git worktree uses the workspace of its main repo. `false` keeps the launching pane's workspace |
+
+Invalid values (non-integer or below 1, non-boolean) fall back to the defaults.
