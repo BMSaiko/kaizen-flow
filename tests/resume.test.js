@@ -7,7 +7,7 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const BIN = path.join(__dirname, "..", "bin", "kaizen.js");
-const run = (cwd, ...a) => spawnSync("node", [BIN, ...a], { cwd, encoding: "utf8", env: { ...process.env, WEZTERM_PANE: "", TMUX_PANE: "" } });
+const run = (cwd, ...a) => spawnSync("node", [BIN, ...a], { cwd, encoding: "utf8", env: { ...process.env, HERDR_PANE_ID: "", WEZTERM_PANE: "", TMUX_PANE: "" } });
 
 function repo() {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-resume-"));

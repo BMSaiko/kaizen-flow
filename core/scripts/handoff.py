@@ -11,7 +11,7 @@ Uso:
   python -I scripts/handoff.py --consume <ficheiro>
 
 `--launch` não abre janelas: em segundo plano, passados ~5 s, escreve `/clear` e depois o prompt de
-continuação no painel do WezTerm onde o Claude Code já corre ($WEZTERM_PANE). `--auto` (usado após o
+continuação no painel onde o Claude Code já corre (herdr, WezTerm ou tmux; sem painel, clipboard). `--auto` (usado após o
 aviso do context-guard) recusa lançar se o ficheiro não existir em `handoffs/`.
 rc: 0 ok, 1 erro
 """
@@ -88,13 +88,28 @@ def continuation_prompt(path):
 
 
 def send(text, pane, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=pane_lib.run_hidden, sleep=time.sleep,
-         inspect=None, confirm=False):
-    pane_lib.send_comandos(["/clear", text], pane, "wezterm", delay, gap, enter_gap, run, sleep, inspect, confirm)
+         inspect=None, confirm=False, backend="wezterm"):
+    pane_lib.send_comandos(["/clear", text], pane, backend, delay, gap, enter_gap, run, sleep, inspect, confirm)
 
 
-def launch(path, pane=None, env=None, run=pane_lib.run_hidden):
+def launch(path, pane=None, env=None, run=pane_lib.run_hidden, backend=None, copy=None):
+    """Agenda /clear + retoma no painel atual (herdr, wezterm ou tmux); sem painel, copia o prompt. None = clipboard."""
+    if backend is None:
+        backend, found = pane_lib.detect_backend(env)
+        pane = pane or found
+    prompt = continuation_prompt(path)
+    if backend == "clipboard":
+        try:
+            (copy or pane_lib._copy)(prompt)
+            print(f"copiado: {prompt}")
+        except OSError:
+            print(f"colar na sessão nova: {prompt}")
+        return None
+    if backend != "wezterm":
+        pane_lib._argvs(backend, pane)[0](pane, prompt)
+        return pane_lib.launch_detached(__file__, ["--send", str(path), "--pane", str(pane), "--backend", backend], env)
     pane = pane or pane_lib.pane_id(env)
-    pane_lib.send_argv(pane, continuation_prompt(path))
+    pane_lib.send_argv(pane, prompt)
     sock = pane_lib.live_socket(env, run)
     if sock is None:
         raise HandoffError("nenhum GUI do WezTerm vivo: retoma à mão numa sessão nova com "
@@ -113,7 +128,8 @@ def main(argv=None):
     group.add_argument("--send", metavar="FICHEIRO", help=argparse.SUPPRESS)
     ap.add_argument("--slug", default="", help="com --write: nome curto da conversa")
     ap.add_argument("--file", help="ficheiro com o corpo do handoff (com --write)")
-    ap.add_argument("--pane", help="painel do WezTerm (default: $WEZTERM_PANE)")
+    ap.add_argument("--pane", help="painel (default: o atual, detetado)")
+    ap.add_argument("--backend", choices=("wezterm", "tmux", "herdr", "clipboard"), help="default: deteção automática")
     ap.add_argument("--socket", help=argparse.SUPPRESS)
     ap.add_argument("--dry-run", action="store_true", help="com --launch: só mostra os comandos")
     ap.add_argument("--auto", action="store_true", help="com --launch: modo do context-guard")
@@ -131,17 +147,23 @@ def main(argv=None):
         elif args.send:
             if args.socket:
                 os.environ["WEZTERM_UNIX_SOCKET"] = args.socket
-            send(continuation_prompt(args.send), args.pane or pane_lib.pane_id(), inspect=pane_lib.check_prompt, confirm=True)
+            backend = args.backend or "wezterm"
+            send(continuation_prompt(args.send), args.pane or pane_lib.pane_id(), confirm=True, backend=backend,
+                 inspect=pane_lib.check_prompt if backend == "wezterm" else None)
         else:
             if args.auto:
                 _check(args.launch)
             if args.dry_run:
-                pane = args.pane or pane_lib.pane_id()
-                for text in ("/clear", continuation_prompt(args.launch)):
-                    print(subprocess.list2cmdline(pane_lib.send_argv(pane, text)))
-                    print(subprocess.list2cmdline(pane_lib.enter_argv(pane)))
-            else:
-                launch(args.launch, args.pane)
+                backend, found = (args.backend, None) if args.backend else pane_lib.detect_backend()
+                if backend == "clipboard":
+                    print(f"clipboard: {continuation_prompt(args.launch)}")
+                else:
+                    pane = args.pane or found or pane_lib.pane_id()
+                    text_argv, key_argv = pane_lib._argvs(backend, pane)
+                    for text in ("/clear", continuation_prompt(args.launch)):
+                        print(subprocess.list2cmdline(text_argv(pane, text)))
+                        print(subprocess.list2cmdline(key_argv(pane)))
+            elif launch(args.launch, args.pane, backend=args.backend):
                 print(f"a continuar neste painel em {SEND_DELAY:.0f}s: /clear e a leitura de {args.launch}")
     except (HandoffError, OSError) as exc:
         print(f"erro: {exc}", file=sys.stderr)

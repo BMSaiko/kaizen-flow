@@ -370,6 +370,7 @@ def test_clipboard_sem_ferramenta_so_imprime(capsys):
 
 
 def test_main_launch_sem_multiplexer_cai_no_clipboard(tmp_path, capsys, monkeypatch):
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
     monkeypatch.delenv("WEZTERM_PANE", raising=False)
     monkeypatch.delenv("TMUX_PANE", raising=False)
     monkeypatch.setattr(sp_handoff, "_copy", lambda text: None)

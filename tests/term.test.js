@@ -7,7 +7,7 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const BIN = path.join(__dirname, "..", "bin", "kaizen.js");
-const run = (...a) => spawnSync("node", [BIN, ...a], { encoding: "utf8", env: { ...process.env, WEZTERM_PANE: "", TMUX_PANE: "" } });
+const run = (...a) => spawnSync("node", [BIN, ...a], { encoding: "utf8", env: { ...process.env, HERDR_PANE_ID: "", WEZTERM_PANE: "", TMUX_PANE: "" } });
 
 test("term --help lista ls|fila|michi|limpar|retomar|orq", () => {
   const r = run("term", "--help");
@@ -34,7 +34,7 @@ test("term ls num projeto limpo: rc 0, sem SPs, --json devolve []", () => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-ls-"));
   assert.strictEqual(run("init", d, "--harness", "claude").status, 0);
   const vazio = fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-ls-estado-"));
-  const env = { ...process.env, WEZTERM_PANE: "", TMUX_PANE: "", SP_FILA_ROOT: vazio };
+  const env = { ...process.env, HERDR_PANE_ID: "", WEZTERM_PANE: "", TMUX_PANE: "", SP_FILA_ROOT: vazio };
   const t = spawnSync("node", [BIN, "term", "ls"], { encoding: "utf8", env, cwd: d });
   assert.strictEqual(t.status, 0, t.stderr);
   assert.match(t.stdout, /sem SPs/);
@@ -47,7 +47,7 @@ test("term ls num projeto limpo: rc 0, sem SPs, --json devolve []", () => {
 test("term michi/fila num projeto limpo: sem elegíveis rc 0; SP inexistente rc 2 sem lançar nada", () => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-arranque-"));
   assert.strictEqual(run("init", d, "--harness", "claude").status, 0);
-  const env = { ...process.env, WEZTERM_PANE: "", TMUX_PANE: "" };
+  const env = { ...process.env, HERDR_PANE_ID: "", WEZTERM_PANE: "", TMUX_PANE: "" };
   const t = (...a) => spawnSync("node", [BIN, "term", ...a], { encoding: "utf8", env, cwd: d, input: "" });
   const m = t("michi");
   assert.strictEqual(m.status, 0, m.stderr);

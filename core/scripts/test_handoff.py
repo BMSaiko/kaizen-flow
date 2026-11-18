@@ -88,7 +88,14 @@ def test_prompt_manda_ler_com_consume_e_e_uma_linha(tmp_path):
     assert "--consume" in text and str(path) in text and "\n" not in text and "\r" not in text
 
 
-def test_dry_run_mostra_clear_e_prompt_no_painel(tmp_path, capsys):
+def _sem_painel(monkeypatch):
+    for var in ("HERDR_PANE_ID", "WEZTERM_PANE", "TMUX_PANE"):
+        monkeypatch.delenv(var, raising=False)
+
+
+def test_dry_run_mostra_clear_e_prompt_no_painel(tmp_path, capsys, monkeypatch):
+    _sem_painel(monkeypatch)
+    monkeypatch.setenv("WEZTERM_PANE", "7")
     path = handoff.write(tmp_path / "handoffs", BODY, "z", now=datetime(2026, 10, 18, 9, 5))
     assert handoff.main(["--launch", str(path), "--auto", "--dry-run", "--pane", "7"]) == 0
     out = capsys.readouterr().out.splitlines()
@@ -146,3 +153,30 @@ def test_comandos_usam_o_nucleo_comum_e_pedem_os_campos(nome):
     assert "handoff-launch" in texto
     assert "Gates por correr" in texto
     assert "Modo automático" not in texto
+
+
+def test_dry_run_em_herdr_usa_comandos_do_herdr(tmp_path, capsys, monkeypatch):
+    _sem_painel(monkeypatch)
+    monkeypatch.setenv("HERDR_PANE_ID", "w3:p1")
+    path = handoff.write(tmp_path / "handoffs", BODY, "z", now=datetime(2026, 10, 18, 9, 5))
+    assert handoff.main(["--launch", str(path), "--dry-run"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert len(out) == 4 and all(linha.startswith("herdr ") for linha in out)
+    assert "/clear" in out[0] and "w3:p1" in out[0] and str(path) in out[2]
+
+
+def test_launch_em_herdr_agenda_envio_com_backend(tmp_path, monkeypatch):
+    _sem_painel(monkeypatch)
+    chamadas = []
+    monkeypatch.setattr(handoff.pane_lib, "launch_detached", lambda script, args, env=None: chamadas.append(args) or args)
+    path = tmp_path / "h.md"
+    args = handoff.launch(path, env={"HERDR_PANE_ID": "w3:p1"})
+    assert args == ["--send", str(path), "--pane", "w3:p1", "--backend", "herdr"] and chamadas
+
+
+def test_launch_sem_painel_copia_prompt(tmp_path, capsys, monkeypatch):
+    copiado = []
+    path = tmp_path / "h.md"
+    assert handoff.launch(path, env={}, copy=copiado.append) is None
+    assert copiado == [handoff.continuation_prompt(path)]
+    assert "copiado:" in capsys.readouterr().out

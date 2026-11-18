@@ -62,15 +62,23 @@ def _paineis_falsos(monkeypatch, tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
+def _sem_painel_do_terminal(monkeypatch):
+    """O painel onde a suite corre (herdr/WezTerm/tmux) não entra nos testes; quem testa a deteção usa `monkeypatch.setenv`."""
+    for var in ("HERDR_PANE_ID", "WEZTERM_PANE", "TMUX_PANE"):
+        monkeypatch.delenv(var, raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _sem_wezterm_real(monkeypatch):
-    """Rede de segurança no ponto único (`subprocess.run`/`Popen`): lançar `wezterm` real num teste é erro; quem precisa troca-o."""
+    """Rede de segurança no ponto único (`subprocess.run`/`Popen`): lançar um multiplexer real (wezterm, herdr, tmux) num teste é erro; quem precisa troca-o."""
     import subprocess
     run, popen = subprocess.run, subprocess.Popen
 
     def _verificar(argv):
         primeiro = argv if isinstance(argv, (str, bytes)) else (list(argv) or [""])[0]
-        if Path(str(primeiro)).stem.lower() == "wezterm":
-            raise AssertionError(f"teste lançou o wezterm real: {argv}")
+        nome = Path(str(primeiro).split()[0] if isinstance(primeiro, str) and primeiro else str(primeiro)).stem.lower()
+        if nome in ("wezterm", "herdr", "tmux"):
+            raise AssertionError(f"teste lançou o {nome} real: {argv}")
 
     def run_guardado(argv, *a, **kw):
         _verificar(argv)
