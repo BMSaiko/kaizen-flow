@@ -3,5 +3,9 @@
     "metodo": "worktree-pr",
     "ramo_principal": "main",
     "merge_estrategia": "squash"
+  },
+  "herdr": {
+    "maxPanesPorTab": 2,
+    "workspacePorProjeto": true
   }
 }

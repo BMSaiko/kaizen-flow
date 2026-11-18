@@ -4,7 +4,7 @@ Movido de `SKILL.md`; texto integral.
 
 ## Document Lifecycle Management
 
-DR/DP/SP vivem em `knowledge/projects/kaizen/<project>/{dr,dp,sp}/{TODO,Doing,Done}/` e movem-se TODO → Doing → Done. O campo `status`/`updated` do frontmatter acompanha a pasta.
+DR/DP/SP vivem em `knowledge/projects/{{agentSlug}}/<project>/{dr,dp,sp}/{TODO,Doing,Done}/` e movem-se TODO → Doing → Done. O campo `status`/`updated` do frontmatter acompanha a pasta.
 
 SP (scripts em `scripts/`, correr com `python -I`):
 - `sp-list.py [--project P] [--status todo|doing] [--all]` — listar SPs pendentes.

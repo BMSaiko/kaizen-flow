@@ -43,7 +43,7 @@ kaizen preflight [slug] [--repo DIR] [--json] [--fix]  # git/worktree/tools chec
 | `kaizen term <sub>` | `ls`, `fila`, `michi`, `limpar`, `retomar`, `orq` | Drives WezTerm panes through `scripts/painel_backend.py` and `scripts/wez.py`: `ls` lists SPs with pane, michi phase, state and queue (see below), `fila` picks a program and runs its SP queue in a new pane, `michi` picks a SP and launches its michi in a new pane (both: see `kaizen term fila|michi` below). `limpar` closes orphan panes and state (dry-run unless `--apply`), `retomar` reopens the pane of a Doing SP that has none (both: see `kaizen term limpar` and `retomar` below). `orq` opens the orchestrator pane (see `kaizen term orq` below). Optional WezTerm keys: [term.md](term.md). |
 | `kaizen resume` | `[slug]`, `--from PHASE`, `--restart [--sim]` | Resumes a story interrupted mid-run (Ctrl+C, crash, closed pane) from its journal, never repeating a closed step. No slug: the single orphan, or a list to choose from (rc 2). `--from` restarts at a phase (rc 2 if unknown); `--restart` archives the state after confirmation. A second pane on the same story is refused with the owner named. Runs `scripts/sp-resume.py`. |
 | `kaizen preflight` | `[slug]`, `--repo DIR`, `--ramo B`, `--sem-orfao`, `--json`, `--fix` | Read-only preflight: dirty worktree, wrong branch, missing or prunable worktree, merge/rebase half done, branch behind main, orphan story, git/Python missing; each with its `EC-NNN` and the safe fix (see [error-log.md](error-log.md#preflight)). rc 0 clean, 1 problems, 2 usage. `--fix` asks before each safe command and never deletes. Runs `scripts/sp-preflight.py`. |
-| `kaizen sync` | `--check`, `--stamp` | Maintainers only: refreshes `core/` from the author's vault. `--check` verifies without writing, `--stamp` stamps the build. Not needed by users. |
+| `kaizen sync` | `--to-vault [--check] [--force]`, `--from-vault [--check] [--stamp]` | Maintainers only. `--to-vault` writes `core/` into the vault (`KAIZEN_SOURCE`), filling the `{{...}}` markers from its `kaizen.config.json` and refusing pieces edited there since the last sync (`--force` overwrites); `--check` lists differences without writing. `--from-vault` is the old direction (vault → `core/`), kept for the transition with a warning. Not needed by users. |
 
 ## Workflow scripts (installed in `scripts/`)
 
@@ -117,6 +117,7 @@ lançado michi de slug-b no painel 42
 - Only `s`/`sim`/`y`/`yes` launches; empty, `n`, `q` or anything else cancels and touches nothing. `--sim` is the explicit confirmation when there is no terminal.
 - `--slug SP` (michi) or `--programa MÃE` (fila) skips the list but still previews and confirms; a SP that is not eligible exits 2.
 - The pane is named by the SP slug (`fila-<mãe>` for a queue). `michi` reuses `michi_handoff_auto.py` (worktree via `sb-worktree.py ensure`); `fila` runs `python -I scripts/sp-fila.py --programa <mãe>` in the project root.
+- herdr keeps at most 2 panes per tab: the new pane splits to the right only when the launching tab has 1 pane, otherwise it opens in a new tab of the same workspace.
 - Without a backend (outside WezTerm/tmux/herdr) it prints the equivalent command and exits 0. A launch that fails exits 1 with the cause; a pane title that fails is only a warning.
 
 ### `kaizen term limpar` and `kaizen term retomar`

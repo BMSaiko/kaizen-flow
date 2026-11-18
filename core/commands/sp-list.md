@@ -10,7 +10,7 @@ Por omissão a vista é agrupada: cada SP-mãe (`kind: program`) com o progresso
 
 ## Seletor (depois da listagem)
 
-Se houver SPs listados, a seguir à saída abrir um seletor com AskUserQuestion (uma pergunta, `multiSelect: false`), para o user escolher um SP e arrancá-lo:
+Se houver SPs listados, a seguir à saída abrir um seletor com AskUserQuestion (uma pergunta, `multiSelect: false`), para o {{userName}} escolher um SP e arrancá-lo:
 
 1. Ordenar os SPs elegíveis (TODO e Doing, filhos e avulsos; SPs-mãe `kind: program` só como agrupador, não selecionáveis) pela ordem da listagem.
 2. Dois passos (AskUserQuestion aceita no máximo 4 opções):
@@ -18,6 +18,6 @@ Se houver SPs listados, a seguir à saída abrir um seletor com AskUserQuestion 
    - **Passo 2, SP**: SPs elegíveis desse projeto, pela ordem da listagem. Cada opção: `label` = slug, `description` = `▶ Doing`/`○ TODO`, prioridade, idade (e `aguarda: …` se houver). Até 4 SPs numa página; com mais de 4: 3 SPs + `Mais →` (página seguinte; na última volta ao início).
 3. `Mais →` (em qualquer passo): repetir o AskUserQuestion com a página seguinte, sem voltar a listar. "Other" já existe por omissão para escrever um slug.
 4. SP escolhido: obter o caminho absoluto (o mesmo que a listagem usa) e seguir os passos 4 e 5 do `/sp-handoff` (bloco `/michi <caminho>` + pergunta sim/não + `sp-handoff.py --launch`), **sem escrever progresso** (a sessão atual não trabalhou nele).
-5. Se o SP escolhido estiver em TODO, avisar que o `/michi` o começa a trabalhar mas não o move para Doing (isso é `scripts/sp-move.py`, só com ordem do user).
+5. Se o SP escolhido estiver em TODO, avisar que o `/michi` o começa a trabalhar mas não o move para Doing (isso é `scripts/sp-move.py`, só com ordem do {{userName}}).
 
 A listagem em si é só leitura: nunca mover nem editar SPs, nunca `git commit`.

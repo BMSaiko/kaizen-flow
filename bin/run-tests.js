@@ -6,7 +6,7 @@ const thr = require("../package.json").coverageThreshold || {};
 const jsMin = (thr.js || {}).lines, pyMin = (thr.python || {}).lines;
 const files = readdirSync("tests").filter((f) => f.endsWith(".test.js")).map((f) => "tests/" + f);
 if (cov) mkdirSync("coverage", { recursive: true });
-const jsArgs = ["--test", ...(cov ? ["--experimental-test-coverage"] : []), ...files];
+const jsArgs = ["--test", ...(cov ? ["--experimental-test-coverage", `--test-coverage-exclude=${require("os").tmpdir().replace(/\\/g, "/")}/**`] : []), ...files];
 const js = spawnSync(process.execPath, jsArgs, { stdio: cov ? ["inherit", "pipe", "inherit"] : "inherit" });
 if (cov) {
   process.stdout.write(js.stdout);

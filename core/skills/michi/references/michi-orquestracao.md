@@ -9,7 +9,7 @@ Regras que saíram do `SKILL.md` sem alteração de contrato. Prova, reflect por
 ## Arranque
 
 - **Estado:** `python -I scripts/sp-estado.py <SP>` (≤30 linhas) em vez de ler SP, lista e git à parte. Aceita o slug (não o caminho).
-- **Pré-voo:** `python -I scripts/sp-preflight.py <slug> --sem-orfao` (`kaizen preflight`; <2 s, só lê). rc 0 = seguir. Problemas no formato EC (o quê · porquê · estado guardado · próximo): nível `aviso` (árvore suja EC-060, atrás do principal EC-025, worktree por limpar EC-063) segue e menciona no report; nível `erro` (EC-031/061/062/064/065): manual = mostrar a mensagem e `AskUserQuestion` (corrigir com o comando sugerido, ou parar); auto ou fila = parar como `bloqueado` com o EC no `--msg`. `--fix` só pelo user no terminal (pede confirmação a cada comando; nunca apaga).
+- **Pré-voo:** `python -I scripts/sp-preflight.py <slug> --sem-orfao` (`kaizen preflight`; <2 s, só lê). rc 0 = seguir. Problemas no formato EC (o quê · porquê · estado guardado · próximo): nível `aviso` (árvore suja EC-060, atrás do principal EC-025, worktree por limpar EC-063) segue e menciona no report; nível `erro` (EC-031/061/062/064/065): manual = mostrar a mensagem e `AskUserQuestion` (corrigir com o comando sugerido, ou parar); auto ou fila = parar como `bloqueado` com o EC no `--msg`. `--fix` só pelo {{userName}} no terminal (pede confirmação a cada comando; nunca apaga).
 - **Perfil:** ler `perfil`/`max_tentativas`/`parar_se` no arranque e na paragem (`michi-perfis.md`).
 - **Worktree:** com `scripts/sb-worktree.py` (só no vault; noutro projeto, `git worktree add` num ramo próprio): `python -I scripts/sb-worktree.py ensure <slug>` e editar pelo caminho absoluto da worktree (o guard bloqueia o checkout principal); `sp-move`/`sp-fechar` saltam sozinhos para ela; commits por fase lá; `merge` (recusa SP fora de Done, `--force` explícito) + `clean` só no fecho.
 - **Tab:** `python -I scripts/tab-title.py <slug>` (best-effort, rc 0; imprime `/rename <slug>`). Vale para a sessão nova do `/sp-handoff`.
@@ -17,7 +17,7 @@ Regras que saíram do `SKILL.md` sem alteração de contrato. Prova, reflect por
 - **Lock do SP:** depois do `--start`, `python -I scripts/sp-resume.py <slug> --lock --painel <painel>`; rc 1 = EC-043 (outro painel é dono): recusar e mostrar a mensagem. No fecho, na paragem final ou no handoff: `python -I scripts/sp-resume.py <slug> --unlock --painel <painel>`. Painel morto: `kaizen resume <slug>` ou `--unlock`.
 - **Checkpoint/rollback:** `scripts/michi-checkpoint.py save|restore` antes da DA e na paragem por gate (`michi-modo-auto.md` §Paragem).
 - **Sessão suja:** se o contexto já tem conversa anterior (não veio de `/clear` nem de handoff), um só AskUserQuestion: «Limpar e iniciar o SP em sessão nova?» + modo; com «sim», `python -I scripts/sp-handoff.py --launch <caminho>` (`--auto` se escolhido) e terminar o turno. Conta como suja qualquer sessão onde já correu trabalho (SP criado ou `/michi` anterior). SP com secções vazias (sem objetivo/passos) não é «nada a fazer»: entra no Grill (fase 1), nunca parar nem saltar o Arranque (passos 2-5, incluindo esta verificação).
-- O user pode parar após qualquer passo (`/stop`) e retomar (`/resume` ou novo `/michi` no mesmo contexto).
+- O {{userName}} pode parar após qualquer passo (`/stop`) e retomar (`/resume` ou novo `/michi` no mesmo contexto).
 
 ## Fase 1 — Grill
 
@@ -48,7 +48,7 @@ Depois da Review e antes do PR: README, MOC e CHANGELOG atualizados, ou `Docs: s
 Não há sub-agentes (`Agent`; sítio único da regra no michi, os outros ficheiros só apontam): o michi e todas as fases correm na sessão principal. Outra sessão é sempre um painel WezTerm com `claude` próprio: `/sp-fila` (um painel por SP, vigia `sp-vigia.py`), `sp-autor.py` (preencher um SP) ou `--painel`. Cada painel commita na sua worktree e reporta o estado em ficheiro, nunca por mensagem:
 
 - `python -I scripts/sp-estado.py <slug> done|pergunta|bloqueado|falhou --msg "<texto>"` (o `sp-autor` usa a chave `sp-autor-<slug>` na fila `sp-autor`); antes de parar a meio, gravar `## Progresso` no SP.
-- O principal (ou o user) lê com `python -I scripts/sp-estado.py --listar`: `pergunta` → `AskUserQuestion` e a resposta vai ao painel pelo user; `done` → propor `sb-worktree.py merge <slug>` (automático com `commit: auto`); `bloqueado`/`falhou` → resumo ao user.
+- O principal (ou o {{userName}}) lê com `python -I scripts/sp-estado.py --listar`: `pergunta` → `AskUserQuestion` e a resposta vai ao painel pelo {{userName}}; `done` → propor `sb-worktree.py merge <slug>` (automático com `commit: auto`); `bloqueado`/`falhou` → resumo ao {{userName}}.
 
 Num painel de fila: sem merge nem `clean` (faz o vigia) e quem encadeia o SP seguinte é o driver (`kaizen-flow.md` §Orquestrador).
 
@@ -56,7 +56,7 @@ Num painel de fila: sem merge nem `clean` (faz o vigia) e quem encadeia o SP seg
 
 Se aparecer `[context-guard] Contexto … >= limite`: acabar o passo em curso (nunca a meio de uma edição ou teste) e correr em modo automático (`--launch --auto`, sem perguntar) o handoff que o aviso nomear: `/sp-handoff` se a sessão correu `/michi <SP>`, `/handoff` se é conversa livre.
 
-**Passagem de sessão num SP em Doing = só `sp-handoff`** (nunca `/handoff` nem `/clear` à mão). Antes dela, `/reflect fase <SP>` escreve `Reflect <fase>: ...` em `## Reflect` do SP; sem essa linha `sp-handoff.py --write|--launch` recusa («falta Reflect da fase <fase>»). A fase vem de `--fase` ou da última linha `Fase: <nome>` de `## Progresso` (sem fase conhecida não há gate; pôr sempre `Fase:` no progresso). `--sem-reflect` é só do user e regista a exceção em `## Progresso`. `/handoff` fica para conversa livre, sem SP em Doing.
+**Passagem de sessão num SP em Doing = só `sp-handoff`** (nunca `/handoff` nem `/clear` à mão). Antes dela, `/reflect fase <SP>` escreve `Reflect <fase>: ...` em `## Reflect` do SP; sem essa linha `sp-handoff.py --write|--launch` recusa («falta Reflect da fase <fase>»). A fase vem de `--fase` ou da última linha `Fase: <nome>` de `## Progresso` (sem fase conhecida não há gate; pôr sempre `Fase:` no progresso). `--sem-reflect` é só do {{userName}} e regista a exceção em `## Progresso`. `/handoff` fica para conversa livre, sem SP em Doing.
 
 | Gatilho | Modo | Regras |
 |---|---|---|
@@ -69,11 +69,11 @@ Se aparecer `[context-guard] Contexto … >= limite`: acabar o passo em curso (n
 
 ## Review restart (pushback)
 
-Quando o user diz que algo está errado/partido/em falta («está errado», «está partido», «tem erros», «isso não está certo», «isso está mal», «wrong», «broken», «has bugs»), o ciclo recomeça na fase anterior mais relevante, não só na DA. Perguntar que fase o user acha que falhou e re-correr daí com o novo input. Defeito: fase 1 (Grill); «scope changed» / «estamos a resolver o problema errado» → fase 1; «implementação errada, plano certo» → fase 4 (DA). Honrar o sinal: não remendar a DA quando a causa é a montante.
+Quando o {{userName}} diz que algo está errado/partido/em falta («está errado», «está partido», «tem erros», «isso não está certo», «isso está mal», «wrong», «broken», «has bugs»), o ciclo recomeça na fase anterior mais relevante, não só na DA. Perguntar que fase o {{userName}} acha que falhou e re-correr daí com o novo input. Defeito: fase 1 (Grill); «scope changed» / «estamos a resolver o problema errado» → fase 1; «implementação errada, plano certo» → fase 4 (DA). Honrar o sinal: não remendar a DA quando a causa é a montante.
 
 ## Commit
 
-Autorizações `commit`/`push`/`pr`/`restricoes` do frontmatter mandam (`michi-modo-auto.md` §Autorizações do SP). Só depois de o user aprovar o report (e ter podido agir no Reflect): propor uma mensagem convencional (assunto ≤72 car., corpo com o porquê); o user confirma antes de qualquer `git commit`. Push + merge são passo separado confirmado (alvo por defeito `main`). **Se o repo tem mais de um ramo longo (`master`, `main`, `dev`), perguntar qual antes do push** (michi 2026-09-03).
+Autorizações `commit`/`push`/`pr`/`restricoes` do frontmatter mandam (`michi-modo-auto.md` §Autorizações do SP). Só depois de o {{userName}} aprovar o report (e ter podido agir no Reflect): propor uma mensagem convencional (assunto ≤72 car., corpo com o porquê); o {{userName}} confirma antes de qualquer `git commit`. Push + merge são passo separado confirmado (alvo por defeito `main`). **Se o repo tem mais de um ramo longo (`master`, `main`, `dev`), perguntar qual antes do push** (michi 2026-09-03).
 
 **Worktree → dev:** `fetch`, merge de `origin/dev` NA worktree, resolver e correr os gates lá, só depois merge no pai (`michi-worktree-merge.md`).
 

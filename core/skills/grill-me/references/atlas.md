@@ -25,7 +25,7 @@ Auto-deteção: o `viewTerminal` do Atlas faz poll do `.log` pela regex `? **Q\d
 
 ## Semente inválida no Atlas
 
-Criar nota «Grilling bloqueado: <card-id> — description vazia», tags `grilled, decision, blocked, needs-input`, corpo «Card <id> sem decisão. Worker abortou sem rounds. Ação: user cola plano/decision na description e clica Reply.»; mover o card para `review` com `result=BLOCKER` (protocolo na skill `atlas-wrapper-python`); não arquivar; sair sem polling. Foi o BUG 3h de 2026-09-01 (a skill abortava em 3 s com o card em review sem pergunta).
+Criar nota «Grilling bloqueado: <card-id> — description vazia», tags `grilled, decision, blocked, needs-input`, corpo «Card <id> sem decisão. Worker abortou sem rounds. Ação: {{userName}} cola plano/decision na description e clica Reply.»; mover o card para `review` com `result=BLOCKER` (protocolo na skill `atlas-wrapper-python`); não arquivar; sair sem polling. Foi o BUG 3h de 2026-09-01 (a skill abortava em 3 s com o card em review sem pergunta).
 
 ## Reply (UI Atlas ↔ worker, 2026-09-01)
 

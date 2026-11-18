@@ -13,18 +13,18 @@ version: 2.7
 
 | # | Fase | Skill / comando | Gate de saída | Decide |
 |---|---|---|---|---|
-| 1 | Grill (DR antes, por defeito) | `/grill-me` | decisões alinhadas; SP de 8 secções salta 1-2 | user |
+| 1 | Grill (DR antes, por defeito) | `/grill-me` | decisões alinhadas; SP de 8 secções salta 1-2 | {{userName}} |
 | 2 | Deep Research | `/dr` | síntese de 1 ecrã | agente |
-| 3 | Deep Planning (TDD) | `/dp` | auditoria por fase + pattern-fit; sign-off | user |
+| 3 | Deep Planning (TDD) | `/dp` | auditoria por fase + pattern-fit; sign-off | {{userName}} |
 | 4 | Deep Acting | `/da` | prova por fase + `/reflect fase` | agente |
 | 5 | Gates | `sp-gates.py` · `/harden` | cada comando com RC; falha = corrigir e repetir tudo | agente |
-| 6 | Pentest | `/pentest` | sem achados abertos (ou decisão do user) | agente / user |
-| 7 | Review | `/review-ciclo` (`sp-revisor.py`, revisor independente) | APROVADO; ESCALAR após 3 iterações | agente / user |
+| 6 | Pentest | `/pentest` | sem achados abertos (ou decisão do {{userName}}) | agente / {{userName}} |
+| 7 | Review | `/review-ciclo` (`sp-revisor.py`, revisor independente) | APROVADO; ESCALAR após 3 iterações | agente / {{userName}} |
 | 8 | Docs | `references/michi-docs.md` | README/MOC/CHANGELOG atualizados ou skip justificado; prova em `## Docs` | agente |
 | 9 | PR | `/pr-fase` | corpo pela template, respeitando `pr:` | agente |
 | 10 | Report | `/report` (`sp-report.py`) | 5 secções, «Dificuldades» não vazia | agente |
-| 11 | Reflect | `/reflect final` | A/B/C proposto; o user aplica | user |
-| 12 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | user |
+| 11 | Reflect | `/reflect final` | A/B/C proposto; o {{userName}} aplica | {{userName}} |
+| 12 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | {{userName}} |
 
 Sem a skill de um passo, faz-se à mão; fase **2b Spike** (só com `spike: incerto`): `michi-orquestracao.md`, `michi-spike.md`.
 
@@ -47,7 +47,7 @@ Hooks, sessão suja, handoff, painéis: `michi-orquestracao.md`.
 
 - **Prova por fase** de entrega antes de fechar e do handoff, em `proofs/` (`sp-prova.py`) (`michi-prova.md`).
 - **Reflect por fase** em `## Reflect` do SP; **final** antes de propor o commit (skill `reflect`).
-- **Pushback do user** («está errado»): recomeçar na fase a montante, por defeito Grill (`michi-orquestracao.md`).
+- **Pushback do {{userName}}** («está errado»): recomeçar na fase a montante, por defeito Grill (`michi-orquestracao.md`).
 - **Commit/push/merge**: regra única em `michi-modo-auto.md` §Proibições e §Autorizações; worktree para dev em `michi-worktree-merge.md`.
 - **Passagem de sessão num SP**: só `sp-handoff` (nunca `/handoff` nem `/clear` à mão), com `Reflect <fase>` já em `## Reflect` do SP.
 - **Ciclo de vida** TODO → Doing → Done com `sp-move.py`; `/michi status`.

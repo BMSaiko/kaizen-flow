@@ -4,6 +4,7 @@ const { spawnSync } = require("child_process");
 const path = require("path");
 const { plan, overlay, files, sha } = require("../sync.js");
 const { homedir } = require("../env.js");
+const { loadCore } = require("../core.js");
 
 const PKG = path.resolve(__dirname, "..", "..");
 const CORE_DIR = path.join(PKG, "core");
@@ -23,21 +24,42 @@ function copy(src, dst) {
 // skills e commands vão para a raiz de core/; a config (.claude/modelos.json) mantém .claude/
 const coreRel = (to) => to.replace(/^\.claude\/(skills|commands)\//, "$1/");
 
-// o vault é pessoal: tudo o que o identifica sai ao copiar para core/
-const SANITIZE = [
-  [/[A-Za-z]:[\\/]+Users[\\/]+bruno/gi, "~"],
-  [/ by Bruno Silva/g, ""],
-  [/Bruno Silva/g, "the user"],
-  [/\bBMS\b/g, "user"],
-  [/\bHEIMDALL\b/g, "the agent"],
-  [/heimdall/gi, "kaizen"],
-];
+// o vault é pessoal: o que o identifica vira marcador ({{chave}}) ao copiar para core/;
+// --to-vault repõe os valores de kaizen.config.json; init/doctor renderizam com os defeitos neutros
+const { MARKER_KEYS, render } = require("../markers.js");
+const VAULT_DEFAULTS = { userFullName: "Bruno Silva", userName: "BMS", agentName: "HEIMDALL", agentSlug: "heimdall" };
 const TEXT_EXT = /\.(md|py|json|txt|js|toml)$/i;
-const sanitize = (t) => SANITIZE.reduce((acc, [re, to]) => acc.replace(re, to), t);
+const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-function sanitizeTree(p) {
-  if (fs.statSync(p).isDirectory()) return fs.readdirSync(p).forEach((n) => sanitizeTree(path.join(p, n)));
-  if (TEXT_EXT.test(p)) fs.writeFileSync(p, sanitize(fs.readFileSync(p, "utf8")));
+// defaults=true só no --from-vault (o vault do autor); o --to-vault usa só a config, senão os defeitos neutros
+function readJson(f) {
+  if (!fs.existsSync(f)) return {};
+  try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch (e) { throw new Error(`JSON inválido em ${f}: ${e.message}`); }
+}
+
+function vaultConfig(vault, defaults = false) {
+  const cfg = readJson(path.join(vault, "kaizen.config.json"));
+  return defaults ? { ...VAULT_DEFAULTS, ...cfg } : cfg;
+}
+
+// valores mais longos primeiro (Bruno Silva antes de BMS); só as chaves conhecidas, nunca palavras soltas
+function sanitizer(cfg) {
+  const rules = [[/[A-Za-z]:[\\/]+Users[\\/]+bruno/gi, "~"]];
+  const keys = MARKER_KEYS.filter((k) => cfg[k]).sort((a, b) => cfg[b].length - cfg[a].length);
+  for (const k of keys) {
+    const v = cfg[k];
+    const b1 = /^\w/.test(v) && k !== "agentSlug" ? "\\b" : "";
+    const b2 = /\w$/.test(v) && k !== "agentSlug" ? "\\b" : "";
+    rules.push([new RegExp(b1 + esc(v) + b2, "g"), `{{${k}}}`]);
+  }
+  // outras grafias do agente (ex.: «Heimdall») não têm marcador: saem com perdas
+  if (cfg.agentSlug) rules.push([new RegExp(esc(cfg.agentSlug), "gi"), "kaizen"]);
+  return (t) => rules.reduce((acc, [re, to]) => acc.replace(re, to), t);
+}
+
+function sanitizeTree(p, clean) {
+  if (fs.statSync(p).isDirectory()) return fs.readdirSync(p).forEach((n) => sanitizeTree(path.join(p, n), clean));
+  if (TEXT_EXT.test(p)) fs.writeFileSync(p, clean(fs.readFileSync(p, "utf8")));
 }
 
 // gera core/ em dest a partir do vault; devolve o que o sync reporta
@@ -47,7 +69,7 @@ function build(dest, tdir, stamp) {
   if (missing.length) throw new Error(`faltam no vault (${VAULT}): ${missing.join(", ")}`);
   fs.rmSync(dest, { recursive: true, force: true });
   for (const [from, to] of parts) copy(path.join(VAULT, from), path.join(dest, coreRel(to)));
-  sanitizeTree(dest);
+  sanitizeTree(dest, sanitizer(vaultConfig(VAULT, true)));
   return { parts, unlisted, ...overlay(dest, tdir, stamp) };
 }
 
@@ -88,4 +110,90 @@ function syncCheck() {
   }
 }
 
-module.exports = { run: (argv) => (argv.includes("--check") ? syncCheck() : sync(argv)) };
+// sentido repo → vault: core/ é a fonte; o vault recebe as peças com os marcadores renderizados
+const MANIFEST_FILE = ".kaizen-sync.json";
+const vaultRel = (rel) => rel.replace(/^(skills|commands)\//, ".claude/$1/");
+
+// [{ rel, data }] das peças do vault tal como o --to-vault as escreveria
+function renderVault(vault) {
+  const cfg = vaultConfig(vault);
+  return loadCore(CORE_DIR, cfg).map(({ rel, data }) => ({ rel: vaultRel(rel), data }));
+}
+
+function readManifest(vault) {
+  return readJson(path.join(vault, MANIFEST_FILE));
+}
+
+// ficheiro do vault mudou desde o último --to-vault (ou, sem registo, difere do que seria escrito)?
+function localEdit(vault, manifest, rel, data) {
+  const f = path.join(vault, rel);
+  if (!fs.existsSync(f)) return false;
+  const cur = sha(fs.readFileSync(f));
+  if (cur === sha(data)) return false;
+  return manifest[rel] ? manifest[rel] !== cur : true;
+}
+
+// órfãs: rels do manifesto anterior que o core/ já não gera e cujo ficheiro ainda existe no vault
+// (manifesto vem do disco: rel inválido ou fora do vault é ignorado com aviso, nunca apagado)
+function vaultOrphans(vault, manifest, pieces) {
+  const current = new Set(pieces.map((p) => p.rel));
+  const root = path.resolve(vault);
+  const out = [];
+  for (const [rel, hash] of Object.entries(manifest || {})) {
+    if (current.has(rel)) continue;
+    const f = path.resolve(root, rel);
+    if (typeof rel !== "string" || !rel || path.isAbsolute(rel) || rel.split(/[\\/]/).includes("..") || !f.startsWith(root + path.sep)) {
+      console.error(`aviso: entrada inválida no manifesto ignorada: ${rel}`);
+      continue;
+    }
+    if (!fs.existsSync(f) || !fs.statSync(f).isFile()) continue;
+    out.push({ rel, f, edited: sha(fs.readFileSync(f)) !== hash });
+  }
+  return out;
+}
+
+function toVault(argv) {
+  if (!fs.existsSync(VAULT) || !fs.statSync(VAULT).isDirectory()) throw new Error(`vault não existe: ${VAULT} (defina KAIZEN_SOURCE)`);
+  const pieces = renderVault(VAULT);
+  const manifest = readManifest(VAULT);
+  if (argv.includes("--check")) {
+    console.log(`sync --to-vault --check: vault ${VAULT}`);
+    const diff = pieces.filter(({ rel, data }) => { const f = path.join(VAULT, rel); return !fs.existsSync(f) || sha(fs.readFileSync(f)) !== sha(data); });
+    for (const { rel } of diff) console.log(`${fs.existsSync(path.join(VAULT, rel)) ? "difere" : "falta"}: ${rel}`);
+    const orph = vaultOrphans(VAULT, manifest, pieces);
+    for (const { rel } of orph) console.log(`remover: ${rel}`);
+    console.log(`sync --to-vault --check: ${diff.length} diferenças, ${orph.length} remoções`);
+    process.exit(diff.length || orph.length ? 1 : 0);
+  }
+  const orph = vaultOrphans(VAULT, manifest, pieces);
+  const conflicts = pieces.filter(({ rel, data }) => localEdit(VAULT, manifest, rel, data)).map((p) => p.rel)
+    .concat(orph.filter((o) => o.edited).map((o) => o.rel));
+  if (conflicts.length && !argv.includes("--force")) {
+    for (const c of conflicts) console.error(`editado no vault: ${c}`);
+    throw new Error(`${conflicts.length} peças editadas no vault desde o último sync; leve-as para o repo (core/) ou repita com --force`);
+  }
+  const next = {};
+  let written = 0;
+  for (const { rel, data } of pieces) {
+    const f = path.join(VAULT, rel);
+    next[rel] = sha(data);
+    if (fs.existsSync(f) && sha(fs.readFileSync(f)) === next[rel]) continue;
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, data);
+    written++;
+  }
+  for (const { f } of orph) fs.rmSync(f);
+  fs.writeFileSync(path.join(VAULT, MANIFEST_FILE), JSON.stringify(next, null, 2) + "\n");
+  console.log(`sync --to-vault: ${written} escritos de ${pieces.length} peças, ${orph.length} removidas em ${VAULT}${conflicts.length ? ` (${conflicts.length} sobrescritos com --force)` : ""}`);
+}
+
+function run(argv) {
+  if (argv.includes("--to-vault")) return toVault(argv);
+  if (!argv.includes("--from-vault")) {
+    throw new Error("kaizen sync precisa de sentido: --to-vault (core/ → vault, o normal) ou --from-vault (vault → core/, antigo, só na transição)");
+  }
+  console.warn("aviso: --from-vault é o sentido antigo (vault → core/); a fonte de verdade é core/ — use --to-vault");
+  return argv.includes("--check") ? syncCheck() : sync(argv);
+}
+
+module.exports = { run };
