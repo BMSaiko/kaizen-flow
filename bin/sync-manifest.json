@@ -38,6 +38,8 @@
     "test_kf_errlog.py",
     "kf_git.py",
     "test_kf_git.py",
+    "kf_erros.py",
+    "test_kf_erros_formato.py",
     "pentest.py",
     "test_pentest.py",
     "review_ciclo.py",
@@ -74,6 +76,7 @@
     "test_wt_redirect.py",
     "test_michi_metodologias.py",
     "sp-migrar-slug.py",
-    "test_sp_migrar_slug.py"
+    "test_sp_migrar_slug.py",
+    "test_kf_erros.py"
   ]
 }

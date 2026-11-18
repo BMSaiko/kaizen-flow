@@ -83,6 +83,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-038 | Queue state left by a run that died (reboot) | the stale queue is refused and abandoning it is offered | resume-orfaos | `core/scripts/test_sp_fila_estado.py::test_fila_obsoleta_recusa_e_propoe_abandonar` |
 | EC-039 | Watcher pid file left behind by a crash | stopping with a dead pid only deletes the file | resume-orfaos | `core/scripts/test_sp_vigia.py::test_parar_pid_morto_so_apaga` |
 | EC-065 | `git` or Python is not on PATH | the preflight reports EC-065 with what is missing and how to install it; rc 1 | preflight-erros-ux | `por cobrir` |
+| EC-068 | Kaizen pieces missing from a project (skills, scripts, AGENTS.md block, hooks) | `kaizen doctor` reports them in one EC-068 message with rc 1 and proposes `kaizen doctor --fix`; nothing is overwritten | preflight-erros-ux | `por cobrir` |
 
 ## Concurrency and corrupted state
 
@@ -99,7 +100,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-048 | `--seguinte` arrives while a story is still being launched | the same story is not launched twice | testes-falha-90 | `core/scripts/test_sp_fila_paralelo.py::test_seguinte_durante_o_lancamento_nao_relanca_o_mesmo_sp` |
 | EC-049 | A second watcher is started for the same queue | it is refused | testes-falha-90 | `core/scripts/test_sp_vigia.py::test_cli_recusa_segundo_vigia` |
 | EC-050 | Phase journal missing or corrupted at resume | resume falls back to the last valid entry and says which one | checkpoint-journal | `core/scripts/test_sp_journal.py::test_ec_050_linha_do_meio_invalida_vai_para_quarentena` |
-| EC-067 | Invalid request to the queue, pane state or resume (unknown slug, invalid transition or phase, wrong option) | refused without writing; the message (EC format) says what is valid and the next command | preflight-erros-ux | `por cobrir` |
+| EC-067 | Invalid request to a kaizen command or to the queue state (unknown slug or folder, invalid transition or phase, wrong option) | refused without writing; the message (EC format) says what is valid and the next command | preflight-erros-ux | `por cobrir` |
 
 ## Windows (atomic rename, CRLF, paths, console close)
 

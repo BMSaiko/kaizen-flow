@@ -8,6 +8,7 @@ const { ADAPTERS } = require("./adapters.js");
 const { init, readSettings, configDir } = require("./init.js");
 const { pythonCmd, py } = require("./python.js");
 const { homedir } = require("../env.js");
+const { formatar } = require("./erros.js");
 
 function checkInstall(dir, harness) {
   const problems = [];
@@ -38,16 +39,26 @@ function codexHookState(configPath) {
 
 function doctor(target, harness = "claude", fix = false, codexConfig) {
   const dir = path.resolve(target || ".");
-  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) { console.error(`erro: ${dir} não é um diretório`); return 1; }
+  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+    console.error(formatar("EC-067", `${dir} não é um diretório`, "o doctor verifica a instalação dentro de uma pasta de projeto", "nada alterado", "`kaizen doctor <pasta do projeto>`"));
+    return 1;
+  }
   let problems = checkInstall(dir, harness);
   if (problems.length && fix) {
     console.log(`doctor --fix: a repor ${problems.length} problema(s) (nada existente é sobrescrito)`);
     init(dir, harness);
     problems = checkInstall(dir, harness);
   }
-  for (const p of problems) console.error(p);
+  if (problems.length) {
+    const lista = problems.slice(0, 5).join("; ") + (problems.length > 5 ? ` (+${problems.length - 5})` : "");
+    console.error(formatar("EC-068", `faltam ${problems.length} peça(s) do kaizen: ${lista}`, "instalação parcial, apagada ou de uma versão anterior",
+      fix ? "o --fix repôs o que pôde; nada existente foi sobrescrito" : "nada alterado", fix ? "rever as peças acima à mão" : `\`kaizen doctor ${target || "."} --fix\` repõe as que faltam`));
+  }
   let rc = problems.length ? 1 : 0;
-  if (!pythonCmd()) { console.error("falta: Python 3 no PATH (ou KAIZEN_PYTHON)"); rc = 1; }
+  if (!pythonCmd()) {
+    console.error(formatar("EC-065", "Python 3 não está no PATH (nem em KAIZEN_PYTHON)", "os scripts do kaizen-flow correm em Python 3", "nada alterado", "instalar o Python 3 (https://python.org) ou definir KAIZEN_PYTHON, e abrir um terminal novo"));
+    rc = 1;
+  }
   else if (!problems.some((p) => p.includes("scripts/"))) rc = py(["scripts/sp-list.py", "--all"], dir) || rc; // os scripts arrancam
   const root = path.join(dir, configDir(dir, "spRoot", "knowledge/projects/kaizen"));
   const sps = [];
