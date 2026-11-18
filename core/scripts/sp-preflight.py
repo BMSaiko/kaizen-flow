@@ -313,4 +313,7 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    for stream in (sys.stdout, sys.stderr):  # Windows em pipe: cp1252 parte os acentos no Node
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     sys.exit(kf_errlog.executar("sp-preflight", main))
