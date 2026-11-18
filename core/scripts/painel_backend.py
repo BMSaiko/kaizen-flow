@@ -232,9 +232,24 @@ class TmuxBackend(_Multiplexer):
             return ""
 
 
+MAX_PANES_TAB = 2
+
+
 class HerdrBackend(_Multiplexer):
-    """herdr (https://github.com/herdrdev/herdr): painéis pela CLI `herdr pane ...` (saída JSON)."""
+    """herdr (https://github.com/herdrdev/herdr): painéis pela CLI `herdr pane ...` (saída JSON).
+
+    Regra workspace-por-projeto: cada repo tem um workspace herdr (label = nome do repo, reutilizado se existir,
+    senão `workspace create --cwd <raiz>`). Uma worktree git usa o workspace do repo principal (`--git-common-dir`),
+    sem `herdr worktree open`: o cwd do painel já é a worktree. Sem resposta do herdr: comportamento anterior.
+    Layout: no máximo `max_panes` (defeito MAX_PANES_TAB) panes por tab; `workspace_por_projeto=False` ignora o workspace do projeto. `abrir` divide à direita só se a origem (HERDR_PANE_ID) está
+    no workspace do projeto e a sua tab tem menos que isso; senão cria tab nova nesse workspace. Origem ausente ou
+    não listada (servidor em baixo): tab nova, nunca split às cegas."""
     nome = "herdr"
+
+    def __init__(self, run=run_hidden, max_panes=MAX_PANES_TAB, workspace_por_projeto=True):
+        super().__init__(run)
+        self.max_panes = max_panes
+        self.workspace_por_projeto = workspace_por_projeto
 
     def _json(self, argv):
         try:
@@ -246,13 +261,60 @@ class HerdrBackend(_Multiplexer):
     def _paineis(self):
         return self._json(["pane", "list"]).get("panes") or []
 
-    def abrir(self, cmd, cwd):
+    def _panes_da_tab(self, origem):
+        """(nº de panes na tab do pane `origem`, workspace) ou (None, None) se a origem não aparece em `pane list`."""
+        paineis = self._paineis()
+        o = next((p for p in paineis if p.get("pane_id") == origem), None)
+        if not o or not o.get("tab_id"):
+            return None, None
+        return sum(1 for p in paineis if p.get("tab_id") == o["tab_id"]), o.get("workspace_id")
+
+    @staticmethod
+    def _repo_do_projeto(projeto):
+        """Repo de código do `projeto` (campo `project:` do SP): `<SB_CODE_ROOT, defeito ~/Documents/code>/<projeto>` se for um diretório; senão None (workspace do repo de `cwd`, o vault)."""
+        if not projeto or "/" in projeto or projeto.startswith("."):
+            return None
+        raiz = Path(os.environ.get("SB_CODE_ROOT", "").strip() or "~/Documents/code").expanduser() / projeto
+        return str(raiz) if raiz.is_dir() else None
+
+    @staticmethod
+    def _raiz_repo(cwd):
+        """Raiz do repo principal de `cwd` (uma worktree resolve para o checkout principal via --git-common-dir); None fora de um repo."""
+        try:
+            r = subprocess.run(["git", "-C", str(cwd), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                               capture_output=True, text=True, encoding="utf-8", timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        comum = (r.stdout or "").strip()
+        if r.returncode != 0 or not comum:
+            return None
+        return os.path.dirname(comum.rstrip("/")) if os.path.basename(comum.rstrip("/")) == ".git" else comum
+
+    def _workspace_para(self, cwd, projeto=None):
+        """(workspace_id, root_pane ou None) do projeto de `cwd`: reutiliza o workspace com label = nome do repo
+        (`workspace list`) ou cria-o (`workspace create --cwd <raiz> --label <nome>`, devolvendo o root pane novo).
+        (None, None) se o herdr não responde: `abrir` cai no comportamento anterior."""
+        raiz = self._repo_do_projeto(projeto) or self._raiz_repo(cwd) or str(cwd)
+        nome = os.path.basename(raiz.rstrip("/")) or raiz
+        ws = next((w.get("workspace_id") for w in self._json(["workspace", "list"]).get("workspaces") or []
+                   if w.get("label") == nome and w.get("workspace_id")), None)
+        if ws:
+            return ws, None
+        res = self._json(["workspace", "create", "--cwd", raiz, "--label", nome, "--no-focus"])
+        return (res.get("workspace") or {}).get("workspace_id"), (res.get("root_pane") or {}).get("pane_id")
+
+    def abrir(self, cmd, cwd, projeto=None):
         origem = os.environ.get("HERDR_PANE_ID")
-        if origem:  # painel novo à direita do agente que lança, sem lhe roubar o foco
+        n, ws_origem = self._panes_da_tab(origem) if origem else (None, None)
+        ws, pane = self._workspace_para(cwd, projeto) if self.workspace_por_projeto else (None, None)
+        if pane:  # workspace acabado de criar: o seu root pane é o painel novo
+            pass
+        elif n is not None and n < self.max_panes and (ws is None or ws == ws_origem):  # só divide dentro do workspace do projeto
             res = self._json(["pane", "split", origem, "--direction", "right", "--cwd", str(cwd), "--no-focus"])
             pane = (res.get("pane") or {}).get("pane_id")
-        else:  # fora do herdr: tab nova no workspace ativo
-            res = self._json(["tab", "create", "--cwd", str(cwd), "--no-focus"])
+        else:  # tab cheia, origem noutro workspace, desconhecida ou fora do herdr: tab nova no workspace do projeto
+            ws = ws or ws_origem
+            res = self._json(["tab", "create", *(["--workspace", ws] if ws else []), "--cwd", str(cwd), "--no-focus"])
             pane = (res.get("root_pane") or {}).get("pane_id")
         if not pane:
             raise BackendError("herdr não devolveu o id do painel novo (o servidor está a correr? `herdr status`)")
@@ -462,20 +524,28 @@ def _disponivel(nome, env, which, fixo=False):
     return which(nome) is not None and (fixo or bool(env.get(variavel)))
 
 
-def por_nome(nome, run=run_hidden, estado_dir=None):
-    """Instancia o backend `nome` (sem verificar o ambiente)."""
+def abrir_painel(backend, cmd, cwd, projeto=None):
+    """`backend.abrir`; só o herdr usa o `projeto` (workspace do repo de código do projeto)."""
+    if isinstance(backend, HerdrBackend):
+        return backend.abrir(cmd, cwd, projeto=projeto)
+    return backend.abrir(cmd, cwd)
+
+
+def por_nome(nome, run=run_hidden, estado_dir=None, herdr=None):
+    """Instancia o backend `nome` (sem verificar o ambiente); `herdr` = dict {maxPanesPorTab, workspacePorProjeto} de `kaizen_config.herdr`."""
     if nome == "wezterm":
         return WeztermBackend(run)
     if nome == "tmux":
         return TmuxBackend(run)
     if nome == "herdr":
-        return HerdrBackend(run)
+        h = herdr or {}
+        return HerdrBackend(run, h.get("maxPanesPorTab", MAX_PANES_TAB), h.get("workspacePorProjeto", True))
     if nome == "background":
         return BackgroundBackend(estado_dir)
     raise BackendError(f"backend desconhecido: {nome!r} (válidos: {', '.join(NOMES)})")
 
 
-def escolher(config="auto", env=None, which=shutil.which, run=run_hidden, estado_dir=None):
+def escolher(config="auto", env=None, which=shutil.which, run=run_hidden, estado_dir=None, herdr=None):
     """Backend a usar ou None.
 
     `config` vem de `painelBackend`: um nome fixo manda (None se estiver indisponível); `auto` deteta o multiplexer
@@ -483,10 +553,10 @@ def escolher(config="auto", env=None, which=shutil.which, run=run_hidden, estado
     """
     env = os.environ if env is None else env
     if config in NOMES:
-        return por_nome(config, run, estado_dir) if _disponivel(config, env, which, fixo=True) else None
+        return por_nome(config, run, estado_dir, herdr) if _disponivel(config, env, which, fixo=True) else None
     for nome in VARIAVEIS:
         if _disponivel(nome, env, which):
-            return por_nome(nome, run, estado_dir)
+            return por_nome(nome, run, estado_dir, herdr)
     return None
 
 

@@ -317,7 +317,7 @@ class ContextoReal(Contexto):
         self.root = root
         if backend is None:
             import kaizen_config
-            backend = painel_backend.escolher(kaizen_config.painel_backend(fe.REPO))
+            backend = painel_backend.escolher(kaizen_config.painel_backend(fe.REPO), herdr=kaizen_config.herdr(fe.REPO))
         self.backend = backend
 
     def _py(self, *args, cwd=None):

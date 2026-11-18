@@ -159,4 +159,4 @@ If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the blo
 
 ## Contributing and license
 
-Contributions are welcome: read [CONTRIBUTING](CONTRIBUTING.md) first (tests with `npm test`, `kaizen audit` clean, conventional commits). Released under the MIT license, see [LICENSE](LICENSE).
+Contributions are welcome: read [CONTRIBUTING](CONTRIBUTING.md) first (tests with `npm test`, `kaizen audit` clean, conventional commits). Released under the MIT license, see [LICENSE](LICENSE). `core/` is the source of truth for skills, commands and scripts: edit them here (the maintainer's vault receives them with `kaizen sync --to-vault`).

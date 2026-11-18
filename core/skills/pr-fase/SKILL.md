@@ -14,14 +14,14 @@ Sem `--criar` (ou com `--dry-run`, que nunca cria) imprime o corpo (template `PR
 | `pr:` do SP | Com `--criar` |
 |---|---|
 | auto | `gh pr create` (rc 0) |
-| pergunta | rc 3: pedir confirmação ao user com AskUserQuestion |
+| pergunta | rc 3: pedir confirmação ao {{userName}} com AskUserQuestion |
 | nunca / em falta | rc 4, não cria |
 
 `--repo` é o caminho local do repo (cwd do `gh`), não `owner/nome`; o SP precisa de `pr:` no frontmatter. Provado com PR real (#1, repo de teste, fechado).
 
 Outros rc: 2 review não aprovado; 5 corpo sem «feito» ou sem «prova»; 6 base ambígua.
 
-A «Prova» inclui os paths `proofs/...` citados no SP, os comandos das `gates:` e o veredicto do review. Base: `--base` manda; senão a única entre `origin/main|master|dev`; mais de uma = rc 6, perguntar ao user. O corpo é limpo de linhas `Co-Authored-By`/`Generated with` (regra em AGENTS.md).
+A «Prova» inclui os paths `proofs/...` citados no SP, os comandos das `gates:` e o veredicto do review. Base: `--base` manda; senão a única entre `origin/main|master|dev`; mais de uma = rc 6, perguntar ao {{userName}}. O corpo é limpo de linhas `Co-Authored-By`/`Generated with` (regra em AGENTS.md).
 
 ## Provas visuais
 
@@ -29,6 +29,6 @@ Com `--pacote` o corpo acrescenta «Como validar», «Como reverter» e as image
 
 ## Vigia do PR
 
-Depois de `gh pr create` (rc 0), armar a vigia sem perguntar: `Monitor` sobre `python -I scripts/pr_watch.py <nº|URL> --repo <repo>` (polling de 60 s, máx. 120 min, só leitura). Uma linha por mudança: `erro` (nome+URL do check), `conflito`, `pendente`, `aguarda-review`, `pronto`, `merged`. Vigia até `pronto`/`merged` (rc 0), `closed` (2), `erro` (5) ou `conflito` (6); outros rc: 3 limite, 4 gh falhou. Avisar o user ao parar; nunca fazer merge nem push. Exceção: projeto com `desenvolvimento.metodo: worktree-pr` fecha com `python -I scripts/pr_fechar.py <nº|URL> --repo <repo>` (merge só com checks verdes; regra em `michi-modo-auto.md` §Autorizações).
+Depois de `gh pr create` (rc 0), armar a vigia sem perguntar: `Monitor` sobre `python -I scripts/pr_watch.py <nº|URL> --repo <repo>` (polling de 60 s, máx. 120 min, só leitura). Uma linha por mudança: `erro` (nome+URL do check), `conflito`, `pendente`, `aguarda-review`, `pronto`, `merged`. Vigia até `pronto`/`merged` (rc 0), `closed` (2), `erro` (5) ou `conflito` (6); outros rc: 3 limite, 4 gh falhou. Avisar o {{userName}} ao parar; nunca fazer merge nem push. Exceção: projeto com `desenvolvimento.metodo: worktree-pr` fecha com `python -I scripts/pr_fechar.py <nº|URL> --repo <repo>` (merge só com checks verdes; regra em `michi-modo-auto.md` §Autorizações).
 
 Testes: `python scripts/test_pr_corpo.py` · `python scripts/test_pr_watch.py`.

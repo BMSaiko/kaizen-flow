@@ -4,7 +4,7 @@ description: Detalhe do da - checkpoint em ficheiro, retoma, verificação, roll
 ---
 # DA — detalhe (movido do SKILL.md v2.2.0)
 
-> Adaptado de obra/superpowers para pi coding agent + the agent.
+> Adaptado de obra/superpowers para pi coding agent + {{agentName}}.
 
 Fase de **execução** de um plano DP aprovado: fase a fase, com verificação em cada passo, escalada estruturada na falha, checkpoints para retomar e rollback automático. **Evidência antes de afirmação: sem «feito» sem verificação; cada passo é auditável.**
 
@@ -112,8 +112,8 @@ Todos: cada fase com `[OK]` em cada passo; relatório final com tudo verde; inte
 
 ## Referência rápida
 
-Loop: anunciar, escolher, executar, checkpoint, verificar, reportar. Escalada por tentativas e rc (`da-stop.py`). Código em `~\Documents\projetcs\<projeto>\`. No fim: plano `DONE`, checkpoint apagado, LFS feito.
+Loop: anunciar, escolher, executar, checkpoint, verificar, reportar. Escalada por tentativas e rc (`da-stop.py`). Código em `<code_root>/<projeto>/`. No fim: plano `DONE`, checkpoint apagado, LFS feito.
 
-## Adaptação Claude Code (the agent)
+## Adaptação Claude Code ({{agentName}})
 
 Mapa `sb_*` → ferramentas nativas, `bash find/grep` proibido e `Agent` proibido (paralelo = chamadas de ferramentas paralelas): dono `AGENTS.md` (§Ferramentas do vault e §Sessão e execução). Extras: `sb_list` → `Glob` (ordenar por data); `sync_daily_notes` → ler/editar a daily note à mão.

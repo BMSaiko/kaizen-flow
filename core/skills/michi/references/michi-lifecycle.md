@@ -4,7 +4,7 @@ Movido de `SKILL.md`; texto integral.
 
 ## Document Lifecycle Management
 
-DR/DP/SP vivem em `knowledge/projects/kaizen/<project>/{dr,dp,sp}/{TODO,Doing,Done}/` e movem-se TODO → Doing → Done. O campo `status`/`updated` do frontmatter acompanha a pasta.
+DR/DP/SP vivem em `knowledge/projects/{{agentSlug}}/<project>/{dr,dp,sp}/{TODO,Doing,Done}/` e movem-se TODO → Doing → Done. O campo `status`/`updated` do frontmatter acompanha a pasta.
 
 SP (scripts em `scripts/`, correr com `python -I`):
 - `sp-list.py [--project P] [--status todo|doing] [--all]` — listar SPs pendentes.
@@ -25,4 +25,4 @@ DR/DP: `doc-move.py <dr|dp> <slug> todo|doing|done` e `doc-list.py <dr|dp> [--al
 
 ## Fecho
 
-`sp-fechar.py <slug>` faz gates + context-budget + `done` + `COMMIT_*.md` (bloqueia se o diff altera scripts do motor com o pacote kf desatualizado: `/kaizen-sync`), antes com `## Prova de done`. Linha `PRÓXIMO FILHO`/`ÚLTIMO FILHO` no output: manual = `AskUserQuestion` «abrir o próximo?»/«fechar a mãe?»; auto = `--next` e fechar a mãe sozinho, sempre numa worktree (`sb-worktree.py ensure <mãe>` → `sp-move done` → commit → `merge`; nunca no checkout principal; fechar antes do `clean` do filho ou numa worktree nova).
+`sp-fechar.py <slug>` faz gates + context-budget + `done` + `COMMIT_*.md` (bloqueia se o diff altera scripts do motor com o pacote kf desatualizado: `/kaizen-sync`; a fonte de verdade é o `core/` do kaizen-flow, o vault recebe com `sync --to-vault`), antes com `## Prova de done`. Linha `PRÓXIMO FILHO`/`ÚLTIMO FILHO` no output: manual = `AskUserQuestion` «abrir o próximo?»/«fechar a mãe?»; auto = `--next` e fechar a mãe sozinho, sempre numa worktree (`sb-worktree.py ensure <mãe>` → `sp-move done` → commit → `merge`; nunca no checkout principal; fechar antes do `clean` do filho ou numa worktree nova).

@@ -23,7 +23,7 @@ from sp_fila_relatorio import destino_relatorio, escrever_commit_md, progresso, 
 
 def _backend_defeito():
     """Backend de painéis da config (`painelBackend` do kaizen.config.json); None se não houver (os testes trocam-no)."""
-    return painel_backend.escolher(kaizen_config.painel_backend(REPO))
+    return painel_backend.escolher(kaizen_config.painel_backend(REPO), herdr=kaizen_config.herdr(REPO))
 
 
 def falta_backend():

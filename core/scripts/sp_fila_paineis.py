@@ -15,6 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sp_painel_estado as pe  # noqa: E402
+import painel_backend  # noqa: E402
 from painel_backend import enviar_prompt  # noqa: E402
 from sp_fila_estado import REPO, SCRIPTS, run_hidden  # noqa: E402
 
@@ -182,7 +183,7 @@ def _lancar_um(alvo, fila, backend, run, sleep, verificar, root, estado_root):
         pe.registar(fila, alvo.slug, root=estado_root, worktree=wt)
         texto = prompt_painel(alvo.slug, wt)
         interativo = getattr(backend, "interativo", True)
-        pane = backend.abrir(cmd if interativo else cmd + [texto], wt)
+        pane = painel_backend.abrir_painel(backend, cmd if interativo else cmd + [texto], wt, getattr(alvo, "project", None))
         titulo = titulo_livre(alvo.slug, _titulos(backend))
         _por_titulo(backend, pane, titulo)
         res["titulo"] = titulo
@@ -231,6 +232,12 @@ def worktree_prevista(slug, repo=REPO):
     return str(raiz_principal(repo).parent / "code-wt" / f"sb-{nome_worktree(slug)}")
 
 
+def _workspace_previsto(projeto):
+    """Nome do workspace herdr: repo de código do `projeto` se existir, senão o repo principal da worktree (vault); ver `HerdrBackend._workspace_para`."""
+    repo = painel_backend.HerdrBackend._repo_do_projeto(projeto)
+    return Path(repo).name if repo else raiz_principal(REPO).name
+
+
 def plano_dry_run(alvos, maximo=None):
     """O que `lancar` faria, sem efeitos: [{slug, modelo, worktree}]; além de `maximo`, `{slug, pendente: True}`."""
     plano = []
@@ -242,11 +249,13 @@ def plano_dry_run(alvos, maximo=None):
             modelo = modelo_sp(alvo.path)["model"]
         except Exception as e:  # noqa: BLE001
             modelo = f"? ({e})"
-        plano.append({"slug": alvo.slug, "modelo": modelo, "worktree": worktree_prevista(alvo.slug)})
+        plano.append({"slug": alvo.slug, "modelo": modelo, "worktree": worktree_prevista(alvo.slug),
+                      "workspace": _workspace_previsto(getattr(alvo, "project", None))})
     return plano
 
 
 def render_dry_run(plano):
-    """Uma linha por SP: `slug · modelo · worktree`, ou `slug · pendente (sem vaga)`."""
-    return "\n".join(f"{p['slug']} · pendente (sem vaga)" if p.get("pendente") else f"{p['slug']} · {p['modelo']} · {p['worktree']}"
+    """Uma linha por SP: `slug · modelo · worktree · workspace <repo>`, ou `slug · pendente (sem vaga)`."""
+    return "\n".join(f"{p['slug']} · pendente (sem vaga)" if p.get("pendente")
+                     else f"{p['slug']} · {p['modelo']} · {p['worktree']} · workspace {p.get('workspace', '?')}"
                      for p in plano)

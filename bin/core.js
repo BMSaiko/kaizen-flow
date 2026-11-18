@@ -1,18 +1,26 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
+const { render } = require("./markers.js");
+
+const TEXT_EXT = /\.(md|py|json|txt|js|toml)$/i;
 
 const CORE = path.resolve(__dirname, "..", "core");
 
-// devolve [{ rel, data }] com rel relativo a core/ e separador "/"
-function loadCore(dir = CORE) {
+// devolve [{ rel, data }] com rel relativo a core/ e separador "/"; os marcadores {{chave}}
+// dos ficheiros de texto saem renderizados com cfg (defeitos neutros sem config)
+function loadCore(dir = CORE, cfg = {}) {
   const out = [];
   (function walk(d) {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       if (e.name === "__pycache__" || e.name === ".pytest_cache" || e.name.endsWith(".pyc")) continue;
       const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p);
-      else out.push({ rel: path.relative(dir, p).replace(/\\/g, "/"), data: fs.readFileSync(p) });
+      else {
+        const raw = fs.readFileSync(p);
+        const data = TEXT_EXT.test(e.name) ? Buffer.from(render(raw.toString("utf8"), cfg), "utf8") : raw;
+        out.push({ rel: path.relative(dir, p).replace(/\\/g, "/"), data });
+      }
     }
   })(dir);
   return out.sort((a, b) => (a.rel < b.rel ? -1 : 1));
