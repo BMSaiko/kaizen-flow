@@ -25,16 +25,20 @@ function copy(src, dst) {
 const coreRel = (to) => to.replace(/^\.claude\/(skills|commands)\//, "$1/");
 
 // o vault é pessoal: o que o identifica vira marcador ({{chave}}) ao copiar para core/;
-// --to-vault (e init/doctor, via render) repõe os valores de kaizen.config.json
+// --to-vault repõe os valores de kaizen.config.json; init/doctor renderizam com os defeitos neutros
 const { MARKER_KEYS, render } = require("../markers.js");
 const VAULT_DEFAULTS = { userFullName: "Bruno Silva", userName: "BMS", agentName: "HEIMDALL", agentSlug: "heimdall" };
 const TEXT_EXT = /\.(md|py|json|txt|js|toml)$/i;
 const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // defaults=true só no --from-vault (o vault do autor); o --to-vault usa só a config, senão os defeitos neutros
+function readJson(f) {
+  if (!fs.existsSync(f)) return {};
+  try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch (e) { throw new Error(`JSON inválido em ${f}: ${e.message}`); }
+}
+
 function vaultConfig(vault, defaults = false) {
-  const f = path.join(vault, "kaizen.config.json");
-  const cfg = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : {};
+  const cfg = readJson(path.join(vault, "kaizen.config.json"));
   return defaults ? { ...VAULT_DEFAULTS, ...cfg } : cfg;
 }
 
@@ -117,8 +121,7 @@ function renderVault(vault) {
 }
 
 function readManifest(vault) {
-  const f = path.join(vault, MANIFEST_FILE);
-  return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : {};
+  return readJson(path.join(vault, MANIFEST_FILE));
 }
 
 // ficheiro do vault mudou desde o último --to-vault (ou, sem registo, difere do que seria escrito)?
