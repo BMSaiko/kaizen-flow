@@ -133,6 +133,25 @@ function localEdit(vault, manifest, rel, data) {
   return manifest[rel] ? manifest[rel] !== cur : true;
 }
 
+// órfãs: rels do manifesto anterior que o core/ já não gera e cujo ficheiro ainda existe no vault
+// (manifesto vem do disco: rel inválido ou fora do vault é ignorado com aviso, nunca apagado)
+function vaultOrphans(vault, manifest, pieces) {
+  const current = new Set(pieces.map((p) => p.rel));
+  const root = path.resolve(vault);
+  const out = [];
+  for (const [rel, hash] of Object.entries(manifest || {})) {
+    if (current.has(rel)) continue;
+    const f = path.resolve(root, rel);
+    if (typeof rel !== "string" || !rel || path.isAbsolute(rel) || rel.split(/[\\/]/).includes("..") || !f.startsWith(root + path.sep)) {
+      console.error(`aviso: entrada inválida no manifesto ignorada: ${rel}`);
+      continue;
+    }
+    if (!fs.existsSync(f) || !fs.statSync(f).isFile()) continue;
+    out.push({ rel, f, edited: sha(fs.readFileSync(f)) !== hash });
+  }
+  return out;
+}
+
 function toVault(argv) {
   if (!fs.existsSync(VAULT) || !fs.statSync(VAULT).isDirectory()) throw new Error(`vault não existe: ${VAULT} (defina KAIZEN_SOURCE)`);
   const pieces = renderVault(VAULT);
@@ -141,10 +160,14 @@ function toVault(argv) {
     console.log(`sync --to-vault --check: vault ${VAULT}`);
     const diff = pieces.filter(({ rel, data }) => { const f = path.join(VAULT, rel); return !fs.existsSync(f) || sha(fs.readFileSync(f)) !== sha(data); });
     for (const { rel } of diff) console.log(`${fs.existsSync(path.join(VAULT, rel)) ? "difere" : "falta"}: ${rel}`);
-    console.log(`sync --to-vault --check: ${diff.length} diferenças`);
-    process.exit(diff.length ? 1 : 0);
+    const orph = vaultOrphans(VAULT, manifest, pieces);
+    for (const { rel } of orph) console.log(`remover: ${rel}`);
+    console.log(`sync --to-vault --check: ${diff.length} diferenças, ${orph.length} remoções`);
+    process.exit(diff.length || orph.length ? 1 : 0);
   }
-  const conflicts = pieces.filter(({ rel, data }) => localEdit(VAULT, manifest, rel, data)).map((p) => p.rel);
+  const orph = vaultOrphans(VAULT, manifest, pieces);
+  const conflicts = pieces.filter(({ rel, data }) => localEdit(VAULT, manifest, rel, data)).map((p) => p.rel)
+    .concat(orph.filter((o) => o.edited).map((o) => o.rel));
   if (conflicts.length && !argv.includes("--force")) {
     for (const c of conflicts) console.error(`editado no vault: ${c}`);
     throw new Error(`${conflicts.length} peças editadas no vault desde o último sync; leve-as para o repo (core/) ou repita com --force`);
@@ -159,8 +182,9 @@ function toVault(argv) {
     fs.writeFileSync(f, data);
     written++;
   }
+  for (const { f } of orph) fs.rmSync(f);
   fs.writeFileSync(path.join(VAULT, MANIFEST_FILE), JSON.stringify(next, null, 2) + "\n");
-  console.log(`sync --to-vault: ${written} escritos de ${pieces.length} peças em ${VAULT}${conflicts.length ? ` (${conflicts.length} sobrescritos com --force)` : ""}`);
+  console.log(`sync --to-vault: ${written} escritos de ${pieces.length} peças, ${orph.length} removidas em ${VAULT}${conflicts.length ? ` (${conflicts.length} sobrescritos com --force)` : ""}`);
 }
 
 function run(argv) {
