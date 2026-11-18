@@ -49,6 +49,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-020 | A session ends before done and the story allows escalation | the story is relaunched once at the next model level, in the same slot | resume-orfaos | `core/scripts/test_sp_vigia.py::test_decidir_uma_so_escalada` |
 | EC-021 | The Enter sent to a new pane is lost and the prompt is not submitted | Enter is resent a bounded number of times, then the launch is marked as error | resume-orfaos | `core/scripts/test_handoff_spawn.py::test_enter_perdido_esgota_tentativas_e_fica_em_erro` |
 | EC-022 | Author pane launched but the prompt never submits (`falhou`) after the ephemeral seed was deleted | the seed is kept until the session has read it, so the launch can be retried | resume-orfaos | `por cobrir` |
+| EC-066 | Model login or session expired (`/login`, OAuth token expired) | the story is left `bloqueado` with the cause and no automatic resume time; the message says to log in and run `kaizen resume` | preflight-erros-ux | `por cobrir` |
 
 ## Git and worktree (conflict, wrong branch, dirty or orphan)
 
@@ -63,6 +64,11 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-029 | Leftover files in a finished worktree include a secret | the watcher refuses to commit them | testes-falha-90 | `core/scripts/test_sp_vigia.py::test_arrumar_worktree_recusa_segredos` |
 | EC-030 | A stale copy of the story is left in TODO after it is closed | closing removes the copy | resume-orfaos | `core/scripts/test_sp_move.py::test_copia_em_todo_e_removida_ao_fechar` |
 | EC-031 | Agent starts writing while the main checkout is not on the main branch | a preflight refuses and prints the command that fixes it | preflight-erros-ux | `por cobrir` |
+| EC-060 | Story worktree has uncommitted changes when a run starts | the preflight lists the dirty files with EC-060 and proposes `git stash push -u -m <tag>`; nothing is changed without `--fix` and confirmation | preflight-erros-ux | `por cobrir` |
+| EC-061 | Worktree is on a branch that is not `agent/<slug>` (or the story's branch) | the preflight reports the current and expected branch with EC-061 and proposes `git checkout <branch>` | preflight-erros-ux | `por cobrir` |
+| EC-062 | The story's worktree is missing | the preflight reports EC-062 and proposes the command that creates it; no state is touched | preflight-erros-ux | `por cobrir` |
+| EC-063 | A worktree is registered but its folder is gone (prunable) | the preflight reports EC-063 and proposes `git worktree prune`; never `worktree remove --force` | preflight-erros-ux | `por cobrir` |
+| EC-064 | A merge, rebase or cherry-pick is half done in the worktree | the preflight reports EC-064 and suggests `--continue`/`--abort` without running them | preflight-erros-ux | `por cobrir` |
 
 ## Terminal crashed or machine off
 
@@ -76,6 +82,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-037 | Multiplexer times out when listing panes | a warning, and the list is shown with liveness unknown | preflight-erros-ux | `core/scripts/test_kf_term_ls.py::test_backend_timeout_avisa_e_lista` |
 | EC-038 | Queue state left by a run that died (reboot) | the stale queue is refused and abandoning it is offered | resume-orfaos | `core/scripts/test_sp_fila_estado.py::test_fila_obsoleta_recusa_e_propoe_abandonar` |
 | EC-039 | Watcher pid file left behind by a crash | stopping with a dead pid only deletes the file | resume-orfaos | `core/scripts/test_sp_vigia.py::test_parar_pid_morto_so_apaga` |
+| EC-065 | `git` or Python is not on PATH | the preflight reports EC-065 with what is missing and how to install it; rc 1 | preflight-erros-ux | `por cobrir` |
 
 ## Concurrency and corrupted state
 
