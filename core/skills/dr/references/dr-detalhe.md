@@ -106,6 +106,6 @@ Saltar fases para ir mais depressa (pesquisa rasa dá planos maus); viés de con
 - [ ] Brief referenciado no plano DP
 - [ ] Nenhuma fase saltada sem justificação; Research Gaps preenchido com as falhas
 
-## Adaptação Claude Code (the agent)
+## Adaptação Claude Code ({{agentName}})
 
 Mapa `sb_*` → ferramentas nativas, `bash find/grep` proibido e `Agent` proibido (paralelo = chamadas de ferramentas paralelas): dono `AGENTS.md` (§Ferramentas do vault e §Sessão e execução). Extras: `sb_list` → `Glob` (ordenar por data); `sync_daily_notes` → ler/editar a daily note à mão.

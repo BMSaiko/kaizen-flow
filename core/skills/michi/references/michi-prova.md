@@ -1,6 +1,6 @@
 # michi — prova visível por fase (2026-10-20)
 
-Fim de cada fase de entrega (DA que muda código/UI): mostrar ao user uma prova observável, como o cliente final usaria a feature. «Os testes passam» sozinho não é prova.
+Fim de cada fase de entrega (DA que muda código/UI): mostrar ao {{userName}} uma prova observável, como o cliente final usaria a feature. «Os testes passam» sozinho não é prova.
 
 ## Tipo de mudança → prova
 
@@ -19,9 +19,9 @@ Fim de cada fase de entrega (DA que muda código/UI): mostrar ao user uma prova 
 ## Regras
 - Artefactos em `proofs/` ao lado do SP (`<pasta do SP>/proofs/<slug>-faseN.<png|txt>`); screenshots nunca no contexto, só o caminho (ver ficheiro só se preciso).
 - Registar no SP, secção extra `## Prova` (fora das 8; `sp-validate.py` tolera): fase, comando/ação, caminho do artefacto, resultado.
-- **Mostrar sempre o caminho absoluto de cada prova na resposta** (um por linha, copiável) ao apresentá-la e no relatório final; o user não deve ter de a procurar.
+- **Mostrar sempre o caminho absoluto de cada prova na resposta** (um por linha, copiável) ao apresentá-la e no relatório final; o {{userName}} não deve ter de a procurar.
 - Prova fabricada é proibida: o output é o real, mesmo que falhe (reportar a falha).
-- Sem prova possível: parar e perguntar ao user (`AskUserQuestion`: dar outra prova / dispensar). Dispensa explícita fica registada «sem prova (dispensada pelo user)».
+- Sem prova possível: parar e perguntar ao {{userName}} (`AskUserQuestion`: dar outra prova / dispensar). Dispensa explícita fica registada «sem prova (dispensada pelo {{userName}})».
 - Modo auto / sem interação: tentar prova alternativa; se nenhuma, registar «sem prova» e dizê-lo no relatório.
 - Captura de UI: esperar por um elemento real da página (`waitFor` no `h1`/conteúdo), nunca um tempo fixo; skeleton na imagem = prova inválida, repetir.
 - Baseline de testes sem as alterações (e2e/jest): usar `git worktree`, nunca `git stash` (ficheiros versionados como `test-results/.last-run.json` fazem o `pop` abortar).

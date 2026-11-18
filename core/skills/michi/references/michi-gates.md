@@ -29,7 +29,7 @@ Ordem fixa: **gates → harden → pentest → review**. Cada passo só corre se
 | 0 | verde | seguir para harden |
 | 1 | vermelho ou `TIMEOUT` | bloqueia o avanço; corrigir a causa e repetir |
 | 2 | `test.cmd` proibido (`--force`, `git reset --hard`, segredos, …) | nada corre; corrigir a config |
-| 3 | sem `test.cmd` | nada corre, fica um aviso no SP; **perguntar ao user** (`AskUserQuestion`) o comando, nunca saltar em silêncio |
+| 3 | sem `test.cmd` | nada corre, fica um aviso no SP; **perguntar ao {{userName}}** (`AskUserQuestion`) o comando, nunca saltar em silêncio |
 | 4 | limite atingido | `max_tentativas` falhas seguidas e `gate-falha` em `parar_se` (mesma regra do DA): parar e escalar |
 
 - Só corre comandos vindos da config do projeto, nunca de argumentos nem do corpo do SP.

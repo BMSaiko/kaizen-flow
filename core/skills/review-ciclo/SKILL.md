@@ -17,8 +17,8 @@ Depois do `pentest`, antes do PR. Quem implementou não se revê: um painel `rev
 |---|---|---|
 | APROVADO | 0 | segue para PR |
 | CORRIGIR | 1 | `--criar-sps` cria um SP P1 por bloqueante; o executor corrige e repete |
-| ESCALAR | 2 | limite de iterações com bloqueantes: pedir decisão ao user |
+| ESCALAR | 2 | limite de iterações com bloqueantes: pedir decisão ao {{userName}} |
 
-Bloqueante = bug, regressão, falha de segurança ou teste em falta; menor = estilo (não bloqueia). O revisor nunca corrige nem commita. Re-review: «Rever só: …» da saída vai para `--rever-so`. O estado fica em `<estado.json>`; apagá-lo recomeça. `skip review` = decisão do user.
+Bloqueante = bug, regressão, falha de segurança ou teste em falta; menor = estilo (não bloqueia). O revisor nunca corrige nem commita. Re-review: «Rever só: …» da saída vai para `--rever-so`. O estado fica em `<estado.json>`; apagá-lo recomeça. `skip review` = decisão do {{userName}}.
 
 Testes: `python -m pytest scripts/test_sp_revisor.py scripts/test_review_ciclo.py -q`.

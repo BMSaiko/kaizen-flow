@@ -4,4 +4,4 @@ argument-hint: "[tema do Super Prompt]"
 model: claude-opus-5-5
 effort: medium
 ---
-Invoca a skill `super-prompt` (criar e rever SPs: §Gerar) (via Skill) com os argumentos: `$ARGUMENTS`, e segue-a tal como se o user tivesse escrito `/super-prompt $ARGUMENTS`.
+Invoca a skill `super-prompt` (criar e rever SPs: §Gerar) (via Skill) com os argumentos: `$ARGUMENTS`, e segue-a tal como se o {{userName}} tivesse escrito `/super-prompt $ARGUMENTS`.

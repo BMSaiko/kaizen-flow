@@ -5,7 +5,7 @@
 | Flag | Preenche | Pergunta do grill |
 |---|---|---|
 | `--project`, `--slug`, `--priority P1\|P2\|P3` | frontmatter | prioridade (default P3) |
-| `--modo auto\|manual` | `modo:` (michi não repete a pergunta de arranque) | não perguntar: defeito `auto`; `--modo manual` só se o user pedir |
+| `--modo auto\|manual` | `modo:` (michi não repete a pergunta de arranque) | não perguntar: defeito `auto`; `--modo manual` só se o {{userName}} pedir |
 | `--commit`, `--push`, `--pr auto\|pergunta\|nunca` | `commit:`/`push:`/`pr:` | não perguntar: defeito por destino (`michi-modo-auto.md` §Autorizações do SP); flag só para desviar |
 | `--restricoes "<texto>"` | `restricoes:` | pastas intocáveis, repos, ações externas |
 | `--perfil cauteloso\|normal\|autonomo` + `--max-tentativas/--max-requests/--parar-se` | perfil e limites | recomendado `normal`; `autonomo` só com gates (`michi/references/michi-perfis.md`) |
@@ -70,7 +70,7 @@ Colar o corpo (ou passar como objetivo do `/michi`). A sessão nova salta grill 
 
 ## Onde guardar
 
-`sp-new.py` devolve `knowledge/projects/kaizen/<projeto>/sp/TODO/<projeto>-<nome>-<YYYY-MM-DD>.md` (o slug é o nome do ficheiro sem `.md`; o nome curto recebe projeto e data). `<nome>`: minúsculas ascii, hífens, ≤48 caracteres. Done antigos (`<nome>-<data>.md`) continuam resolúveis. SPs fora do padrão: `python -I scripts/sp-organize.py` (dry-run; `--apply` só com aprovação).
+`sp-new.py` devolve `knowledge/projects/{{agentSlug}}/<projeto>/sp/TODO/<projeto>-<nome>-<YYYY-MM-DD>.md` (o slug é o nome do ficheiro sem `.md`; o nome curto recebe projeto e data). `<nome>`: minúsculas ascii, hífens, ≤48 caracteres. Done antigos (`<nome>-<data>.md`) continuam resolúveis. SPs fora do padrão: `python -I scripts/sp-organize.py` (dry-run; `--apply` só com aprovação).
 
 ## Autor
-Entradas (semente do painel `sp-autor.py`, ou o principal se escreve direto numa sessão nova): slug, projeto, grill (`## Spec`), DR mini, flags (`--michi`/`@nível`: simples = tarefa mecânica, default = normal, complexo = refactor largo ou risco alto), regra «preencher 8 secções, §4 verificável, §7 concreto, validar». Resumo: `Caminhos:` / `Ordem e dependências:` / `michi_modelo:` por SP / `Dúvidas:`. Revisão: mesmas entradas com os caminhos e os ajustes do user.
+Entradas (semente do painel `sp-autor.py`, ou o principal se escreve direto numa sessão nova): slug, projeto, grill (`## Spec`), DR mini, flags (`--michi`/`@nível`: simples = tarefa mecânica, default = normal, complexo = refactor largo ou risco alto), regra «preencher 8 secções, §4 verificável, §7 concreto, validar». Resumo: `Caminhos:` / `Ordem e dependências:` / `michi_modelo:` por SP / `Dúvidas:`. Revisão: mesmas entradas com os caminhos e os ajustes do {{userName}}.
