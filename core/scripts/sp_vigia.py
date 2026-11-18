@@ -8,19 +8,25 @@ Os efeitos vivem no `Contexto` (o real é `ContextoReal`; os testes trocam-no).
 
 Uso: módulo importado por sp-vigia.py; sem execução direta
 rc: sem execução direta"""
+import hashlib
 import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sp_leitura  # noqa: E402
 from painel_backend import popen_sem_janela, run_hidden  # noqa: E402
 from sp_disco import guardar, ler_json  # noqa: E402
+import kf_erros  # noqa: E402
 
 MARCAS = {"pergunta": "? ", "bloqueado": "! ", "falhou": "x "}
 LOCK_OCUPADO = "outro merge em curso"
 INTERVALO = 10.0
+ECRA_LINHAS = 15  # cauda do ecrã lida para quota/rede/sessão (o resto é histórico)
+EC_PAUSA = (kf_erros.EC_QUOTA, kf_erros.EC_REDE, kf_erros.EC_SESSAO)
+RETOMA_TEXTO = "continua"  # enviado ao painel quando a pausa (quota/rede) acaba
 
 
 def memoria_nova():
@@ -72,6 +78,17 @@ class Contexto:
     def nota_relatorio(self, path, texto): raise NotImplementedError
     def estado_global(self): raise NotImplementedError
     def log(self, msg): raise NotImplementedError
+
+    def agora(self):
+        return datetime.now()
+
+    def pausar(self, slug, msg, motivo, retoma_em):
+        """SP a-correr → bloqueado por quota/rede/sessão, com `motivo` e `retoma_em` (o contexto real grava os campos)."""
+        self.transitar(slug, "bloqueado", msg)
+
+    def retomar(self, slug, msg):
+        """bloqueado (pausa acabada) → a-correr, limpando `motivo` e `retoma_em`."""
+        self.transitar(slug, "a-correr", msg)
 
     def escalar(self, sp):
         """Relança o SP no nível seguinte se `sp_escalada` o pedir; {de, para, ...} ou None (sem escalada)."""
@@ -153,6 +170,64 @@ def _done(ctx, mem, sp):
     return _seguinte(ctx, mem, slug)
 
 
+def ec_pausa(sp):
+    """EC da pausa (quota/rede/sessão) gravada no `motivo` do SP, ou None."""
+    ecs = kf_erros.ecs_em(sp.get("motivo") or "")
+    return ecs[0] if ecs and ecs[0] in EC_PAUSA else None
+
+
+def _falha_no_ecra(ctx, mem, sp):
+    """SP a correr com a cauda do ecrã parada em dois ticks e com quota/rede/sessão → `bloqueado` com motivo e retoma.
+
+    Parada = igual ao tick anterior: um agente a trabalhar (ou a escrever sobre quotas) muda o ecrã e não bloqueia."""
+    ler = getattr(ctx.backend, "ecra", None)
+    if ler is None:
+        return False
+    texto = _seguro(ctx, ler, sp["pane"]) or ""
+    cauda = "\n".join([l for l in str(texto).splitlines() if l.strip()][-ECRA_LINHAS:])
+    marca = hashlib.sha1(cauda.encode("utf-8", "replace")).hexdigest()
+    ecras = mem.setdefault("ecras", {})
+    anterior, ecras[sp["slug"]] = ecras.get(sp["slug"]), marca
+    if not cauda or anterior != marca:
+        return False
+    r = kf_erros.classificar_falha(cauda, None, agora=ctx.agora())
+    if r is None:
+        return False
+    ec, motivo, retoma = r
+    proximo = f"retoma automática às {retoma}" if retoma else f"fazer login no harness e `kaizen resume {sp['slug']}`"
+    msg = f"{ec} {motivo}; {proximo}"
+    ctx.pausar(sp["slug"], msg, f"{ec} {motivo}", retoma)
+    ctx.log(f"pausa {sp['slug']}: {msg}")
+    _avisar(ctx, mem, {**sp, "estado": "bloqueado", "msg": msg})
+    return True
+
+
+def _retomar_pausa(ctx, mem, sp):
+    """Pausa por quota/rede com `retoma_em` já passado e painel vivo: volta a `a-correr` e envia «continua»."""
+    pane = sp.get("pane")
+    if ec_pausa(sp) not in (kf_erros.EC_QUOTA, kf_erros.EC_REDE) or not sp.get("retoma_em") or not pane:
+        return False
+    if not kf_erros.ja_passou(sp["retoma_em"], ctx.agora()) or ctx.backend.estado(pane) == "morto":
+        return False
+    enviar = getattr(ctx.backend, "enviar", None)
+    if enviar is None:
+        return False
+    try:
+        ctx.retomar(sp["slug"], f"retomado depois da pausa ({ec_pausa(sp)})")
+    except Exception as e:  # noqa: BLE001 — sem vaga ou estado mudado: tenta no tick seguinte
+        ctx.log(f"retoma {sp['slug']} adiada: {e}")
+        return False
+    if not _seguro(ctx, enviar, pane, RETOMA_TEXTO):
+        ctx.log(f"retoma {sp['slug']}: envio falhou, volta à pausa")
+        ctx.pausar(sp["slug"], sp.get("msg") or "", sp.get("motivo"), kf_erros.retoma_padrao(ctx.agora()))
+        return False
+    mem.setdefault("ecras", {}).pop(sp["slug"], None)
+    mem["avisos"].pop(sp["slug"], None)
+    _seguro(ctx, ctx.backend.titulo, pane, sp["slug"])
+    ctx.log(f"retoma {sp['slug']}: {RETOMA_TEXTO} enviado")
+    return True
+
+
 def _um(ctx, mem, sp):
     slug, estado = sp["slug"], sp.get("estado")
     if slug in mem["tratados"]:
@@ -163,7 +238,11 @@ def _um(ctx, mem, sp):
         ctx.transitar(slug, "falhou", "painel fechou sem estado")
         sp = {**sp, "estado": "falhou", "msg": "painel fechou sem estado"}
         estado = "falhou"
-    if estado in ("falhou", "bloqueado") and slug not in mem.get("escalados", []):
+    if estado == "a-correr" and sp.get("pane") and _falha_no_ecra(ctx, mem, sp):
+        return None
+    if estado == "bloqueado" and _retomar_pausa(ctx, mem, sp):
+        return None
+    if estado in ("falhou", "bloqueado") and slug not in mem.get("escalados", []) and not ec_pausa(sp):
         esc = _seguro(ctx, ctx.escalar, sp)
         if esc is not None:
             mem.setdefault("escalados", []).append(slug)  # uma tentativa por SP, mesmo se o relançamento falhou
@@ -216,7 +295,7 @@ def caminhos(pasta):
     return p / "vigia.pid", p / "vigia.log", p / "vigia.json"
 
 
-def arrancar(fila, script, run=subprocess.Popen):
+def arrancar(fila, script, run=None):
     """Lança `sp-vigia.py <fila>` destacado da sessão (sobrevive ao fim do turno); devolve o processo."""
     return popen_sem_janela([sys.executable, "-I", str(script), str(fila)], "destacado", run=run, close_fds=True,
                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -291,7 +370,7 @@ def modo_do_sp(path):
     return sp_leitura.frontmatter(texto).get("modo") or None
 
 
-def toast_windows(texto, run=subprocess.Popen):
+def toast_windows(texto, run=None):
     """Balão do Windows por PowerShell `NotifyIcon` (spike 2026-11-11); no Linux, `notify-send`. Processo destacado, sem esperar."""
     if sys.platform != "win32":
         return popen_sem_janela(["notify-send", "-a", "sp-fila", "sp-fila", str(texto)[:200]], run=run,
@@ -330,6 +409,12 @@ class ContextoReal(Contexto):
 
     def transitar(self, slug, estado, msg=None):
         self.pe.transitar(slug, estado, msg=msg, fila=self.fila)
+
+    def pausar(self, slug, msg, motivo, retoma_em):
+        self.pe.transitar(slug, "bloqueado", msg=msg, fila=self.fila, motivo=motivo, retoma_em=retoma_em)
+
+    def retomar(self, slug, msg):
+        self.pe.transitar(slug, "a-correr", msg=msg, fila=self.fila, motivo=None, retoma_em=None)
 
     def modo(self, sp):
         return modo_do_sp(_sp_na_worktree(sp.get("worktree"), sp["slug"]))

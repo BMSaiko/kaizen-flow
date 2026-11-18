@@ -604,3 +604,62 @@ def test_sem_reflect_no_write_mantem_o_progresso_e_a_excecao(tmp_path):
     assert sp_handoff.main(["--write", str(sp), "--file", str(corpo), "--sem-reflect"]) == 0
     texto = sp.read_text(encoding="utf-8")
     assert "- feito: x" in texto and "exceção: handoff sem Reflect de fase" in texto
+
+
+# --- handoff num painel herdr de uma fila (EC-059) -----------------------------------------
+
+def _fila(root, slug="sp-x", pane="w3:p17", estado="a-correr", wt="/wt/sb-sp-x"):
+    import sp_painel_estado as pe
+    pe.criar_fila("mae", root=root, ordem=[slug])
+    pe.registar("mae", slug, root=root, pane=pane, worktree=wt)
+    pe.transitar(slug, "a-correr", fila="mae", root=root)
+    if estado != "a-correr":
+        pe.transitar(slug, estado, fila="mae", root=root)
+
+
+def test_retoma_num_painel_da_fila_repete_o_prompt_da_fila(tmp_path, monkeypatch):
+    monkeypatch.setenv("SP_FILA_ROOT", str(tmp_path))
+    _fila(tmp_path)
+    cmds = sp_handoff.resume_commands("claude", "knowledge/p/sp/Doing/sp-x.md", pane="w3:p17")
+    assert cmds[0] == "/clear " and cmds[-1].startswith("/michi --auto sp-x (painel da fila /sp-fila) Worktree já criada: /wt/sb-sp-x")
+    assert "sp-estado.py sp-x" in cmds[-1] and "\n" not in cmds[-1]
+
+
+@pytest.mark.parametrize("pane,estado", [("w3:p99", "a-correr"), (None, "a-correr"), ("w3:p17", "done")])
+def test_fora_do_painel_da_fila_retoma_normal(tmp_path, monkeypatch, pane, estado):
+    monkeypatch.setenv("SP_FILA_ROOT", str(tmp_path))
+    _fila(tmp_path, estado=estado)
+    cmds = sp_handoff.resume_commands("claude", "k/sp/Doing/sp-x.md", pane=pane)
+    assert cmds[-1] == "/michi k/sp/Doing/sp-x.md"
+
+
+def test_sem_fila_retoma_normal(tmp_path, monkeypatch):
+    monkeypatch.setenv("SP_FILA_ROOT", str(tmp_path / "nada"))
+    assert sp_handoff.resume_commands("claude", "k/sp-y.md", pane="w3:p17")[-1] == "/michi k/sp-y.md"
+
+
+def test_dry_run_herdr_na_fila_mostra_o_prompt_da_fila(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SP_FILA_ROOT", str(tmp_path))
+    for v in ("WEZTERM_PANE", "TMUX_PANE"):
+        monkeypatch.delenv(v, raising=False)
+    monkeypatch.setenv("HERDR_PANE_ID", "w3:p17")
+    _fila(tmp_path)
+    sp = tmp_path / "sp-x.md"
+    sp.write_text("---\nstatus: Doing\n---\n## Reflect\n- Reflect da: x\n", encoding="utf-8")
+    assert sp_handoff.main(["--launch", str(sp), "--dry-run", "--fase", "da"]) == 0
+    out = capsys.readouterr().out
+    assert "herdr pane send-text w3:p17" in out and "/michi --auto sp-x (painel da fila" in out
+
+
+def test_send_herdr_confere_o_prompt_antes_de_escrever(monkeypatch):
+    vistos = []
+    monkeypatch.setattr(sp_handoff, "check_prompt", lambda p, backend: vistos.append((p, backend)))
+    insp = sp_handoff._inspect("herdr")
+    insp("w3:p17")
+    assert vistos == [("w3:p17", "herdr")] and sp_handoff._inspect("clipboard") is None
+
+
+def test_prompt_da_fila_permite_o_handoff_e_proibe_o_resto():
+    import sp_fila_paineis as fp
+    p = fp.prompt_painel("s", "/wt")
+    assert "sp-handoff.py --launch <SP> --auto" in p and "abrir painéis" in p and "/handoff" in p

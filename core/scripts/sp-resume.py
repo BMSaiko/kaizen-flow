@@ -3,11 +3,13 @@
 
 Uso: python -I scripts/sp-resume.py [<slug>] [--from <fase>] [--restart [--sim]] [--raiz R]
      python -I scripts/sp-resume.py <slug> --lock|--unlock [--painel P]   (michi por CLI)
-rc: 0 ok / nada a retomar · 1 recusado (EC-043 lock vivo, ou --restart sem confirmação) · 2 uso inválido (fase, escolha pendente)
+rc: 0 ok / nada a retomar · 1 recusado (EC-043 lock vivo, EC-016/017 pausa antes de `retoma_em`, --restart sem confirmação) · 2 uso inválido (fase, escolha pendente)
 
 Candidato = SP com checkpoint em `<raiz>/.kaizen/estado/` sem lock vivo e fora de Done (EC-027, UC-031).
 Ponto de retoma = passo seguinte ao último «fim» do journal (EC-001); passos abertos repetem (idempotentes)
 ou revertem (plano do `michi-checkpoint.py restore`, sem --apply). `--restart` arquiva (nunca apaga) o estado (UC-032).
+SP pausado pela fila por quota/rede (`motivo` + `retoma_em` no estado do painel) só retoma depois dessa hora.
+Antes de retomar corre o pré-voo (`sp-preflight.py`) e mostra os problemas como aviso. Erros no formato de `kf_erros`.
 """
 import argparse
 import shutil
@@ -16,6 +18,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kf_erros  # noqa: E402
 import sp_disco  # noqa: E402
 import sp_journal  # noqa: E402
 
@@ -97,7 +100,20 @@ def ponto_de_retoma(raiz, slug):
 
 
 def _msg(o_que, porque, guardado, proximo, ec):
-    return f"{o_que} · {porque} · estado guardado: {guardado} · próximo comando: {proximo} [{ec}]"
+    return kf_erros.erro(ec, o_que, porque, guardado, proximo)
+
+
+def pausa(slug, painel_root=None):
+    """(motivo, retoma_em) se a fila deixou o SP `bloqueado` por quota/rede/sessão; senão None. Nunca levanta."""
+    try:
+        import sp_painel_estado as pe
+        sp = pe.ler(pe.procurar(slug, painel_root), slug, painel_root)
+    except Exception:  # noqa: BLE001 — sem fila que o registe: não há pausa
+        return None
+    ecs = kf_erros.ecs_em(sp.get("motivo") or "")
+    if sp.get("estado") != "bloqueado" or not ecs or ecs[0] not in (kf_erros.EC_QUOTA, kf_erros.EC_REDE, kf_erros.EC_SESSAO):
+        return None
+    return sp["motivo"], sp.get("retoma_em")
 
 
 def _arquivar(raiz, slug):
@@ -127,29 +143,41 @@ def _slug_valido(slug):
     return bool(slug) and slug not in (".", "..") and not any(c in slug for c in ("/", chr(92), ":"))
 
 
-def resume(raiz, slug, from_fase=None, restart=False, confirmar=None):
+def resume(raiz, slug, from_fase=None, restart=False, confirmar=None, agora=None, painel_root=None):
     """Devolve (rc, mensagem). `confirmar` é um callable sem argumentos (True = confirmado)."""
     if not _slug_valido(slug):
-        return 2, f"slug inválido «{slug}»"
+        return 2, _msg(f"slug inválido «{slug}»", "o slug é um nome de ficheiro (sem /, \\ nem :)", "nada alterado",
+                       "`kaizen resume` sem argumentos lista os SPs interrompidos", "EC-067")
     if from_fase is not None and from_fase not in FASES:
-        return 2, f"fase inválida «{from_fase}»; fases válidas: {', '.join(FASES)}"
+        return 2, _msg(f"fase inválida «{from_fase}»", f"fases válidas: {', '.join(FASES)}", "nada alterado",
+                       f"`kaizen resume {slug} --from <fase>`", "EC-067")
     if restart and from_fase is not None:
-        return 2, "--restart e --from não se combinam: --restart recomeça sempre em grill"
+        return 2, _msg("--restart e --from não se combinam", "--restart recomeça sempre em grill", "nada alterado",
+                       f"`kaizen resume {slug} --restart` ou `kaizen resume {slug} --from <fase>`", "EC-067")
     d = sp_disco.dono(raiz, slug)
     if d["estado"] == "vivo":
         return 1, _msg_ocupado(slug, d)
+    p = pausa(slug, painel_root)
+    if p and p[1] and not kf_erros.ja_passou(p[1], agora):
+        ec = kf_erros.ecs_em(p[0])[0]
+        return 1, _msg(f"SP {slug} em pausa até {p[1]}", p[0], "checkpoint e journal intactos",
+                       f"esperar até {p[1]} (a fila retoma sozinha se o painel estiver vivo) e `kaizen resume {slug}`", ec)
     if restart:
         if confirmar is None or not confirmar():
-            return 1, f"--restart não confirmado: nada alterado (EC-001). Confirmar com `kaizen resume {slug} --restart --sim`."
+            return 1, _msg("--restart não confirmado", "arquivar o estado pede confirmação explícita (EOF vale não)",
+                           "nada alterado (EC-001)", f"`kaizen resume {slug} --restart --sim`", "EC-006")
         destino = _arquivar(raiz, slug)
         if destino is None:
-            return 1, f"SP {slug} sem estado a arquivar: nada alterado (EC-001)"
+            return 1, _msg(f"SP {slug} sem estado a arquivar", "não há checkpoint nem journal em .kaizen/estado",
+                           "nada alterado (EC-001)", "`kaizen resume` lista os SPs com estado", "EC-050")
         return 0, f"recomeçado do início em {FASES[0]}; estado anterior arquivado em {destino} (UC-032)"
     estado_p, jp = sp_journal.caminhos(raiz, slug)
     if not estado_p.exists() and not jp.exists():
-        return 1, f"SP {slug} sem estado a retomar: nada alterado (EC-001)"
+        return 1, _msg(f"SP {slug} sem estado a retomar", "não há checkpoint nem journal em .kaizen/estado",
+                       "nada alterado (EC-001)", f"`/michi {slug}` arranca-o do início", "EC-050")
     if _em_done(raiz, slug):
-        return 1, f"SP {slug} já está em Done: nada a retomar (EC-001)"
+        return 1, _msg(f"SP {slug} já está em Done", "um SP fechado não se retoma", "nada alterado (EC-001)",
+                       "`kaizen resume` lista os SPs interrompidos", "EC-067")
     ponto = ponto_de_retoma(raiz, slug)
     fase = ponto["fase"]
     if from_fase is not None:
@@ -197,7 +225,7 @@ def main(argv=None):
     if (a.lock or a.unlock) and not a.slug:
         ap.error("--lock/--unlock precisam de <slug>")
     if (a.lock or a.unlock) and not _slug_valido(a.slug):
-        print(f"slug inválido «{a.slug}»", file=sys.stderr)
+        print(resume(a.raiz, a.slug)[1], file=sys.stderr)
         return 2
     if a.lock:
         try:
@@ -224,8 +252,23 @@ def main(argv=None):
         slug = cands[0]
     rc, texto = resume(a.raiz, slug, a.from_fase, a.restart, (lambda: True) if a.sim else _perguntar)
     print(texto, file=sys.stderr if rc else sys.stdout)
+    if rc == 0 and not a.restart:
+        _preflight(a.raiz, slug)
     return rc
 
 
+def _preflight(raiz, slug):
+    """Pré-voo antes de retomar: só avisa (sem o órfão do próprio SP); nunca muda o rc do resume."""
+    try:
+        from sp_carregar import carregar
+        pf = carregar(Path(__file__).resolve().with_name("sp-preflight.py"), "sp_preflight")
+        probs = pf.diagnosticar(slug, repo=raiz, ignorar_orfao=True)
+    except Exception:  # noqa: BLE001 — fora de git ou sem o pré-voo: retomar na mesma
+        return
+    for p in probs:
+        print(f"aviso do pré-voo:\n{p.texto()}", file=sys.stderr)
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    import kf_errlog
+    sys.exit(kf_errlog.executar("sp-resume", main))

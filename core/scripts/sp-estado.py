@@ -135,8 +135,28 @@ def listar(root=None, em_json=False, todas=False, raiz_sp=None):
         out.append(f"{f['fila']} · {f.get('modo') or '-'} · {len(f['sps'])} SPs" + (f" · {f['erro']}" if f.get("erro") else ""))
         for sp in f["sps"]:
             partes = [sp["slug"], sp["estado"]] + [_uma_linha(sp[k]) for k in ("modelo", "msg") if sp.get(k)]
+            if sp.get("motivo") and not (sp.get("msg") and sp["motivo"] in sp["msg"]):
+                partes.append(_uma_linha(sp["motivo"]))
+            if sp.get("retoma_em"):
+                partes.append(f"retoma {sp['retoma_em']}")
             out.append("  " + " · ".join(partes))
     return "\n".join(out)
+
+
+def _msg_erro(e):
+    """Recusa do estado no formato único (kf_erros), com o EC do catálogo."""
+    import kf_erros
+    if isinstance(e, TimeoutError):
+        return kf_erros.erro("EC-042", f"sp-estado: {e}", "outro processo tem o lock do estado das filas",
+                             "nada escrito", "repetir daqui a uns segundos")
+    if isinstance(e, sp_painel_estado.SemVaga):
+        return kf_erros.erro("EC-033", f"sp-estado: {e}", "o teto global de painéis ativos está atingido",
+                             "o SP fica no estado em que estava", "esperar que um painel acabe; a fila reaproveita a vaga")
+    if sp_painel_estado.ILEGIVEL in str(e):
+        return kf_erros.erro("EC-047", f"sp-estado: {e}", "o JSON do estado do painel está corrompido",
+                             "ficheiro intacto (nada adivinhado)", "`sp-estado.py --listar` e, se preciso, `sp-fila.py --parar`")
+    return kf_erros.erro("EC-067", f"sp-estado: {e}", "pedido inválido ao estado da fila", "nada escrito",
+                         "`sp-estado.py --listar` mostra slugs e estados válidos")
 
 
 def main(argv=None):
@@ -167,7 +187,7 @@ def main(argv=None):
                 sp = sp_painel_estado.transitar(args.sp, args.novo, msg=args.msg, fila=args.fila, root=args.root)
                 print(f"{sp['slug']} · {sp['estado']} · fila {sp['fila']}")
         except (sp_painel_estado.ErroEstado, TimeoutError) as e:
-            print(f"sp-estado: {e}", file=sys.stderr)
+            print(_msg_erro(e), file=sys.stderr)
             return 1
         return 0
     if args.sp is None:

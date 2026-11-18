@@ -537,3 +537,14 @@ def test_relatorio_e_gastos_listam_escaladas(tmp_path):
 def test_relatorio_sem_escaladas_nao_muda():
     import sp_fila_relatorio as fr
     assert fr.escaladas({}) == {} and "escalado" not in fr.render_gastos({"feitos": ["a"]}, {"a": 1.0})
+
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.parametrize("n", ["0", "4"])
+def test_recusa_de_concorrencia_no_formato_ec067(tmp_path, capsys, n):
+    import kf_erros
+    rc = sp_fila.main(["--concorrencia", n, "--estado", str(tmp_path / "e.json"), "--root", str(tmp_path / "sps")])
+    lido = kf_erros.ler(capsys.readouterr().err.rstrip("\n"))
+    assert rc == 1 and lido is not None and lido.ec == "EC-067" and "--concorrencia" in lido.oque

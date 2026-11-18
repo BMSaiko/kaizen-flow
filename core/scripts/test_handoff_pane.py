@@ -182,3 +182,23 @@ def test_text_arrived_prompt_longo_quebrado_sem_linha_do_prompt():
     assert hp.text_arrived(ecra, texto) is True
     assert hp.text_arrived("❯ \n────", texto) is False
     assert hp.text_arrived("❯ /michi x", "/michi x") is True
+
+
+def test_pane_id_por_backend():
+    env = {"HERDR_PANE_ID": "w3:p17", "TMUX_PANE": "%4", "WEZTERM_PANE": "7"}
+    assert hp.pane_id(env, backend="herdr") == "w3:p17"
+    assert hp.pane_id(env, backend="tmux") == "%4"
+    assert hp.pane_id(env, backend="wezterm") == hp.pane_id(env) == "7"
+    with pytest.raises(hp.HandoffError, match="HERDR_PANE_ID"):
+        hp.pane_id({}, backend="herdr")
+
+
+def test_check_prompt_le_o_ecra_pelo_backend_herdr():
+    vistos = []
+
+    def run(argv, **kw):
+        vistos.append(argv)
+        return _Res("❯ rascunho")
+    with pytest.raises(hp.HandoffError):
+        hp.check_prompt("w3:p17", run=run, backend="herdr")
+    assert vistos == [["herdr", "pane", "read", "w3:p17", "--source", "visible"]]

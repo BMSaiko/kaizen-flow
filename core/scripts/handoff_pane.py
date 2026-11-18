@@ -25,10 +25,15 @@ ENTER_SETTLE = 6.0  # o Claude Code demora a limpar o prompt (hooks UserPromptSu
 class HandoffError(Exception):
     pass
 
-def pane_id(env=None):
-    pane = (os.environ if env is None else env).get("WEZTERM_PANE")
+PANE_ENV = {"herdr": "HERDR_PANE_ID", "wezterm": "WEZTERM_PANE", "tmux": "TMUX_PANE"}
+
+
+def pane_id(env=None, backend=None):
+    """Painel onde o agente corre, pela variável do backend (sem backend: WezTerm, como antes)."""
+    nome = PANE_ENV.get(backend, "WEZTERM_PANE")
+    pane = (os.environ if env is None else env).get(nome)
     if not pane:
-        raise HandoffError("WEZTERM_PANE não definido: o Claude Code não está a correr num painel do WezTerm")
+        raise HandoffError(f"{nome} não definido: o Claude Code não está a correr num painel do {backend or 'WezTerm'}")
     return pane
 
 
@@ -137,9 +142,9 @@ def text_arrived(screen, text):
     return bool(cauda) and cauda in "".join(screen.split())
 
 
-def check_prompt(pane, run=run_hidden):
-    screen = run(["wezterm", "cli", "get-text", "--pane-id", str(pane)], check=True,
-                 capture_output=True, text=True, encoding="utf-8").stdout
+def check_prompt(pane, run=run_hidden, backend="wezterm"):
+    """Aborta se o prompt do painel já tem texto (não o corromper); lê o ecrã pelo backend (wezterm, tmux, herdr)."""
+    screen = read_screen(backend, pane, run)
     if prompt_has_text(screen):
         raise HandoffError(f"o prompt do painel {pane} tem texto por enviar: handoff abortado para não o corromper")
 

@@ -13,6 +13,7 @@ kaizen catalog [render] [--check] [--json] [--no-run]  # edge case / use case co
 kaizen demo [--keep]                  # runs the SP cycle in a temp repo
 kaizen term ls [--json] [--fila X]|fila|michi|limpar|retomar|orq  # terminal panes
 kaizen resume [slug] [--from PHASE] [--restart]  # resume an interrupted story
+kaizen preflight [slug] [--repo DIR] [--json] [--fix]  # git/worktree/tools check before a run
 ```
 
 | Command | Option | Meaning |
@@ -41,6 +42,7 @@ kaizen resume [slug] [--from PHASE] [--restart]  # resume an interrupted story
 | `kaizen demo` | `--keep` | Runs the whole cycle in a temp git repo: `init`, `sp-new` (gate `node --version`), `sp-move doing`, `sp-gates`, `sp-move done`, `sp-report`. The folder is deleted at the end unless `--keep`. Recording in `docs/assets/demo.cast`. |
 | `kaizen term <sub>` | `ls`, `fila`, `michi`, `limpar`, `retomar`, `orq` | Drives WezTerm panes through `scripts/painel_backend.py` and `scripts/wez.py`: `ls` lists SPs with pane, michi phase, state and queue (see below), `fila` picks a program and runs its SP queue in a new pane, `michi` picks a SP and launches its michi in a new pane (both: see `kaizen term fila|michi` below). `limpar` closes orphan panes and state (dry-run unless `--apply`), `retomar` reopens the pane of a Doing SP that has none (both: see `kaizen term limpar` and `retomar` below). `orq` opens the orchestrator pane (see `kaizen term orq` below). Optional WezTerm keys: [term.md](term.md). |
 | `kaizen resume` | `[slug]`, `--from PHASE`, `--restart [--sim]` | Resumes a story interrupted mid-run (Ctrl+C, crash, closed pane) from its journal, never repeating a closed step. No slug: the single orphan, or a list to choose from (rc 2). `--from` restarts at a phase (rc 2 if unknown); `--restart` archives the state after confirmation. A second pane on the same story is refused with the owner named. Runs `scripts/sp-resume.py`. |
+| `kaizen preflight` | `[slug]`, `--repo DIR`, `--ramo B`, `--sem-orfao`, `--json`, `--fix` | Read-only preflight: dirty worktree, wrong branch, missing or prunable worktree, merge/rebase half done, branch behind main, orphan story, git/Python missing; each with its `EC-NNN` and the safe fix (see [error-log.md](error-log.md#preflight)). rc 0 clean, 1 problems, 2 usage. `--fix` asks before each safe command and never deletes. Runs `scripts/sp-preflight.py`. |
 | `kaizen sync` | `--to-vault [--check] [--force]`, `--from-vault [--check] [--stamp]` | Maintainers only. `--to-vault` writes `core/` into the vault (`KAIZEN_SOURCE`), filling the `{{...}}` markers from its `kaizen.config.json` and refusing pieces edited there since the last sync (`--force` overwrites); `--check` lists differences without writing. `--from-vault` is the old direction (vault → `core/`), kept for the transition with a warning. Not needed by users. |
 
 ## Workflow scripts (installed in `scripts/`)

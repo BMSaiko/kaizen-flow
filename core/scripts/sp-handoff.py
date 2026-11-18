@@ -10,8 +10,11 @@ Uso:
   python -I scripts/sp-handoff.py --spawn <slug>... [--max N] [--backend wezterm|tmux|background|clipboard]
 
 `--launch` não abre janelas: em segundo plano, passados ~5 s (para o turno atual acabar), escreve
-`/clear` e depois `/michi <caminho>` no painel do WezTerm onde o Claude Code já corre ($WEZTERM_PANE),
-via `wezterm cli send-text`. Não faz nada fora desse painel. `--auto` (usado após o aviso do
+`/clear` e depois `/michi <caminho>` no painel onde o Claude Code já corre (herdr $HERDR_PANE_ID, WezTerm
+$WEZTERM_PANE ou tmux $TMUX_PANE), com o prompt vazio confirmado antes. Não faz nada fora desse painel.
+Num painel de uma fila (`sp-fila`: o estado do SP regista este painel), o `/michi` enviado é o prompt
+da fila (`/michi --auto <slug>` com a worktree, as proibições e o `sp-estado` no fim), para a sessão
+nova continuar em auto e o vigia manter o SP `a-correr` (EC-059). `--auto` (usado após o aviso do
 context-guard) recusa lançar se o SP estiver em Done; em TODO lança sem o mover (o michi da sessão nova faz `sp-move doing`).
 `--nivel` (escalada de modelo, harness claude): entre o `/clear` e o `/michi` envia `/model <modelo do nível>` (modelos.json).
 
@@ -79,13 +82,37 @@ def modelo_nivel(nivel):
     return modelos.michi(data, nivel)[0]["model"]
 
 
-def resume_commands(harness, sp_path, nivel=None):
+def prompt_da_fila(sp_path, pane, root=None):
+    """Prompt da fila se `pane` é o painel registado do SP numa fila por acabar; senão None (nunca levanta)."""
+    if not pane:
+        return None
+    try:
+        import sp_painel_estado as pe
+        slug = Path(sp_path).stem
+        sp = pe.ler(pe.procurar(slug, root), slug, root)
+        if sp.get("estado") in pe.FINAIS or str(sp.get("pane") or "") != str(pane):
+            return None
+        import sp_fila_paineis
+        return sp_fila_paineis.prompt_painel(slug, sp.get("worktree") or str(Path.cwd()))
+    except Exception:  # noqa: BLE001 — sem fila (ou estado ilegível): handoff normal
+        return None
+
+
+def resume_commands(harness, sp_path, nivel=None, pane=None):
     if harness not in HARNESSES:
         raise HandoffError(f"harness desconhecido '{harness}' (válidos: {', '.join(HARNESSES)})")
     clear, resume = HARNESSES[harness]
     if nivel and harness != "claude":
         raise HandoffError("--nivel só com o harness claude")
-    return [clear, *([f"/model {modelo_nivel(nivel)}"] if nivel else []), resume.format(sp=sp_path)]
+    fila = prompt_da_fila(sp_path, pane) if harness == "claude" else None
+    return [clear, *([f"/model {modelo_nivel(nivel)}"] if nivel else []), fila or resume.format(sp=sp_path)]
+
+
+def _inspect(backend):
+    """Confere o prompt vazio antes de escrever, em qualquer backend com ecrã legível."""
+    if backend in ("wezterm", "tmux", "herdr"):
+        return lambda p: check_prompt(p, backend=backend)
+    return None
 
 
 def deliver_clipboard(harness, sp_path, copy=None):
@@ -102,19 +129,19 @@ def deliver_clipboard(harness, sp_path, copy=None):
 
 def send(sp_path, pane, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=run_hidden, sleep=time.sleep,
          inspect=None, backend="wezterm", harness="claude", confirm=False, nivel=None):
-    send_comandos(resume_commands(harness, sp_path, nivel), pane, backend, delay, gap, enter_gap, run, sleep, inspect, confirm)
+    send_comandos(resume_commands(harness, sp_path, nivel, pane), pane, backend, delay, gap, enter_gap, run, sleep, inspect, confirm)
 
 
 def launch(sp_path, pane=None, backend=None, harness="claude", nivel=None):
     """Lança em segundo plano o `send`, para o /clear só chegar depois de o turno atual acabar."""
-    resume = resume_commands(harness, sp_path, nivel)[-1]
     if backend is None:
         backend, found = detect_backend()
         pane = pane or found
     if backend == "clipboard":
         deliver_clipboard(harness, sp_path)
         return None
-    pane = pane or pane_id()
+    pane = pane or pane_id(backend=backend)
+    resume = resume_commands(harness, sp_path, nivel, pane)[-1]
     _argvs(backend, pane)[0](pane, resume)
     if backend == "wezterm":
         pane_exists(pane)
@@ -195,22 +222,24 @@ def main(argv=None):
             return 1 if falhou else 0
         elif args.send:
             backend = args.backend or "wezterm"
-            send(args.send, args.pane or pane_id(), backend=backend, harness=args.harness,
-                 inspect=check_prompt if backend == "wezterm" else None, confirm=True, nivel=args.nivel)
+            send(args.send, args.pane or pane_id(backend=backend), backend=backend, harness=args.harness,
+                 inspect=_inspect(backend), confirm=True, nivel=args.nivel)
         elif args.dry_run:
             backend, found = (args.backend, None) if args.backend else detect_backend()
             pane = args.pane or found
             if backend == "clipboard":
                 print(f"clipboard: {resume_commands(args.harness, args.launch, args.nivel)[-1]}")
             else:
-                pane = pane or pane_id()
+                pane = pane or pane_id(backend=backend)
                 text_argv, key_argv = _argvs(backend, pane)
-                for text in resume_commands(args.harness, args.launch, args.nivel):
+                for text in resume_commands(args.harness, args.launch, args.nivel, pane):
                     print(subprocess.list2cmdline(text_argv(pane, text)))
                     print(subprocess.list2cmdline(key_argv(pane)))
         else:
-            if launch(args.launch, args.pane, args.backend, args.harness, args.nivel):
-                print(f"a continuar neste painel em {SEND_DELAY:.0f}s: {' e '.join(resume_commands(args.harness, args.launch, args.nivel))}")
+            argv_send = launch(args.launch, args.pane, args.backend, args.harness, args.nivel)
+            if argv_send:
+                pane = argv_send[argv_send.index("--pane") + 1]
+                print(f"a continuar neste painel em {SEND_DELAY:.0f}s: {' e '.join(resume_commands(args.harness, args.launch, args.nivel, pane))}")
     except (HandoffError, OSError) as exc:
         print(f"erro: {exc}", file=sys.stderr)
         return 1

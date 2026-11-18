@@ -150,3 +150,22 @@ def test_listar_mostra_orfaos_como_interrompido_ec027(tmp_path):
     dados = json.loads(sp_estado.listar(str(fila), em_json=True, raiz_sp=str(tmp_path)))
     assert dados["interrompidos"] == [{"slug": "sp-orfao", "estado": "interrompido", "proximo": "kaizen resume sp-orfao"}]
     assert "interrompido" not in sp_estado.listar(str(fila), raiz_sp=str(tmp_path / "vazio"))
+
+
+def test_listar_mostra_pausa_com_retoma_em(tmp_path):
+    import sp_painel_estado as pe
+    root = tmp_path / "filas"
+    pe.criar_fila("f1", root=root, ordem=["a"])
+    pe.registar("f1", "a", root=root, pane="1")
+    pe.transitar("a", "a-correr", fila="f1", root=root)
+    pe.transitar("a", "bloqueado", msg="EC-016 quota; retoma automática às 2026-11-18T15:00:00", fila="f1", root=root,
+                 motivo="EC-016 quota", retoma_em="2026-11-18T15:00:00")
+    texto = sp_estado.listar(str(root), raiz_sp=str(tmp_path / "vazio"))
+    assert "a · bloqueado · EC-016 quota; retoma automática" in texto and "retoma 2026-11-18T15:00:00" in texto
+
+
+def test_recusas_do_estado_no_formato_ec(tmp_path, capsys):
+    import kf_erros
+    assert sp_estado.main(["nao-existe", "done", "--root", str(tmp_path)]) == 1
+    lido = kf_erros.ler(capsys.readouterr().err.rstrip("\n"))
+    assert lido is not None and lido.ec == "EC-067" and "slug desconhecido" in lido.oque

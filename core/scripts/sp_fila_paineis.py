@@ -72,7 +72,8 @@ def prompt_painel(slug, worktree):
     """Prompt numa só linha (o Enter enviado ao painel submete-o): michi em modo auto na worktree, atalhos proibidos e `sp-estado` no fim."""
     return (f"/michi --auto {slug} (painel da fila /sp-fila) Worktree já criada: {worktree}; lê e escreve só lá. "
             "Nunca: `sp-fechar.py --sem-budget`, `--sem-testes` ou semelhantes, merge, `sb-worktree clean`, `/kaizen-sync`, "
-            "abrir painéis ou `sp-handoff --launch`. Ao terminar ou parar, corre por último "
+            "abrir painéis ou `/handoff`; passagem de sessão só com `sp-handoff.py --launch <SP> --auto` (repete este prompt). "
+            "Ao terminar ou parar, corre por último "
             f"`python -I scripts/sp-estado.py {slug} <estado> --msg '<resumo numa linha>'` "
             "com <estado> = done (SP em Done na worktree), pergunta (decisão do user em falta), bloqueado (gate ou erro) ou falhou.")
 

@@ -7,8 +7,10 @@ Uso nos scripts (no fim do ficheiro):
         sys.exit(kf_errlog.executar("sp-move", main))
 
 Cada falha (exceção ou rc != 0) vira uma linha JSON: ts, script, args, tipo, mensagem,
-branch, rc (+ contexto). Best effort: falhar a gravar nunca parte o script, e a
-mensagem, o stdout e o rc do script não mudam. Nunca grava valores de segredos.
+branch, rc (+ contexto, + ec quando há código EC-NNN). Best effort: falhar a gravar nunca
+parte o script, e a mensagem, o stdout e o rc do script não mudam. Nunca grava valores de segredos.
+Exceção não tratada: sai no formato de `kf_erros` (EC-010, rc 1, sem stack); `KF_DEBUG=1`
+ou `--debug` nos argumentos re-levanta a exceção (stack completo).
 
 Local: $KF_ERRLOG, senão %LOCALAPPDATA%\\kaizen-flow\\errors.jsonl, senão
 ~/.kaizen-flow/errors.jsonl (fora do git). Rotação a 1 MiB (errors.jsonl.1).
@@ -23,6 +25,7 @@ from pathlib import Path as _P
 import sys as _s
 _s.path.insert(0, str(_P(__file__).resolve().parent))
 from painel_backend import run_hidden  # noqa: E402
+import kf_erros  # noqa: E402
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -99,8 +102,8 @@ def _rodar(path):
         pass
 
 
-def registar(script, erro, contexto=None, rc=None, args=None):
-    """Grava uma linha no log. Devolve True se gravou; nunca levanta."""
+def registar(script, erro, contexto=None, rc=None, args=None, ec=None):
+    """Grava uma linha no log (com `ec`, ou o 1.º EC-NNN da mensagem). Devolve True se gravou; nunca levanta."""
     try:
         if isinstance(erro, BaseException):
             tipo, mensagem = type(erro).__name__, str(erro)
@@ -115,6 +118,9 @@ def registar(script, erro, contexto=None, rc=None, args=None):
             "branch": _branch(),
             "rc": rc,
         }
+        ec = ec or next(iter(kf_erros.ecs_em(mensagem)), None)
+        if ec:
+            linha["ec"] = ec
         if contexto:
             linha["contexto"] = _limpar_texto(contexto, MAX_MSG)
         path = caminho_log()
@@ -147,6 +153,15 @@ def _ultima_linha(texto):
     return linhas[-1] if linhas else ""
 
 
+def _msg_inesperado(script, e, gravou):
+    detalhe = _limpar_texto(f"{type(e).__name__}: {e}", 200)
+    estado = (f"nada foi desfeito; detalhe gravado em {caminho_log()}" if gravou
+              else "nada foi desfeito; log de erros não gravado (pasta sem escrita)")
+    return kf_erros.erro(kf_erros.EC_INESPERADO, f"{script} falhou com um erro inesperado ({detalhe})",
+                         "exceção não tratada no script", estado,
+                         "repetir com `KF_DEBUG=1` para ver o stack e reportar com a linha do log")
+
+
 def executar(script, main, argv=None):
     """Corre `main()` (lê `sys.argv`; `argv` só serve para o log) e regista exceções e rc != 0 sem mudar o resultado (re-raise, mesmo rc)."""
     real = sys.stderr
@@ -162,8 +177,12 @@ def executar(script, main, argv=None):
             registar(script, msg or f"SystemExit({code})", rc=code if isinstance(code, int) else 1, args=args)
         raise
     except Exception as e:
-        registar(script, e, rc=1, args=args)
-        raise
+        sys.stderr = real
+        gravou = registar(script, e, rc=1, args=args, ec=kf_erros.EC_INESPERADO)
+        if os.environ.get("KF_DEBUG") or "--debug" in [str(a) for a in args]:
+            raise
+        print(_msg_inesperado(script, e, gravou), file=real)
+        raise SystemExit(1) from None
     finally:
         sys.stderr = real
     if rc not in (None, 0):

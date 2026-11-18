@@ -96,14 +96,63 @@ def test_wrapper_rc_nao_zero_regista_e_mantem_rc_e_stderr(log, capsys):
     assert l["rc"] == 3 and l["mensagem"] == "erro: coisa" and l["args"] == ["x"]
 
 
-def test_wrapper_excecao_regista_e_repropaga(log):
+def test_wrapper_excecao_regista_e_sai_no_formato_ec010(log, capsys, monkeypatch):
+    monkeypatch.delenv("KF_DEBUG", raising=False)
+
+    def main():
+        raise KeyError("k")
+
+    with pytest.raises(SystemExit) as e:
+        kf_errlog.executar("s", main, argv=[])
+    assert e.value.code == 1
+    err = capsys.readouterr().err
+    assert err.startswith("EC-010 O quê: s falhou com um erro inesperado (KeyError: 'k')")
+    assert "Porquê:" in err and "Estado guardado:" in err and "Próximo:" in err and "Traceback" not in err
+    (l,) = linhas(log)
+    assert l["tipo"] == "KeyError" and l["rc"] == 1 and l["ec"] == "EC-010"
+
+
+def test_wrapper_excecao_com_kf_debug_repropaga(log, monkeypatch):
+    monkeypatch.setenv("KF_DEBUG", "1")
+
     def main():
         raise KeyError("k")
 
     with pytest.raises(KeyError):
         kf_errlog.executar("s", main, argv=[])
     (l,) = linhas(log)
-    assert l["tipo"] == "KeyError" and l["rc"] == 1
+    assert l["ec"] == "EC-010"
+
+
+def test_wrapper_excecao_com_flag_debug_repropaga(log, monkeypatch):
+    monkeypatch.delenv("KF_DEBUG", raising=False)
+    with pytest.raises(ValueError):
+        kf_errlog.executar("s", lambda: (_ for _ in ()).throw(ValueError("v")), argv=["--debug"])
+
+
+def test_wrapper_excecao_com_log_inacessivel_diz_que_nao_gravou(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("KF_DEBUG", raising=False)
+    ficheiro = tmp_path / "f"
+    ficheiro.write_text("x")
+    monkeypatch.setenv("KF_ERRLOG", str(ficheiro / "e.jsonl"))
+    with pytest.raises(SystemExit):
+        kf_errlog.executar("s", lambda: 1 / 0, argv=[])
+    assert "log de erros não gravado" in capsys.readouterr().err
+
+
+def test_registar_grava_ec_dado_ou_tirado_da_mensagem(log):
+    kf_errlog.registar("s", "x", ec="EC-016")
+    kf_errlog.registar("s", "EC-043 O quê: SP em curso")
+    kf_errlog.registar("s", "sem código")
+    a, b, c = linhas(log)
+    assert a["ec"] == "EC-016" and b["ec"] == "EC-043" and "ec" not in c
+
+
+def test_wrapper_systemexit_com_mensagem_ec_grava_ec(log):
+    with pytest.raises(SystemExit):
+        kf_errlog.executar("s", lambda: sys.exit("EC-061 O quê: ramo errado"), argv=[])
+    (l,) = linhas(log)
+    assert l["ec"] == "EC-061"
 
 
 def test_wrapper_systemexit_texto_e_codigo(log):
