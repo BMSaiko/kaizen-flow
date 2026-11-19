@@ -54,38 +54,41 @@ def _id(valor):
     return None if valor in (None, "") else str(valor)
 
 
+def _classificar(sp, fila, vivos, proprio, suja):
+    """(ação, protegido) de um SP: no máximo um deles é não nulo."""
+    slug, estado, pane = sp.get("slug"), sp.get("estado"), _id(sp.get("pane"))
+    vivo = pane is not None and pane in vivos
+    base = {"slug": slug, "fila": fila, "alvo": pane}
+    if estado == pe.ILEGIVEL:
+        return None, {**base, "motivo": "estado ilegível"}
+    if estado in pe.ATIVOS and not vivo:
+        return {**base, "acao": "estado-orfao", "motivo": f"{estado} sem painel vivo → bloqueado"}, None
+    if not vivo:
+        return None, None
+    if pane == proprio:
+        return None, {**base, "motivo": "painel onde corre o comando"}
+    if estado in pe.ATIVOS:
+        return None, {**base, "motivo": f"SP {estado}"}
+    if estado != "done":
+        return None, {**base, "motivo": f"SP {estado} (rever antes de fechar)"}
+    s = suja(sp.get("worktree"))
+    if s is False:
+        return {**base, "acao": "fechar-painel", "motivo": "SP done, worktree limpa"}, None
+    return None, {**base, "motivo": "worktree suja" if s else "worktree não verificada"}
+
+
 def planear(filas, vivos, proprio=None, suja=worktree_suja):
     """(ações, protegidos). `vivos`: ids dos painéis vivos. Cada ação: {acao, alvo, slug, fila, motivo}."""
     acoes, protegidos = [], []
     for f in filas:
         presos = 0
         for sp in f["sps"]:
-            slug, estado, pane = sp.get("slug"), sp.get("estado"), _id(sp.get("pane"))
-            vivo = pane is not None and pane in vivos
-            base = {"slug": slug, "fila": f["fila"], "alvo": pane}
-            if estado == pe.ILEGIVEL:
-                protegidos.append({**base, "motivo": "estado ilegível"})
+            acao, protegido = _classificar(sp, f["fila"], vivos, proprio, suja)
+            if acao:
+                acoes.append(acao)
+            if protegido:
+                protegidos.append(protegido)
                 presos += 1
-            elif estado in pe.ATIVOS and not vivo:
-                acoes.append({**base, "acao": "estado-orfao", "motivo": f"{estado} sem painel vivo → bloqueado"})
-            elif not vivo:
-                continue
-            elif pane == proprio:
-                protegidos.append({**base, "motivo": "painel onde corre o comando"})
-                presos += 1
-            elif estado in pe.ATIVOS:
-                protegidos.append({**base, "motivo": f"SP {estado}"})
-                presos += 1
-            elif estado != "done":
-                protegidos.append({**base, "motivo": f"SP {estado} (rever antes de fechar)"})
-                presos += 1
-            else:
-                s = suja(sp.get("worktree"))
-                if s is False:
-                    acoes.append({**base, "acao": "fechar-painel", "motivo": "SP done, worktree limpa"})
-                else:
-                    protegidos.append({**base, "motivo": "worktree suja" if s else "worktree não verificada"})
-                    presos += 1
         sps = f["sps"]
         if sps and not presos and all(sp.get("estado") == "done" for sp in sps):
             acoes.append({"acao": "remover-fila", "alvo": None, "slug": None, "fila": f["fila"],
