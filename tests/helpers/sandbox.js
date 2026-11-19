@@ -26,7 +26,7 @@ function correr(cmd, args, cwd, env, extra = {}) {
 
 /** Cria o sandbox; `init: false` deixa só o tmpdir com `git init`. */
 function sandbox({ init = true, harness = "claude" } = {}) {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), "kaizen e2e "));
+  const base = fs.realpathSync(fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "kaizen e2e ")));
   const dir = path.join(base, "projeto ção");
   fs.mkdirSync(dir);
   const env = envIsolado(base);
