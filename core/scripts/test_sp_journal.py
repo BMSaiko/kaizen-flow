@@ -251,7 +251,7 @@ def test_caminho_com_espacos_e_acentos(tmp_path):
 
 
 @pytest.mark.skipif(os.name != "nt", reason="caminhos > 260 só limitam no Windows")
-def test_ec_057_caminho_maior_que_260(tmp_path):
+def test_ec_055_journal_caminho_maior_que_260(tmp_path):
     raiz = tmp_path
     for _ in range(12):
         raiz = raiz / ("d" * 30)

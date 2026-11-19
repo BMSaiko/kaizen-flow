@@ -108,6 +108,11 @@ def problemas(cat, root):
                     probs.append(f"{iid}: ficheiro de teste inexistente {r[0]}")
                 elif not _nome_existe(root / r[0], r[1], (teste.split("::")[1:-1] or [None])[-1]):
                     probs.append(f"{iid}: teste '{r[1]}' não existe em {r[0]}")
+                else:
+                    m = re.search(r"(?i)(?:^|_)(ec|uc)_(\d{3})", r[1])
+                    outro = m and f"{m.group(1).upper()}-{m.group(2)}"
+                    if outro and isinstance(iid, str) and outro[:2] == iid[:2] and outro != iid:
+                        probs.append(f"{iid}: teste '{r[1]}' tem o nome de {outro} (ligado ao EC/UC errado?)")
     for cid in ids_cat:
         if not any(isinstance(e, dict) and e.get("categoria") == cid for e in cat.get("edge_cases") or []):
             probs.append(f"categoria {cid}: vazia (sem EC)")

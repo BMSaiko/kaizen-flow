@@ -18,11 +18,12 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 |---|---|---|---|---|
 | EC-001 | Ctrl+C during a michi phase (DA step half done) | the last finished phase and step are journaled; `kaizen resume` continues from the next step | checkpoint-journal | `core/scripts/test_sp_journal.py::test_ec_001_inicio_sem_fim_e_interrompido` |
 | EC-002 | Pane of a queued story closed while it was running | the watcher marks the story `falhou` and frees the slot; the next story in the queue starts | resume-orfaos | `core/scripts/test_sp_vigia.py::test_painel_morto_sem_estado_passa_a_falhou` |
-| EC-003 | Ctrl+C while `sp-gates.py` is running a gate | the unfinished gate is not cached as green; rerunning the gates starts that gate again | testes-falha-90 | `por cobrir` |
+| EC-003 | Ctrl+C while `sp-gates.py` is running a gate | the unfinished gate is not cached as green; rerunning the gates starts that gate again | testes-falha-90 | `core/scripts/test_sp_gates.py::test_ec_003_ctrl_c_num_gate_nao_o_deixa_verde_na_cache` |
 | EC-004 | Interrupted while a story file is being rewritten (move, handoff, approval) | the write is atomic: the story is either the old or the new version, never truncated | checkpoint-journal | `core/scripts/test_sp_journal.py::test_ec_004_gravacao_atomica_leitor_nunca_ve_json_parcial` |
 | EC-005 | Fresh session fails while printing the handoff it is consuming | the handoff file is kept; `handoff.py consume` can be run again | resume-orfaos | `core/scripts/test_handoff.py::test_consume_falha_a_imprimir_nao_apaga` |
 | EC-006 | Ctrl+D (EOF) at a terminal confirmation | EOF counts as no; nothing is abandoned or deleted | preflight-erros-ux | `core/scripts/test_sp_fila_estado.py::test_obsoleta_eof_no_terminal_vale_como_nao` |
-| EC-059 | `/sp-handoff --launch` run inside a pane started by a queue (`/clear`, then `/michi` in the same pane) | the handoff is allowed; the watcher keeps the story `a-correr` and does not mark it `falhou` or launch the next one | resume-orfaos | `por cobrir` |
+| EC-059 | `/sp-handoff --launch` run inside a pane started by a queue (`/clear`, then `/michi` in the same pane) | the handoff is allowed; the watcher keeps the story `a-correr` and does not mark it `falhou` or launch the next one | resume-orfaos | `core/scripts/test_sp_handoff.py::test_ec_059_retoma_num_painel_da_fila_repete_o_prompt_da_fila` |
+| EC-069 | Terminal pane closed (SIGHUP) during a phase on Linux or macOS | the checkpoint is written with `interrompido: true` before the process ends (rc 128+SIGHUP) | testes-falha-90 | `core/scripts/test_falha_journal_disco.py::test_ec_069_sighup_num_processo_real_grava_checkpoint` |
 
 ## Crash (script, gate or test: rc != 0, exception, timeout)
 
@@ -48,7 +49,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-019 | Model session or context runs out mid-phase | the phase is journaled before the handoff; the fresh session resumes from it | checkpoint-journal | `core/scripts/test_sp_journal.py::test_ec_019_fase_gravada_antes_do_handoff` |
 | EC-020 | A session ends before done and the story allows escalation | the story is relaunched once at the next model level, in the same slot | resume-orfaos | `core/scripts/test_sp_vigia.py::test_decidir_uma_so_escalada` |
 | EC-021 | The Enter sent to a new pane is lost and the prompt is not submitted | Enter is resent a bounded number of times, then the launch is marked as error | resume-orfaos | `core/scripts/test_handoff_spawn.py::test_enter_perdido_esgota_tentativas_e_fica_em_erro` |
-| EC-022 | Author pane launched but the prompt never submits (`falhou`) after the ephemeral seed was deleted | the seed is kept until the session has read it, so the launch can be retried | resume-orfaos | `por cobrir` |
+| EC-022 | Author pane launched but the prompt never submits (`falhou`) after the ephemeral seed was deleted | the seed is kept until the session has read it, so the launch can be retried | resume-orfaos | `core/scripts/test_sp_autor_painel.py::test_ec_022_prompt_nao_submetido_mantem_a_semente_e_permite_relancar` |
 | EC-066 | Model login or session expired (`/login`, OAuth token expired) | the story is left `bloqueado` with the cause and no automatic resume time; the message says to log in and run `kaizen resume` | preflight-erros-ux | `core/scripts/test_sp_vigia.py::test_sessao_expirada_bloqueia_sem_retoma_automatica` |
 
 ## Git and worktree (conflict, wrong branch, dirty or orphan)
@@ -74,8 +75,8 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 
 | ID | Trigger | Expected | Owner | Test |
 |---|---|---|---|---|
-| EC-032 | Terminal crashed or machine off with panes still registered `a-correr` | registrations are reconciled with the live panes so orphans no longer take a slot | resume-orfaos | `por cobrir` |
-| EC-033 | Story left `pendente` for lack of a slot when a slot opens | the pending story starts on its own | resume-orfaos | `por cobrir` |
+| EC-032 | Terminal crashed or machine off with panes still registered `a-correr` | registrations are reconciled with the live panes so orphans no longer take a slot | resume-orfaos | `core/scripts/test_sp_vigia.py::test_ec_032_paineis_orfaos_reconciliados_libertam_as_vagas` |
+| EC-033 | Story left `pendente` for lack of a slot when a slot opens | the pending story starts on its own | resume-orfaos | `core/scripts/test_sp_fila_paralelo.py::test_ec_033_pendente_sem_vaga_arranca_quando_a_vaga_abre` |
 | EC-034 | Session closed before the story reaches done | the story becomes `falhou` and the queue launches the next one | resume-orfaos | `core/scripts/test_sp_fila_paralelo.py::test_sessao_fechada_fora_de_done_vira_falhada_e_a_fila_lanca_a_seguinte` |
 | EC-035 | The terminal GUI socket recorded for handoff is dead | the most recent live socket is used | resume-orfaos | `core/scripts/test_handoff_socket.py::test_live_socket_morto_escolhe_o_vivo_mais_recente` |
 | EC-036 | No terminal multiplexer available for a parallel queue | refused with a clear error before any state is created | preflight-erros-ux | `core/scripts/test_sp_fila_paralelo.py::test_main_paralelo_sem_backend_recusa_antes_de_criar_estado` |
@@ -110,7 +111,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-052 | Story file with CRLF line endings is rewritten by a handoff | CRLF is preserved | testes-falha-90 | `core/scripts/test_sp_handoff.py::test_write_preserva_crlf` |
 | EC-053 | Story file with CRLF line endings is approved | CRLF is preserved and approving twice changes nothing | testes-falha-90 | `core/scripts/test_sp_aprovar.py::test_aprovar_idempotente_e_preserva_crlf` |
 | EC-054 | Resume command sent to a pane with spaces in the path | the path reaches the pane intact | testes-falha-90 | `core/scripts/test_sp_handoff.py::test_send_ordem_espera_clear_espera_michi_com_espacos_no_caminho` |
-| EC-055 | Worktree path longer than 260 characters | a clear error naming the path, or long-path support, never a half-created worktree | testes-falha-90 | `por cobrir` |
-| EC-056 | Accented characters in a path or story title | files are read and written as UTF-8 without mangling | testes-falha-90 | `por cobrir` |
-| EC-057 | Console window closed (CTRL_CLOSE_EVENT) during a phase | the phase journal is flushed before the process ends | checkpoint-journal | `core/scripts/test_sp_journal.py::test_ec_057_caminho_maior_que_260` |
+| EC-055 | Worktree path longer than 260 characters | a clear error naming the path, or long-path support, never a half-created worktree | testes-falha-90 | `core/scripts/test_sp_preflight.py::test_ec_055_worktree_com_caminho_longo_erro_claro_sem_criar` |
+| EC-056 | Accented characters in a path or story title | files are read and written as UTF-8 without mangling | testes-falha-90 | `core/scripts/test_sp_progresso.py::test_ec_056_titulo_e_caminho_acentuados_lidos_e_escritos_em_utf8` |
+| EC-057 | Console window closed (CTRL_CLOSE_EVENT) during a phase | the phase journal is flushed before the process ends | checkpoint-journal | `core/scripts/test_sp_journal.py::test_ec_057_handler_de_fecho_de_consola_grava_checkpoint` |
 | EC-058 | Text with control characters sent to a pane | it is refused before anything is sent | testes-falha-90 | `core/scripts/test_sp_handoff.py::test_send_argv_recusa_caracteres_de_controlo` |

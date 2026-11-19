@@ -279,3 +279,19 @@ def test_desempenho_menos_de_2s_com_worktrees_reais(repo):
     t = time.perf_counter()
     diag(repo / ".." / "wt-a", "a")
     assert time.perf_counter() - t < 2.0
+
+
+def test_ec_055_worktree_com_caminho_longo_erro_claro_sem_criar(repo, monkeypatch):
+    """EC-055: destino da worktree acima do limite → erro com o caminho; o pré-voo não cria nada."""
+    monkeypatch.setattr(pf, "LIMITE_CAMINHO", 10)
+    antes = sorted(p.name for p in repo.parent.iterdir())
+    probs = diag(repo, "y")
+    assert ecs(probs) == ["EC-062", "EC-055"]
+    longo = probs[1]
+    assert longo.nivel == "erro" and f"{repo.name}-y" in longo.oque and "core.longpaths" in longo.proximo
+    assert sorted(p.name for p in repo.parent.iterdir()) == antes
+
+
+def test_ec_055_caminho_curto_sem_aviso(repo, monkeypatch):
+    monkeypatch.setattr(pf, "LIMITE_CAMINHO", 10_000)
+    assert ecs(diag(repo, "y")) == ["EC-062"]

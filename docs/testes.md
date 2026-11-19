@@ -44,10 +44,19 @@ Regra de subida:
 Além da cobertura de linhas, o workflow mede a cobertura de casos: `docs/catalogo.json` é a fonte única dos edge cases (`EC-NNN`, por categoria) e dos use cases (`UC-NNN`); `docs/edge-cases.md` e `docs/use-cases.md` são gerados a partir dele (`kaizen catalog render`).
 
 - Cada entrada tem `teste` = `caminho::[Classe::]nome` ou `por cobrir`. Um caso só conta como coberto se o teste existir e passar (pytest: não falha nem é saltado; Node: `# pass` ≥ 1 e `# fail` 0).
-- `kaizen catalog --check`: valida a estrutura (IDs únicos e sem buracos, categorias com casos, testes existentes) e que os `.md` estão em dia; rc 1 em qualquer problema.
+- `kaizen catalog --check`: valida a estrutura (IDs únicos e sem buracos, categorias com casos, testes existentes, nome do teste sem outro `ec_NNN`/`uc_NNN`) e que os `.md` estão em dia; rc 1 em qualquer problema.
 - `kaizen catalog` (report): corre os testes ligados e imprime cobertos/total; rc 0 só com EC ≥ 0,9 e UC = 1,0 (`limiar` no JSON). `--json` para máquinas, `--no-run` conta os testes ligados sem os correr.
 - Para cobrir um caso: escrever o teste, trocar `por cobrir` pelo nome real em `docs/catalogo.json`, correr `kaizen catalog render` e `kaizen catalog --check`.
 - Linha de base (2026-11-16): EC 43/59 (0,73), UC 22/34 (0,65); rc 1 até os filhos do programa de retoma fecharem os casos em falta.
+
+## Testes de falha e propriedades
+
+- Fixtures de injeção em `core/scripts/conftest.py`: `relogio` e `tempo_falso` (relógio controlado), `falha_replace` (`os.replace` falha N vezes e depois passa); cada uma tem teste-sentinela.
+- Propriedades Hypothesis em `core/scripts/test_propriedades.py` (checkpoint/journal, estado corrompido, locks), perfil `kaizen` determinístico (`derandomize=True`). Contraexemplo = bug: correção mínima no módulo dono + EC no catálogo.
+- Fault injection em `core/scripts/test_falha_journal_disco.py` (sinais, disco cheio, quarentena, cauda truncada, `.rec` morto, unlink preso, heartbeat) e performance em `test_falha_performance.py` (checkpoint < 200 ms, pré-voo < 2 s, mediana de 5).
+- Nome do teste com o EC que garante (`test_ec_NNN_...`); confirmar o ID no catálogo antes de o escrever.
+- Cobertura de linhas ≥ 90 % nos módulos de erro/retoma (`sp_journal`, `sp_disco`, `sp-resume`, `sp-preflight`, `kf_erros`); o bloco Windows de `sp_disco.pid_vivo` não corre no Linux.
+- fast-check (Node): sem alvo. O CLI Node só copia ficheiros (`init`, `sync`) e invoca Python; o estado (journal, checkpoint, locks) vive em Python e é coberto pelo Hypothesis.
 
 ## Correr localmente
 

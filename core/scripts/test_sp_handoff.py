@@ -617,7 +617,7 @@ def _fila(root, slug="sp-x", pane="w3:p17", estado="a-correr", wt="/wt/sb-sp-x")
         pe.transitar(slug, estado, fila="mae", root=root)
 
 
-def test_retoma_num_painel_da_fila_repete_o_prompt_da_fila(tmp_path, monkeypatch):
+def test_ec_059_retoma_num_painel_da_fila_repete_o_prompt_da_fila(tmp_path, monkeypatch):
     monkeypatch.setenv("SP_FILA_ROOT", str(tmp_path))
     _fila(tmp_path)
     cmds = sp_handoff.resume_commands("claude", "knowledge/p/sp/Doing/sp-x.md", pane="w3:p17")

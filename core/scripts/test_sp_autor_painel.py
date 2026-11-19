@@ -271,3 +271,16 @@ def test_fechar_sem_estado_usa_o_painel_atual(tmp_path, monkeypatch):
     monkeypatch.setattr(sa.painel_backend, "painel_atual", lambda env=None: ("herdr", "w3:pX"))
     assert sa.fechar("nao-existe", b, estado_root=tmp_path / "e") == "w3:pX"
     assert b.fechados == ["w3:pX"]
+
+
+def test_ec_022_prompt_nao_submetido_mantem_a_semente_e_permite_relancar(modelos_json, sp_vazio, tmp_path):
+    """EC-022: o painel falha antes de ler a semente (`falhou`): a semente fica e o relançamento passa."""
+    root = tmp_path / "estado"
+    s = _semente(tmp_path, "decisões por ler")
+    falha = sa.lancar(sp_vazio, s, FakeBackend(enviar_ok=False), cwd=tmp_path, estado_root=root, sleep=lambda x: None)
+    assert falha["estado"] == "falhou"
+    assert s.read_text(encoding="utf-8") == "decisões por ler"
+    ok = FakeBackend()
+    res = sa.lancar(sp_vazio, s, ok, cwd=tmp_path, estado_root=root, sleep=lambda x: None)
+    assert res["estado"] == "a-correr" and len(ok.abertos) == 1
+    assert any(str(s) in texto for _, texto in ok.enviados)

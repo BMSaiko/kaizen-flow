@@ -17,11 +17,12 @@ LOCK_VELHO_S = 60  # um bloqueio mais antigo, sem pid legível, é de uma sessã
 HEARTBEAT_S = 15  # intervalo do heartbeat do lock de SP
 HEARTBEAT_VELHO_S = 90  # heartbeat mais antigo = dono preso ou pid reutilizado (órfão)
 HEARTBEAT_SEM_PID_S = 1800  # lock sem pid (michi por CLI: cada fase renova) só expira após este silêncio
+PID_MAX = 2**31 - 1  # maior pid aceite por `os.kill` (C int) e pelos pids reais de Linux/macOS/Windows
 
 
 def pid_vivo(pid):
     """True se o processo `pid` existe. Windows: OpenProcess + GetExitCodeProcess (259 = ainda ativo); nunca `os.kill(pid, 0)`, que lá termina o processo."""
-    if pid <= 0:
+    if pid <= 0 or pid > PID_MAX:  # EC-041: pid fora do intervalo do SO (lock adulterado) não existe; `os.kill` daria OverflowError
         return False
     if os.name != "nt":
         try:

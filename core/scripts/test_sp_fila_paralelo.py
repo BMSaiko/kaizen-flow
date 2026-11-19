@@ -548,3 +548,23 @@ def test_recusa_de_concorrencia_no_formato_ec067(tmp_path, capsys, n):
     rc = sp_fila.main(["--concorrencia", n, "--estado", str(tmp_path / "e.json"), "--root", str(tmp_path / "sps")])
     lido = kf_erros.ler(capsys.readouterr().err.rstrip("\n"))
     assert rc == 1 and lido is not None and lido.ec == "EC-067" and "--concorrencia" in lido.oque
+
+
+def test_ec_033_pendente_sem_vaga_arranca_quando_a_vaga_abre(tmp_path):
+    """EC-033: SP `pendente` por falta de vaga arranca sozinho no tick seguinte, depois de uma vaga abrir."""
+    root = tmp_path / "sps"
+    make_sp(root, "a")
+    outra = pe.criar_fila("outra")
+    for s in ("x", "y", "z"):
+        pe.registar(outra, s)
+        assert pe.reclamar_vaga(s, fila=outra)
+    st = _estado(tmp_path, concorrencia=2, max=None)
+    painel = PainelFalso()
+    quando = datetime(2026, 10, 25, 12, 0)
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), quando, backend=painel)
+    assert out["acao"] == "espera" and painel.abertos == []
+    pe.transitar("x", "done", fila=outra)
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), quando, backend=painel)
+    fila_a = json.loads(st.read_text(encoding="utf-8"))["fila_paineis"]
+    assert out["acao"] == "lancou" and out["slugs"] == ["a"] and len(painel.abertos) == 1
+    assert pe.ler(fila_a, "a")["estado"] == "a-correr"

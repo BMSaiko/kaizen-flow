@@ -70,3 +70,27 @@ def test_require_doing(tmp_path):
     for st in ("TODO", "Doing"):
         p.write_text(f"---\nstatus: {st}\n---\n", encoding="utf-8")
         sp_progresso.require_doing(p)
+
+
+def test_ec_056_titulo_e_caminho_acentuados_lidos_e_escritos_em_utf8(tmp_path):
+    """EC-056: título e pasta com acentos; o SP é lido e reescrito em UTF-8 por bytes, sem mutilar."""
+    import sp_leitura
+
+    pasta = tmp_path / "histórias ação" / "çãé"
+    pasta.mkdir(parents=True)
+    p = pasta / "coração-é.md"
+    titulo = "# Super Prompt - Configuração de ação: «Ñandú» já é ótimo"
+    original = (
+        "---\r\nstatus: Doing\r\nupdated: 2020-01-01T00:00:00Z\r\nslug: coração-é\r\ntítulo: Ação\r\n---\r\n"
+        f"{titulo}\r\n\r\n## Notas\r\n\r\nçãõ\r\n"
+    )
+    p.write_bytes(original.encode("utf-8"))
+    fm, texto = sp_leitura.ler(p)
+    assert fm["slug"] == "coração-é" and titulo in texto
+    sp_progresso.write(p, "passo «ação» feito: ç ã é", today="2026-11-19")
+    dados = p.read_bytes()
+    t = dados.decode("utf-8")
+    assert titulo.encode("utf-8") in dados and "çãõ\r\n" in t
+    assert "passo «ação» feito: ç ã é\r\n" in t
+    assert "�" not in t and b"\r\r\n" not in dados
+    assert t.count("\r\n") == t.count("\n")
