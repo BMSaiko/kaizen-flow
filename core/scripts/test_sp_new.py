@@ -371,7 +371,7 @@ def test_parent_repetido_nao_duplica_entrada(tmp_path):
 def test_parent_inexistente_ou_nao_programa_falha_sem_criar_filho(tmp_path):
     root = program(tmp_path)
     sp_new.create(root, "atlas", "atlas-plain-2026-10-18", "P2", TODAY)
-    for parent, msg in (("nada", "não existe"), ("atlas-plain-2026-10-18", "kind: program")):
+    for parent, _msg in (("nada", "não existe"), ("atlas-plain-2026-10-18", "kind: program")):
         argv = ["--root", str(root), "--project", "atlas", "--slug", "x", "--priority", "P2", "--parent", parent]
         assert sp_new.main(argv) == 1
         assert not list((root / "atlas/sp/TODO").glob("atlas-x-*.md"))

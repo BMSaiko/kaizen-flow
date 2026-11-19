@@ -23,7 +23,7 @@ def invalidar():
 def _varrer(root):
     """([`*.md` ordenados], {pasta: mtime_ns}) sob `root`."""
     ficheiros, pastas = [], {}
-    for pasta, subs, nomes in os.walk(root):
+    for pasta, _subs, nomes in os.walk(root):
         pastas[pasta] = os.stat(pasta).st_mtime_ns
         ficheiros.extend(Path(pasta, n) for n in nomes if n.endswith(".md"))
     return sorted(ficheiros), pastas

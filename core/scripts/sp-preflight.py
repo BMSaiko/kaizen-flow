@@ -208,7 +208,7 @@ def diagnosticar(slug=None, repo=".", ramo=None, ignorar_orfao=False, which=shut
 def _estado_da_arvore(path, ramo, rp, slug):
     probs = []
     paths = _git(path, "rev-parse", *[a for n, _ in _ESTADOS_GIT for a in ("--git-path", n)]).stdout.splitlines()
-    for (nome, oper), p in zip(_ESTADOS_GIT, paths):
+    for (_nome, oper), p in zip(_ESTADOS_GIT, paths):
         if (Path(p) if Path(p).is_absolute() else Path(path) / p).exists():
             probs.append(Problema(
                 "EC-064", "erro", f"{oper} a meio em {path}", f"um `git {oper}` parou (conflito ou interrupção)",
