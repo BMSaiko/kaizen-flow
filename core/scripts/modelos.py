@@ -175,9 +175,7 @@ def sync(path, check=False):
     return diff
 
 
-def main(argv=None):
-    for stream in (sys.stdout, sys.stderr):
-        stream.reconfigure(encoding="utf-8")
+def _parser():
     ap = argparse.ArgumentParser(description="Modelo/effort por papel")
     ap.add_argument("--config", default=str(DEFAULT))
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -197,53 +195,86 @@ def main(argv=None):
     s.add_argument("--effort")
     y = sub.add_parser("sync")
     y.add_argument("--check", action="store_true")
-    ns = ap.parse_args(argv)
+    return ap
 
+
+def _cmd_list(ns, data):
+    for nome, p in data["papeis"].items():
+        print(f"{nome:<12} {p.get('model', ''):<22} {p.get('effort', '')}")
+    return 0
+
+
+def _cmd_get(ns, data):
+    p = papel(data, ns.papel)
+    if ns.cadeia:
+        print(chr(10).join(cadeia(data, ns.papel)))
+    else:
+        print(json.dumps(p) if ns.json else p["model"])
+    return 0
+
+
+def _cmd_michi(ns, data):
+    r, aviso = michi(data, ns.nivel)
+    if aviso:
+        print(aviso, file=sys.stderr)
+    print(json.dumps(r) if ns.json else r["model"])
+    return 0
+
+
+def _cmd_args(ns, data):
+    print(" ".join(cli_args(ns.papel, ns.config)))
+    return 0
+
+
+def _cmd_set(ns, data):
+    p = papel(data, ns.papel)
+    if ns.effort is not None and ns.effort not in EFFORTS:
+        raise ModelosError(f"effort inválido: {ns.effort} (válidos: {'|'.join(EFFORTS)})")
+    model, aviso = resolve(data, ns.modelo)
+    if aviso:
+        print(aviso, file=sys.stderr)
+    p["model"] = model
+    if ns.effort:
+        p["effort"] = ns.effort
+    save(ns.config, data)
+    print(f"{ns.papel}: {model} / {p.get('effort', '')}")
+    for rel in sync(ns.config):
+        print(f"sync: {rel}")
+    return 0
+
+
+def _cmd_sync(ns, data):
+    diff = sync(ns.config, check=ns.check)
+    for rel in diff:
+        print(f"{'difere' if ns.check else 'sync'}: {rel}")
+    if ns.check and diff:
+        print("frontmatter diverge de modelos.json: correr `modelos.py sync`", file=sys.stderr)
+        return 1
+    return 0
+
+
+_COMANDOS = {
+    "list": _cmd_list,
+    "get": _cmd_get,
+    "michi": _cmd_michi,
+    "args": _cmd_args,
+    "set": _cmd_set,
+    "sync": _cmd_sync,
+}
+
+
+def main(argv=None):
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(encoding="utf-8")
+    ns = _parser().parse_args(argv)
     try:
         data = load(ns.config)
         for aviso in avisos_ids(data):
             print(aviso, file=sys.stderr)
-        if ns.cmd == "list":
-            for nome, p in data["papeis"].items():
-                print(f"{nome:<12} {p.get('model', ''):<22} {p.get('effort', '')}")
-        elif ns.cmd == "get":
-            p = papel(data, ns.papel)
-            if ns.cadeia:
-                print(chr(10).join(cadeia(data, ns.papel)))
-            else:
-                print(json.dumps(p) if ns.json else p["model"])
-        elif ns.cmd == "michi":
-            r, aviso = michi(data, ns.nivel)
-            if aviso:
-                print(aviso, file=sys.stderr)
-            print(json.dumps(r) if ns.json else r["model"])
-        elif ns.cmd == "args":
-            print(" ".join(cli_args(ns.papel, ns.config)))
-        elif ns.cmd == "set":
-            p = papel(data, ns.papel)
-            if ns.effort is not None and ns.effort not in EFFORTS:
-                raise ModelosError(f"effort inválido: {ns.effort} (válidos: {'|'.join(EFFORTS)})")
-            model, aviso = resolve(data, ns.modelo)
-            if aviso:
-                print(aviso, file=sys.stderr)
-            p["model"] = model
-            if ns.effort:
-                p["effort"] = ns.effort
-            save(ns.config, data)
-            print(f"{ns.papel}: {model} / {p.get('effort', '')}")
-            for rel in sync(ns.config):
-                print(f"sync: {rel}")
-        elif ns.cmd == "sync":
-            diff = sync(ns.config, check=ns.check)
-            for rel in diff:
-                print(f"{'difere' if ns.check else 'sync'}: {rel}")
-            if ns.check and diff:
-                print("frontmatter diverge de modelos.json: correr `modelos.py sync`", file=sys.stderr)
-                return 1
+        return _COMANDOS[ns.cmd](ns, data)
     except ModelosError as e:
         print(e, file=sys.stderr)
         return 2
-    return 0
 
 
 if __name__ == "__main__":
