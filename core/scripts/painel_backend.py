@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sp_disco import ler_json  # noqa: E402
+import contextlib
 
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 try:
@@ -497,10 +498,8 @@ class BackgroundBackend(Backend):
                 os.kill(pid, signal.SIGTERM)
         filho = self._filhos.get(str(id))
         if filho is not None:
-            try:
+            with contextlib.suppress(subprocess.TimeoutExpired):
                 filho.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                pass
         return True
 
     def ecra(self, id):

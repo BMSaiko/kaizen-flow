@@ -16,6 +16,7 @@ from handoff_pane import (ENTER_SETTLE, ENTER_TRIES, HandoffError, _argvs, _copy
                           run_hidden, send_confirmed)
 
 from sp_fila_estado import ESTADO, atualizar, guardar, registar_sessao  # noqa: E402
+import contextlib
 try:
     import modelos  # noqa: E402
 except ImportError:  # kaizen-flow sem modelos.py: lança só `claude`
@@ -130,8 +131,6 @@ def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.slee
     if backend == "clipboard":
         ok = [r["slug"] for r in results if r["ok"]]
         if ok:
-            try:
+            with contextlib.suppress(OSError):
                 (copy or _copy)(f"/michi --auto {ok[-1]}")
-            except OSError:
-                pass
     return results

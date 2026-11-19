@@ -10,7 +10,7 @@ import json
 import os
 import threading
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from pathlib import Path
 
 LOCK_VELHO_S = 60  # um bloqueio mais antigo, sem pid legível, é de uma sessão morta
@@ -217,10 +217,8 @@ class LockSp:
     def iniciar_heartbeat(self, intervalo=HEARTBEAT_S):
         def corre():
             while not self._parar.wait(intervalo):
-                try:
+                with suppress(OSError):
                     self.heartbeat()
-                except OSError:
-                    pass
         self._thread = threading.Thread(target=corre, daemon=True)
         self._thread.start()
 
