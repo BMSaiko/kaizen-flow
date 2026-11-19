@@ -205,7 +205,7 @@ def test_json_ilegivel_ou_em_falta_rc1(repo, capsys):
 
 def test_report_usa_o_executor_e_devolve_rc(repo, capsys, monkeypatch):
     p = escrever(repo, base())
-    monkeypatch.setattr(kc, "correr_testes", lambda refs, root: {r: True for r in refs})
+    monkeypatch.setattr(kc, "correr_testes", lambda refs, root: dict.fromkeys(refs, True))
     assert kc.main(["report", "--file", str(p), "--root", str(repo)]) == 1  # EC 1/2 < 0,9
     out = capsys.readouterr().out
     assert "EC: 1/2" in out and "UC: 1/1" in out and "EC-002" in out

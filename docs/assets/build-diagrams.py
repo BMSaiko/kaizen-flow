@@ -1,7 +1,7 @@
 """Regenera os SVG de docs/assets. Uso: python -I docs/assets/build-diagrams.py docs/assets"""
 import sys
 out = sys.argv[1] if len(sys.argv) > 1 else "."
-C = dict(blue="#38bdf8", violet="#a78bfa", amber="#fbbf24", green="#34d399", red="#f87171", grey="#94a3b8")
+C = {"blue": "#38bdf8", "violet": "#a78bfa", "amber": "#fbbf24", "green": "#34d399", "red": "#f87171", "grey": "#94a3b8"}
 
 
 def head(w, h, title, desc, t, sub):
