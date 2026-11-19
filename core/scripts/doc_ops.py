@@ -8,7 +8,7 @@ rc: n/a (listar devolve 0; erros por exceção)
 """
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -97,7 +97,7 @@ def move(root, kind, slug, dest):
     if src.parent.name == target:
         return f"{slug}: já está em {target} ({src})"
     dst = src.parent.parent / target / src.name
-    updated = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    updated = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     new_raw = rewrite(src.read_bytes(), target, updated)
     kaizen_engine.relocate(src, dst)
     dst.write_bytes(new_raw)

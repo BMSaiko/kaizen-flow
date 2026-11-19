@@ -15,7 +15,7 @@ _s.path.insert(0, str(_P(__file__).resolve().parent))
 from painel_backend import run_hidden  # noqa: E402
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -145,7 +145,7 @@ def arrancar_ajuste(info, validar, vagas, spawn):
     if not ok:
         return {"acao": "falhou", "motivo": f"SP inválido: {msg}"}
     if vagas() <= 0:
-        return {"acao": "em-espera", "espera": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        return {"acao": "em-espera", "espera": datetime.now(UTC).isoformat(timespec="seconds")}
     res = (spawn([info["ajuste"]]) or [{}])[0]
     if res.get("ok"):
         return {"acao": "a-correr"}

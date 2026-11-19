@@ -6,7 +6,7 @@ rc: n/a
 Exceções (único sítio): SPs com `origem:` (correção nascida de um veredicto `ajustar`, SP de `pentest`)
 ficam aprovados pela origem, sem grill. SPs de `date` anterior a DESDE não precisam de `aprovado`.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 DESDE = "2026-11-13"
 RONDAS_MINIMAS = 1
@@ -21,7 +21,7 @@ def por_aprovar(fm):
 
 
 def agora():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def gravar_campos(path, campos):

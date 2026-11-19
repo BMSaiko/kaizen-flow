@@ -21,7 +21,7 @@ import subprocess  # só para SubprocessError; correr processos é com painel_ba
 import sys
 import threading
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -72,12 +72,12 @@ def _chave(raiz, slug):
 
 
 def _agora():
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    return datetime.now(UTC).isoformat(timespec="milliseconds")
 
 
 def _quarentena(path):
     """Move `path` para `<path>.corrupt-<ts>` sem nunca sobrescrever; devolve o novo caminho."""
-    carimbo = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")
+    carimbo = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%f")
     destino = path.with_name(f"{path.name}.corrupt-{carimbo}")
     n = 0
     while destino.exists():
@@ -119,7 +119,7 @@ def _reparar_cauda(jp):
 
 
 def _quarentena_bytes(path, dados):
-    carimbo = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")
+    carimbo = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%f")
     destino = path.with_name(f"{path.name}.corrupt-{carimbo}")
     n = 0
     while destino.exists():
