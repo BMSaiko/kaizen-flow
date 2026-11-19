@@ -93,10 +93,8 @@ def _recuperar(lock):
             lock.unlink(missing_ok=True)
         return morto
     finally:
-        try:
+        with suppress(OSError):  # falha: fica para a recuperação por idade
             guarda.unlink(missing_ok=True)
-        except OSError:  # fica para a recuperação por idade
-            pass
 
 
 @contextmanager

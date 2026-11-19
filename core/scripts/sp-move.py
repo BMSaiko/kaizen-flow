@@ -11,6 +11,7 @@ Uso:
   python -I scripts/sp-move.py --tipo dr|dp <slug> <todo|doing|done>   # move um DR/DP (substitui doc-move.py)
 rc: 0 movido, 1 erro
 """
+import contextlib
 import argparse
 import re
 import sys
@@ -119,10 +120,8 @@ def move(root, slug, dest, project=None):
     dst.write_bytes(new_raw)
     n = _move_proofs(sp, dst)
     if sp.parent:  # o `state` do filho na mãe acompanha todo o movimento, não só --start/--next
-        try:
+        with contextlib.suppress(Exception):  # mãe em falta/ilegível: o movimento já está feito
             sp_handoff.sync_program_ready(root, dst)
-        except Exception:  # mãe em falta ou ilegível: o movimento já está feito, não bloquear
-            pass
     if target == "Done":
         _agent_claim(slug, target)
     extra = f" (+{n} provas)" if n else ""

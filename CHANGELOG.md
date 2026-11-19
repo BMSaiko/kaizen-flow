@@ -5,6 +5,8 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-19
+
 ### Added
 - `kaizen catalog [render|--check|--json|--no-run]`: catálogo numerado de edge cases (`EC-NNN`, 7 categorias) e use cases (`UC-NNN`) em `docs/catalogo.json`, cada um ligado ao teste que o cobre; gera `docs/edge-cases.md` e a coluna `ID` de `docs/use-cases.md` e mede a fração coberta (rc 0 só com EC ≥ 0,9 e UC = 1,0). Linha de base: EC 0,73, UC 0,65.
 - `kaizen demo [--keep]`: corre o ciclo SP (init, sp-new, Doing, gates, Done, report) numa pasta temporária; gravação em `docs/assets/demo.cast`.
@@ -16,6 +18,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 - `test_orfaos.py`: falha e lista todo script de `core/scripts` sem chamador fora de `commands.md`, `agent-commands.md` e CHANGELOG.
 
 ### Changed
+- Simplificação: `try/except/pass` passa a `contextlib.suppress` em `sp-move`, `sp-rever`, `sp_escalada` e `sp_disco` (ruff SIM105), sem mudança de comportamento.
 - Refactor do vault chega ao `core/`: regras das skills `da`, `dr`, `dp` e `super-prompt` passam a apontar para um só dono (`AGENTS.md`, `michi-modo-auto.md`); sync, testes e audit verdes.
 
 ### Deprecated
@@ -64,6 +67,8 @@ Primeira release do kaizen-flow (histórico desde 2026-10-22).
 - Testes e caminhos POSIX independentes do ambiente e do WezTerm no CI.
 - `sync` copia as fixtures do `sp-fila`; fixture sem literais de caminho Windows.
 
-[Unreleased]: https://github.com/BMSaiko/kaizen-flow/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/BMSaiko/kaizen-flow/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/BMSaiko/kaizen-flow/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/BMSaiko/kaizen-flow/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/BMSaiko/kaizen-flow/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/BMSaiko/kaizen-flow/releases/tag/v0.1.0
