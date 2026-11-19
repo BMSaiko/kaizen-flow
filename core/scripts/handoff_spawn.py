@@ -86,6 +86,29 @@ def _send_line(backend, pane, text, run, sleep):
                    tries=SPAWN_ENTER_TRIES, settle=SPAWN_SETTLE)
 
 
+def _adiado(slug, maximo):
+    return {"slug": slug, "ok": False, "painel": None, "worktree": None,
+            "erro": f"adiado: máximo de {maximo} painéis em simultâneo"}
+
+
+def _spawn_um(slug, backend, run, sleep, res):
+    """Cria a worktree e o painel de um SP e envia o `/michi --auto`; preenche `res` e levanta se algo falhar."""
+    wt = run([sys.executable, "-I", str(Path(__file__).with_name("sb-worktree.py")), "ensure", slug],
+             check=True, capture_output=True, text=True, encoding="utf-8").stdout.strip().splitlines()[-1]
+    res["worktree"] = wt
+    cmd = f"/michi --auto {slug}"
+    claude = _claude_cmd(slug)
+    if backend == "clipboard":
+        print(f"{slug}: cd {wt} && {' '.join(claude)}  →  {cmd}")
+    elif backend == "background":  # sem terminal: não há prompt a esperar, o comando corre direto em `claude -p`
+        res["painel"] = _spawn_pane(backend, wt, run, (*claude, "-p", cmd))
+    else:
+        res["painel"] = _spawn_pane(backend, wt, run, claude)
+        _wait_prompt(backend, res["painel"], run, sleep)
+        _send_line(backend, res["painel"], cmd, run, sleep)
+    res["ok"] = True
+
+
 def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.sleep, estado_path=None, copy=None, registar=True, dry_run=False):
     """Um painel e uma worktree por SP: `sb-worktree ensure`, painel novo, `/michi --auto <slug>`, registo no estado.
 
@@ -94,7 +117,7 @@ def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.slee
     """
     backend = backend or detect_backend()[0]
     if dry_run:  # sem efeitos: nem worktree, nem painel, nem estado
-        return [{"slug": s, "ok": True, "painel": None, "worktree": None, "dry_run": True, "cmd": " ".join(_claude_cmd(s))} for s in slugs[:maximo]] +                [{"slug": s, "ok": False, "painel": None, "worktree": None, "erro": f"adiado: máximo de {maximo} painéis em simultâneo"} for s in slugs[maximo:]]
+        return [{"slug": s, "ok": True, "painel": None, "worktree": None, "dry_run": True, "cmd": " ".join(_claude_cmd(s))} for s in slugs[:maximo]] + [_adiado(s, maximo) for s in slugs[maximo:]]
     estado_path = Path(estado_path or ESTADO)
     estado_path.parent.mkdir(parents=True, exist_ok=True)
     if registar and not estado_path.exists():
@@ -104,30 +127,17 @@ def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.slee
         res = {"slug": slug, "ok": False, "painel": None, "worktree": None}
         results.append(res)
         if n >= maximo:
-            res["erro"] = f"adiado: máximo de {maximo} painéis em simultâneo"
+            res["erro"] = _adiado(slug, maximo)["erro"]
             continue
         try:
-            wt = run([sys.executable, "-I", str(Path(__file__).with_name("sb-worktree.py")), "ensure", slug],
-                     check=True, capture_output=True, text=True, encoding="utf-8").stdout.strip().splitlines()[-1]
-            res["worktree"] = wt
-            cmd = f"/michi --auto {slug}"
-            claude = _claude_cmd(slug)
-            if backend == "clipboard":
-                print(f"{slug}: cd {wt} && {' '.join(claude)}  →  {cmd}")
-            elif backend == "background":  # sem terminal: não há prompt a esperar, o comando corre direto em `claude -p`
-                res["painel"] = _spawn_pane(backend, wt, run, (*claude, "-p", cmd))
-            else:
-                res["painel"] = _spawn_pane(backend, wt, run, claude)
-                _wait_prompt(backend, res["painel"], run, sleep)
-                _send_line(backend, res["painel"], cmd, run, sleep)
-            res["ok"] = True
+            _spawn_um(slug, backend, run, sleep, res)
         except (subprocess.CalledProcessError, OSError, HandoffError, IndexError, painel_backend.BackendError) as exc:
             res["erro"] = (getattr(exc, "stderr", None) or str(exc)).strip() or type(exc).__name__
             continue
         if not registar:
             continue
         inicio = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        atualizar(estado_path, lambda e, s=slug, i=inicio: registar_sessao(e, s, i, worktree=wt, painel=res["painel"], estado="lancado"))
+        atualizar(estado_path, lambda e, s=slug, i=inicio: registar_sessao(e, s, i, worktree=res["worktree"], painel=res["painel"], estado="lancado"))
     if backend == "clipboard":
         ok = [r["slug"] for r in results if r["ok"]]
         if ok:
