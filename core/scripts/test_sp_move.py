@@ -77,7 +77,7 @@ def make_child(root, folder, slug, deps="", parent="mae"):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(
         f"---\nstatus: {folder}\ncreated: 2026-10-01T10:00:00Z\nupdated: 2026-10-01T10:00:00Z\nslug: {slug}\n"
-        f"project: atlas\nparent: {parent}\n{deps}---\n# {slug}\n".encode("utf-8"))
+        f"project: atlas\nparent: {parent}\n{deps}---\n# {slug}\n".encode())
     return path
 
 
@@ -87,7 +87,7 @@ def make_mae(root):
     path.write_bytes(
         ("---\nstatus: TODO\ncreated: 2026-10-01T10:00:00Z\nupdated: 2026-10-01T10:00:00Z\nslug: mae\nproject: atlas\n"
          "kind: program\nchildren:\n  - slug: a\n    depends_on: []\n    state: Doing\n"
-         "  - slug: b\n    depends_on: [a]\n    state: TODO\n---\n# mãe\n").encode("utf-8"))
+         "  - slug: b\n    depends_on: [a]\n    state: TODO\n---\n# mãe\n").encode())
     return path
 
 
@@ -249,7 +249,7 @@ def make_mae_todo(root, slug="mae", parent=None):
     par = f"parent: {parent}\n" if parent else ""
     path.write_bytes(
         (f"---\nstatus: TODO\ncreated: 2026-10-01T10:00:00Z\nupdated: 2026-10-01T10:00:00Z\nslug: {slug}\nproject: atlas\n"
-         f"{par}kind: program\nchildren:\n  - slug: a\n    depends_on: []\n    state: TODO\n---\n# mãe\n").encode("utf-8"))
+         f"{par}kind: program\nchildren:\n  - slug: a\n    depends_on: []\n    state: TODO\n---\n# mãe\n").encode())
     return path
 
 
