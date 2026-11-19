@@ -180,15 +180,18 @@ def michi_start(marker_dir, session_id, payload, tokens, env=None):
     return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": text}}
 
 
+def _default_marker_dir():
+    import tempfile
+
+    return Path(tempfile.gettempdir()) / "claude-context-guard"
+
+
 def hook(payload, env=None, marker_dir=None):
     session_id = payload.get("session_id")
     transcript = payload.get("transcript_path")
     if not session_id or not transcript or payload.get("agent_id"):
         return None  # subagente: o aviso gastaria o marcador da sessão e não chegaria ao modelo principal
-    if marker_dir is None:
-        import tempfile
-
-        marker_dir = Path(tempfile.gettempdir()) / "claude-context-guard"
+    marker_dir = marker_dir or _default_marker_dir()
     if payload.get("hook_event_name") == "UserPromptSubmit":
         bind_sp(marker_dir, session_id, payload.get("prompt"))
     tokens = context_tokens(transcript)
@@ -208,16 +211,19 @@ def hook(payload, env=None, marker_dir=None):
     if not _claim(marker_dir, session_id, "limite"):
         return None
     event = payload.get("hook_event_name") or "UserPromptSubmit"
-    sp = _bound_sp_doing(marker_dir, session_id)
+    text = _limite_texto(tokens, limit, _bound_sp_doing(marker_dir, session_id))
+    return {"hookSpecificOutput": {"hookEventName": event, "additionalContext": text}}
+
+
+def _limite_texto(tokens, limit, sp):
     if sp:
         action = (f"corre `/reflect fase {Path(sp).stem}` e só depois /sp-handoff em modo automático:\n"
                   f"sem perguntar, com `sp-handoff.py --launch {sp} --auto` (num SP, só sp-handoff; sem a linha Reflect da fase recusa).")
     else:
         action = ("corre /handoff em modo automático:\nsem perguntar, escreve o handoff e lança-o com "
                   "`handoff.py --launch <ficheiro> --auto`.")
-    text = (f"[context-guard] Contexto {_k(tokens)} >= limite {_k(limit)}. Acaba o passo em curso (nunca a meio de "
+    return (f"[context-guard] Contexto {_k(tokens)} >= limite {_k(limit)}. Acaba o passo em curso (nunca a meio de "
             f"uma edição ou teste) e {action} Não repitas este aviso.")
-    return {"hookSpecificOutput": {"hookEventName": event, "additionalContext": text}}
 
 
 def main(argv=None):
