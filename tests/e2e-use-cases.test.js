@@ -383,7 +383,7 @@ test("UC-031 kaizen resume --from começa na fase pedida", T, comSandbox({}, (sb
   journal(sb, slug, [["inicio", "dp", "p1"], ["fim", "dp", "p1"], ["inicio", "da", "p2"], ["fim", "da", "p2"], ["inicio", "gates", "p3"]]);
   const r = sb.kz("resume", slug, "--from", "da");
   ok(r, "resume --from");
-  assert.match(r.out, /\bda\b/);
+  assert.match(r.out, /retomar from-e2e em da\b/);
   assert.doesNotMatch(r.out, /em gates/);
 }));
 

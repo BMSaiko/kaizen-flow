@@ -76,7 +76,7 @@ function lancarPy(sb, codigo) {
   const child = spawn(PY, ["-c", codigo], { cwd: sb.dir, env: sb.env, stdio: ["ignore", "pipe", "pipe"] });
   return new Promise((res, rej) => {
     let buf = "";
-    const t = setTimeout(() => rej(new Error("processo filho não ficou pronto")), TIMEOUT);
+    const t = setTimeout(() => { matar(child); rej(new Error("processo filho não ficou pronto")); }, TIMEOUT);
     child.stdout.on("data", (d) => { buf += d; if (buf.includes("pronto")) { clearTimeout(t); res(child); } });
     child.on("exit", (c) => { clearTimeout(t); rej(new Error(`filho saiu cedo rc ${c}: ${buf}`)); });
   });
