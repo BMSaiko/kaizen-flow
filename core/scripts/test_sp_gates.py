@@ -366,3 +366,27 @@ def test_avisos_suite_completa_sem_timeout():
     um = sp_gates.parse_gates(sp_text(("python -m pytest scripts/sub -q", {})))
     assert sp_gates.avisos(sem) and "timeout" in sp_gates.avisos(sem)[0]
     assert sp_gates.avisos(com) == [] and sp_gates.avisos(um) == []
+
+
+def test_ec_003_ctrl_c_num_gate_nao_o_deixa_verde_na_cache(tmp_path, monkeypatch):
+    """EC-003: Ctrl+C a meio de um gate não o põe na cache; a corrida seguinte volta a corrê-lo."""
+    (tmp_path / "f.txt").write_text("1", encoding="utf-8")
+    cache = tmp_path / "c.json"
+    g = [_gate(tmp_path, 'python -c "print(1)"', ["f.txt"]), _gate(tmp_path, 'python -c "print(2)"', ["f.txt"])]
+    real = sp_gates.run_hidden
+    chamadas = []
+
+    def interromper_no_segundo(cmd, **kw):
+        chamadas.append(cmd)
+        if cmd == g[1]["cmd"] and len(chamadas) == 2:
+            raise KeyboardInterrupt
+        return real(cmd, **kw)
+
+    monkeypatch.setattr(sp_gates, "run_hidden", interromper_no_segundo)
+    with pytest.raises(KeyboardInterrupt):
+        sp_gates.run(g, cache_path=cache)
+    guardada = sp_gates._load_cache(cache)
+    assert not any(k.endswith("::" + g[1]["cmd"]) for k in guardada)
+    r = sp_gates.run(g, cache_path=cache)
+    assert [x["rc"] for x in r] == [0, 0] and not r[1].get("cached")
+    assert chamadas.count(g[1]["cmd"]) == 2

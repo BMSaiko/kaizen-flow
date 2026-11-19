@@ -147,7 +147,9 @@ def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sle
     res = {"estado": None, "chave": k, "pane": None, "modelo": modelo, "msg": None}
     fila = _fila(estado_root)
     o_titulo, o_pane = origem if origem is not None else origem_atual(backend)
-    pe.registar(fila, k, root=estado_root, modelo=modelo, worktree=str(cwd), origem_titulo=o_titulo, origem_pane=o_pane)
+    reg = pe.registar(fila, k, root=estado_root, modelo=modelo, worktree=str(cwd), origem_titulo=o_titulo, origem_pane=o_pane)
+    if reg.get("estado") == "falhou":  # EC-022: relançar depois de um painel falhado (semente ainda por ler)
+        pe.transitar(k, "pendente", fila=fila, root=estado_root)
     if not pe.reclamar_vaga(k, fila=fila, root=estado_root, modelo=modelo):
         return {**res, "estado": "pendente", "msg": f"sem vaga: {pe.MAX_PARALELO} painéis ativos no total"}
     pane = None

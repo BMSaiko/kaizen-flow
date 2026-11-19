@@ -14,6 +14,7 @@ rc: 0 limpo · 1 há problemas (ou correção recusada) · 2 erro de uso (pasta 
 """
 import argparse
 import json
+import os
 import re
 import shutil
 import sys
@@ -29,6 +30,8 @@ import kf_git  # noqa: E402
 from painel_backend import run_hidden  # noqa: E402
 
 NADA = "nada alterado"
+# EC-055: margem para os ficheiros dentro da worktree caberem nos 260 do Windows (sem limite noutros SO)
+LIMITE_CAMINHO = 200 if os.name == "nt" else None
 _DATA = re.compile(r"-\d{4}-\d{2}-\d{2}$")
 _ESTADOS_GIT = (("MERGE_HEAD", "merge"), ("rebase-merge", "rebase"), ("rebase-apply", "rebase"),
                 ("CHERRY_PICK_HEAD", "cherry-pick"), ("REVERT_HEAD", "revert"))
@@ -175,6 +178,11 @@ def diagnosticar(slug=None, repo=".", ramo=None, ignorar_orfao=False, which=shut
                 "EC-062", "erro", f"o SP {slug} não tem worktree (ramo «{esperado}»)",
                 "o SP corre numa worktree própria, fora do checkout principal",
                 f"git -C \"{principal}\" worktree add \"{destino}\" {criar}{esperado}"))
+            if LIMITE_CAMINHO and len(str(destino)) > LIMITE_CAMINHO:
+                probs.append(Problema(
+                    "EC-055", "erro", f"o caminho da worktree tem {len(str(destino))} caracteres: {destino}",
+                    "no Windows os ficheiros dentro dela passam dos 260 caracteres e o git deixa-a a meio",
+                    "git config --global core.longpaths true, ou um repo num caminho mais curto"))
             alvo = None
         else:
             fix = ["git", "-C", top, "checkout", esperado] if _existe_ramo(repo, esperado) else None

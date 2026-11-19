@@ -655,3 +655,28 @@ def test_contexto_real_grava_motivo_e_retoma_em(tmp_path):
         assert sp["estado"] == "a-correr" and sp["motivo"] is None and sp["retoma_em"] is None
     finally:
         pe.transitar = orig
+
+
+def test_ec_032_paineis_orfaos_reconciliados_libertam_as_vagas(tmp_path):
+    """EC-032: terminal/máquina caiu com painéis `a-correr`; o vigia vê-os mortos e as vagas voltam."""
+    import sp_painel_estado as pe
+    root = tmp_path / "estado"
+    fila = pe.criar_fila("mae", root=root, ordem=["a", "b"])
+    for s in ("a", "b"):
+        pe.registar(fila, s, root=root, pane=f"p-{s}", worktree=f"/wt/{s}")
+        assert pe.reclamar_vaga(s, fila=fila, root=root)
+    assert pe.vagas_livres(root=root) == pe.MAX_PARALELO - 2
+
+    class CtxDisco(Ctx):
+        def ler_fila(self):
+            return pe.ler(fila, root=root)
+
+        def transitar(self, slug, estado, msg=None):
+            self.chamadas.append(("transitar", slug, estado, msg))
+            pe.transitar(slug, estado, msg=msg, fila=fila, root=root)
+
+    ctx = CtxDisco({}, backend=Backend(mortos={"p-a", "p-b"}))
+    sp_vigia.passo(ctx, sp_vigia.memoria_nova())
+    assert {pe.ler(fila, s, root=root)["estado"] for s in ("a", "b")} == {"falhou"}
+    assert pe.vagas_livres(root=root) == pe.MAX_PARALELO
+    assert ("seguinte", "a") in ctx.chamadas and ("seguinte", "b") in ctx.chamadas
