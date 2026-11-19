@@ -44,6 +44,7 @@ import sp_fila_execucao  # noqa: E402
 import sp_fila_paineis  # noqa: E402
 import sp_vigia  # noqa: E402
 import kf_erros  # noqa: E402
+import contextlib
 
 
 def _erro(ec, oque, porque, estado, proximo):
@@ -273,10 +274,8 @@ def main(argv=None):
             elif motivo:
                 return 1
         if estado.exists():
-            try:
+            with contextlib.suppress(ValueError):
                 print(_resumo_antigo(estado, args), file=sys.stderr)
-            except ValueError:
-                pass
             _erro("EC-067", f"fila já em curso ({estado})", "só há uma fila por estado", "fila em curso intacta",
                   "`--seguinte` continua, `--parar` abandona")
             return 1

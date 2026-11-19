@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import painel_backend  # noqa: E402
 import sp_vigia  # noqa: E402
 from sp_carregar import carregar  # noqa: E402
+import contextlib
 
 
 class Backend:
@@ -385,10 +386,8 @@ def test_cli_erro_fatal_vai_para_o_log(tmp_path, monkeypatch):
         def ler_fila(self):
             raise RuntimeError("boom")
     ctx = Rebenta(9)
-    try:
+    with contextlib.suppress(RuntimeError):
         cli.main(["f1", "--uma-vez"], contexto=ctx)
-    except RuntimeError:
-        pass
     assert any("vigia morreu" in m and "boom" in m for m in ctx.logs)
     assert not (tmp_path / "f1" / "vigia.pid").exists()
 

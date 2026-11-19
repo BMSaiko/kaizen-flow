@@ -34,6 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import contextlib
 
 DEFAULT_TIMEOUT = 300
 RC_SEM_COMANDO = 3  # fase de testes sem `test.cmd` na config
@@ -222,10 +223,8 @@ def run(gates, cache_path=None):
         if rc != 0:
             break
     if cache_path:
-        try:
+        with contextlib.suppress(OSError):
             Path(cache_path).write_text(json.dumps(cache, indent=1), encoding="utf-8")
-        except OSError:
-            pass
     return results
 
 
