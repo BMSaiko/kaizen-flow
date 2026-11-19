@@ -250,3 +250,15 @@ def test_base_nao_e_mutada_pelos_testes():
     b = copy.deepcopy(a)
     kc.medir(a, {})
     assert a == b
+
+
+def test_ec_057_teste_com_outro_ec_no_nome_e_recusado(repo):
+    (repo / "tests" / "test_a.py").write_text(
+        "def test_um():\n    pass\n\ndef test_ec_002_x():\n    pass\n\ndef test_ec_001_y():\n    pass\n", encoding="utf-8")
+    cat = base()
+    cat["edge_cases"][0]["teste"] = "tests/test_a.py::test_ec_002_x"
+    assert any("EC-001" in p and "EC-002" in p for p in kc.problemas(cat, repo))
+    cat["edge_cases"][0]["teste"] = "tests/test_a.py::test_ec_001_y"
+    assert kc.problemas(cat, repo) == []
+    cat["edge_cases"][0]["teste"] = "tests/test_a.py::test_um"
+    assert kc.problemas(cat, repo) == []
