@@ -119,6 +119,35 @@ def launch(path, pane=None, env=None, run=pane_lib.run_hidden, backend=None, cop
     return pane_lib.launch_detached(__file__, ["--send", str(path), "--pane", str(pane), "--socket", sock], novo)
 
 
+def _enviar_tarefa(args):
+    if args.socket:
+        os.environ["WEZTERM_UNIX_SOCKET"] = args.socket
+    backend = args.backend or "wezterm"
+    send(continuation_prompt(args.send), args.pane or pane_lib.pane_id(), confirm=True, backend=backend,
+         inspect=pane_lib.check_prompt if backend == "wezterm" else None)
+
+
+def _dry_run(args):
+    backend, found = (args.backend, None) if args.backend else pane_lib.detect_backend()
+    if backend == "clipboard":
+        print(f"clipboard: {continuation_prompt(args.launch)}")
+        return
+    pane = args.pane or found or pane_lib.pane_id()
+    text_argv, key_argv = pane_lib._argvs(backend, pane)
+    for text in ("/clear", continuation_prompt(args.launch)):
+        print(subprocess.list2cmdline(text_argv(pane, text)))
+        print(subprocess.list2cmdline(key_argv(pane)))
+
+
+def _lancar(args):
+    if args.auto:
+        _check(args.launch)
+    if args.dry_run:
+        _dry_run(args)
+    elif launch(args.launch, args.pane, backend=args.backend):
+        print(f"a continuar neste painel em {SEND_DELAY:.0f}s: /clear e a leitura de {args.launch}")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Apoio ao /handoff")
     group = ap.add_mutually_exclusive_group(required=True)
@@ -145,26 +174,9 @@ def main(argv=None):
         elif args.consume:
             consume(args.consume)
         elif args.send:
-            if args.socket:
-                os.environ["WEZTERM_UNIX_SOCKET"] = args.socket
-            backend = args.backend or "wezterm"
-            send(continuation_prompt(args.send), args.pane or pane_lib.pane_id(), confirm=True, backend=backend,
-                 inspect=pane_lib.check_prompt if backend == "wezterm" else None)
+            _enviar_tarefa(args)
         else:
-            if args.auto:
-                _check(args.launch)
-            if args.dry_run:
-                backend, found = (args.backend, None) if args.backend else pane_lib.detect_backend()
-                if backend == "clipboard":
-                    print(f"clipboard: {continuation_prompt(args.launch)}")
-                else:
-                    pane = args.pane or found or pane_lib.pane_id()
-                    text_argv, key_argv = pane_lib._argvs(backend, pane)
-                    for text in ("/clear", continuation_prompt(args.launch)):
-                        print(subprocess.list2cmdline(text_argv(pane, text)))
-                        print(subprocess.list2cmdline(key_argv(pane)))
-            elif launch(args.launch, args.pane, backend=args.backend):
-                print(f"a continuar neste painel em {SEND_DELAY:.0f}s: /clear e a leitura de {args.launch}")
+            _lancar(args)
     except (HandoffError, OSError) as exc:
         print(f"erro: {exc}", file=sys.stderr)
         return 1
