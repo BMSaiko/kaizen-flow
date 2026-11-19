@@ -10,7 +10,7 @@ executor espera com `--esperar` (sem polling por LLM). Conta para o teto global 
 
 Uso:
   python -I scripts/sp-revisor.py --sp <SP.md> --base <ref> --achados <ficheiro> [--cwd <pasta>] [--checklist codigo|ui|docs]
-      [--rever-so F ...] [--backend auto|wezterm|tmux] [--inline] [--dry-run]
+      [--rever-so F ...] [--backend auto|herdr|wezterm|tmux|background] [--inline] [--dry-run]
   python -I scripts/sp-revisor.py --sp <SP.md> --esperar [--timeout 900]
 rc: 0 painel aberto / done / inline / dry-run · 1 erro, bloqueado ou falhou · 2 sem vaga (pendente) · 3 timeout de --esperar
 """
@@ -201,7 +201,7 @@ def main(argv=None, diff=None):
     ap.add_argument("--cwd", default=str(Path.cwd()), help="pasta do painel (a worktree; defeito: cwd)")
     ap.add_argument("--checklist", default="codigo", choices=sorted(CHECKLISTS))
     ap.add_argument("--rever-so", nargs="+", metavar="F", help="re-review: só estes ficheiros (saída «Rever só» de review_ciclo.py)")
-    ap.add_argument("--backend", default="auto", help="auto|wezterm|tmux")
+    ap.add_argument("--backend", default="auto", help="auto (usa painelBackend)|herdr|wezterm|tmux|background")
     ap.add_argument("--modelos", help="modelos.json alternativo")
     ap.add_argument("--inline", action="store_true", help="review na própria sessão (imprime a semente; não independente)")
     ap.add_argument("--esperar", action="store_true", help="bloqueia até o revisor acabar (rc 3 = timeout)")
@@ -232,9 +232,9 @@ def main(argv=None, diff=None):
                   f"{prompt(args.sp, Path(args.achados).with_name(Path(args.achados).stem + '.semente.md'), args.achados)}")
             return 0
         import painel_backend
-        backend = painel_backend.escolher(args.backend)
+        backend = painel_backend.escolher_por_config(args.backend)
         if backend is None:
-            print(f"aviso: {painel_backend.falta(args.backend)}; a cair em --inline (review não independente)", file=sys.stderr)
+            print(f"aviso: {painel_backend.falta(painel_backend.config_efetiva(args.backend))}; a cair em --inline (review não independente)", file=sys.stderr)
             print(semente(args.sp, args.base, args.cwd, diff, args.checklist, args.rever_so))
             return 0
         res = lancar(args.sp, args.base, args.achados, backend, args.cwd, run=painel_backend.run_hidden, diff=diff,

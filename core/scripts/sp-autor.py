@@ -9,9 +9,9 @@ origem (`origem_titulo`, mais `origem_pane` como pista); o painel corre `--avisa
 recebe uma linha com o caminho do SP (resolvida pelo título; origem ausente = só registo, rc 0).
 
 Uso:
-  python -I scripts/sp-autor.py --sp <SP.md vazio> --semente <ficheiro> [--cwd <pasta>] [--backend auto|wezterm|tmux] [--dry-run]
+  python -I scripts/sp-autor.py --sp <SP.md vazio> --semente <ficheiro> [--cwd <pasta>] [--backend auto|herdr|wezterm|tmux|background] [--dry-run]
   python -I scripts/sp-autor.py --consume <semente>
-  python -I scripts/sp-autor.py --avisar <slug> [--sp <SP.md>] [--backend auto|wezterm|tmux]
+  python -I scripts/sp-autor.py --avisar <slug> [--sp <SP.md>] [--backend auto|herdr|wezterm|tmux|background]
 rc: 0 painel aberto (ou dry-run / consume ok) · 1 erro · 2 sem vaga (pendente)
 """
 import argparse
@@ -183,7 +183,7 @@ def main(argv=None):
     ap.add_argument("--fechar", metavar="SLUG", help="fecha o painel do papel pelo backend ativo (usado pelo painel no fim)")
     ap.add_argument("--papel", default=PAPEL, help="papel do painel a fechar (sp-autor|revisor)")
     ap.add_argument("--cwd", default=str(Path(__file__).resolve().parent.parent), help="pasta do painel (defeito: o repo)")
-    ap.add_argument("--backend", default="auto", help="auto|wezterm|tmux")
+    ap.add_argument("--backend", default="auto", help="auto (usa painelBackend)|herdr|wezterm|tmux|background")
     ap.add_argument("--modelos", help="modelos.json alternativo")
     ap.add_argument("--dry-run", action="store_true", help="mostra título, modelo e prompt sem abrir")
     args = ap.parse_args(argv)
@@ -192,7 +192,7 @@ def main(argv=None):
         MODELOS = Path(args.modelos)
     if args.fechar:
         try:
-            print(f"{chave(args.fechar, args.papel)} · fechar · {fechar(args.fechar, painel_backend.escolher(args.backend), rotulo=args.papel) or 'nada'}")
+            print(f"{chave(args.fechar, args.papel)} · fechar · {fechar(args.fechar, painel_backend.escolher_por_config(args.backend), rotulo=args.papel) or 'nada'}")
         except Exception as e:  # noqa: BLE001
             print(f"erro a fechar: {e}", file=sys.stderr)
             return 1
@@ -200,7 +200,7 @@ def main(argv=None):
     if args.avisar:
         try:
             import painel_backend
-            print(f"{chave(args.avisar)} · aviso · {avisar(args.avisar, painel_backend.escolher(args.backend), sp=args.sp)}")
+            print(f"{chave(args.avisar)} · aviso · {avisar(args.avisar, painel_backend.escolher_por_config(args.backend), sp=args.sp)}")
         except Exception as e:  # noqa: BLE001 — falhar a avisar nunca muda o resultado do sp-autor
             print(f"aviso falhou (ignorado): {e}", file=sys.stderr)
         return 0
@@ -214,7 +214,7 @@ def main(argv=None):
             print(f"{titulo(slug_de(args.sp))} · {' '.join(comando())} · {args.cwd}\n{prompt(args.sp, args.semente)}")
             return 0
         import painel_backend
-        backend = painel_backend.escolher(args.backend)
+        backend = painel_backend.escolher_por_config(args.backend)
         res = lancar(args.sp, args.semente, backend, args.cwd, run=painel_backend.run_hidden)
     except (SpAutorErro, modelos.ModelosError, pe.ErroEstado) as e:
         print(f"erro: {e}", file=sys.stderr)

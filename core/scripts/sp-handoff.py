@@ -7,7 +7,7 @@ Uso:
   python -I scripts/sp-handoff.py --resolve [slug]        # slug de um programa (SP-mãe): devolve o filho em Doing
   python -I scripts/sp-handoff.py --write <caminho> --file <progresso.md>
   python -I scripts/sp-handoff.py --launch <caminho> [--dry-run] [--auto] [--nivel simples|default|complexo|critico]
-  python -I scripts/sp-handoff.py --spawn <slug>... [--max N] [--backend wezterm|tmux|background|clipboard]
+  python -I scripts/sp-handoff.py --spawn <slug>... [--max N] [--backend herdr|wezterm|tmux|background|clipboard]
 
 `--launch` não abre janelas: em segundo plano, passados ~5 s (para o turno atual acabar), escreve
 `/clear` e depois `/michi <caminho>` no painel onde o Claude Code já corre (herdr $HERDR_PANE_ID, WezTerm

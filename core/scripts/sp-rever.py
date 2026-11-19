@@ -185,7 +185,7 @@ def _reais(d):
         from sp_carregar import carregar
         if "lancar" not in d:
             sa = carregar(here / "sp-autor.py", "sp_autor")
-            be = painel_backend.escolher("auto")
+            be = painel_backend.escolher_por_config()
             d["lancar"] = lambda sp, sem, **k: sa.lancar(sp, sem, be, str(here.parent), run=painel_backend.run_hidden, **k)
         if "vagas" not in d:
             d["vagas"] = pe.vagas_livres
