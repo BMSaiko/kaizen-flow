@@ -47,7 +47,18 @@ Além da cobertura de linhas, o workflow mede a cobertura de casos: `docs/catalo
 - `kaizen catalog --check`: valida a estrutura (IDs únicos e sem buracos, categorias com casos, testes existentes, nome do teste sem outro `ec_NNN`/`uc_NNN`) e que os `.md` estão em dia; rc 1 em qualquer problema.
 - `kaizen catalog` (report): corre os testes ligados e imprime cobertos/total; rc 0 só com EC ≥ 0,9 e UC = 1,0 (`limiar` no JSON). `--json` para máquinas, `--no-run` conta os testes ligados sem os correr.
 - Para cobrir um caso: escrever o teste, trocar `por cobrir` pelo nome real em `docs/catalogo.json`, correr `kaizen catalog render` e `kaizen catalog --check`.
-- Linha de base (2026-11-16): EC 43/59 (0,73), UC 22/34 (0,65); rc 1 até os filhos do programa de retoma fecharem os casos em falta.
+- Linha de base (2026-11-16): EC 43/59 (0,73), UC 22/34 (0,65); rc 1 até os filhos do programa de retoma fecharem os casos em falta. Em 2026-11-19: UC 34/34 (1,0) com os testes e2e.
+
+## Testes e2e dos use cases
+
+`tests/e2e-use-cases.test.js` tem um teste por `UC-NNN` (nome estável `UC-NNN <objetivo>`, ligado em `docs/catalogo.json`) e um teste do fluxo normal (init → doctor → sp-new → sp-validate → sp-move → status). Cada teste corre o CLI real (`bin/kaizen.js` e os `sp-*` instalados) num sandbox de `tests/helpers/sandbox.js`:
+
+- tmpdir com espaço e acento no caminho, `git init` e `kaizen init` prontos;
+- `HOME`/`USERPROFILE` isolados e sem variáveis de painel (`HERDR_PANE_ID`, `WEZTERM_PANE`, `TMUX*`): nada toca na máquina nem abre painéis;
+- transcripts de fixture para `usage`/`report`; fila, handoff e painéis só em `--dry-run`;
+- retoma: UC-030 usa um processo real que segura o lock e é morto a meio (2.º processo recusado com EC-043) (`matar()`, multiplataforma).
+
+Correr só estes: `node --test tests/e2e-use-cases.test.js` (cerca de 15 s); um caso: `node --test --test-name-pattern "UC-015" tests/e2e-use-cases.test.js`.
 
 ## Testes de falha e propriedades
 
