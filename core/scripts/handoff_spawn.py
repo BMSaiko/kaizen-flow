@@ -6,7 +6,7 @@ rc: n/a
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -125,7 +125,7 @@ def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.slee
             continue
         if not registar:
             continue
-        inicio = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        inicio = datetime.now(UTC).isoformat(timespec="seconds")
         atualizar(estado_path, lambda e, s=slug, i=inicio: registar_sessao(e, s, i, worktree=wt, painel=res["painel"], estado="lancado"))
     if backend == "clipboard":
         ok = [r["slug"] for r in results if r["ok"]]

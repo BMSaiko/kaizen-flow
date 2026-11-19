@@ -14,7 +14,7 @@ import sys as _s
 _s.path.insert(0, str(_P(__file__).resolve().parent))
 from painel_backend import run_hidden  # noqa: E402
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -35,7 +35,7 @@ def _log(line):
     try:
         LOG.parent.mkdir(parents=True, exist_ok=True)
         with LOG.open("a", encoding="utf-8") as fh:
-            fh.write(f"{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')} {line}\n")
+            fh.write(f"{datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')} {line}\n")
     except OSError:
         pass
 

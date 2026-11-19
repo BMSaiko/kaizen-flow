@@ -14,7 +14,7 @@ import re
 import statistics
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -53,10 +53,10 @@ def linha(sp_path, custos, project=None, now=None):
     text = Path(sp_path).read_text(encoding="utf-8")
     fm = sp_indice.frontmatter(sp_path)
     slug = fm.get("slug") or re.sub(r"-\d{4}-\d{2}-\d{2}$", "", Path(sp_path).stem)
-    fim = _parse(fm.get("updated")) or now or datetime.now(timezone.utc)
+    fim = _parse(fm.get("updated")) or now or datetime.now(UTC)
     ini = _parse(str(fm.get("created", "")))
     if ini and ini.tzinfo is None:
-        ini = ini.replace(tzinfo=timezone.utc)
+        ini = ini.replace(tzinfo=UTC)
     horas = f"{(fim - ini).total_seconds() / 3600:.1f}" if ini else "n/d"
     reflects = len(re.findall(r"(?im)^\s*[-*|].*\breflect\b", text))
     gates = "sim" if str(fm.get("gates_tentativas", "")) == "1" else "n/d"
