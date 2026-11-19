@@ -16,12 +16,8 @@ ErroEstado, ILEGIVEL, MAX_PARALELO, FINAIS = pe.ErroEstado, pe.ILEGIVEL, pe.MAX_
 _LIMITES_ANTIGOS = ("max", "ate", "horas", "usd", "orcamento", "max_falhas", "concorrencia")
 
 
-def migrar_antigo(path=None, root=None, agora=None):
-    """Converte o `~/.claude/sp-fila-estado.json` (estado único) numa fila; devolve o fila-id ou None se não há ficheiro.
-
-    O ficheiro antigo fica onde está (a série `sp-handoff --launch` ainda o usa). Recusa com `ErroEstado`:
-    JSON ilegível, formato desconhecido, nomes inválidos, fila já migrada ou sessões que rebentam o teto."""
-    path = Path(path) if path else Path.home() / ".claude" / "sp-fila-estado.json"
+def _ler_antigo(path):
+    """Lê e valida o estado antigo; devolve `(antigo, sessoes, listas, modo)` ou None se não há ficheiro."""
     try:
         bruto = path.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -53,6 +49,19 @@ def migrar_antigo(path=None, root=None, agora=None):
         modo = "paralelo" if int(antigo.get("concorrencia") or 1) > 1 else "sequencial"
     except (TypeError, ValueError):
         raise ErroEstado(f"estado antigo em formato desconhecido: {path} (`concorrencia` não é um número)") from None
+    return antigo, sessoes, listas, modo
+
+
+def migrar_antigo(path=None, root=None, agora=None):
+    """Converte o `~/.claude/sp-fila-estado.json` (estado único) numa fila; devolve o fila-id ou None se não há ficheiro.
+
+    O ficheiro antigo fica onde está (a série `sp-handoff --launch` ainda o usa). Recusa com `ErroEstado`:
+    JSON ilegível, formato desconhecido, nomes inválidos, fila já migrada ou sessões que rebentam o teto."""
+    path = Path(path) if path else Path.home() / ".claude" / "sp-fila-estado.json"
+    lido = _ler_antigo(path)
+    if lido is None:
+        return None
+    antigo, sessoes, listas, modo = lido
     feitos = [s for s in dict.fromkeys(listas["feitos"]) if s not in sessoes]
     falhados = [s for s in dict.fromkeys(listas["falhados"]) if s not in sessoes and s not in feitos]
     for s in [*sessoes, *feitos, *falhados]:
