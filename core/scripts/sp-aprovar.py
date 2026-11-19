@@ -26,11 +26,11 @@ class SpAprovarError(Exception):
 
 
 def _achar(root, slug, project=None):
-    found = [s for s in sp_list.collect(root, include_done=True) if s.slug == slug and (not project or s.project == project)]
+    found = sp_list.encontrar(sp_list.collect(root, include_done=True), slug, project)
     if not found:
         raise SpAprovarError(f"SP '{slug}' não encontrado; ver scripts/sp-list.py")
     if len(found) > 1:
-        raise SpAprovarError(f"SP '{slug}' ambíguo; usar --project")
+        raise SpAprovarError(f"SP '{slug}' ambíguo ({', '.join(s.slug for s in found)}); usar o slug completo ou --project")
     return found[0]
 
 
@@ -48,9 +48,11 @@ def verificar(root, slug, project=None):
 
 
 def aprovar(root, slug, rondas, programa=False, project=None):
-    if rondas < sp_aprovacao.RONDAS_MINIMAS:
-        raise SpAprovarError(f"grill-me obrigatório: mínimo {sp_aprovacao.RONDAS_MINIMAS} ronda (--rondas)")
     sp = _achar(root, slug, project)
+    slug = sp.slug
+    if rondas < sp_aprovacao.RONDAS_MINIMAS and not (rondas == 0 and sp_aprovacao.oito_secoes(sp.path.read_text(encoding="utf-8"))):
+        raise SpAprovarError(f"grill-me obrigatório: mínimo {sp_aprovacao.RONDAS_MINIMAS} ronda (--rondas); "
+                             "`--rondas 0` só com as 8 secções do SP preenchidas")
     alvo = [sp]
     if programa:
         alvo += [s for s in sp_list.collect(root, include_done=True) if s.project == sp.project and s.parent == slug]
@@ -68,7 +70,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Aprova um SP (portão de criação)")
     ap.add_argument("slug")
     ap.add_argument("--programa", action="store_true", help="grava também em todos os filhos")
-    ap.add_argument("--rondas", type=int, default=0, help="rondas de grill-me feitas (mínimo 1)")
+    ap.add_argument("--rondas", type=int, default=0, help="rondas de grill-me feitas (mínimo 1; 0 só com as 8 secções preenchidas)")
     ap.add_argument("--verificar", action="store_true", help="só verifica; rc 1 se por aprovar")
     ap.add_argument("--project")
     ap.add_argument("--root", default=None, help=argparse.SUPPRESS)

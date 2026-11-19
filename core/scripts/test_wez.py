@@ -35,9 +35,8 @@ def test_run_cli_sem_wezterm_da_erro():
 
 def test_run_cli_timeout_da_erro():
     exc = subprocess.TimeoutExpired(cmd="wezterm", timeout=1)
-    with mock.patch.object(wez.subprocess, "run", side_effect=exc):
-        with pytest.raises(wez.WezError, match="tempo"):
-            wez.run_cli(["list"])
+    with mock.patch.object(wez.subprocess, "run", side_effect=exc), pytest.raises(wez.WezError, match="tempo"):
+        wez.run_cli(["list"])
 
 
 def test_list_panes_le_json():
@@ -48,9 +47,8 @@ def test_list_panes_le_json():
 
 
 def test_list_panes_json_invalido_da_erro():
-    with mock.patch.object(wez, "run_cli", return_value="nao-json"):
-        with pytest.raises(wez.WezError, match="JSON"):
-            wez.list_panes()
+    with mock.patch.object(wez, "run_cli", return_value="nao-json"), pytest.raises(wez.WezError, match="JSON"):
+        wez.list_panes()
 
 
 def test_help_lista_subcomandos(capsys):

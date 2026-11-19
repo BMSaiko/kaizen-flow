@@ -49,9 +49,8 @@ def test_bloqueio_recupera_lock_de_dono_morto(tmp_path):
 
 def test_bloqueio_nunca_apaga_lock_de_dono_vivo(tmp_path):
     (tmp_path / "estado.lock").write_text(str(os.getpid()), encoding="utf-8")
-    with pytest.raises(TimeoutError):
-        with sp_disco.bloqueio(tmp_path / "estado", espera=0.3):
-            pass
+    with pytest.raises(TimeoutError), sp_disco.bloqueio(tmp_path / "estado", espera=0.3):
+        pass
     assert (tmp_path / "estado.lock").exists()
 
 
@@ -88,9 +87,8 @@ def test_lock_sp_livre_cria_e_liberta(tmp_path):
 def test_lock_sp_segundo_painel_e_recusado_com_o_dono(tmp_path):
     """EC-043 / EC-042: lock vivo nunca é roubado; o erro indica o painel dono."""
     with sp_disco.lock_sp(tmp_path, "sp-a", painel="p1"):
-        with pytest.raises(sp_disco.LockOcupado) as e:
-            with sp_disco.lock_sp(tmp_path, "sp-a", painel="p2"):
-                pass
+        with pytest.raises(sp_disco.LockOcupado) as e, sp_disco.lock_sp(tmp_path, "sp-a", painel="p2"):
+            pass
         assert e.value.dono["painel"] == "p1"
         assert sp_disco.dono(tmp_path, "sp-a")["pid"] == os.getpid()
 
