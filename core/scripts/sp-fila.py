@@ -162,7 +162,7 @@ def _arrancar_vigia(estado):
         return None
 
 
-def main(argv=None):
+def _parser():
     ap = argparse.ArgumentParser(description="Fila autónoma de SPs")
     ap.add_argument("--abandonar-obsoleta", action="store_true", help="ao arrancar: abandona sem perguntar uma fila obsoleta (arrancada há mais de 60 min e nenhum SP em Doing); fila viva nunca é tocada")
     ap.add_argument("--dry-run", action="store_true", help="mostra a ordem e as exclusões, sem lançar")
@@ -181,7 +181,90 @@ def main(argv=None):
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     ap.add_argument("--estado", default=str(ESTADO), help=argparse.SUPPRESS)
     ap.add_argument("--relatorios", default=str(RELATORIOS), help=argparse.SUPPRESS)
-    args = ap.parse_args(argv)
+    return ap
+
+
+def _concorrencia_invalida(args):
+    """Rejeita `--concorrencia` fora de 1..MAX_PARALELO; True se já escreveu o erro."""
+    if args.concorrencia is not None and args.concorrencia < 1:
+        _erro("EC-067", f"--concorrencia exige N >= 1 (recebido {args.concorrencia})", "sem a opção a fila corre em série",
+              "nada alterado", f"repetir com `--concorrencia 1..{MAX_PARALELO}` ou sem a opção")
+        return True
+    if args.concorrencia is not None and args.concorrencia > MAX_PARALELO:
+        _erro("EC-067", f"--concorrencia máx. {MAX_PARALELO} painéis em simultâneo (recebido {args.concorrencia})",
+              "o teto de painéis é global a todas as filas", "nada alterado", f"repetir com `--concorrencia {MAX_PARALELO}`")
+        return True
+    return False
+
+
+def _cmd_parar(args, estado):
+    """`--parar`: abandona a fila."""
+    fid = None
+    try:
+        if estado.exists():
+            print(_resumo_antigo(estado, args))
+            fid = ler(estado).get("fila_paineis")
+    except ValueError:  # corrompido: abandonar na mesma
+        pass
+    _limpar_paineis(fid)
+    estado.unlink(missing_ok=True)
+    print("fila abandonada")
+    return 0
+
+
+def _cmd_gastos(args, estado):
+    """`--gastos`: custo de cada sessão da corrida."""
+    if not estado.exists() and estado.with_name("ultima.json").exists():
+        estado = estado.with_name("ultima.json")  # fila já terminada: os gastos ficam consultáveis
+    if not estado.exists():
+        _erro("EC-067", "sem fila em curso", "não há estado de fila nem a última fila terminada", "nada alterado",
+              "arrancar com `sp-fila.py`")
+        return 1
+    atual = _ler_ou_erro(estado)
+    if atual is None:
+        return 1
+    print(render_gastos(atual, _custos()))
+    return 0
+
+
+def _novo_estado(args, mae, modo, so):
+    """Estado inicial de uma fila nova."""
+    fm = mae[1] if mae else {}
+    def num(k):
+        return float(fm[k]) if fm.get(k) not in (None, "") else None
+    usd = num("orcamento_usd")
+    novo = {"max": args.max, "concorrencia": max(1, args.concorrencia or 0) if args.concorrencia else None, "ate": args.ate, "orcamento": int(num("orcamento_requests") or args.orcamento or 0) or None,
+            "max_falhas": max(0, args.max_falhas), "seguidas": 0, "usados": 0, "modo": modo, "feitos": [], "falhados": [], "sessoes": {}, "projeto": args.projeto,
+            "programa": args.programa, "horas": num("orcamento_horas"), "usd": usd,
+            "inicio": datetime.now().isoformat(timespec="seconds")}
+    if usd is not None:
+        novo["custo_inicio"] = sum(_custos().get(s, 0.0) for s in so)
+    return novo
+
+
+def _imprimir(out, estado):
+    """Mostra o que `seguinte` decidiu."""
+    if out["acao"] == "espera":
+        print(f"a aguardar · {', '.join(out['sessoes'])}")
+        if out.get("pendentes"):
+            print(f"sem vaga de painel (máx. {MAX_PARALELO} no total das filas) · pendentes: {', '.join(out['pendentes'])}")
+    elif out["acao"] == "lancou":
+        if out.get("itens"):  # paralelo: um painel por SP, já aberto com o modelo do SP
+            print(f"lançado em painéis · {', '.join(out['slugs'])} · terminar o turno")
+            for i in out["itens"]:
+                print(f"  {i['slug']} · {i.get('modelo') or '?'} · {i.get('worktree') or '?'}")
+            _arrancar_vigia(estado)
+        else:
+            print(f"lançado · {', '.join(out['slugs'])} · terminar o turno")
+    else:
+        print(f"fila terminada: {out['motivo']}\nrelatório: {out['relatorio']}")
+        if out.get("fechar_mae"):
+            m = out["fechar_mae"]
+            print(f"fechar-mae: {m} · `sb-worktree.py ensure {m}` → `sp-move.py {m} done` → commit → `sb-worktree.py merge {m}`")
+
+
+def main(argv=None):
+    args = _parser().parse_args(argv)
     max_dado = args.max
     if args.max is None and not args.concorrencia:
         args.max = MAX_DEFEITO  # em paralelo None = sem máximo
@@ -191,42 +274,16 @@ def main(argv=None):
             estado = estado_de(args.programa)
         elif args.seguinte or args.gastos or args.parar:
             estado = sp_fila_estado.localizar(args.slug) or estado
-    if args.concorrencia is not None and args.concorrencia < 1:
-        _erro("EC-067", f"--concorrencia exige N >= 1 (recebido {args.concorrencia})", "sem a opção a fila corre em série",
-              "nada alterado", f"repetir com `--concorrencia 1..{MAX_PARALELO}` ou sem a opção")
-        return 1
-    if args.concorrencia is not None and args.concorrencia > MAX_PARALELO:
-        _erro("EC-067", f"--concorrencia máx. {MAX_PARALELO} painéis em simultâneo (recebido {args.concorrencia})",
-              "o teto de painéis é global a todas as filas", "nada alterado", f"repetir com `--concorrencia {MAX_PARALELO}`")
+    if _concorrencia_invalida(args):
         return 1
 
     if args.ajuda:
         print(AJUDA)
         return 0
     if args.parar:
-        fid = None
-        try:
-            if estado.exists():
-                print(_resumo_antigo(estado, args))
-                fid = ler(estado).get("fila_paineis")
-        except ValueError:  # corrompido: abandonar na mesma
-            pass
-        _limpar_paineis(fid)
-        estado.unlink(missing_ok=True)
-        print("fila abandonada")
-        return 0
+        return _cmd_parar(args, estado)
     if args.gastos:
-        if not estado.exists() and estado.with_name("ultima.json").exists():
-            estado = estado.with_name("ultima.json")  # fila já terminada: os gastos ficam consultáveis
-        if not estado.exists():
-            _erro("EC-067", "sem fila em curso", "não há estado de fila nem a última fila terminada", "nada alterado",
-                  "arrancar com `sp-fila.py`")
-            return 1
-        atual = _ler_ou_erro(estado)
-        if atual is None:
-            return 1
-        print(render_gastos(atual, _custos()))
-        return 0
+        return _cmd_gastos(args, estado)
     items = load(args.root, args.projeto)
     mae = None
     if args.programa:
@@ -284,16 +341,7 @@ def main(argv=None):
                   "nenhum estado criado", "instalar/abrir o WezTerm, tmux ou herdr, ou correr sem `--concorrencia`")
             return 1
         estado.parent.mkdir(parents=True, exist_ok=True)
-        fm = mae[1] if mae else {}
-        def num(k):
-            return float(fm[k]) if fm.get(k) not in (None, "") else None
-        usd = num("orcamento_usd")
-        novo = {"max": args.max, "concorrencia": max(1, args.concorrencia or 0) if args.concorrencia else None, "ate": args.ate, "orcamento": int(num("orcamento_requests") or args.orcamento or 0) or None,
-                "max_falhas": max(0, args.max_falhas), "seguidas": 0, "usados": 0, "modo": modo, "feitos": [], "falhados": [], "sessoes": {}, "projeto": args.projeto,
-                "programa": args.programa, "horas": num("orcamento_horas"), "usd": usd,
-                "inicio": datetime.now().isoformat(timespec="seconds")}
-        if usd is not None:
-            novo["custo_inicio"] = sum(_custos().get(s, 0.0) for s in so)
+        novo = _novo_estado(args, mae, modo, so)
         guardar(estado, novo)
     try:
         out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug)
@@ -308,23 +356,7 @@ def main(argv=None):
     except TimeoutError as e:  # lock preso: o estado fica intacto (sem «fila vazia» nem falhados); repetir `--seguinte --slug`
         _erro("EC-042", str(e), "outro processo tem o lock da fila", "o estado não foi alterado", "repetir `--seguinte`")
         return 1
-    if out["acao"] == "espera":
-        print(f"a aguardar · {', '.join(out['sessoes'])}")
-        if out.get("pendentes"):
-            print(f"sem vaga de painel (máx. {MAX_PARALELO} no total das filas) · pendentes: {', '.join(out['pendentes'])}")
-    elif out["acao"] == "lancou":
-        if out.get("itens"):  # paralelo: um painel por SP, já aberto com o modelo do SP
-            print(f"lançado em painéis · {', '.join(out['slugs'])} · terminar o turno")
-            for i in out["itens"]:
-                print(f"  {i['slug']} · {i.get('modelo') or '?'} · {i.get('worktree') or '?'}")
-            _arrancar_vigia(estado)
-        else:
-            print(f"lançado · {', '.join(out['slugs'])} · terminar o turno")
-    else:
-        print(f"fila terminada: {out['motivo']}\nrelatório: {out['relatorio']}")
-        if out.get("fechar_mae"):
-            m = out["fechar_mae"]
-            print(f"fechar-mae: {m} · `sb-worktree.py ensure {m}` → `sp-move.py {m} done` → commit → `sb-worktree.py merge {m}`")
+    _imprimir(out, estado)
     return 0
 
 
