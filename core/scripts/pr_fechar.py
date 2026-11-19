@@ -29,6 +29,17 @@ def _gh_merge(pr, estrategia, repo):
     return r.returncode, (r.stderr or r.stdout).strip()
 
 
+def _vigia_parou(rc):
+    """Traduz o rc do vigia em (rc, mensagem) quando não há merge a fazer; None se o PR está verde."""
+    if rc == 0:
+        return None
+    if rc == 6:
+        return 12, "conflito com a base; sem merge"
+    if rc in (3, 4):
+        return rc, "vigia parou (limite de duração ou gh falhou); sem merge"
+    return 11, "checks vermelhos, PR fechado ou erro; sem merge"
+
+
 def fechar(pr, repo, watch_fn=None, fetch_fn=pr_watch.fetch, merge_fn=_gh_merge, interval=60, max_seconds=7200):
     """Devolve (rc, mensagem). `watch_fn(pr, repo)` devolve o rc do pr_watch (injetável nos testes)."""
     d = kaizen_config.desenvolvimento(repo)
@@ -37,13 +48,9 @@ def fechar(pr, repo, watch_fn=None, fetch_fn=pr_watch.fetch, merge_fn=_gh_merge,
     if watch_fn is None:
         def watch_fn(p, r):
             return pr_watch.watch(p, r, fetch_fn=fetch_fn, interval=interval, max_seconds=max_seconds)
-    rc = watch_fn(pr, repo)
-    if rc == 6:
-        return 12, "conflito com a base; sem merge"
-    if rc in (3, 4):
-        return rc, "vigia parou (limite de duração ou gh falhou); sem merge"
-    if rc != 0:
-        return 11, "checks vermelhos, PR fechado ou erro; sem merge"
+    parou = _vigia_parou(watch_fn(pr, repo))
+    if parou:
+        return parou
     try:
         estado, det = pr_watch.classify(fetch_fn(pr, repo))
     except pr_watch.GhError as e:
