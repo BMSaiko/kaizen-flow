@@ -297,9 +297,9 @@ def test_bloqueio_que_nao_e_pausa_nao_trava_o_resume(tmp_path):
 
 
 @pytest.mark.parametrize("args,ec", [
-    (dict(slug="a/b"), "EC-067"), (dict(slug=SLUG, from_fase="x"), "EC-067"),
-    (dict(slug=SLUG, restart=True, from_fase="dp"), "EC-067"), (dict(slug=SLUG), "EC-050"),
-    (dict(slug=SLUG, restart=True, confirmar=lambda: False), "EC-006"),
+    ({"slug": "a/b"}, "EC-067"), ({"slug": SLUG, "from_fase": "x"}, "EC-067"),
+    ({"slug": SLUG, "restart": True, "from_fase": "dp"}, "EC-067"), ({"slug": SLUG}, "EC-050"),
+    ({"slug": SLUG, "restart": True, "confirmar": lambda: False}, "EC-006"),
 ])
 def test_recusas_no_formato_de_4_partes(tmp_path, args, ec):
     import kf_erros
