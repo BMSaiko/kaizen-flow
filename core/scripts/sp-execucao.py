@@ -10,7 +10,7 @@ rc: 0 ok, 1 erro (não é mãe, valor inválido, SP em falta)
 """
 import argparse
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -49,7 +49,7 @@ def gravar(root, slug, modo, project=None):
     sp, fm = _mae(root, slug, project)
     if fm.get("execucao") == modo:
         return f"{slug}: execucao já é {modo}"
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     lines = sp.path.read_bytes().decode("utf-8").splitlines(keepends=True)
     end = next(i for i in range(1, len(lines)) if lines[i].strip() == "---")
     eol = lines[0][len(lines[0].rstrip("\r\n")):] or "\n"

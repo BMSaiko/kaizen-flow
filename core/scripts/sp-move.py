@@ -13,7 +13,7 @@ rc: 0 movido, 1 erro
 """
 import argparse
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -105,7 +105,7 @@ def move(root, slug, dest, project=None):
     if target == "Doing":
         _agent_claim(slug, target)
     dst = sp.path.parent.parent / target / sp.path.name
-    updated = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    updated = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     new_raw = _rewrite_frontmatter(sp.path.read_bytes(), target, updated)
     if dst.exists():
         raise SpMoveError(f"destino já ocupado por outro ficheiro: {dst}")
