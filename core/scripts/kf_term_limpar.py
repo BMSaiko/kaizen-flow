@@ -162,7 +162,7 @@ def candidatos(root_sp, filas, vivos):
     """SPs em Doing (não-mãe) sem painel vivo registado, pela ordem do `sp-list`."""
     painel = {sp.get("slug"): _id(sp.get("pane")) for f in filas for sp in f["sps"]}
     return [s for s in sp_list.collect(Path(root_sp), include_done=False)
-            if s.status == "Doing" and s.kind != "program" and not (painel.get(s.slug) in vivos)]
+            if s.status == "Doing" and s.kind != "program" and painel.get(s.slug) not in vivos]
 
 
 def spawn_real(backend):

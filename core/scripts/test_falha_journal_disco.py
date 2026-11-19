@@ -88,7 +88,7 @@ def test_ec_069_sighup_num_processo_real_grava_checkpoint(tmp_path):
         "print('pronto', flush=True)\n"
         "for _ in range(600):\n"
         "    time.sleep(0.05)\n"
-    ).encode("utf-8"))
+    ).encode())
     p = subprocess.Popen([sys.executable, str(script), str(tmp_path), SLUG], stdout=subprocess.PIPE, text=True)
     try:
         assert p.stdout.readline().strip() == "pronto"
@@ -238,7 +238,7 @@ def test_ec_050_cli_estado_corrompido_avisa_e_devolve_json(tmp_path, capsys):
 def test_cli_reconstruir(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(sp_journal, "_git", lambda *a: None)
     sp = tmp_path / "sp.md"
-    sp.write_bytes("---\nphase: DP\n---\n# título ção\n".encode("utf-8"))
+    sp.write_bytes("---\nphase: DP\n---\n# título ção\n".encode())
     assert sp_journal.main(["reconstruir", "--slug", SLUG, "--raiz", str(tmp_path), "--sp", str(sp)]) == 0
     dados = json.loads(capsys.readouterr().out)
     assert dados["reconstruido"] is True and dados["fase"] == "DP"
@@ -308,9 +308,8 @@ def test_ec_051_unlink_do_lock_sempre_preso_acaba_por_levantar(tmp_path, monkeyp
 
     monkeypatch.setattr(pathlib.Path, "unlink", unlink)
     monkeypatch.setattr(sp_disco.time, "sleep", lambda s: None)
-    with pytest.raises(PermissionError):
-        with sp_disco.bloqueio(tmp_path / "f"):
-            pass
+    with pytest.raises(PermissionError), sp_disco.bloqueio(tmp_path / "f"):
+        pass
 
 
 def test_ec_043_heartbeat_em_thread_renova_e_sobrevive_a_erros_de_disco(tmp_path, monkeypatch):

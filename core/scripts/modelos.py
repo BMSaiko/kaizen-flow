@@ -124,7 +124,7 @@ def save(path, data):
 
 def _set_key(fm, key, value, eol):
     """Substitui ou acrescenta `key: value` (nível de topo) no bloco de frontmatter (bytes)."""
-    linha = f"{key}: {value}".encode("utf-8")
+    linha = f"{key}: {value}".encode()
     linhas = fm.split(eol)
     for i, l in enumerate(linhas):
         if l.startswith(key.encode() + b":"):

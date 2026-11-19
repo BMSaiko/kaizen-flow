@@ -173,7 +173,7 @@ def make_program(root, state_b="Doing"):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(
             f"---\nstatus: {folder}\ncreated: 2026-10-01T10:00:00Z\nupdated: 2026-10-01T10:00:00Z\nslug: {slug}\n"
-            f"project: atlas\nparent: mae\n{deps}---\n# {slug}\n".encode("utf-8"))
+            f"project: atlas\nparent: mae\n{deps}---\n# {slug}\n".encode())
     return mae
 
 

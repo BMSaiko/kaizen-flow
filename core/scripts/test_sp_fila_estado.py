@@ -201,9 +201,8 @@ def test_bloqueio_com_pid_vivo_nao_e_roubado(tmp_path):
     st = _estado(tmp_path)
     lock = Path(f"{st}.lock")
     lock.write_text(str(os.getpid()), encoding="utf-8")
-    with pytest.raises(TimeoutError):
-        with sp_fila.bloqueio(st, espera=0.2):
-            pass
+    with pytest.raises(TimeoutError), sp_fila.bloqueio(st, espera=0.2):
+        pass
     assert lock.exists()
 
 
