@@ -83,7 +83,8 @@ def relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora, custos=None,
 
 def progresso(mae_path, estado, fila, motivo, agora):
     """Acrescenta `## Progresso (sessão <data>)` à mãe: feitos, falhados, por correr."""
-    listar = lambda xs: [f"- {x}" for x in xs] or ["- nenhum"]
+    def listar(xs):
+        return [f"- {x}" for x in xs] or ["- nenhum"]
     porcorrer = [sp.slug for sp in fila if sp.slug not in estado["falhados"]]
     linhas = ["", f"## Progresso (sessão {agora:%Y-%m-%d %H:%M})", "", f"Paragem: {motivo}.", f"Modo: {_modo(estado)}.", "", "Feitos:",
               *listar(estado["feitos"]), "", "Falhados:", *listar(estado["falhados"]), "", "Por correr:",

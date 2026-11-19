@@ -286,7 +286,8 @@ def main(argv=None):
             return 1
         estado.parent.mkdir(parents=True, exist_ok=True)
         fm = mae[1] if mae else {}
-        num = lambda k: float(fm[k]) if fm.get(k) not in (None, "") else None
+        def num(k):
+            return float(fm[k]) if fm.get(k) not in (None, "") else None
         usd = num("orcamento_usd")
         novo = {"max": args.max, "concorrencia": max(1, args.concorrencia or 0) if args.concorrencia else None, "ate": args.ate, "orcamento": int(num("orcamento_requests") or args.orcamento or 0) or None,
                 "max_falhas": max(0, args.max_falhas), "seguidas": 0, "usados": 0, "modo": modo, "feitos": [], "falhados": [], "sessoes": {}, "projeto": args.projeto,
