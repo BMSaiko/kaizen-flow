@@ -32,28 +32,34 @@ def _cmd(valor):
     return valor.strip().strip("`").strip()
 
 
-def validate(path):
-    text = Path(path).read_text(encoding="utf-8")
-    erros = []
+def _erros_frontmatter(text):
     fm = re.match(r"---\n(.*?)\n---\n", text, re.S)
     if not fm:
-        erros.append("frontmatter em falta")
-    else:
-        for k in FM_KEYS:
-            if not re.search(rf"^{k}:\s*\S", fm.group(1), re.M):
-                erros.append(f"frontmatter sem {k}")
+        return ["frontmatter em falta"]
+    return [f"frontmatter sem {k}" for k in FM_KEYS if not re.search(rf"^{k}:\s*\S", fm.group(1), re.M)]
+
+
+def _erros_fase(n, corpo):
+    erros = []
+    for nome in FIELDS:
+        v = _campo(corpo, nome)
+        if v is None:
+            erros.append(f"fase {n}: falta {nome}")
+        elif nome == "Gate" and _cmd(v).lower() in PLACEHOLDER:
+            erros.append(f"fase {n}: Gate vazio/placeholder")
+        elif nome != "Gate" and v.lower() in PLACEHOLDER:
+            erros.append(f"fase {n}: {nome} vazio")
+    return erros
+
+
+def validate(path):
+    text = Path(path).read_text(encoding="utf-8")
+    erros = _erros_frontmatter(text)
     fases = _fases(text)
     if not 2 <= len(fases) <= 7:
         erros.append(f"{len(fases)} fases (esperado 2-7)")
     for n, corpo in fases:
-        for nome in FIELDS:
-            v = _campo(corpo, nome)
-            if v is None:
-                erros.append(f"fase {n}: falta {nome}")
-            elif nome == "Gate" and _cmd(v).lower() in PLACEHOLDER:
-                erros.append(f"fase {n}: Gate vazio/placeholder")
-            elif nome != "Gate" and v.lower() in PLACEHOLDER:
-                erros.append(f"fase {n}: {nome} vazio")
+        erros.extend(_erros_fase(n, corpo))
     for sec in ("Risks", "Out of Scope"):
         if not re.search(rf"^## {sec}\s*$", text, re.M):
             erros.append(f"falta a secção {sec}")
