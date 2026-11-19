@@ -137,7 +137,7 @@ def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.slee
         if not registar:
             continue
         inicio = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        atualizar(estado_path, lambda e, s=slug, i=inicio: registar_sessao(e, s, i, worktree=res["worktree"], painel=res["painel"], estado="lancado"))
+        atualizar(estado_path, lambda e, s=slug, i=inicio, r=res: registar_sessao(e, s, i, worktree=r["worktree"], painel=r["painel"], estado="lancado"))
     if backend == "clipboard":
         ok = [r["slug"] for r in results if r["ok"]]
         if ok:
