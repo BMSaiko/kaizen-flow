@@ -132,7 +132,19 @@ def encontrar(sps, ref, project=None):
     exatos = [sp for sp in ok if sp.slug in (ref, base)]
     if exatos:
         return exatos
-    return [sp for sp in ok if sp.slug == sem_data(base) or (sem_data(base) == base and sem_data(sp.slug) == base)]
+    casados = [sp for sp in ok if sp.slug == sem_data(base) or (sem_data(base) == base and sem_data(sp.slug) == base)]
+    return casados or fragmento(ok, base)
+
+
+FRAGMENTO_MIN = 6
+
+
+def fragmento(sps, ref):
+    """Último recurso: SPs cujo slug contém `ref` (fragmento de pelo menos FRAGMENTO_MIN caracteres, sem barras nem data).
+    Quem chama decide o que fazer com mais de um (os comandos recusam o ambíguo e listam os candidatos)."""
+    if len(ref) < FRAGMENTO_MIN or "/" in ref or re.search(r"\d{4}-\d{2}-\d{2}", ref):
+        return []
+    return [sp for sp in sps if ref in sp.slug]
 
 
 def normalize_ref(root, ref):
@@ -145,7 +157,8 @@ def normalize_ref(root, ref):
     for cand in (base, re.sub(r"-\d{4}-\d{2}-\d{2}$", "", base)):
         if cand in slugs:
             return cand
-    return ref
+    achados = fragmento(sps, base)
+    return achados[0].slug if len(achados) == 1 else ref
 
 
 def sort_sps(sps, key="status", reverse=False):

@@ -335,3 +335,15 @@ def test_copia_em_todo_e_removida_ao_fechar(tmp_path):
     sp_move.move(tmp_path, "mae", "done")
     assert not todo.exists() and not (tmp_path / "atlas/sp/Doing/mae.md").exists()
     assert (tmp_path / "atlas/sp/Done/mae.md").exists()
+
+
+def test_avisos_fecho_lista_o_que_falta(tmp_path):
+    make_sp(tmp_path, "atlas/sp/TODO", "abc")
+    avisos = sp_move.avisos_fecho(tmp_path, "abc", "atlas")
+    assert any("gates:" in a for a in avisos) and any("Decisões" in a for a in avisos)
+
+
+def test_avisos_fecho_vazio_com_gates_e_decisoes(tmp_path):
+    p = make_sp(tmp_path, "atlas/sp/TODO", "abc", body="# corpo\n\n## Decisões\n- x\n")
+    p.write_text(p.read_text(encoding="utf-8").replace("slug: abc", "slug: abc\ngates:\n  - cmd: echo ok", 1), encoding="utf-8")
+    assert sp_move.avisos_fecho(tmp_path, "abc", "atlas") == []

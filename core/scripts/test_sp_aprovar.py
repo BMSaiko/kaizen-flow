@@ -108,3 +108,33 @@ def test_validate_ui_exige_esboco():
     base = _texto("ui: sim\n") + "## Decisões\n- x\n"
     assert any("Esboço" in e for e in sp_validate.validate(base))
     assert not any("Esboço" in e for e in sp_validate.validate(base + "## Esboço\n+--+\n"))
+
+
+CORPO8 = "\n".join(f"## {n}. Secção\ntexto {n}\n" for n in range(1, 9))
+
+
+def test_rondas_zero_so_com_oito_secoes(tmp_path):
+    p = make_sp(tmp_path, "cheio", extra={"date": "2026-11-13"})
+    p.write_text(p.read_text(encoding="utf-8").replace("# corpo", CORPO8), encoding="utf-8")
+    assert "grill 0" in sp_aprovar.aprovar(tmp_path, "cheio", rondas=0)
+    assert fm_de(p)["grill"] == "0"
+    v = make_sp(tmp_path, "vazio", extra={"date": "2026-11-13"})
+    v.write_text(v.read_text(encoding="utf-8").replace("# corpo", CORPO8.replace("texto 5", "")), encoding="utf-8")
+    try:
+        sp_aprovar.aprovar(tmp_path, "vazio", rondas=0)
+    except sp_aprovar.SpAprovarError as exc:
+        assert "8 secções" in str(exc)
+    else:
+        raise AssertionError("devia recusar")
+
+
+def test_aprovar_por_fragmento_unico_e_ambiguo(tmp_path):
+    make_sp(tmp_path, "alfa-terminal-2026-11-13", extra={"date": "2026-11-13"})
+    make_sp(tmp_path, "beta-terminal-2026-11-13", extra={"date": "2026-11-13"})
+    assert "alfa-terminal-2026-11-13: aprovado" in sp_aprovar.aprovar(tmp_path, "alfa-terminal", rondas=1)
+    try:
+        sp_aprovar.aprovar(tmp_path, "terminal", rondas=1)
+    except sp_aprovar.SpAprovarError as exc:
+        assert "ambíguo" in str(exc) and "beta-terminal" in str(exc)
+    else:
+        raise AssertionError("devia recusar")

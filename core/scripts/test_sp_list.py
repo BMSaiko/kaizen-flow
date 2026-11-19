@@ -412,3 +412,20 @@ def test_encontrar_nunca_casa_datas_diferentes(tmp_path):
     sps = sp_list.collect(tmp_path, include_done=True)
     assert sp_list.encontrar(sps, "kf-x-2026-11-02") == []
     assert [s.slug for s in sp_list.encontrar(sps, "kf-y-2026-11-02.md")] == ["kf-y"]  # ficheiro datado, slug sem data
+
+
+def test_encontrar_fragmento_unico_e_ambiguo(tmp_path):
+    make_sp(tmp_path, "atlas/sp/TODO", "atlas-terminal-default-2026-11-19", project="atlas")
+    make_sp(tmp_path, "atlas/sp/TODO", "atlas-terminal-limpar-2026-11-19", project="atlas")
+    sps = sp_list.collect(tmp_path)
+    assert [s.slug for s in sp_list.encontrar(sps, "terminal-default")] == ["atlas-terminal-default-2026-11-19"]
+    assert len(sp_list.encontrar(sps, "terminal")) == 2
+    assert sp_list.encontrar(sps, "termi") == []  # curto demais
+    assert sp_list.encontrar(sps, "terminal-default-2026-11-01") == []  # com data nunca por fragmento
+
+
+def test_normalize_ref_fragmento_so_se_unico(tmp_path):
+    make_sp(tmp_path, "atlas/sp/TODO", "atlas-terminal-default-2026-11-19", project="atlas")
+    make_sp(tmp_path, "atlas/sp/TODO", "atlas-terminal-limpar-2026-11-19", project="atlas")
+    assert sp_list.normalize_ref(tmp_path, "terminal-default") == "atlas-terminal-default-2026-11-19"
+    assert sp_list.normalize_ref(tmp_path, "terminal") == "terminal"

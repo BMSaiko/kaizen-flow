@@ -12,6 +12,7 @@ Uso:
 rc: 0 movido, 1 erro
 """
 import argparse
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -185,6 +186,21 @@ def start(root, slug, project=None):
     return "\n".join(out)
 
 
+def avisos_fecho(root, slug, project=None):
+    """Linhas de aviso com o que o `sp-fechar` vai exigir e o SP ainda não tem (`gates:`, `## Decisões`); [] se estiver tudo."""
+    achados = sp_list.encontrar(sp_list.collect(root, include_done=True), slug, project)
+    if len(achados) != 1:
+        return []
+    texto = achados[0].path.read_text(encoding="utf-8")
+    fm = sp_list.parse_frontmatter(texto)
+    falta = []
+    if not re.search(r"(?m)^gates:\s*$", texto.split("\n---", 2)[0]) and not fm.get("gates"):
+        falta.append("`gates:` executáveis no frontmatter")
+    if not re.search(r"(?m)^## Decisões\s*$", texto):
+        falta.append("`## Decisões` (o grill registado)")
+    return [f"aviso: o sp-fechar vai exigir {x}" for x in falta]
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Move um SP entre TODO, Doing e Done")
     ap.add_argument("slug", nargs="?")
@@ -222,6 +238,8 @@ def main(argv=None):
             if args.dest.lower() != "doing" or args.next:
                 raise SpMoveError("--start não se combina com outro destino nem com --next")
             print(start(args.root, args.slug, args.project))
+            for linha in avisos_fecho(args.root, args.slug, args.project):
+                print(linha, file=sys.stderr)
         elif args.next:
             if args.dest.lower() != "done":
                 raise SpMoveError(f"--next só se usa com 'done'; corre sp-move.py {args.slug} done --next")

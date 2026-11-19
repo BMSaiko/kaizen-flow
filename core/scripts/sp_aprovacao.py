@@ -6,6 +6,7 @@ rc: n/a
 Exceções (único sítio): SPs com `origem:` (correção nascida de um veredicto `ajustar`, SP de `pentest`)
 ficam aprovados pela origem, sem grill. SPs de `date` anterior a DESDE não precisam de `aprovado`.
 """
+import re
 from datetime import datetime, timezone
 
 DESDE = "2026-11-13"
@@ -18,6 +19,13 @@ def por_aprovar(fm):
     if not data or data < DESDE:
         return False
     return not (fm.get("aprovado") or fm.get("origem"))
+
+
+def oito_secoes(texto):
+    """True se o corpo tem as secções `## 1.` a `## 8.` todas com texto (SP completo: o grill pode saltar-se, `--rondas 0`)."""
+    partes = re.split(r"(?m)^## (\d)\.", texto)
+    corpos = {partes[i]: partes[i + 1] for i in range(1, len(partes) - 1, 2)}
+    return all(str(n) in corpos and corpos[str(n)].split("\n", 1)[-1].strip() for n in range(1, 9))
 
 
 def agora():
