@@ -559,6 +559,27 @@ def escolher(config="auto", env=None, which=shutil.which, run=run_hidden, estado
     return None
 
 
+def config_efetiva(backend="auto", repo=None):
+    """Nome a passar a `escolher`/`falta`: um `--backend` explícito manda; `auto` ou vazio usa `painelBackend` da config do repo."""
+    if backend and backend != "auto":
+        return backend
+    try:
+        import kaizen_config
+        return kaizen_config.painel_backend(repo or Path.cwd())
+    except Exception:  # noqa: BLE001 - config ilegível: deteção automática
+        return "auto"
+
+
+def escolher_por_config(backend="auto", repo=None, **kw):
+    """`escolher` com a config efetiva e as opções do herdr do repo (o ponto único para scripts com `--backend`)."""
+    try:
+        import kaizen_config
+        herdr = kaizen_config.herdr(repo or Path.cwd())
+    except Exception:  # noqa: BLE001
+        herdr = None
+    return escolher(config_efetiva(backend, repo), herdr=herdr, **kw)
+
+
 def falta(config="auto", env=None, which=shutil.which):
     """Mensagem de uma linha: o que falta para haver backend (para o aviso do fallback sequencial)."""
     env = os.environ if env is None else env

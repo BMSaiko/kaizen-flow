@@ -525,3 +525,27 @@ def test_herdr_projeto_sem_repo_de_codigo_cai_no_vault(monkeypatch, tmp_path):
     monkeypatch.setenv("SB_CODE_ROOT", str(tmp_path))
     assert pb.HerdrBackend._repo_do_projeto("inexistente") is None
     assert pb.HerdrBackend._repo_do_projeto("../x") is None
+
+
+def test_config_efetiva_explicito_manda(tmp_path):
+    assert pb.config_efetiva("tmux", tmp_path) == "tmux"
+
+
+@pytest.mark.parametrize("cfg,esperado", [("herdr", "herdr"), ("tmux", "tmux"), (None, "auto"), ("lixo", "auto")])
+def test_config_efetiva_auto_le_painel_backend(tmp_path, cfg, esperado):
+    if cfg is not None:
+        (tmp_path / "kaizen.config.json").write_text(json.dumps({"painelBackend": cfg}), encoding="utf-8")
+    assert pb.config_efetiva("auto", tmp_path) == esperado
+    assert pb.config_efetiva(None, tmp_path) == esperado
+
+
+def test_escolher_por_config_usa_a_chave_e_nao_o_ambiente(tmp_path):
+    (tmp_path / "kaizen.config.json").write_text(json.dumps({"painelBackend": "tmux"}), encoding="utf-8")
+    b = pb.escolher_por_config("auto", tmp_path, env={"HERDR_PANE_ID": "1"}, which=lambda n: "/bin/" + n)
+    assert b.nome == "tmux"
+
+
+def test_escolher_por_config_explicito_ignora_a_chave(tmp_path):
+    (tmp_path / "kaizen.config.json").write_text(json.dumps({"painelBackend": "tmux"}), encoding="utf-8")
+    b = pb.escolher_por_config("herdr", tmp_path, env={}, which=lambda n: "/bin/" + n)
+    assert b.nome == "herdr"

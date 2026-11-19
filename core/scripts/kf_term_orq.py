@@ -138,7 +138,7 @@ def main(argv=None, backend="auto", entrada=input, saida=print, correr=run_hidde
         import kf_term_ls
         backend, aviso = kf_term_ls.backend_por_config()
         if backend is None:
-            print(f"aviso: {aviso or 'sem backend de painéis'}; o ORQ precisa de WezTerm ou tmux", file=sys.stderr)
+            print(f"aviso: {aviso or 'sem backend de painéis'}; o ORQ precisa de herdr, WezTerm ou tmux", file=sys.stderr)
             return 1
     try:
         if a.modo == "acao":
