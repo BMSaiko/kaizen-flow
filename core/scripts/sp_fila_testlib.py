@@ -43,7 +43,7 @@ def slugs(result):
 
 
 def reasons(result):
-    return {slug: why for slug, why in result[1]}
+    return dict(result[1])
 
 
 def _runner(calls):
