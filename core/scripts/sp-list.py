@@ -192,7 +192,7 @@ def build_tree(sps):
         return [d for d in sp.depends_on if (sp.project, d) not in done]
 
     groups, used = [], set()
-    for key, mother in sorted(mothers.items(), key=lambda kv: kv[0]):
+    for _key, mother in sorted(mothers.items(), key=lambda kv: kv[0]):
         if mother is None:
             continue
         kids = sorted((sp for sp in sps if sp.project == mother.project and sp.parent == mother.slug

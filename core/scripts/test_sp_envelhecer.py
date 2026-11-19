@@ -28,7 +28,7 @@ class T(unittest.TestCase):
             f = mk(r, "a", "P3", "2026-10-01")
             today = date(2026, 11, 1)
             for _ in range(2):
-                for sp, old, new, base, age in env.plan(r, today):
+                for sp, _old, new, base, _age in env.plan(r, today):
                     env.apply(sp, new, base)
             txt = f.read_text(encoding="utf-8")
             self.assertIn("priority: P1", txt)
