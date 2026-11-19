@@ -443,122 +443,136 @@ def _handler():
     return _HANDLER[0]
 
 
+class _Rotas:
+    """Métodos do handler HTTP; fora de _definir_handler para não somarem à sua complexidade."""
+    timeout = 5  # uma ligação muda não pode prender o servidor single-thread
+
+    def log_message(self, *a):
+        pass
+
+    def _resp(self, code, corpo, tipo="application/json; charset=utf-8"):
+        b = corpo.encode("utf-8") if isinstance(corpo, str) else corpo
+        self.send_response(code)
+        self.send_header("Content-Type", tipo)
+        self.send_header("Content-Length", str(len(b)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Security-Policy", "default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; base-uri 'none'")
+        self.end_headers()
+        self.wfile.write(b)
+
+    def _json(self, code, obj):
+        self._resp(code, json.dumps(obj, ensure_ascii=False))
+
+    def _drenar(self):
+        """Lê e deita fora o corpo pendente (até MAX_CORPO): recusar sem o ler faz o Windows enviar RST ao cliente."""
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return
+        if 0 < n <= MAX_CORPO:
+            self.rfile.read(n)
+
+    def _autorizado(self):
+        import hmac
+        s = self.server
+        self.server.pedido = time.time()
+        porta = s.server_address[1]
+        if self.headers.get("Host") not in (f"127.0.0.1:{porta}", f"localhost:{porta}"):
+            self._drenar()
+            self._json(403, {"erro": "host"})
+            return False
+        t = (re.search(r"[?&]t=([^&]*)", self.path) or [None, ""])[1]
+        if not hmac.compare_digest(t.encode(), s.token.encode()):
+            self._drenar()
+            self._json(403, {"erro": "token"})
+            return False
+        return True
+
+    def do_GET(self):
+        if not self._autorizado():
+            return
+        if self.path.split("?")[0] != "/":
+            return self._json(404, {"erro": "nao existe"})
+        s = self.server
+        try:
+            retomar(s.estado)
+        except Exception:  # noqa: BLE001 — a página abre mesmo sem conseguir retomar
+            pass
+        s.cartoes = por_rever(s.raiz, s.estado)
+        s.servidos = {c["slug"] for c in s.cartoes}
+        self._resp(200, pagina(s.cartoes, s.token, em_curso(s.estado)), "text/html; charset=utf-8")
+
+    def _corpo(self):
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = -1
+        if n < 0 or n > MAX_CORPO:
+            self._json(413, {"erro": "corpo grande"})
+            return None
+        try:
+            d = json.loads(self.rfile.read(n) or b"{}")
+        except ValueError:
+            d = None
+        if not isinstance(d, dict):
+            self._json(400, {"erro": "json"})
+            return None
+        return d
+
+    def _post_sair(self, d):
+        self.server.fechar = True
+        self._json(200, {"ok": True})
+
+    def _post_desfazer(self, d):
+        s = self.server
+        if not s.ultimo:
+            return self._json(409, {"erro": "nada para desfazer"})
+        slug, anterior = s.ultimo
+        _repor(s.estado, slug, anterior)
+        s.ultimo = None
+        self._json(200, {"slug": slug, "estado": "pendente"})
+
+    def _post_veredicto(self, d):
+        s = self.server
+        slug, est, texto = d.get("slug"), d.get("estado"), d.get("texto", "")
+        if slug not in s.servidos or est not in ESTADOS[1:]:
+            return self._json(400, {"erro": "slug ou estado inválido"})
+        antes = _ler_estado(s.estado).get(slug)
+        try:
+            e = aplicar_veredicto(slug, est, texto, s.estado, s.raiz, arrancar=bool(d.get("arrancar")))
+        except Exception as ex:  # noqa: BLE001 — ValueError e VeredictoErro viram 400, o resto 500
+            return self._json(400 if isinstance(ex, ValueError) or type(ex).__name__ == "VeredictoErro" else 500, {"erro": str(ex)[:300]})
+        s.ultimo = (slug, antes)
+        self._json(200, {"slug": slug, "estado": est, "acao": e.get("acao"), "motivo": e.get("motivo", "")})
+
+    def _post_arrancar(self, d):
+        slug = d.get("slug")
+        try:
+            r = arrancar_entrada(slug, self.server.estado)
+        except Exception as ex:  # noqa: BLE001
+            return self._json(400, {"erro": str(ex)[:300]})
+        self._json(200, {"slug": slug, **r})
+
+    def do_POST(self):
+        if not self._autorizado():
+            return
+        rota = self.path.split("?")[0]
+        d = self._corpo()
+        if d is None:
+            return
+        fn = {"/sair": self._post_sair, "/desfazer": self._post_desfazer,
+              "/veredicto": self._post_veredicto, "/arrancar": self._post_arrancar}.get(rota)
+        if fn is None:
+            return self._json(404, {"erro": "nao existe"})
+        fn(d)
+
+
 def _definir_handler():
-    import hmac
     from http.server import BaseHTTPRequestHandler
 
-    class _Handler(BaseHTTPRequestHandler):
-        timeout = 5  # uma ligação muda não pode prender o servidor single-thread
-
-        def log_message(self, *a):
-            pass
-
-        def _resp(self, code, corpo, tipo="application/json; charset=utf-8"):
-            b = corpo.encode("utf-8") if isinstance(corpo, str) else corpo
-            self.send_response(code)
-            self.send_header("Content-Type", tipo)
-            self.send_header("Content-Length", str(len(b)))
-            self.send_header("Cache-Control", "no-store")
-            self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header("Content-Security-Policy", "default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; base-uri 'none'")
-            self.end_headers()
-            self.wfile.write(b)
-
-        def _json(self, code, obj):
-            self._resp(code, json.dumps(obj, ensure_ascii=False))
-
-        def _drenar(self):
-            """Lê e deita fora o corpo pendente (até MAX_CORPO): recusar sem o ler faz o Windows enviar RST ao cliente."""
-            try:
-                n = int(self.headers.get("Content-Length") or 0)
-            except ValueError:
-                return
-            if 0 < n <= MAX_CORPO:
-                self.rfile.read(n)
-
-        def _autorizado(self):
-            s = self.server
-            self.server.pedido = time.time()
-            porta = s.server_address[1]
-            if self.headers.get("Host") not in (f"127.0.0.1:{porta}", f"localhost:{porta}"):
-                self._drenar()
-                self._json(403, {"erro": "host"})
-                return False
-            t = (re.search(r"[?&]t=([^&]*)", self.path) or [None, ""])[1]
-            if not hmac.compare_digest(t.encode(), s.token.encode()):
-                self._drenar()
-                self._json(403, {"erro": "token"})
-                return False
-            return True
-
-        def do_GET(self):
-            if not self._autorizado():
-                return
-            if self.path.split("?")[0] != "/":
-                return self._json(404, {"erro": "nao existe"})
-            s = self.server
-            try:
-                retomar(s.estado)
-            except Exception:  # noqa: BLE001 — a página abre mesmo sem conseguir retomar
-                pass
-            s.cartoes = por_rever(s.raiz, s.estado)
-            s.servidos = {c["slug"] for c in s.cartoes}
-            self._resp(200, pagina(s.cartoes, s.token, em_curso(s.estado)), "text/html; charset=utf-8")
-
-        def _corpo(self):
-            try:
-                n = int(self.headers.get("Content-Length") or 0)
-            except ValueError:
-                n = -1
-            if n < 0 or n > MAX_CORPO:
-                self._json(413, {"erro": "corpo grande"})
-                return None
-            try:
-                d = json.loads(self.rfile.read(n) or b"{}")
-            except ValueError:
-                d = None
-            if not isinstance(d, dict):
-                self._json(400, {"erro": "json"})
-                return None
-            return d
-
-        def do_POST(self):
-            if not self._autorizado():
-                return
-            s = self.server
-            rota = self.path.split("?")[0]
-            d = self._corpo()
-            if d is None:
-                return
-            if rota == "/sair":
-                s.fechar = True
-                return self._json(200, {"ok": True})
-            if rota == "/desfazer":
-                if not s.ultimo:
-                    return self._json(409, {"erro": "nada para desfazer"})
-                slug, anterior = s.ultimo
-                _repor(s.estado, slug, anterior)
-                s.ultimo = None
-                return self._json(200, {"slug": slug, "estado": "pendente"})
-            if rota == "/veredicto":
-                slug, est, texto = d.get("slug"), d.get("estado"), d.get("texto", "")
-                if slug not in s.servidos or est not in ESTADOS[1:]:
-                    return self._json(400, {"erro": "slug ou estado inválido"})
-                antes = _ler_estado(s.estado).get(slug)
-                try:
-                    e = aplicar_veredicto(slug, est, texto, s.estado, s.raiz, arrancar=bool(d.get("arrancar")))
-                except Exception as ex:  # noqa: BLE001 — ValueError e VeredictoErro viram 400, o resto 500
-                    return self._json(400 if isinstance(ex, ValueError) or type(ex).__name__ == "VeredictoErro" else 500, {"erro": str(ex)[:300]})
-                s.ultimo = (slug, antes)
-                return self._json(200, {"slug": slug, "estado": est, "acao": e.get("acao"), "motivo": e.get("motivo", "")})
-            if rota == "/arrancar":
-                slug = d.get("slug")
-                try:
-                    r = arrancar_entrada(slug, s.estado)
-                except Exception as ex:  # noqa: BLE001
-                    return self._json(400, {"erro": str(ex)[:300]})
-                return self._json(200, {"slug": slug, **r})
-            self._json(404, {"erro": "nao existe"})
+    class _Handler(_Rotas, BaseHTTPRequestHandler):
+        pass
 
     return _Handler
 
