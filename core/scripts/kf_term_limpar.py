@@ -170,6 +170,19 @@ def spawn_real(backend):
     return mha._spawn_real(backend.nome)
 
 
+def _escolher(cands, slug, pasta_handoffs, entrada, escrever):
+    """Lista os candidatos e devolve o escolhido (None se o user cancelar)."""
+    for i, s in enumerate(cands, 1):
+        hs = _handoffs(s.slug, pasta_handoffs)
+        escrever(f"{i}) {s.slug}" + (f"  handoff: {hs[-1]}" if hs else "  (sem handoff pendente)") + "\n")
+    if len(cands) > 1 and not slug:
+        r = entrada("número (q cancela): ").strip().lower()
+        if not (r.isdigit() and 1 <= int(r) <= len(cands)):
+            return None
+        return cands[int(r) - 1]
+    return cands[0]
+
+
 def retomar(a, root_sp, root_estado, backend, aviso, entrada, escrever, pasta_handoffs, spawn=None):
     if backend is None:
         print(f"aviso: {aviso or 'sem backend de painéis'}; sem painel para reabrir", file=sys.stderr)
@@ -188,17 +201,10 @@ def retomar(a, root_sp, root_estado, backend, aviso, entrada, escrever, pasta_ha
     if not cands:
         escrever("nada a retomar\n")
         return 0
-    for i, s in enumerate(cands, 1):
-        hs = _handoffs(s.slug, pasta_handoffs)
-        escrever(f"{i}) {s.slug}" + (f"  handoff: {hs[-1]}" if hs else "  (sem handoff pendente)") + "\n")
-    if len(cands) > 1 and not a.slug:
-        r = entrada("número (q cancela): ").strip().lower()
-        if not (r.isdigit() and 1 <= int(r) <= len(cands)):
-            escrever("cancelado\n")
-            return 0
-        alvo = cands[int(r) - 1]
-    else:
-        alvo = cands[0]
+    alvo = _escolher(cands, a.slug, pasta_handoffs, entrada, escrever)
+    if alvo is None:
+        escrever("cancelado\n")
+        return 0
     if not a.sim and not confirmar(f"reabrir o michi de {alvo.slug} num painel novo?", entrada):
         escrever("cancelado\n")
         return 0
