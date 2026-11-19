@@ -69,6 +69,34 @@ def _script(nome):
     return str(Path(__file__).resolve().parent / nome)
 
 
+def _enviar(a, backend, titulo, entrada, saida):
+    texto = a.alvo or ""
+    if not texto or len(texto) > MAX_TEXTO or CONTROLO.search(texto):
+        print(f"erro: texto vazio, com caracteres de controlo ou acima de {MAX_TEXTO}", file=sys.stderr)
+        return 2
+    if not backend.interativo:
+        print("erro: este backend não aceita texto", file=sys.stderr)
+        return 2
+    saida(f"enviar para o painel {a.painel} ({titulo}), texto exato: {texto!r}")
+    if not confirmar("enviar?", entrada):
+        saida("cancelado")
+        return 0
+    saida("enviado" if backend.enviar(a.painel, texto) else "não enviado")
+    return 0
+
+
+def _matar(a, backend, titulo, entrada, saida):
+    if titulo == TITULO:
+        print("erro: o painel ORQ não se mata por aqui", file=sys.stderr)
+        return 2
+    saida(f"matar o painel {a.painel} ({titulo})")
+    if not confirmar("matar?", entrada):
+        saida("cancelado")
+        return 0
+    saida("fechado" if backend.fechar(a.painel) else "já não existia")
+    return 0
+
+
 def acao(a, backend, entrada=input, saida=print, correr=run_hidden):
     if a.acao == "ls":
         return correr([sys.executable, "-I", _script("kf_term_ls.py"), "--json"], check=False).returncode
@@ -89,28 +117,8 @@ def acao(a, backend, entrada=input, saida=print, correr=run_hidden):
         saida(dados_painel(texto))
         return 0
     if a.acao == "enviar":
-        texto = a.alvo or ""
-        if not texto or len(texto) > MAX_TEXTO or CONTROLO.search(texto):
-            print(f"erro: texto vazio, com caracteres de controlo ou acima de {MAX_TEXTO}", file=sys.stderr)
-            return 2
-        if not backend.interativo:
-            print("erro: este backend não aceita texto", file=sys.stderr)
-            return 2
-        saida(f"enviar para o painel {a.painel} ({titulo}), texto exato: {texto!r}")
-        if not confirmar("enviar?", entrada):
-            saida("cancelado")
-            return 0
-        saida("enviado" if backend.enviar(a.painel, texto) else "não enviado")
-        return 0
-    if titulo == TITULO:
-        print("erro: o painel ORQ não se mata por aqui", file=sys.stderr)
-        return 2
-    saida(f"matar o painel {a.painel} ({titulo})")
-    if not confirmar("matar?", entrada):
-        saida("cancelado")
-        return 0
-    saida("fechado" if backend.fechar(a.painel) else "já não existia")
-    return 0
+        return _enviar(a, backend, titulo, entrada, saida)
+    return _matar(a, backend, titulo, entrada, saida)
 
 
 def main(argv=None, backend="auto", entrada=input, saida=print, correr=run_hidden, raiz=None):
