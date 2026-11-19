@@ -229,7 +229,7 @@ def _color():
 
 
 def paint(text, *codes):
-    return f"[{';'.join(codes)}m{text}[0m" if codes and _color() else text
+    return f"\x1b[{';'.join(codes)}m{text}\x1b[0m" if codes and _color() else text
 
 
 STATUS_STYLE = {"Doing": ("1", "32"), "TODO": (), "Done": ("2",)}
