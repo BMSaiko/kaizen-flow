@@ -10,6 +10,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+try:  # Hypothesis determinístico em todos os testes: mesma semente a cada corrida (sem flaky); `@settings` local só muda o que define
+    from hypothesis import settings as _hyp_settings
+
+    _hyp_settings.register_profile("kaizen", derandomize=True, deadline=None, print_blob=True)
+    _hyp_settings.load_profile("kaizen")
+except ImportError:  # Hypothesis é dependência de dev; sem ela só os testes que a importam falham
+    pass
+
 # Testes de 30-40 s (análise de todas as sessões AMATA). O gate completo corre-os; `-m "not lento"` salta-os.
 LENTOS = (
     ("test_amata_solver_primitivas", "test_fixtures_derivam_para_a_integranda"),
@@ -173,3 +181,68 @@ class Relogio:
 def relogio():
     """Relógio injetável (`agora`/`dormir`) no lugar de `time.time`/`time.sleep` reais."""
     return Relogio()
+
+
+class FalhaReplace:
+    """`os.replace` que levanta `PermissionError` (antivírus/indexador no Windows) nas primeiras `n` chamadas e depois passa."""
+
+    def __init__(self, n, real):
+        self.n, self.real, self.chamadas, self.falhas = n, real, 0, 0
+
+    def __call__(self, origem, destino):
+        self.chamadas += 1
+        if self.falhas < self.n:
+            self.falhas += 1
+            raise PermissionError(13, "ficheiro em uso (injetado)", str(destino))
+        return self.real(origem, destino)
+
+
+@pytest.fixture
+def falha_replace(monkeypatch):
+    """Fábrica `falha_replace(n)`: troca `os.replace` por um que falha `n` vezes e devolve o injetor (contadores)."""
+    import os
+
+    real = os.replace
+
+    def fazer(n):
+        injetor = FalhaReplace(n, real)
+        monkeypatch.setattr(os, "replace", injetor)
+        return injetor
+
+    return fazer
+
+
+class TempoFalso:
+    """Substituto do módulo `time` dentro de um módulo: `time`/`monotonic`/`sleep`/`time_ns` usam o `Relogio`; o resto é o real."""
+
+    def __init__(self, relogio):
+        import time as _real
+        self._real, self.relogio = _real, relogio
+
+    def time(self):
+        return self.relogio.agora()
+
+    def monotonic(self):
+        return self.relogio.agora()
+
+    def time_ns(self):
+        return int(self.relogio.agora() * 1e9)
+
+    def sleep(self, segundos):
+        self.relogio.dormir(segundos)
+
+    def __getattr__(self, nome):
+        return getattr(self._real, nome)
+
+
+@pytest.fixture
+def tempo_falso(monkeypatch, relogio):
+    """Fábrica `tempo_falso(*modulos)`: o `time` desses módulos passa a ser o `relogio` (sem sleeps reais); devolve o relógio."""
+    def fazer(*modulos, inicio=1_700_000_000.0):
+        relogio.t = float(inicio)
+        falso = TempoFalso(relogio)
+        for m in modulos:
+            monkeypatch.setattr(m, "time", falso)
+        return relogio
+
+    return fazer
