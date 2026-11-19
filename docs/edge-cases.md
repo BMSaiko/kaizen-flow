@@ -23,6 +23,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-005 | Fresh session fails while printing the handoff it is consuming | the handoff file is kept; `handoff.py consume` can be run again | resume-orfaos | `core/scripts/test_handoff.py::test_consume_falha_a_imprimir_nao_apaga` |
 | EC-006 | Ctrl+D (EOF) at a terminal confirmation | EOF counts as no; nothing is abandoned or deleted | preflight-erros-ux | `core/scripts/test_sp_fila_estado.py::test_obsoleta_eof_no_terminal_vale_como_nao` |
 | EC-059 | `/sp-handoff --launch` run inside a pane started by a queue (`/clear`, then `/michi` in the same pane) | the handoff is allowed; the watcher keeps the story `a-correr` and does not mark it `falhou` or launch the next one | resume-orfaos | `core/scripts/test_sp_handoff.py::test_ec_059_retoma_num_painel_da_fila_repete_o_prompt_da_fila` |
+| EC-069 | Terminal pane closed (SIGHUP) during a phase on Linux or macOS | the checkpoint is written with `interrompido: true` before the process ends (rc 128+SIGHUP) | testes-falha-90 | `core/scripts/test_falha_journal_disco.py::test_ec_069_sighup_num_processo_real_grava_checkpoint` |
 
 ## Crash (script, gate or test: rc != 0, exception, timeout)
 

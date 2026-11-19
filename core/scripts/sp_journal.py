@@ -289,7 +289,7 @@ def _ao_interromper(raiz, slug):
 
 
 def instalar_sinais(raiz, slug):
-    """SIGINT/SIGTERM/SIGBREAK e (Windows) fecho da consola gravam o checkpoint e saem; False fora da thread principal."""
+    """SIGINT/SIGTERM/SIGBREAK/SIGHUP e (Windows) fecho da consola gravam o checkpoint e saem; False fora da thread principal."""
     global _CALLBACK_CONSOLA
     if threading.current_thread() is not threading.main_thread():
         return False
@@ -302,7 +302,7 @@ def instalar_sinais(raiz, slug):
             raise KeyboardInterrupt
         sys.exit(128 + int(signum))
 
-    for nome in ("SIGINT", "SIGTERM", "SIGBREAK"):
+    for nome in ("SIGINT", "SIGTERM", "SIGBREAK", "SIGHUP"):  # EC-069: SIGHUP = painel fechado (Linux/macOS)
         sig = getattr(signal, nome, None)
         if sig is not None:
             anteriores[sig] = signal.signal(sig, handler)
