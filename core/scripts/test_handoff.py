@@ -9,6 +9,12 @@ from sp_carregar import carregar  # noqa: E402
 
 handoff = carregar(Path(__file__).with_name("handoff.py"), "handoff", fresco=True)
 
+@pytest.fixture(autouse=True)
+def _loops_hermeticos(tmp_path_factory, monkeypatch):
+    """Nunca ler o estado real dos loops do user."""
+    monkeypatch.setenv("SB_LOOPS_DIR", str(tmp_path_factory.mktemp("loops")))
+
+
 BODY = "**Feito**\n- a\n\n**Por fazer**\n- b\n\n**Próximo passo**\nc\n"
 
 
@@ -180,3 +186,13 @@ def test_launch_sem_painel_copia_prompt(tmp_path, capsys, monkeypatch):
     assert handoff.launch(path, env={}, copy=copiado.append) is None
     assert copiado == [handoff.continuation_prompt(path)]
     assert "copiado:" in capsys.readouterr().out
+
+
+def test_write_acrescenta_loops_ativos_fora_do_limite(tmp_path, monkeypatch):
+    import loop_estado
+    monkeypatch.setenv("SB_LOOPS_DIR", str(tmp_path / "loops"))
+    sem = handoff.write(tmp_path / "h1", BODY, "a", now=datetime(2026, 10, 18, 9, 5)).read_text(encoding="utf-8")
+    assert "Loops ativos" not in sem
+    loop_estado.set_estado("ronda", int(time.time()) + 3600, perm="SB: commit,merge")
+    com = handoff.write(tmp_path / "h2", BODY, "a", now=datetime.now()).read_text(encoding="utf-8")
+    assert "## Loops ativos" in com and "/ronda" in com and "SB: commit,merge" in com
