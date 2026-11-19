@@ -5,7 +5,7 @@ rc: n/a
 """
 import re
 import sys
-from datetime import date, datetime, timezone, UTC
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -108,7 +108,7 @@ def write(path, progress, today=None):
     end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
     if end is None:
         raise HandoffError("frontmatter sem fecho")
-    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     for i in range(1, end):
         if UPDATED_RE.match(lines[i]):
             lines[i] = f"updated: {stamp}{eol}"

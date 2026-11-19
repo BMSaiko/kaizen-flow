@@ -27,7 +27,7 @@ _s.path.insert(0, str(_P(__file__).resolve().parent))
 from painel_backend import run_hidden  # noqa: E402
 import kf_erros  # noqa: E402
 import sys
-from datetime import datetime, timezone, UTC
+from datetime import datetime, timezone
 from pathlib import Path
 
 MAX_BYTES = 1024 * 1024
@@ -110,7 +110,7 @@ def registar(script, erro, contexto=None, rc=None, args=None, ec=None):
         else:
             tipo, mensagem = "mensagem", str(erro)
         linha = {
-            "ts": datetime.now(UTC).isoformat(timespec="seconds"),
+            "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "script": str(script),
             "args": filtrar_args(sys.argv[1:] if args is None else args),
             "tipo": tipo,
