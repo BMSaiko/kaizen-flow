@@ -70,9 +70,9 @@ def _done_so_na_worktree(root, slug, run):
     for linha in (r.stdout or "").splitlines():
         if linha.startswith("worktree "):
             atual = linha[9:].strip()
-        elif linha.strip() == f"branch refs/heads/agent/{nome}" and atual and Path(atual).resolve() != Path(root).resolve():
-            if any(Path(atual).glob(f"**/sp/Done/{slug}*.md")):
-                return atual
+        elif linha.strip() == f"branch refs/heads/agent/{nome}" and atual and Path(atual).resolve() != Path(root).resolve() \
+                and any(Path(atual).glob(f"**/sp/Done/{slug}*.md")):
+            return atual
     return None
 
 
