@@ -13,7 +13,7 @@ import signal
 import subprocess
 import sys
 import time
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -128,7 +128,7 @@ def test_ec_042_ao_interromper_com_lock_preso_grava_na_mesma(tmp_path, monkeypat
 class _RelogioParado(datetime):
     @classmethod
     def now(cls, tz=None):
-        return datetime(2026, 1, 2, 3, 4, 5, 6, tzinfo=UTC)
+        return datetime(2026, 1, 2, 3, 4, 5, 6, tzinfo=timezone.utc)
 
 
 def test_ec_050_quarentena_com_o_mesmo_carimbo_nunca_sobrescreve(tmp_path, monkeypatch):
