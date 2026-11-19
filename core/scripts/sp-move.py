@@ -72,10 +72,8 @@ def _agent_claim(slug, target):
             raise SpMoveError(str(exc))
 
 
-def move(root, slug, dest, project=None):
-    if dest.lower() not in DESTS:
-        raise SpMoveError(f"destino inválido '{dest}' (todo|doing|done)")
-    target = DESTS[dest.lower()]
+def _resolver(root, slug, target, project):
+    """O SP a mover e as cópias duplicadas em TODO (só ao fechar)."""
     matches = [sp for sp in sp_list.collect(root, include_done=True) if sp.slug == slug]
     if project:
         matches = [sp for sp in matches if sp.project == project]
@@ -90,7 +88,14 @@ def move(root, slug, dest, project=None):
     if len(matches) > 1:
         opts = ", ".join(f"{sp.project} ({sp.status})" for sp in matches)
         raise SpMoveError(f"SP '{slug}' ambíguo: {opts}; usar --project")
-    sp = matches[0]
+    return matches[0], dups
+
+
+def move(root, slug, dest, project=None):
+    if dest.lower() not in DESTS:
+        raise SpMoveError(f"destino inválido '{dest}' (todo|doing|done)")
+    target = DESTS[dest.lower()]
+    sp, dups = _resolver(root, slug, target, project)
     for d in dups:  # a cópia desatualizada sai sempre, mesmo que o SP já esteja no destino
         if d.path != sp.path and d.path.exists():
             kaizen_engine.relocate(d.path, d.path.with_suffix(".md.dup"))
