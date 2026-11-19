@@ -27,6 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 import handoff_pane as pane_lib  # noqa: E402
+import loop_estado  # noqa: E402
 from handoff_pane import ENTER_GAP, SEND_DELAY, SEND_GAP, HandoffError  # noqa: E402
 from sp_progresso import check_delta  # noqa: E402
 
@@ -63,6 +64,9 @@ def write(folder, body, slug, now=None):
     path = folder / f"{now:%Y-%m-%d-%H%M}-{_slugify(slug)}.md"
     head = f"---\ntype: handoff\ncreated: {now:%Y-%m-%dT%H:%M:%S}\n---\n"
     text = f"{head}# Handoff {now:%Y-%m-%d %H:%M} ({_slugify(slug)})\n\n{body.replace(chr(13) + chr(10), chr(10)).strip(chr(10))}\n"
+    loops = loop_estado.bloco_handoff(now=now.timestamp())
+    if loops:
+        text += f"\n{loops}\n"
     path.write_bytes(text.encode("utf-8"))
     cleanup(folder, keep=path)
     return path

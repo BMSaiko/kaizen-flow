@@ -5,10 +5,17 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import handoff_resume as hr  # noqa: E402
 
 SCRIPT = Path(__file__).resolve().parent / "handoff_resume.py"
+
+@pytest.fixture(autouse=True)
+def _loops_hermeticos(tmp_path_factory, monkeypatch):
+    """Nunca ler o estado real dos loops do user."""
+    monkeypatch.setenv("SB_LOOPS_DIR", str(tmp_path_factory.mktemp("loops")))
 
 
 def _mk(folder, name, age_h=0):
@@ -80,3 +87,15 @@ def test_main_em_processo_nunca_falha_o_arranque(monkeypatch, capsys):
     monkeypatch.setattr(hr, "_default_dir", lambda: (_ for _ in ()).throw(RuntimeError("sem config")))
     assert hr.main() == 0
     assert capsys.readouterr().out == ""
+
+
+def test_loop_ativo_manda_retomar_mesmo_sem_handoff(tmp_path, monkeypatch):
+    import loop_estado
+    monkeypatch.setenv("SB_LOOPS_DIR", str(tmp_path / "loops"))
+    assert hr.hook('{"source":"clear"}', tmp_path) == ""
+    loop_estado.set_estado("ronda", int(time.time()) + 600)
+    out = json.loads(hr.hook('{"source":"clear"}', tmp_path))["hookSpecificOutput"]["additionalContext"]
+    assert "[loop]" in out and "/ronda" in out
+    _mk(tmp_path, "2026-11-19-conversa.md")
+    out = json.loads(hr.hook('{"source":"clear"}', tmp_path))["hookSpecificOutput"]["additionalContext"]
+    assert "[handoff]" in out and "[loop]" in out

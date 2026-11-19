@@ -13,6 +13,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import loop_estado  # noqa: E402
+
 MAX_AGE_H = 12
 SOURCES = {"clear", "startup"}
 
@@ -48,7 +51,7 @@ def hook(stdin_text, folder, now=None):
         data = {}
     if data.get("source", "startup") not in SOURCES:
         return ""
-    ctx = build_context(pending(folder, now))
+    ctx = " ".join(p for p in (build_context(pending(folder, now)), loop_estado.ordem_retoma(now=now)) if p)
     if not ctx:
         return ""
     return json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ctx}},
