@@ -112,6 +112,29 @@ def save(repo, store, slug):
     return n
 
 
+def _restore_one(repo, base, rel, saved, apply):
+    """Reverte um caminho; devolve False se já estava como no checkpoint."""
+    target = _inside(repo, rel)
+    if saved is not None and saved["sha"] is not None:
+        if _sha(target) == saved["sha"]:
+            return False
+        if apply:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((base / saved["blob"]).read_bytes())
+        return True
+    in_head = bool(_git(repo, "ls-tree", "HEAD", "--", rel, text=True).strip())
+    if saved is None and in_head:  # estava limpo: volta ao HEAD
+        if apply:
+            _git(repo, "restore", "--source=HEAD", "--staged", "--worktree", "--", rel)
+        return True
+    # já estava apagado no checkpoint, ou não existia: foi criado depois
+    if not target.exists():
+        return False
+    if apply:
+        target.unlink()
+    return True
+
+
 def restore(repo, store, slug, n=None, only=None, apply=True):
     """Devolve os caminhos revertidos (ou a reverter, com `apply=False`)."""
     cps = list_checkpoints(store, slug)
@@ -131,30 +154,8 @@ def restore(repo, store, slug, n=None, only=None, apply=True):
         candidates &= wanted
     done = []
     for rel in sorted(candidates):
-        target = _inside(repo, rel)
-        saved = cp["files"].get(rel)
-        if saved is not None and saved["sha"] is not None:
-            if _sha(target) == saved["sha"]:
-                continue
-            if apply:
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes((base / saved["blob"]).read_bytes())
-        else:
-            in_head = bool(_git(repo, "ls-tree", "HEAD", "--", rel, text=True).strip())
-            if saved is not None and saved["sha"] is None:  # já estava apagado no checkpoint
-                if not target.exists():
-                    continue
-                if apply:
-                    target.unlink()
-            elif in_head:  # estava limpo: volta ao HEAD
-                if apply:
-                    _git(repo, "restore", "--source=HEAD", "--staged", "--worktree", "--", rel)
-            else:  # não existia: foi criado depois
-                if not target.exists():
-                    continue
-                if apply:
-                    target.unlink()
-        done.append(rel)
+        if _restore_one(repo, base, rel, cp["files"].get(rel), apply):
+            done.append(rel)
     return done
 
 
