@@ -12,6 +12,7 @@ O servidor só escuta em loopback, termina com `q`, após 15 min sem pedidos ou 
 e só lê `sp/proofs/<slug>/` e o ficheiro de estado. Stdlib apenas, sem rede.
 rc: 0 (o hook nunca falha)
 """
+import contextlib
 import json
 import os
 import re
@@ -495,10 +496,8 @@ class _Rotas:
         if self.path.split("?")[0] != "/":
             return self._json(404, {"erro": "nao existe"})
         s = self.server
-        try:
+        with contextlib.suppress(Exception):  # a página abre mesmo sem conseguir retomar
             retomar(s.estado)
-        except Exception:  # noqa: BLE001 — a página abre mesmo sem conseguir retomar
-            pass
         s.cartoes = por_rever(s.raiz, s.estado)
         s.servidos = {c["slug"] for c in s.cartoes}
         self._resp(200, pagina(s.cartoes, s.token, em_curso(s.estado)), "text/html; charset=utf-8")

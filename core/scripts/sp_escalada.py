@@ -9,6 +9,7 @@ Regras: `.claude/skills/michi/references/michi-perfis.md` (coluna «Escalada»).
 Uso: módulo importado por sp_vigia.py; sem execução direta
 rc: n/a
 """
+import contextlib
 import re
 import sys
 import time
@@ -110,10 +111,8 @@ def relancar(slug, nivel, sp, fila, backend, run=None, sleep=time.sleep, estado_
     if not wt:
         return {"estado": "falhou", "msg": "sem worktree para relançar"}
     if sp.get("pane"):
-        try:
+        with contextlib.suppress(Exception):  # painel já fechado
             backend.fechar(sp["pane"])
-        except Exception:  # noqa: BLE001 — painel já fechado
-            pass
     cmd = fp.comando_nivel(nivel)
     modelo = cmd[2]
     pe.transitar(slug, "pendente", msg=f"escalada para {nivel}", fila=fila, root=estado_root)
