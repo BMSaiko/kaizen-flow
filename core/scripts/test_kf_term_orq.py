@@ -21,7 +21,7 @@ class Falso(pb.Backend):
         return "9"
 
     def listar(self):
-        return {i: None for i in self.ecras}
+        return dict.fromkeys(self.ecras)
 
     def fechar(self, id):
         self.fechados.append(id)

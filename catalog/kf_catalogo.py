@@ -318,7 +318,7 @@ def _report(cat, root, como_json, sem_correr):
     refs = _refs(cat)
     res = {} if sem_correr else correr_testes(refs, root)
     if sem_correr:
-        res = {r: True for r in refs}
+        res = dict.fromkeys(refs, True)
     m = medir(cat, res)
     if como_json:
         print(json.dumps(m, ensure_ascii=False, indent=2))
