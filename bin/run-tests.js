@@ -6,6 +6,10 @@ const thr = require("../package.json").coverageThreshold || {};
 const jsMin = (thr.js || {}).lines, pyMin = (thr.python || {}).lines;
 const files = readdirSync("tests").filter((f) => f.endsWith(".test.js")).map((f) => "tests/" + f);
 if (cov) mkdirSync("coverage", { recursive: true });
+// temporários de todos os testes (JS, pytest e filhos) numa pasta da execução, apagada à saída: sem ela, /tmp esgota os inodes
+const runTmp = require("fs").mkdtempSync(require("path").join(require("os").tmpdir(), "kaizen-run-"));
+for (const k of ["TMPDIR", "TEMP", "TMP"]) process.env[k] = runTmp;
+process.on("exit", () => { try { require("fs").rmSync(runTmp, { recursive: true, force: true }); } catch {} });
 const jsArgs = ["--test", ...(cov ? ["--experimental-test-coverage", `--test-coverage-exclude=${require("os").tmpdir().replace(/\\/g, "/")}/**`] : []), ...files];
 // sem cobertura, o pytest arranca já em paralelo com o JS (saída para ficheiro, impressa no fim): ~25 % menos de tempo total
 let bg = null;
@@ -20,7 +24,7 @@ if (cov) {
   process.stdout.write(js.stdout);
   require("fs").writeFileSync("coverage/js.txt", js.stdout);
 }
-const fim = (code) => { if (bg) try { require("fs").unlinkSync(bg.out); } catch {} process.exit(code); };
+const fim = (code) => process.exit(code);
 if (js.status !== 0) { if (bg) bg.proc.kill(); fim(js.status || 1); }
 if (cov && jsMin !== undefined) {
   const m = /all files\s*\|\s*([\d.]+)/.exec(js.stdout.toString());
