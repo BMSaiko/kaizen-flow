@@ -22,14 +22,18 @@ def test_run_cli_devolve_stdout():
 
 
 def test_run_cli_rc_diferente_de_zero_da_erro():
-    with mock.patch.object(wez.subprocess, "run", return_value=_done(rc=1, err="boom")), \
-            pytest.raises(wez.WezError, match="boom"):
+    with (
+        mock.patch.object(wez.subprocess, "run", return_value=_done(rc=1, err="boom")),
+        pytest.raises(wez.WezError, match="boom"),
+    ):
         wez.run_cli(["list"])
 
 
 def test_run_cli_sem_wezterm_da_erro():
-    with mock.patch.object(wez.subprocess, "run", side_effect=FileNotFoundError), \
-            pytest.raises(wez.WezError, match="PATH"):
+    with (
+        mock.patch.object(wez.subprocess, "run", side_effect=FileNotFoundError),
+        pytest.raises(wez.WezError, match="PATH"),
+    ):
         wez.run_cli(["list"])
 
 
