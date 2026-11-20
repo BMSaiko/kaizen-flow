@@ -121,8 +121,7 @@ def test_worktree_hint_so_em_worktree(tmp_path):
 
 
 def _mod():
-    m = carregar(SCRIPTS / "sp-fechar.py", "sp_fechar", fresco=True)
-    return m
+    return carregar(SCRIPTS / "sp-fechar.py", "sp_fechar", fresco=True)
 
 
 def test_avisos_sem_prova_nem_reflect():

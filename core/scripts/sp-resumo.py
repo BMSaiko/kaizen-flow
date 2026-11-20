@@ -92,7 +92,7 @@ def resumo(root, slug, project=None):
         if not linhas:
             faltas.append(titulo.split(" (")[0])
             linhas = ["(em falta)"]
-        saida += [f"{titulo}:"] + [x if x.startswith(" ") or x.startswith("-") or not x else f"  {x}" for x in linhas]
+        saida += [f"{titulo}:"] + [x if x.startswith((" ", "-")) or not x else f"  {x}" for x in linhas]
     if faltas:
         saida.append(_corta(f"FALTA matéria: {', '.join(faltas)}"))
     if len(saida) > MAX_LINHAS:

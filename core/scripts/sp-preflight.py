@@ -316,8 +316,7 @@ def main(argv=None):
             print(msg, file=sys.stderr if r else sys.stdout)
     kf_git.invalidar()
     restantes = diagnosticar(a.slug, a.repo, a.ramo, a.sem_orfao)
-    rc = 1 if restantes else 0
-    return rc
+    return 1 if restantes else 0
 
 
 if __name__ == "__main__":
