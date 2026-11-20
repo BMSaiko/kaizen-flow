@@ -12,6 +12,7 @@ Passo com «inicio» sem «fim»/«revertido» = interrompido: idempotente repet
 (nunca se apaga) e reconstrói-se do git + `phase:` do SP. Fecho da consola conta como Ctrl+C.
 rc: 0 ok; 128+sinal se interrompido (Ctrl+C, fecho da consola)
 """
+import contextlib
 import argparse
 import json
 import os
@@ -138,10 +139,9 @@ def _acrescentar(raiz, slug, fase, passo, evento, idempotente):
         f.write(json.dumps(linha, ensure_ascii=True).encode("ascii") + b"\n")
         f.flush()
         os.fsync(f.fileno())
-    try:
+    # o heartbeat nunca parte a API do journal: o evento já está gravado
+    with contextlib.suppress(OSError, TimeoutError):
         sp_disco.renovar_lock(raiz, slug)  # cada evento é sinal de vida do dono (michi por CLI)
-    except (OSError, TimeoutError):
-        pass  # o heartbeat nunca parte a API do journal: o evento já está gravado
 
 
 def inicio(raiz, slug, fase, passo, idempotente=True):
@@ -281,10 +281,8 @@ def _ao_interromper(raiz, slug):
         gravar_checkpoint(raiz, slug, fase, passo, extra={"interrompido": True})
     except OSError:
         return False
-    try:
+    with contextlib.suppress(OSError, TimeoutError):
         sp_disco.libertar_lock(raiz, slug)  # só apaga se for deste pid: o SP fica logo candidato a `kaizen resume`
-    except (OSError, TimeoutError):
-        pass
     return True
 
 

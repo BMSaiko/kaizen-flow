@@ -14,6 +14,7 @@ Uso:
   python -I scripts/sp-autor.py --avisar <slug> [--sp <SP.md>] [--backend auto|herdr|wezterm|tmux|background]
 rc: 0 painel aberto (ou dry-run / consume ok) · 1 erro · 2 sem vaga (pendente)
 """
+import contextlib
 import argparse
 import sys
 import time
@@ -166,10 +167,8 @@ def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sle
         msg = f"erro a lançar {k}: {e}"
         pe.transitar(k, "falhou", msg=msg, fila=fila, root=estado_root)
         if pane is not None:
-            try:
+            with contextlib.suppress(Exception):
                 backend.fechar(pane)
-            except Exception:  # noqa: BLE001
-                pass
         return {**res, "estado": "falhou", "pane": pane, "msg": msg}
     return {**res, "estado": "a-correr", "pane": str(pane)}
 
