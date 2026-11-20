@@ -4,6 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
+import sp_indice  # noqa: E402
 from sp_fila_testlib import make_sp, plan, reasons, slugs  # noqa: E402
 
 sp_aprovar = kaizen_engine.load("sp-aprovar")
@@ -119,6 +120,7 @@ def test_rondas_zero_so_com_oito_secoes(tmp_path):
     assert "grill 0" in sp_aprovar.aprovar(tmp_path, "cheio", rondas=0)
     assert fm_de(p)["grill"] == "0"
     v = make_sp(tmp_path, "vazio", extra={"date": "2026-11-13"})
+    sp_indice.invalidar()  # o mtime das pastas no NTFS é grosseiro: a listagem em cache não veria o SP novo
     v.write_text(v.read_text(encoding="utf-8").replace("# corpo", CORPO8.replace("texto 5", "")), encoding="utf-8")
     try:
         sp_aprovar.aprovar(tmp_path, "vazio", rondas=0)
