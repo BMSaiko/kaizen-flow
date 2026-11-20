@@ -71,10 +71,7 @@ def _enum(errors, fm, key, validos):
 
 
 def _erros_frontmatter(fm, text, folder):
-    errors = []
-    for field in REQUIRED_FIELDS:
-        if not fm.get(field):
-            errors.append(f"frontmatter sem '{field}'")
+    errors = [f"frontmatter sem '{field}'" for field in REQUIRED_FIELDS if not fm.get(field)]
     _enum(errors, fm, "modo", ("auto", "manual"))
     _enum(errors, fm, "michi_modelo", ("simples", "default", "complexo", "critico"))
     if fm.get("execucao"):
