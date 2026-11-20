@@ -6,7 +6,8 @@ push sem force; nunca levanta: devolve uma linha de estado.
 Uso: módulo importado pelos hooks (`from auto_commit import ...`), não tem CLI.
 rc: n/a (biblioteca; as funções devolvem uma linha de estado)
 """
-import sys as _s, pathlib as _p
+import sys as _s
+import pathlib as _p
 _s.path.insert(0, str(_p.Path(__file__).resolve().parent))
 from painel_backend import run_hidden  # noqa: E402
 from pathlib import Path

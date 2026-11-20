@@ -55,3 +55,9 @@ jobs:
           mkdir proj && cd proj && git init -q
           ../node_modules/.bin/kaizen init
           ../node_modules/.bin/kaizen audit .
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: ruff (config em ruff.toml)
+        run: pipx run ruff==0.17.1 check .
