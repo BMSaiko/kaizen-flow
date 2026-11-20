@@ -92,7 +92,7 @@ class Contexto:
 
     def escalar(self, sp):
         """Relança o SP no nível seguinte se `sp_escalada` o pedir; {de, para, ...} ou None (sem escalada)."""
-        return None
+        return
 
 
 def _seguro(ctx, f, *a):

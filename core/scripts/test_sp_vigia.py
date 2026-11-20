@@ -556,7 +556,7 @@ class CtxPausa(Ctx):
 
     def escalar(self, sp):
         self.escaladas.append(sp["slug"])
-        return None
+        return
 
 
 def test_quota_no_ecra_parado_bloqueia_com_motivo_e_retoma_em():

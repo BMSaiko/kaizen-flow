@@ -1,0 +1,18 @@
+target-version = "py310"
+line-length = 160
+extend-exclude = ["coverage", "docs/assets"]
+
+[lint]
+select = ["E", "F", "W", "B", "UP", "C4", "SIM", "PERF", "RET", "PIE"]
+ignore = [
+  "UP017",  # datetime.UTC só existe no 3.11+
+  "UP031",  # % é mais legível que .format
+  "RET502", "RET503",  # só acrescentam `return None`
+  "PERF401",  # nem sempre mais legível
+  "E402",  # scripts fazem sys.path.insert antes dos imports
+  "E501", "E741", "E731", "PERF203", "B904", "B905", "SIM108",
+]
+
+[lint.per-file-ignores]
+"**/test_*.py" = ["B011", "SIM117", "E501"]
+"core/scripts/conftest.py" = ["E501"]

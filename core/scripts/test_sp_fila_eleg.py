@@ -170,7 +170,8 @@ def test_aplicar_master_usa_a_pasta_de_master_e_nao_a_do_disco(tmp_path):
     git("init", "-b", "master")
     make_sp(tmp_path, "um", folder="Done")
     make_sp(tmp_path, "dois")
-    git("add", "."); git("commit", "-m", "x")
+    git("add", ".")
+    git("commit", "-m", "x")
     git("checkout", "-b", "atrasada")
     um = tmp_path / "p" / "sp"
     (um / "Done" / "um.md").rename(um / "TODO" / "um.md")  # disco da worktree atrasada: um ainda em TODO

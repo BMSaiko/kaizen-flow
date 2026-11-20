@@ -54,7 +54,7 @@ def _sem_custos_reais(monkeypatch):
         import sp_fila_execucao
     except ImportError:
         return
-    monkeypatch.setattr(sp_fila_execucao, "_custos", lambda: {})
+    monkeypatch.setattr(sp_fila_execucao, "_custos", dict)
 
 
 @pytest.fixture(autouse=True)
