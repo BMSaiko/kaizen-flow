@@ -12,7 +12,6 @@ Passo com «inicio» sem «fim»/«revertido» = interrompido: idempotente repet
 (nunca se apaga) e reconstrói-se do git + `phase:` do SP. Fecho da consola conta como Ctrl+C.
 rc: 0 ok; 128+sinal se interrompido (Ctrl+C, fecho da consola)
 """
-import contextlib
 import argparse
 import contextlib
 import json

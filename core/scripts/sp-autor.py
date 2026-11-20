@@ -14,7 +14,6 @@ Uso:
   python -I scripts/sp-autor.py --avisar <slug> [--sp <SP.md>] [--backend auto|herdr|wezterm|tmux|background]
 rc: 0 painel aberto (ou dry-run / consume ok) · 1 erro · 2 sem vaga (pendente)
 """
-import contextlib
 import argparse
 import contextlib
 import sys
