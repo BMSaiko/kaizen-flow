@@ -119,7 +119,7 @@ def test_rondas_zero_so_com_oito_secoes(tmp_path):
     assert "grill 0" in sp_aprovar.aprovar(tmp_path, "cheio", rondas=0)
     assert fm_de(p)["grill"] == "0"
     v = make_sp(tmp_path, "vazio", extra={"date": "2026-11-13"})
-    v.write_text(v.read_text(encoding="utf-8").replace("# corpo", CORPO8.replace("texto 5", "")), encoding="utf-8")
+    v.write_bytes(v.read_text(encoding="utf-8").replace("# corpo", CORPO8.replace("texto 5", "")).encode("utf-8"))  # LF também no Windows
     try:
         sp_aprovar.aprovar(tmp_path, "vazio", rondas=0)
     except sp_aprovar.SpAprovarError as exc:
