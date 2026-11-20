@@ -16,6 +16,7 @@ rc: 0 painel aberto (ou dry-run / consume ok) · 1 erro · 2 sem vaga (pendente)
 """
 import contextlib
 import argparse
+import contextlib
 import sys
 import time
 from pathlib import Path
@@ -167,7 +168,7 @@ def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sle
         msg = f"erro a lançar {k}: {e}"
         pe.transitar(k, "falhou", msg=msg, fila=fila, root=estado_root)
         if pane is not None:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(Exception):  # noqa: BLE001
                 backend.fechar(pane)
         return {**res, "estado": "falhou", "pane": pane, "msg": msg}
     return {**res, "estado": "a-correr", "pane": str(pane)}

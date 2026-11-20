@@ -14,6 +14,7 @@ rc: 0 ok; 128+sinal se interrompido (Ctrl+C, fecho da consola)
 """
 import contextlib
 import argparse
+import contextlib
 import json
 import os
 import re

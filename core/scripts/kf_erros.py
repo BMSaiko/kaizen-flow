@@ -158,35 +158,47 @@ def retoma_padrao(agora=None, intervalo_min=None):
     return _iso((agora or datetime.now()) + timedelta(minutes=_intervalo(intervalo_min)))
 
 
-def _hora_no_texto(texto, agora):
+def _hora_epoch(texto):
     m = _EPOCH.search(texto)
     if m:
         try:
             return datetime.fromtimestamp(int(m.group(1)))
         except (OverflowError, OSError, ValueError):
             pass
-    m = _DURACAO.search(texto)
-    if m:
-        total = timedelta()
-        for n, u in _UNIDADE.findall(m.group(1)):
-            u = u.lower()
-            mult = {"d": "days", "h": "hours", "m": "minutes", "s": "seconds"}[u[0]]
-            if u.startswith("mi") or u == "m":
-                mult = "minutes"
-            total += timedelta(**{mult: int(n)})
-        if total:
-            return agora + total
-    m = _HORA.search(texto)
-    if m:
-        h, mi, ap = int(m.group(1)), int(m.group(2) or 0), (m.group(3) or "").lower()
-        if ap == "p" and h < 12:
-            h += 12
-        elif ap == "a" and h == 12:
-            h = 0
-        if h < 24 and mi < 60 and (ap or m.group(2)):
-            alvo = agora.replace(hour=h, minute=mi, second=0, microsecond=0)
-            return alvo if alvo > agora else alvo + timedelta(days=1)
     return None
+
+
+def _hora_duracao(texto, agora):
+    m = _DURACAO.search(texto)
+    if not m:
+        return None
+    total = timedelta()
+    for n, u in _UNIDADE.findall(m.group(1)):
+        u = u.lower()
+        mult = {"d": "days", "h": "hours", "m": "minutes", "s": "seconds"}[u[0]]
+        if u.startswith("mi") or u == "m":
+            mult = "minutes"
+        total += timedelta(**{mult: int(n)})
+    return agora + total if total else None
+
+
+def _hora_relogio(texto, agora):
+    m = _HORA.search(texto)
+    if not m:
+        return None
+    h, mi, ap = int(m.group(1)), int(m.group(2) or 0), (m.group(3) or "").lower()
+    if ap == "p" and h < 12:
+        h += 12
+    elif ap == "a" and h == 12:
+        h = 0
+    if h < 24 and mi < 60 and (ap or m.group(2)):
+        alvo = agora.replace(hour=h, minute=mi, second=0, microsecond=0)
+        return alvo if alvo > agora else alvo + timedelta(days=1)
+    return None
+
+
+def _hora_no_texto(texto, agora):
+    return _hora_epoch(texto) or _hora_duracao(texto, agora) or _hora_relogio(texto, agora)
 
 
 def classificar_falha(texto, rc=None, agora=None, intervalo_min=None):
