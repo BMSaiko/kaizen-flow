@@ -8,6 +8,7 @@ o painel se chegou a abrir e deixa a worktree intacta. Só stdlib.
 Uso: módulo importado por sp_fila_execucao.py e sp-fila.py; sem execução direta
 rc: n/a
 """
+import contextlib
 import re
 import sys
 import time
@@ -195,10 +196,8 @@ def _lancar_um(alvo, fila, backend, run, sleep, verificar, root, estado_root):
         msg = f"erro a lançar {alvo.slug}: {e}"
         pe.transitar(alvo.slug, "falhou", msg=msg, fila=fila, root=estado_root)
         if pane is not None:
-            try:
+            with contextlib.suppress(Exception):
                 backend.fechar(pane)
-            except Exception:  # noqa: BLE001 — o registo já diz falhou
-                pass
         return {**res, "estado": "falhou", "msg": msg}
     return {**res, "estado": "a-correr"}
 
