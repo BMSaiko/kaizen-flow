@@ -1,4 +1,5 @@
 "use strict";
+const semCache = (src) => !/[\\/](__pycache__|\.pytest_cache|\.ruff_cache|\.hypothesis)([\\/]|$)/.test(src);
 const test = require("node:test");
 const assert = require("node:assert");
 const fs = require("fs");
@@ -76,7 +77,7 @@ test("sync --check sai 0 com core/ em dia e 1 quando o vault mudou, sem tocar em
   // cópia do pacote: o teste escreve em core/ e os outros ficheiros de teste correm em paralelo
   const pkg = tmp();
   const root = path.join(__dirname, "..");
-  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true });
+  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true, filter: semCache });
   const kz = path.join(pkg, "bin", "kaizen.js");
   const v = fakeVault();
   const env = { ...process.env, KAIZEN_SOURCE: v };
@@ -95,7 +96,7 @@ test("sync --check sai 0 com core/ em dia e 1 quando o vault mudou, sem tocar em
 test("sync --check falha com ficheiro órfão em core/ que o vault já não gera, sem lhe tocar", () => {
   const pkg = tmp();
   const root = path.join(__dirname, "..");
-  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true });
+  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true, filter: semCache });
   const kz = path.join(pkg, "bin", "kaizen.js");
   const v = fakeVault();
   const env = { ...process.env, KAIZEN_SOURCE: v };
@@ -119,7 +120,7 @@ test("owns() reconhece caminhos do vault que entram no sync", () => {
 test("sync --check imprime a fonte e sai 1 quando o sync apagaria ficheiros rastreados de core/", () => {
   const pkg = tmp();
   const root = path.join(__dirname, "..");
-  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true });
+  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true, filter: semCache });
   const kz = path.join(pkg, "bin", "kaizen.js");
   const git = (...a) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...a], { cwd: pkg, encoding: "utf8" });
   git("init", "-q");
@@ -155,7 +156,7 @@ test("owns(rel) é verdadeiro exatamente para as origens que plan() devolve", ()
 function pkgCopy() {
   const pkg = tmp();
   const root = path.join(__dirname, "..");
-  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true });
+  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true, filter: semCache });
   return { pkg, kz: path.join(pkg, "bin", "kaizen.js") };
 }
 
