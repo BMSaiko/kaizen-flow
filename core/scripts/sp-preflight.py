@@ -309,7 +309,6 @@ def main(argv=None):
         print("\n\n".join(p.texto() for p in probs))
     if not a.fix or not probs:
         return 1 if probs else 0
-    rc = 1
     for p in probs:
         if p.fix:
             r, msg = corrigir(p, lambda p=p: _perguntar(" ".join(p.fix)))

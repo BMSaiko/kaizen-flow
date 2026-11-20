@@ -11,7 +11,8 @@ import os
 import re
 import shutil
 import subprocess
-import sys as _s, pathlib as _p
+import sys as _s
+import pathlib as _p
 _s.path.insert(0, str(_p.Path(__file__).resolve().parent))
 from painel_backend import run_hidden  # noqa: E402
 import sys
