@@ -19,6 +19,8 @@ Sem `--criar` (ou com `--dry-run`, que nunca cria) imprime o corpo (template `PR
 
 `--repo` é o caminho local do repo (cwd do `gh`), não `owner/nome`; o SP precisa de `pr:` no frontmatter. Provado com PR real (#1, repo de teste, fechado).
 
+Antes de `gh pr create`, em repos com `bin/kaizen.js` corre `node bin/kaizen.js audit .`; hits = rc 1, PR não criado.
+
 Outros rc: 2 review não aprovado; 5 corpo sem «feito» ou sem «prova»; 6 base ambígua.
 
 A «Prova» inclui os paths `proofs/...` citados no SP, os comandos das `gates:` e o veredicto do review. Base: `--base` manda; senão a única entre `origin/main|master|dev`; mais de uma = rc 6, perguntar ao {{userName}}. O corpo é limpo de linhas `Co-Authored-By`/`Generated with` (regra em AGENTS.md).

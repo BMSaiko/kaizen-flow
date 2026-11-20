@@ -4,7 +4,7 @@
 Uso: pr_corpo.py <SP.md> --review <estado.json> [--pentest <relatorio>] [--repo R] [--titulo T] [--base B] [--criar] [--dry-run]
 Sem --criar (ou com --dry-run) só imprime o corpo e a base detetada; nunca cria PR. Com --criar: exige review APROVADO e respeita `pr:` do SP
 (auto cria; pergunta sai com rc 3 para o agente pedir confirmação; nunca recusa).
-rc 0 ok, 2 review não aprovado, 3 pedir confirmação, 4 política `nunca`/em falta, 5 corpo incompleto,
+rc 0 ok, 1 `kaizen audit` com hits (só repos com bin/kaizen.js), 2 review não aprovado, 3 pedir confirmação, 4 política `nunca`/em falta, 5 corpo incompleto,
 6 base ambígua (main/master/dev): pedir ao user ou passar --base.
 Nunca acrescenta atribuição a agentes.
 rc: 0 ok, 2 review não aprovado, 3 política `pergunta`, 4 política não é `auto`, 5 corpo sem feito/prova, 6 base ambígua
@@ -12,6 +12,7 @@ rc: 0 ok, 2 review não aprovado, 3 política `pergunta`, 4 política não é `a
 import argparse
 import json
 import re
+import subprocess
 from pathlib import Path as _P
 import sys as _s
 _s.path.insert(0, str(_P(__file__).resolve().parent))
@@ -62,6 +63,14 @@ def detetar_base(repo):
     nomes = {l.strip().split("/", 1)[1] for l in r.stdout.splitlines() if "/" in l and "->" not in l}
     cand = [b for b in ("main", "master", "dev") if b in nomes]
     return (cand[0] if len(cand) == 1 else None), cand
+
+
+def audit_kaizen(repo):
+    """None se limpo ou repo sem `bin/kaizen.js`; senão o output do `kaizen audit` falhado."""
+    if not (Path(repo) / "bin" / "kaizen.js").is_file():
+        return None
+    r = subprocess.run(["node", "bin/kaizen.js", "audit", "."], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    return None if r.returncode == 0 else ((r.stdout or "") + (r.stderr or "")).strip() or f"rc {r.returncode}"
 
 
 def bloco_provas(pasta, url_base=""):
@@ -146,6 +155,10 @@ def main(argv=None):
     if not base:
         print(f"PR não criado: base ambígua ou desconhecida {cand}, pedir ao user ou usar --base", file=sys.stderr)
         return 6
+    hits = audit_kaizen(a.repo)
+    if hits is not None:
+        print(f"PR recusado: kaizen audit com hits, corrigir antes de abrir\n{hits}", file=sys.stderr)
+        return 1
     titulo = a.titulo or frontmatter(sp, "slug") or "PR"
     r = run_visivel(["gh", "pr", "create", "--base", base, "--title", titulo, "--body", texto], cwd=a.repo, text=True)
     return r.returncode

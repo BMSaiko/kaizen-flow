@@ -68,6 +68,38 @@ class PrTest(unittest.TestCase):
         self.assertEqual(cmd[cmd.index("--base") + 1], "main")
         self.assertNotIn("Co-Authored-By", cmd[-1])
 
+    def _repo_kaizen(self):
+        d = Path(tempfile.mkdtemp())
+        (d / "bin").mkdir()
+        (d / "bin" / "kaizen.js").write_text("", encoding="utf-8")
+        return str(d)
+
+    def test_audit_com_hits_recusa_o_pr(self):
+        repo = self._repo_kaizen()
+        chamadas = []
+
+        def fake(cmd, *a, **k):
+            chamadas.append(cmd)
+            return mock.Mock(returncode=1 if "audit" in cmd else 0, stdout="hit", stderr="")
+        with mock.patch("subprocess.run", side_effect=fake):
+            rc, _, err = correr(montar("auto") + ["--criar", "--base", "main", "--repo", repo])
+        self.assertEqual(rc, 1)
+        self.assertIn("audit", err)
+        self.assertEqual(chamadas[0], ["node", "bin/kaizen.js", "audit", "."])
+        self.assertFalse(any(c[:3] == ["gh", "pr", "create"] for c in chamadas))
+
+    def test_audit_limpo_deixa_criar(self):
+        repo = self._repo_kaizen()
+        with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0, stdout="", stderr="")) as m:
+            rc, _, _ = correr(montar("auto") + ["--criar", "--base", "main", "--repo", repo])
+        self.assertEqual(rc, 0)
+        self.assertEqual(m.call_args[0][0][:3], ["gh", "pr", "create"])
+
+    def test_sem_kaizen_js_nao_corre_audit(self):
+        with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)) as m:
+            correr(montar("auto") + ["--criar", "--base", "main"])
+        self.assertFalse(any("audit" in c[0][0] for c in m.call_args_list))
+
     def test_pergunta_nunca_e_review_reprovado_nao_criam(self):
         with mock.patch("subprocess.run") as m:
             self.assertEqual(correr(montar("pergunta") + ["--criar"])[0], 3)
