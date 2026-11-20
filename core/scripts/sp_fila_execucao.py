@@ -101,6 +101,28 @@ def _mae_na_worktree(mae, run):
     return wt / rel
 
 
+def _lancar(alvo, doing, estado, paralelo, backend, run, root):
+    """Lança o filho (painel ou sp-handoff); devolve (erro|None, item|None)."""
+    erro, item = None, None
+    if paralelo:  # painel: vaga global, `ensure`, Doing só na worktree do filho (nunca o `sp-move` do orquestrador), painel com o modelo do SP
+        try:
+            item = sp_fila_paineis.lancar([alvo], estado["fila_paineis"], backend, run=run, root=root)[0]
+        except Exception as e:  # noqa: BLE001 — registo das filas ilegível ou inválido: falha só este SP
+            item = {"slug": alvo.slug, "estado": "falhou", "msg": f"erro a lançar {alvo.slug}: {e}"}
+        if item["estado"] == "falhou":
+            erro = item["msg"]
+    else:
+        r = run([sys.executable, "-I", str(SCRIPTS / "sp-move.py"), "--root", str(root), "--project", alvo.project, alvo.slug, "doing"],
+                capture_output=True, text=True, encoding="utf-8")
+        if r.returncode != 0:
+            erro = f"erro a lançar {alvo.slug}: {(r.stderr or r.stdout).strip()}"
+        if not erro:
+            r = run([sys.executable, "-I", str(SCRIPTS / "sp-handoff.py"), "--launch", str(doing), "--auto"], capture_output=True, text=True, encoding="utf-8")
+            if r.returncode != 0:
+                erro = f"erro a lançar {alvo.slug}: {(r.stderr or r.stdout).strip()}"
+    return erro, item
+
+
 def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, backend=None):
     estado = ler(estado_path)
     if not slug and estado.get("concorrencia") and estado["sessoes"]:
@@ -160,23 +182,7 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
         registar_sessao(estado, alvo.slug, inicio, requests=REQ_POR_SP, reserva=True)  # reservar o slug antes de soltar o lock
         guardar(estado_path, estado)
         pilha.close()
-        erro, item = None, None
-        if paralelo:  # painel: vaga global, `ensure`, Doing só na worktree do filho (nunca o `sp-move` do orquestrador), painel com o modelo do SP
-            try:
-                item = sp_fila_paineis.lancar([alvo], estado["fila_paineis"], backend, run=run, root=root)[0]
-            except Exception as e:  # noqa: BLE001 — registo das filas ilegível ou inválido: falha só este SP
-                item = {"slug": alvo.slug, "estado": "falhou", "msg": f"erro a lançar {alvo.slug}: {e}"}
-            if item["estado"] == "falhou":
-                erro = item["msg"]
-        else:
-            r = run([sys.executable, "-I", str(SCRIPTS / "sp-move.py"), "--root", str(root), "--project", alvo.project, alvo.slug, "doing"],
-                    capture_output=True, text=True, encoding="utf-8")
-            if r.returncode != 0:
-                erro = f"erro a lançar {alvo.slug}: {(r.stderr or r.stdout).strip()}"
-            if not erro:
-                r = run([sys.executable, "-I", str(SCRIPTS / "sp-handoff.py"), "--launch", str(doing), "--auto"], capture_output=True, text=True, encoding="utf-8")
-                if r.returncode != 0:
-                    erro = f"erro a lançar {alvo.slug}: {(r.stderr or r.stdout).strip()}"
+        erro, item = _lancar(alvo, doing, estado, paralelo, backend, run, root)
         pilha.enter_context(bloqueio(estado_path))
         estado = ler(estado_path)  # outros `--seguinte` podem ter alterado o estado durante o spawn
         if item and item["estado"] == "pendente":  # sem vaga global: tira a reserva, não é falha; nada mais abre agora
