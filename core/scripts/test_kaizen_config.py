@@ -6,8 +6,7 @@ HERE = Path(__file__).resolve().parent
 
 
 def load(name, file):
-    mod = carregar(HERE / file, name, fresco=True)
-    return mod
+    return carregar(HERE / file, name, fresco=True)
 
 
 cfg = load("kaizen_config", "kaizen_config.py")

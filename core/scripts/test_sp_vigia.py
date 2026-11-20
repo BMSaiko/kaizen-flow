@@ -342,8 +342,7 @@ def test_parar_pid_morto_so_apaga(tmp_path):
 
 
 def _cli():
-    m = carregar(Path(__file__).parent / "sp-vigia.py", "sp_vigia_cli", registar=False, fresco=True)
-    return m
+    return carregar(Path(__file__).parent / "sp-vigia.py", "sp_vigia_cli", registar=False, fresco=True)
 
 
 def test_cli_um_tick_apaga_pidfile(tmp_path, monkeypatch):
