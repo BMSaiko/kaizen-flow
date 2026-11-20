@@ -85,11 +85,6 @@ def _ler_sp(sp):
     return ""
 
 
-def _sp_move_na_worktree(root, worktree, alvo):
-    """Delega em `sp_fila_paineis.sp_move_na_worktree` (um só sítio para o argv do `sp-move` na worktree)."""
-    return sp_fila_paineis.sp_move_na_worktree(root, worktree, alvo)
-
-
 def _mae_na_worktree(mae, run):
     """Ficheiro da mãe na worktree dela (`ensure`): o `## Progresso` nunca suja master (a prova real apanhou-o lá).
 

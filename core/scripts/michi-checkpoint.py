@@ -85,10 +85,10 @@ def _inside(repo, rel):
 
 def list_checkpoints(store, slug):
     base = _slug_dir(store, slug)
-    out = []
-    for f in sorted(base.glob("checkpoint-*.json"), key=lambda p: int(p.stem.rsplit("-", 1)[1])):
-        out.append(json.loads(f.read_text(encoding="utf-8")))
-    return out
+    return [
+        json.loads(f.read_text(encoding="utf-8"))
+        for f in sorted(base.glob("checkpoint-*.json"), key=lambda p: int(p.stem.rsplit("-", 1)[1]))
+    ]
 
 
 def save(repo, store, slug):
@@ -152,11 +152,7 @@ def restore(repo, store, slug, n=None, only=None, apply=True):
         for rel in wanted:
             _inside(repo, rel)
         candidates &= wanted
-    done = []
-    for rel in sorted(candidates):
-        if _restore_one(repo, base, rel, cp["files"].get(rel), apply):
-            done.append(rel)
-    return done
+    return [rel for rel in sorted(candidates) if _restore_one(repo, base, rel, cp["files"].get(rel), apply)]
 
 
 def main(argv=None):

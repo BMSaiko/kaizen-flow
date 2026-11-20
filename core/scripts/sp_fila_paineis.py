@@ -196,7 +196,7 @@ def _lancar_um(alvo, fila, backend, run, sleep, verificar, root, estado_root):
         msg = f"erro a lançar {alvo.slug}: {e}"
         pe.transitar(alvo.slug, "falhou", msg=msg, fila=fila, root=estado_root)
         if pane is not None:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(Exception):  # o registo já diz falhou
                 backend.fechar(pane)
         return {**res, "estado": "falhou", "msg": msg}
     return {**res, "estado": "a-correr"}
