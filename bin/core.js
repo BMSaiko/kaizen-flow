@@ -5,6 +5,7 @@ const { render } = require("./markers.js");
 
 const TEXT_EXT = /\.(md|py|json|txt|js|toml)$/i;
 
+const CACHES = new Set(["__pycache__", ".pytest_cache", ".ruff_cache", ".hypothesis"]);
 const CORE = path.resolve(__dirname, "..", "core");
 
 // devolve [{ rel, data }] com rel relativo a core/ e separador "/"; os marcadores {{chave}}
@@ -13,7 +14,7 @@ function loadCore(dir = CORE, cfg = {}) {
   const out = [];
   (function walk(d) {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-      if (e.name === "__pycache__" || e.name === ".pytest_cache" || e.name.endsWith(".pyc")) continue;
+      if (CACHES.has(e.name) || e.name.endsWith(".pyc")) continue;
       const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p);
       else {
