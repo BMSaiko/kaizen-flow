@@ -133,6 +133,43 @@ def _orfaos(alvo):
         return []
 
 
+def _problemas_do_sp(slug, ramo, repo, top, principal, atual, wts, no_principal):
+    """Problemas do SP face à worktree atual; devolve (problemas, alvo da verificação ou None)."""
+    probs, alvo = [], atual
+    esperado = ramo or f"agent/{_base(slug)}"
+    do_sp = next((w for w in wts if (w["ramo"] == ramo if ramo else ramo_do_sp(slug, w["ramo"])) and not w["prunable"]), None)
+    if ramo_do_sp(slug, atual.get("ramo")) or (ramo and atual.get("ramo") == ramo):
+        alvo = atual
+    elif do_sp is not None:
+        if no_principal:
+            alvo = do_sp
+        else:
+            probs.append(Problema(
+                "EC-061", "erro", f"worktree {top} está em «{atual.get('ramo')}», não no ramo do SP «{do_sp['ramo']}»",
+                "cada SP trabalha só na sua worktree", f"cd \"{do_sp['path']}\" (a worktree do SP)"))
+            alvo = do_sp
+    elif no_principal:
+        criar = "" if _existe_ramo(repo, esperado) else "-b "
+        destino = Path(principal).parent / f"{Path(principal).name}-{_base(slug)}"
+        probs.append(Problema(
+            "EC-062", "erro", f"o SP {slug} não tem worktree (ramo «{esperado}»)",
+            "o SP corre numa worktree própria, fora do checkout principal",
+            f"git -C \"{principal}\" worktree add \"{destino}\" {criar}{esperado}"))
+        if LIMITE_CAMINHO and len(str(destino)) > LIMITE_CAMINHO:
+            probs.append(Problema(
+                "EC-055", "erro", f"o caminho da worktree tem {len(str(destino))} caracteres: {destino}",
+                "no Windows os ficheiros dentro dela passam dos 260 caracteres e o git deixa-a a meio",
+                "git config --global core.longpaths true, ou um repo num caminho mais curto"))
+        alvo = None
+    else:
+        fix = ["git", "-C", top, "checkout", esperado] if _existe_ramo(repo, esperado) else None
+        probs.append(Problema(
+            "EC-061", "erro", f"worktree {top} está em «{atual.get('ramo') or 'HEAD destacado'}», não em «{esperado}»",
+            "cada SP trabalha no seu ramo `agent/<slug>`",
+            f"git -C \"{top}\" checkout {esperado}" if fix else f"git -C \"{top}\" switch -c {esperado}", fix=fix))
+    return probs, alvo
+
+
 def diagnosticar(slug=None, repo=".", ramo=None, ignorar_orfao=False, which=shutil.which):
     """Lista de Problema (vazia = limpo). Só lê: nenhum comando que altere o repo corre aqui."""
     if slug is not None and not _slug_valido(slug):
@@ -159,37 +196,8 @@ def diagnosticar(slug=None, repo=".", ramo=None, ignorar_orfao=False, which=shut
             "o checkout principal fica no ramo principal; o trabalho faz-se numa worktree",
             f"git -C \"{principal}\" checkout {rp}", fix=["git", "-C", principal, "checkout", rp]))
     if slug:
-        esperado = ramo or f"agent/{_base(slug)}"
-        do_sp = next((w for w in wts if (w["ramo"] == ramo if ramo else ramo_do_sp(slug, w["ramo"])) and not w["prunable"]), None)
-        if ramo_do_sp(slug, atual.get("ramo")) or (ramo and atual.get("ramo") == ramo):
-            alvo = atual
-        elif do_sp is not None:
-            if no_principal:
-                alvo = do_sp
-            else:
-                probs.append(Problema(
-                    "EC-061", "erro", f"worktree {top} está em «{atual.get('ramo')}», não no ramo do SP «{do_sp['ramo']}»",
-                    "cada SP trabalha só na sua worktree", f"cd \"{do_sp['path']}\" (a worktree do SP)"))
-                alvo = do_sp
-        elif no_principal:
-            criar = "" if _existe_ramo(repo, esperado) else "-b "
-            destino = Path(principal).parent / f"{Path(principal).name}-{_base(slug)}"
-            probs.append(Problema(
-                "EC-062", "erro", f"o SP {slug} não tem worktree (ramo «{esperado}»)",
-                "o SP corre numa worktree própria, fora do checkout principal",
-                f"git -C \"{principal}\" worktree add \"{destino}\" {criar}{esperado}"))
-            if LIMITE_CAMINHO and len(str(destino)) > LIMITE_CAMINHO:
-                probs.append(Problema(
-                    "EC-055", "erro", f"o caminho da worktree tem {len(str(destino))} caracteres: {destino}",
-                    "no Windows os ficheiros dentro dela passam dos 260 caracteres e o git deixa-a a meio",
-                    "git config --global core.longpaths true, ou um repo num caminho mais curto"))
-            alvo = None
-        else:
-            fix = ["git", "-C", top, "checkout", esperado] if _existe_ramo(repo, esperado) else None
-            probs.append(Problema(
-                "EC-061", "erro", f"worktree {top} está em «{atual.get('ramo') or 'HEAD destacado'}», não em «{esperado}»",
-                "cada SP trabalha no seu ramo `agent/<slug>`",
-                f"git -C \"{top}\" checkout {esperado}" if fix else f"git -C \"{top}\" switch -c {esperado}", fix=fix))
+        novos, alvo = _problemas_do_sp(slug, ramo, repo, top, principal, atual, wts, no_principal)
+        probs += novos
     if alvo is not None:
         probs += _estado_da_arvore(alvo["path"], alvo.get("ramo"), rp, slug)
         orfaos = [] if ignorar_orfao else _orfaos(alvo["path"])
