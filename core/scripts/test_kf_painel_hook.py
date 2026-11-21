@@ -113,7 +113,7 @@ def test_leitura_de_ficheiro_antigo_sem_fase_nem_pergunta(fila):
 # --- slug ---
 
 def test_resolver_slug_por_prefixo_do_ramo(fila):
-    fid, root = fila
+    _fid, root = fila
     assert ph.resolver_slug(env={}, ramo=BRANCH, root=root) == SLUG
 
 

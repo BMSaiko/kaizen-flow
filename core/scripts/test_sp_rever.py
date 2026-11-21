@@ -160,7 +160,7 @@ def req(porta, metodo, caminho, corpo=None, host=None):
 
 
 def test_servidor_so_loopback(srv):
-    porta, _ = srv
+    _porta, _ = srv
     assert sr.criar_servidor(0, "x", Path("."), Path("e.json")).server_address[0] == "127.0.0.1"
 
 
@@ -203,7 +203,7 @@ def test_post_recusa_token_slug_estado_e_tamanho(srv):
 def test_desfazer_restaura(srv):
     porta, estado = srv
     req(porta, "POST", "/veredicto?t=tok", {"slug": "a-2026-11-13", "estado": "ajustar", "texto": "t"})
-    st, body = req(porta, "POST", "/desfazer?t=tok", {})
+    st, _body = req(porta, "POST", "/desfazer?t=tok", {})
     assert st == 200
     assert "a-2026-11-13" not in json.loads(estado.read_text(encoding="utf-8"))
     assert req(porta, "POST", "/desfazer?t=tok", {})[0] == 409

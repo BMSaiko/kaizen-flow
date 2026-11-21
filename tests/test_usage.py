@@ -127,7 +127,7 @@ class ReportTest(unittest.TestCase):
         self.assertNotIn("Warning", out)
 
     def test_report_writes_week_file_metrics_only(self):
-        rc, out = self.run_cli("report", *self.argv, "--week", "2026-W43")
+        _rc, out = self.run_cli("report", *self.argv, "--week", "2026-W43")
         path = Path(out.strip())
         self.assertEqual(path, self.d / "reports" / "usage" / "2026-W43.md")
         text = path.read_text(encoding="utf-8")

@@ -260,7 +260,7 @@ def test_id_desconhecido_avisa_com_rc_0(tmp_path):
     d["conhecidos"] = ["claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-2", "claude-fable-5-1"]
     f = tmp_path / "m.json"
     f.write_bytes(json.dumps(d).encode())
-    rc, out, err = run(f, "list")
+    rc, _out, err = run(f, "list")
     assert rc == 0 and "claude-xyz-9" in err and "michi-exec" in err
     assert "claude-sonnet-5-5" not in err
 

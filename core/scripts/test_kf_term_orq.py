@@ -78,7 +78,7 @@ def test_ler_painel_inexistente():
 
 def test_injecao_texto_do_painel_nao_executa_nada():
     b = Falso()
-    rc, out = run(["acao", "ler", "2"], b)
+    rc, _out = run(["acao", "ler", "2"], b)
     assert rc == 0 and b.fechados == [] and b.enviados == [] and b.abertos == []
 
 
@@ -91,7 +91,7 @@ def test_enviar_sem_confirmacao_explicita_cancela(resp):
 
 def test_enviar_confirmado_mostra_texto_exato():
     b = Falso()
-    rc, out = run(["acao", "enviar", "1", "sim"], b, "s")
+    _rc, out = run(["acao", "enviar", "1", "sim"], b, "s")
     assert b.enviados == [("1", "sim")] and "'sim'" in out
 
 

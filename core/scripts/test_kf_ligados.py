@@ -66,7 +66,7 @@ def test_ficheiro_kf_em_sincronia_fecha(cenario):
 
 def test_ficheiro_kf_fora_de_sincronia_bloqueia(cenario):
     (cenario / "pkg" / "core" / "scripts" / "wt_redirect.py").write_text("# desatualizado\n", encoding="utf-8")
-    rc, out, err = fechar(cenario)
+    rc, out, _err = fechar(cenario)
     assert rc == 1
     assert "/kaizen-sync" in out and "wt_redirect.py" in out
     assert not done(cenario)

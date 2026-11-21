@@ -501,7 +501,7 @@ def test_segunda_mae_arranca_com_estado_proprio(tmp_path, monkeypatch, capsys):
     em_curso = fe.estado_de("mae-a")
     em_curso.parent.mkdir(parents=True)
     fe.guardar(em_curso, {"sessoes": {"mae-a-f1": {}}, "feitos": [], "falhados": [], "inicio": datetime.now().isoformat(timespec="seconds")})
-    monkeypatch.setattr(sp_fila.sp_fila_execucao, "_backend_defeito", lambda: PainelFalso())
+    monkeypatch.setattr(sp_fila.sp_fila_execucao, "_backend_defeito", PainelFalso)
     monkeypatch.setattr(sp_fila, "seguinte", lambda *a, **k: {"acao": "espera", "sessoes": ["mae-a-f1"], "pendentes": ["mae-b-f1"]})
     monkeypatch.setattr(sp_fila, "_arrancar_vigia", lambda *a, **k: None)
     rc = sp_fila.main(["--programa", "mae-b", "--root", str(root), "--relatorios", str(tmp_path / "rel")])

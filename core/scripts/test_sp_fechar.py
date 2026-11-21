@@ -94,7 +94,7 @@ def test_gate_verde_fecha_e_gera_commit(root):
 
 def test_gate_vermelho_nao_move(root):
     novo_doing(root, fs("vermelho"), f'"{sys.executable}" -c "import sys; sys.exit(1)"')
-    rc, out, err = fechar(root, fs("vermelho"))
+    rc, _out, _err = fechar(root, fs("vermelho"))
     assert rc == 1
     assert list((root / "vault" / PROJECT / "sp" / "Doing").glob(f"{fs('vermelho')}.md"))
     assert not list((root / "vault" / PROJECT / "sp" / "Done").glob(f"{fs('vermelho')}.md"))
@@ -284,17 +284,17 @@ def test_docs_secao_fecha(root):
 
 
 def test_docs_linha_na_prova_fecha(root):
-    slug, (rc, out, err) = _completo(root, "docslinha", docs=None, prova_extra="Docs: README atualizado\n")
+    _slug, (rc, out, err) = _completo(root, "docslinha", docs=None, prova_extra="Docs: README atualizado\n")
     assert rc == 0, out + err
 
 
 def test_docs_skip_com_motivo_fecha(root):
-    slug, (rc, out, err) = _completo(root, "docsskip", docs=None, prova_extra="Docs: skip — só código interno\n")
+    _slug, (rc, out, err) = _completo(root, "docsskip", docs=None, prova_extra="Docs: skip — só código interno\n")
     assert rc == 0, out + err
 
 
 def test_docs_skip_sem_motivo_bloqueia(root):
-    slug, (rc, out, err) = _completo(root, "docsskipv", docs=None, prova_extra="Docs: skip — \n")
+    slug, (rc, _out, _err) = _completo(root, "docsskipv", docs=None, prova_extra="Docs: skip — \n")
     assert rc == 1 and _doing(root, slug)
 
 

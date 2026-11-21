@@ -121,7 +121,7 @@ def test_gravar_preserva_imagens_manuais(tmp_path):
 
 
 def test_anexar_recusa_proibidos(tmp_path):
-    repo, vault = preparar(tmp_path)
+    _repo, vault = preparar(tmp_path)
     segredo = tmp_path / "id_rsa.png"
     segredo.write_bytes(b"x")
     with pytest.raises(provas.ProvasError):

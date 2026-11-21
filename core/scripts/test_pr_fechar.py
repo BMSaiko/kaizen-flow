@@ -21,7 +21,7 @@ def run(tmp_path, dados, **kw):
 
 
 def test_verde_faz_merge_com_estrategia(tmp_path):
-    rc, msg, m = run(tmp_path, pr(checks=[ok()]), merge_estrategia="rebase")
+    rc, _msg, m = run(tmp_path, pr(checks=[ok()]), merge_estrategia="rebase")
     assert rc == 0 and m == ["rebase"]
 
 
