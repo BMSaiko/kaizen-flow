@@ -241,7 +241,7 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
         body += ["## Decisões", ""] + [f"- {d.strip()}" for d in decisoes] + [""]
     if ui:
         body += ["## Esboço", "", "(ASCII ou mermaid do ecrã; o resumo mostra-o)", ""]
-    path =root / project / "sp" / "TODO" / f"{slug}.md"
+    path = root / project / "sp" / "TODO" / f"{slug}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(head + body), encoding="utf-8")
     sp_list.sp_indice.invalidar()  # mtime de pasta é grosseiro no Windows: sem isto o slug novo fica fora da cache

@@ -357,7 +357,7 @@ def main(argv=None):
     for s in (sys.stdout, sys.stderr):
         if hasattr(s, "reconfigure"):
             s.reconfigure(encoding="utf-8")
-    ap =argparse.ArgumentParser(prog="kaizen catalog", description="Catálogo EC/UC: validar, gerar e medir a cobertura.")
+    ap = argparse.ArgumentParser(prog="kaizen catalog", description="Catálogo EC/UC: validar, gerar e medir a cobertura.")
     ap.add_argument("acao", nargs="?", choices=("report", "render"), default="report")
     ap.add_argument("--check", action="store_true", help="validar estrutura e .md gerados")
     ap.add_argument("--json", action="store_true", help="report em JSON")

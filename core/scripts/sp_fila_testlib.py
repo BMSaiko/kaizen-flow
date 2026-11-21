@@ -139,4 +139,3 @@ class PainelFalso:
 
     def titulos(self):
         return dict(self._titulos)
-
