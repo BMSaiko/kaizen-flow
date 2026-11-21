@@ -262,8 +262,7 @@ def _ficheiros(raiz):
     out = set()
     for d, dirs, files in os.walk(raiz):
         dirs[:] = [x for x in dirs if x not in CFG_IGNORAR]
-        for f in files:
-            out.add(os.path.relpath(os.path.join(d, f), raiz).replace(os.sep, "/"))
+        out.update(os.path.relpath(os.path.join(d, f), raiz).replace(os.sep, "/") for f in files)
     return out
 
 
