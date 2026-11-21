@@ -268,6 +268,11 @@ def render_tree(groups, loose, visible):
     rows += [(ICONS[sp.status], sp.status, sp.priority, sp.slug, fmt_created(sp), sp.project, sp.warning) for sp in loose if visible(sp)]
     if rows and rows[-1] is None:
         rows.pop()
+    return _render_rows(rows)
+
+
+def _render_rows(rows):
+    """Alinha e pinta as linhas de `render_tree`; `None` = linha em branco."""
     real = [r for r in rows if r]
     if not real:
         return ""
