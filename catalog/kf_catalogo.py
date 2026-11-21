@@ -270,8 +270,8 @@ def render_use_cases(cat):
         "| ID | I want to... | Run | You get | Test |",
         "|---|---|---|---|---|",
     ]
-    for u in cat["use_cases"]:
-        linhas.append(f"| {u['id']} | {_cel(u['objetivo'])} | {_cel(u['comando'])} | {_cel(u['resultado'])} | {_teste_md(u['teste'])} |")
+    linhas += [f"| {u['id']} | {_cel(u['objetivo'])} | {_cel(u['comando'])} | {_cel(u['resultado'])} | {_teste_md(u['teste'])} |"
+               for u in cat["use_cases"]]
     return "\n".join(linhas) + "\n"
 
 

@@ -129,8 +129,7 @@ def listar(root=None, em_json=False, todas=False, raiz_sp=None):
     if not filas and not orfaos:
         return f"sem filas · vagas livres {livres}/{teto}"
     out = [f"vagas livres {livres}/{teto}"]
-    for o in orfaos:
-        out.append(f"{o['slug']} · {o['estado']} · {o['proximo']}")
+    out += [f"{o['slug']} · {o['estado']} · {o['proximo']}" for o in orfaos]
     for f in filas:
         out.append(f"{f['fila']} · {f.get('modo') or '-'} · {len(f['sps'])} SPs" + (f" · {f['erro']}" if f.get("erro") else ""))
         for sp in f["sps"]:
