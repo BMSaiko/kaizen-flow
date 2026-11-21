@@ -68,7 +68,7 @@ def test_run_para_no_primeiro_vermelho(tmp_path):
 
 
 def test_run_timeout(tmp_path):
-    gate = {"cmd": f'{PY} -c "import time; time.sleep(8)"', "cwd": str(tmp_path), "timeout": 1}
+    gate = {"cmd": f'{PY} -c "import time; time.sleep(8)"', "cwd": str(tmp_path), "timeout": 0.3}
     (result,) = sp_gates.run([gate])
     assert result["rc"] != 0 and result["timeout"] is True
 
@@ -259,7 +259,7 @@ def test_fase_testes_falha_bloqueia(tmp_path):
 
 
 def test_fase_testes_timeout(tmp_path):
-    rc, results = sp_gates.fase_testes(_repo(tmp_path, f"{PY} -c \"import time; time.sleep(5)\""), timeout=1)
+    rc, results = sp_gates.fase_testes(_repo(tmp_path, f"{PY} -c \"import time; time.sleep(5)\""), timeout=0.3)
     assert rc == 1 and results[0]["timeout"] is True
 
 
