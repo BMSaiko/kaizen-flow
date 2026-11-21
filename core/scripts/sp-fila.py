@@ -309,6 +309,30 @@ def _preparar_estado(args, estado, mae, modo, so):
     return None
 
 
+def _resolver_programa(args, max_dado):
+    """Carrega os SPs e, com `--programa`, a mãe e o modo da fila (`execucao:`). Devolve (items, mae, modo, rc); rc != None = erro."""
+    items = load(args.root, args.projeto)
+    mae = modo = None
+    if args.programa:
+        mae = next(((sp, fm) for sp, fm in items if sp.slug == args.programa), None)
+        if mae is None:
+            _erro("EC-067", f"SP-mãe desconhecido: {args.programa}", "nenhum SP em TODO/Doing tem esse slug", "nada alterado",
+                  "`sp-list.py` para ver os slugs")
+            return items, mae, modo, 1
+        args.projeto = mae[0].project
+        items = load(args.root, args.projeto)
+    if mae and not args.dry_run and not args.seguinte:  # o modo é da mãe (`execucao:`), nunca escolhido pela fila
+        modo = str(mae[1].get("execucao") or "").strip()
+        if modo not in MODOS:
+            _erro("EC-067", f"modo por escolher: sp-execucao.py {args.programa} sequencial|paralelo",
+                  "o modo da fila é da mãe (`execucao:`), nunca escolhido pela fila", "nada alterado",
+                  f"`python -I scripts/sp-execucao.py {args.programa} sequencial|paralelo`")
+            return items, mae, modo, 1
+        args.concorrencia = 1 if modo == "sequencial" else min(args.concorrencia or MAX_PARALELO, MAX_PARALELO)
+        args.max = max_dado
+    return items, mae, modo, None
+
+
 def main(argv=None):
     args = _parser().parse_args(argv)
     max_dado = args.max
@@ -330,26 +354,9 @@ def main(argv=None):
         return _cmd_parar(args, estado)
     if args.gastos:
         return _cmd_gastos(args, estado)
-    items = load(args.root, args.projeto)
-    mae = None
-    if args.programa:
-        mae = next(((sp, fm) for sp, fm in items if sp.slug == args.programa), None)
-        if mae is None:
-            _erro("EC-067", f"SP-mãe desconhecido: {args.programa}", "nenhum SP em TODO/Doing tem esse slug", "nada alterado",
-                  "`sp-list.py` para ver os slugs")
-            return 1
-        args.projeto = mae[0].project
-        items = load(args.root, args.projeto)
-    modo = None
-    if mae and not args.dry_run and not args.seguinte:  # o modo é da mãe (`execucao:`), nunca escolhido pela fila
-        modo = str(mae[1].get("execucao") or "").strip()
-        if modo not in MODOS:
-            _erro("EC-067", f"modo por escolher: sp-execucao.py {args.programa} sequencial|paralelo",
-                  "o modo da fila é da mãe (`execucao:`), nunca escolhido pela fila", "nada alterado",
-                  f"`python -I scripts/sp-execucao.py {args.programa} sequencial|paralelo`")
-            return 1
-        args.concorrencia = 1 if modo == "sequencial" else min(args.concorrencia or MAX_PARALELO, MAX_PARALELO)
-        args.max = max_dado
+    items, mae, modo, rc = _resolver_programa(args, max_dado)
+    if rc is not None:
+        return rc
     so = descendentes(items, args.programa) if args.programa else None
     if args.dry_run:
         return _cmd_dry_run(args, items, so)
