@@ -253,11 +253,8 @@ def seguinte(root, slug, project=None, fila=False):
     return f"SEGUINTE: nenhum filho elegível de {kid.parent} (os restantes dependem de SPs por fechar)"
 
 
-def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True, sem_prova=None):
-    """Corre o fecho. Devolve (rc, linhas)."""
-    t_total = time.monotonic()
-    sp = find_doing(root, slug, project)
-    slug = sp.slug  # o resto (sp_move, seguinte, COMMIT) usa o slug completo, não o `ref` curto
+def _verificar(sp, slug, testes, sem_prova, commit_dir):
+    """Gates, test-fast, Docs, prova/reflect e pacote de provas. Devolve (rc, linhas); rc None = pode fechar."""
     lines = []
     rc, text, resultados = passo("gates", run_gates, sp)
     lines.append(text)
@@ -282,6 +279,17 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
         lines += extra
         if rc:
             return 1, lines
+    return None, lines
+
+
+def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True, sem_prova=None):
+    """Corre o fecho. Devolve (rc, linhas)."""
+    t_total = time.monotonic()
+    sp = find_doing(root, slug, project)
+    slug = sp.slug  # o resto (sp_move, seguinte, COMMIT) usa o slug completo, não o `ref` curto
+    rc, lines = _verificar(sp, slug, testes, sem_prova, commit_dir)
+    if rc is not None:
+        return rc, lines
     if commit:
         bloqueio = kf_por_sincronizar(commit_dir)
         if bloqueio:
