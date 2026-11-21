@@ -238,7 +238,7 @@ def aplicar_veredicto(slug, estado_novo, texto, estado=ESTADO, raiz=RAIZ, arranc
         raise sv.VeredictoErro("frase vazia")
     atual = _ler_estado(estado).get(slug)
     if (estado_novo in ("ajustar", "redirecionar") and isinstance(atual, dict) and atual.get("estado") == estado_novo
-            and atual.get("acao") in CURSO[:3] + ("fechado",)):
+            and atual.get("acao") in (*CURSO[:3], "fechado")):
         if arrancar and estado_novo == "ajustar" and atual.get("acao") == "em-todo":
             arrancar_entrada(slug, estado, **deps)
         return _ler_estado(estado)[slug]

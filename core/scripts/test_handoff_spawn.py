@@ -118,7 +118,7 @@ def test_painel_background_e_dry_run_levam_o_modelo(tmp_path, monkeypatch, capsy
     abertos = []
     monkeypatch.setattr(hs, "_spawn_pane", lambda b, wt, r, cmd=("claude",): abertos.append(list(cmd)) or "bg1")
     _spawn(["y"], backend="background", run=FakeRun())
-    assert abertos == [_FLAGS + ["-p", "/michi --auto y"]]
+    assert abertos == [[*_FLAGS, "-p", "/michi --auto y"]]
     res = _spawn(["z"], backend="tmux", run=FakeRun(), dry_run=True)
     assert res[0]["cmd"] == " ".join(_FLAGS)
     _spawn(["w"], backend="clipboard", run=FakeRun(), copy=lambda s: None)

@@ -104,12 +104,12 @@ def _git_repo(path, ramo="main"):
     g = ["git", "-C", str(path), "-c", "user.name=t", "-c", "user.email=t@t"]
     subprocess.run(["git", "init", "-q", "-b", ramo, str(path)], check=True)
     (path / "a.txt").write_text("1\n", encoding="utf-8")
-    subprocess.run(g + ["add", "a.txt"], check=True)
-    subprocess.run(g + ["commit", "-qm", "base"], check=True)
-    subprocess.run(g + ["checkout", "-qb", "sp/x"], check=True)
+    subprocess.run([*g, "add", "a.txt"], check=True)
+    subprocess.run([*g, "commit", "-qm", "base"], check=True)
+    subprocess.run([*g, "checkout", "-qb", "sp/x"], check=True)
     (path / "novo.py").write_text("x = 1\n", encoding="utf-8")
-    subprocess.run(g + ["add", "novo.py"], check=True)
-    subprocess.run(g + ["commit", "-qm", "sp"], check=True)
+    subprocess.run([*g, "add", "novo.py"], check=True)
+    subprocess.run([*g, "commit", "-qm", "sp"], check=True)
     return path
 
 
@@ -137,11 +137,11 @@ def test_alterado_externo_ignora_commits_novos_da_base(tmp_path, capsys):
     import subprocess
     ext = _git_repo(tmp_path / "ext")
     g = ["git", "-C", str(ext), "-c", "user.name=t", "-c", "user.email=t@t"]
-    subprocess.run(g + ["checkout", "-q", "main"], check=True)
+    subprocess.run([*g, "checkout", "-q", "main"], check=True)
     (ext / "alheio.txt").write_text("y\n", encoding="utf-8")
-    subprocess.run(g + ["add", "alheio.txt"], check=True)
-    subprocess.run(g + ["commit", "-qm", "alheio"], check=True)
-    subprocess.run(g + ["checkout", "-q", "sp/x"], check=True)
+    subprocess.run([*g, "add", "alheio.txt"], check=True)
+    subprocess.run([*g, "commit", "-qm", "alheio"], check=True)
+    subprocess.run([*g, "checkout", "-q", "sp/x"], check=True)
     sp = tmp_path / "sp.md"
     sp.write_text(SP.replace("    timeout: 120\n", f"    cwd: {ext}\n"), encoding="utf-8")
     sp_report.main([str(sp)])

@@ -72,9 +72,9 @@ def test_painel_abre_na_worktree_com_o_michi_do_sp(ambiente):
     b = PainelFalso()
     calls = []
     _lancar([_alvo(ambiente.root, "a")], fila, b, _run(calls))
-    (cmd, cwd), = b.abertos
+    (_cmd, cwd), = b.abertos
     assert Path(cwd) == Path("/wt/sb-a")
-    (pane, texto), = b.enviados
+    (_pane, texto), = b.enviados
     assert texto.startswith("/michi --auto a ") and "\n" not in texto
     ordem = [c[0] for c in calls]
     i_ensure = next(i for i, a in enumerate(ordem) if "ensure" in a)

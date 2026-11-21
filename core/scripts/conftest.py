@@ -66,7 +66,7 @@ def _paineis_falsos(monkeypatch, tmp_path_factory):
         from sp_fila_testlib import PainelFalso
     except ImportError:
         return
-    monkeypatch.setattr(sp_fila_execucao, "_backend_defeito", lambda: PainelFalso(), raising=False)
+    monkeypatch.setattr(sp_fila_execucao, "_backend_defeito", PainelFalso, raising=False)
 
 
 @pytest.fixture(autouse=True)

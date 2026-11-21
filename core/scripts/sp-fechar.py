@@ -208,7 +208,7 @@ def em_fila(slug, estado=None):
     if estado is None:  # estados por mãe (`~/.claude/sp-fila/<mãe>/fila.json`) e o único antigo
         base = Path.home() / ".claude" / "sp-fila"
         cands = sorted(base.glob("*/fila.json")) if base.is_dir() else []
-        return any(em_fila(slug, c) for c in cands + [FILA_ESTADO])
+        return any(em_fila(slug, c) for c in [*cands, FILA_ESTADO])
     try:
         return slug in ler_json(estado, {}).get("sessoes", {})
     except AttributeError:
@@ -259,12 +259,12 @@ def _verificar(sp, slug, testes, sem_prova, commit_dir):
     rc, text, resultados = passo("gates", run_gates, sp)
     lines.append(text)
     if rc:
-        return rc, lines + [f"{slug}: gate vermelho, SP continua em Doing"]
+        return rc, [*lines, f"{slug}: gate vermelho, SP continua em Doing"]
     if testes and not sp_gates.parse_gates(sp.path.read_text(encoding="utf-8")):
         rc, text = passo("test-fast", run_fast)
         lines.append(text)
         if rc:
-            return 1, lines + [f"{slug}: test-fast vermelho, SP continua em Doing"]
+            return 1, [*lines, f"{slug}: test-fast vermelho, SP continua em Doing"]
     docs = falta_docs(sp.path.read_text(encoding="utf-8"))
     if docs:  # --sem-prova não dispensa Docs
         return 1, lines + docs + [f"{slug}: SP continua em Doing (registar a fase Docs; --sem-prova não a dispensa)"]
@@ -293,15 +293,15 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
     if commit:
         bloqueio = kf_por_sincronizar(commit_dir)
         if bloqueio:
-            return 1, lines + [bloqueio, f"{slug}: kaizen-flow por sincronizar, SP continua em Doing"]
+            return 1, [*lines, bloqueio, f"{slug}: kaizen-flow por sincronizar, SP continua em Doing"]
     if budget:
         rc, text = passo("context-budget", run_budget)
         lines.append(text)
         if rc:
-            return 1, lines + [f"{slug}: orçamento de contexto excedido, SP continua em Doing"]
+            return 1, [*lines, f"{slug}: orçamento de contexto excedido, SP continua em Doing"]
     fila = em_fila(slug)
     if nxt and fila:
-        return 1, lines + [f"{slug}: sessão da fila, --next não se aplica (o driver lança o seguinte)"]
+        return 1, [*lines, f"{slug}: sessão da fila, --next não se aplica (o driver lança o seguinte)"]
     if nxt:
         lines.append(sp_move.advance(root, slug, sp.project))
     else:

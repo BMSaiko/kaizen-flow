@@ -293,7 +293,7 @@ def test_fila_json_corrompido_aparece_na_listagem_sem_rebentar(tmp_path):
 
 
 def test_filas_ativas_deixa_de_fora_as_acabadas(tmp_path):
-    a, b = _duas_filas(tmp_path, n=1)
+    _a, b = _duas_filas(tmp_path, n=1)
     pe.transitar("a0", "a-correr", root=tmp_path)
     pe.transitar("a0", "done", root=tmp_path)
     assert [f["fila"] for f in pe.filas_ativas(root=tmp_path)] == [b]

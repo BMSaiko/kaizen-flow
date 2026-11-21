@@ -96,7 +96,7 @@ def resumo(root, slug, project=None):
     if faltas:
         saida.append(_corta(f"FALTA matéria: {', '.join(faltas)}"))
     if len(saida) > MAX_LINHAS:
-        saida = saida[:MAX_LINHAS - 1] + ["…"]
+        saida = [*saida[:MAX_LINHAS - 1], "…"]
         if faltas:
             saida[-1] = _corta(f"FALTA matéria: {', '.join(faltas)}")
     return (1 if faltas else 0), "\n".join(saida)

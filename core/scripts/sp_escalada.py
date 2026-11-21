@@ -123,7 +123,7 @@ def relancar(slug, nivel, sp, fila, backend, run=None, sleep=time.sleep, estado_
     try:
         texto = prompt_escalada(slug, wt)
         interativo = getattr(backend, "interativo", True)
-        pane = backend.abrir(cmd if interativo else cmd + [texto], wt)
+        pane = backend.abrir(cmd if interativo else [*cmd, texto], wt)
         f = getattr(backend, "titulo", None)
         if f:
             f(pane, slug)

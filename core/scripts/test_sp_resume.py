@@ -96,7 +96,7 @@ def test_restart_sem_confirmacao_nao_altera_uc032(tmp_path):
 
 def test_restart_confirmado_arquiva_sem_apagar_uc032(tmp_path):
     _passos(tmp_path, SLUG, [("dp", "p1", "inicio"), ("dp", "p1", "fim")])
-    rc, texto = SR.resume(tmp_path, SLUG, restart=True, confirmar=lambda: True)
+    rc, _texto = SR.resume(tmp_path, SLUG, restart=True, confirmar=lambda: True)
     assert rc == 0
     arquivo = list((tmp_path / ".kaizen" / "estado" / "arquivo").iterdir())
     assert len(arquivo) == 1 and (arquivo[0] / f"{SLUG}.journal.jsonl").exists() and (arquivo[0] / f"{SLUG}.json").exists()

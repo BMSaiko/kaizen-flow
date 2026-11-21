@@ -99,7 +99,7 @@ def test_resolve_pane(nome, pid):
 
 
 def test_resolve_pane_ambiguo_lista_candidatos():
-    panes = PANES + [{"pane_id": 9, "title": "kf-bugs-outro", "tab_title": ""}]
+    panes = [*PANES, {"pane_id": 9, "title": "kf-bugs-outro", "tab_title": ""}]
     with pytest.raises(wez.WezError, match="amb\u00edguo.*0.*9"):
         wez.resolve_pane("kf-bugs", panes)
 

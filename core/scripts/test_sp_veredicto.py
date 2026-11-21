@@ -106,7 +106,7 @@ def test_arrancar_lanca_michi(raiz):
 
 def test_arrancar_sem_vaga_fica_em_espera_e_retoma(raiz):
     lancados = []
-    r = sv.arrancar_ajuste(_info(), validar=lambda sp: (True, ""), vagas=lambda: 0, spawn=lambda s: lancados.append(s))
+    r = sv.arrancar_ajuste(_info(), validar=lambda sp: (True, ""), vagas=lambda: 0, spawn=lancados.append)
     assert r["acao"] == "em-espera" and lancados == []
     dados = {"a": {"estado": "ajustar", "acao": "em-espera", "ajuste": "x", "sp": "x.md"},
              "b": {"estado": "ok", "acao": "fechado"}}

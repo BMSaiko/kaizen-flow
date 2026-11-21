@@ -74,9 +74,7 @@ def main():
     total_chars = sum(len(b) for b in blocks)
 
     new_body = (
-        ["", f"Texto integral em `{rel}` ({len(blocks)} entradas, numeradas como abaixo). Ler só a entrada relevante.", ""]
-        + index
-        + [""]
+        ["", f"Texto integral em `{rel}` ({len(blocks)} entradas, numeradas como abaixo). Ler só a entrada relevante.", "", *index, ""]
     )
     out = lines[:begin + 1] + new_body + lines[end:]
     ref.parent.mkdir(parents=True, exist_ok=True)

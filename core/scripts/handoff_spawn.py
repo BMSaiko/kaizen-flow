@@ -53,7 +53,7 @@ def _claude_cmd(slug=None):
     try:
         nivel = _nivel_sp(slug)
         if nivel is None:
-            return ["claude"] + modelos.cli_args(PAPEL, MODELOS)
+            return ["claude", *modelos.cli_args(PAPEL, MODELOS)]
         m, aviso = modelos.michi(modelos.load(MODELOS), nivel)
         if aviso:
             print(aviso, file=sys.stderr)
