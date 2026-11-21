@@ -61,7 +61,7 @@ def _esboco(text):
     return _extra(text, "Esboço")
 
 
-GATES_OBRIGATORIOS_DESDE ="2026-11-13"  # SPs anteriores só têm aviso
+GATES_OBRIGATORIOS_DESDE = "2026-11-13"  # SPs anteriores só têm aviso
 
 
 def _enum(errors, fm, key, validos):
@@ -70,8 +70,9 @@ def _enum(errors, fm, key, validos):
         errors.append(f"{key} '{fm[key]}' inválido ({'|'.join(validos)})")
 
 
-def _erros_frontmatter(fm, text, folder):
-    errors = [f"frontmatter sem '{field}'" for field in REQUIRED_FIELDS if not fm.get(field)]
+def _erros_politica(fm):
+    """Enums e dependências entre `modo`, `commit`/`push`/`pr`/`merge`, `perfil`, limites, `parar_se` e escopo."""
+    errors = []
     _enum(errors, fm, "modo", ("auto", "manual"))
     _enum(errors, fm, "michi_modelo", ("simples", "default", "complexo", "critico"))
     if fm.get("execucao"):
@@ -102,9 +103,16 @@ def _erros_frontmatter(fm, text, folder):
         errors += [f"{key}: glob inválido '{g}'" for g in vals if ".." in g.replace("\\", "/").split("/")]
     if globs["fora_de_escopo"] and not globs["escopo"]:
         errors.append("fora_de_escopo exige escopo")
+    return errors
+
+
+def _erros_gates(fm, text):
+    """Exigências de gates, decisões e esboço conforme o perfil, o modo, a data e a UI."""
+    errors = []
     if fm.get("perfil") == "autonomo" and not sp_gates.parse_gates(text):
         errors.append("perfil autonomo exige gates")
-    if fm.get("modo") == "auto" and fm.get("kind") != "program" and str(fm.get("date", "")) >= GATES_OBRIGATORIOS_DESDE                 and not sp_gates.parse_gates(text):
+    if fm.get("modo") == "auto" and fm.get("kind") != "program" and str(fm.get("date", "")) >= GATES_OBRIGATORIOS_DESDE \
+            and not sp_gates.parse_gates(text):
         errors.append(f"modo auto exige 'gates:' executáveis (SP de {GATES_OBRIGATORIOS_DESDE} em diante)")
     errors += sp_gates.problems(sp_gates.parse_gates(text))
     novo = str(fm.get("date", "")) >= sp_aprovacao.DESDE and fm.get("kind") != "program" and not fm.get("origem")
@@ -114,6 +122,12 @@ def _erros_frontmatter(fm, text, folder):
         errors.append("SP novo exige '## Decisões' não vazia (o grill-me fica registado)")
     if fm.get("ui") == "sim" and not _esboco(text):
         errors.append("ui: sim exige a secção '## Esboço' (ASCII ou mermaid)")
+    return errors
+
+
+def _erros_comandos(fm, folder):
+    """`permitir` e `prova` sem comandos proibidos; `status` igual à pasta."""
+    errors = []
     if "permitir" in fm:
         cmds = kaizen_engine.parse_permitir(fm["permitir"])
         if not cmds:
@@ -127,6 +141,11 @@ def _erros_frontmatter(fm, text, folder):
     if folder and fm.get("status") and fm["status"] != folder:
         errors.append(f"status '{fm['status']}' ≠ pasta '{folder}'")
     return errors
+
+
+def _erros_frontmatter(fm, text, folder):
+    errors = [f"frontmatter sem '{field}'" for field in REQUIRED_FIELDS if not fm.get(field)]
+    return errors + _erros_politica(fm) + _erros_gates(fm, text) + _erros_comandos(fm, folder)
 
 
 def validate(text, folder=None):
