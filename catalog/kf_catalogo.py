@@ -99,6 +99,20 @@ def _problemas_item(secao, n, iid, item, campos, vistos, ids_cat, filhos, root):
     return probs
 
 
+def _problemas_secao(secao, itens, campos, ids_cat, filhos, root):
+    if not isinstance(itens, list) or not itens:
+        return [f"{secao}: lista não vazia em falta"]
+    probs, vistos = [], set()
+    for n, item in enumerate(itens, 1):
+        if not isinstance(item, dict):
+            probs.append(f"{secao}[{n}]: tem de ser um objeto")
+            continue
+        iid = item.get("id", f"{secao}[{n}]")
+        probs += _problemas_item(secao, n, iid, item, campos, vistos, ids_cat, filhos, root)
+        vistos.add(iid)
+    return probs
+
+
 def problemas(cat, root):
     """Lista de problemas de estrutura (vazia = catálogo válido)."""
     root = Path(root)
@@ -118,18 +132,7 @@ def problemas(cat, root):
         probs.append("filhos: lista não vazia de nomes")
         filhos = []
     for secao, campos in CAMPOS.items():
-        itens = cat.get(secao)
-        if not isinstance(itens, list) or not itens:
-            probs.append(f"{secao}: lista não vazia em falta")
-            continue
-        vistos = set()
-        for n, item in enumerate(itens, 1):
-            if not isinstance(item, dict):
-                probs.append(f"{secao}[{n}]: tem de ser um objeto")
-                continue
-            iid = item.get("id", f"{secao}[{n}]")
-            probs += _problemas_item(secao, n, iid, item, campos, vistos, ids_cat, filhos, root)
-            vistos.add(iid)
+        probs += _problemas_secao(secao, cat.get(secao), campos, ids_cat, filhos, root)
     for cid in ids_cat:
         if not any(isinstance(e, dict) and e.get("categoria") == cid for e in cat.get("edge_cases") or []):
             probs.append(f"categoria {cid}: vazia (sem EC)")
