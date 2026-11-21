@@ -73,7 +73,7 @@ def filtrar_args(argv):
             out.append(REDACTED)
             continue
         if a.startswith("-") and "=" in a:
-            nome, _, valor = a.partition("=")
+            nome = a.partition("=")[0]
             out.append(f"{nome}={REDACTED}" if _SECRET_NAME.search(nome) else _limpar_texto(a, MAX_ARG))
             continue
         if a.startswith("-") and _SECRET_NAME.search(a):
