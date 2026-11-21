@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]  # PRs já correm em pull_request (evita a matriz em dobro)
   pull_request:
+concurrency:  # push novo num PR cancela a corrida anterior (main corre sempre até ao fim)
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 permissions:
   contents: read
 jobs:
