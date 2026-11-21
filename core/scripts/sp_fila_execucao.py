@@ -123,14 +123,8 @@ def _lancar(alvo, doing, estado, paralelo, backend, run, root):
     return erro, item
 
 
-def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, backend=None):
-    estado = ler(estado_path)
-    if not slug and estado.get("concorrencia") and estado["sessoes"]:
-        raise SlugObrigatorio("em modo paralelo `--seguinte` exige `--slug <SP que fechou>`; sem ele fecharia sessões ainda vivas")
-    items = load(root, estado.get("projeto"))
-    if estado.get("concorrencia"):  # worktrees atrasadas: o estado dos SPs é o de master
-        aplicar_master(items)
-    so = descendentes(items, estado["programa"]) if estado.get("programa") else None
+def _registar_fechadas(root, estado, items, slug, run):
+    """Passa as sessões fechadas a feitas/falhadas (só o `slug` dado, ou todas); recusa um Done que só existe na worktree."""
     for fechada in ([slug] if slug else list(estado["sessoes"])):
         sp = next((s for s, _ in items if s.slug == fechada), None)
         if fechada in estado["sessoes"] and (sp is None or sp.status != "Done"):
@@ -147,6 +141,17 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
         estado["seguidas"] = 0 if feito else estado.get("seguidas", 0) + 1
         del estado["sessoes"][fechada]
         _fechar_painel(estado, fechada, feito)
+
+
+def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, backend=None):
+    estado = ler(estado_path)
+    if not slug and estado.get("concorrencia") and estado["sessoes"]:
+        raise SlugObrigatorio("em modo paralelo `--seguinte` exige `--slug <SP que fechou>`; sem ele fecharia sessões ainda vivas")
+    items = load(root, estado.get("projeto"))
+    if estado.get("concorrencia"):  # worktrees atrasadas: o estado dos SPs é o de master
+        aplicar_master(items)
+    so = descendentes(items, estado["programa"]) if estado.get("programa") else None
+    _registar_fechadas(root, estado, items, slug, run)
     # Paralelo (--concorrencia N): sem orçamento; só `--ate` e `--max` explícito; o único travão é o guard de contexto, que continua a sessão por handoff.
     teto = estado.get("concorrencia") or 1
     paralelo = bool(estado.get("concorrencia"))  # um só critério: com `concorrencia` (mesmo 1) lança num painel
