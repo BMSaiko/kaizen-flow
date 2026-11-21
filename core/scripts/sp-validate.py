@@ -90,9 +90,8 @@ def _erros_politica(fm):
         errors.append("merge auto exige pr auto")
     _enum(errors, fm, "perfil", ("cauteloso", "normal", "autonomo"))
     _enum(errors, fm, "escalar", ("sim", "nao"))
-    for key in ("max_tentativas", "max_requests"):
-        if key in fm and not (fm[key].isdigit() and int(fm[key]) >= 1):
-            errors.append(f"{key} '{fm[key]}' tem de ser um inteiro ≥ 1")
+    errors += [f"{key} '{fm[key]}' tem de ser um inteiro ≥ 1" for key in ("max_tentativas", "max_requests")
+               if key in fm and not (fm[key].isdigit() and int(fm[key]) >= 1)]
     bad = [x for x in sp_list.parse_list(fm.get("parar_se")) if x not in ("gate-falha", "ambiguidade", "ficheiro-fora-de-escopo", "custo")]
     if bad:
         errors.append(f"parar_se inválido {bad}")

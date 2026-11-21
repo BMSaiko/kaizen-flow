@@ -204,9 +204,8 @@ def validar(d, ui=False, pasta=None):
         p.append("experimentar: máximo 3 linhas")
     if not isinstance(d["criterios"], dict) or not {"cumpridos", "por_cumprir"} <= set(d["criterios"]):
         p.append("criterios: precisa de cumpridos e por_cumprir")
-    for r in d["reverter"] if isinstance(d["reverter"], list) else [d["reverter"]]:
-        if PERIGOSO.search(str(r)):
-            p.append(f"reverter: comando perigoso (reset/force): {r}")
+    reverter = d["reverter"] if isinstance(d["reverter"], list) else [d["reverter"]]
+    p += [f"reverter: comando perigoso (reset/force): {r}" for r in reverter if PERIGOSO.search(str(r))]
     erros_im, tipos = _problemas_imagens(d["imagens"], pasta)
     p += erros_im
     if ui and "depois" not in tipos:
