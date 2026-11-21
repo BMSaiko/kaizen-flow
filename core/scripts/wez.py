@@ -107,7 +107,7 @@ def resolve_pane(nome, panes=None):
 
 def _cwd(p):
     c = p.get("cwd", "") or ""
-    c = c[len("file://"):] if c.startswith("file://") else c
+    c = c.removeprefix("file://")
     return c[1:] if re.match(r"^/[A-Za-z]:/", c) else c
 
 

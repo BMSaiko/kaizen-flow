@@ -49,7 +49,7 @@ def orfaos():
         pad = re.compile(r"(?<![\w-])" + re.escape(nome) + r"(?:\.py)?(?![\w-])")
         if not any(
             pad.search(t) for f, t in textos.items()
-            if f != p and f.name not in (f"test_{nome.replace('-', '_')}.py",)
+            if f != p and f.name != f"test_{nome.replace('-', '_')}.py"
         ):
             res.append(p.name)
     return res
