@@ -53,7 +53,7 @@ def preview(path, max_linhas=PREVIEW_LINHAS):
     while linhas and not linhas[0].strip():
         linhas.pop(0)
     if len(linhas) > max_linhas:
-        linhas = linhas[:max_linhas] + ["…"]
+        linhas = [*linhas[:max_linhas], "…"]
     return "\n".join(linhas)
 
 

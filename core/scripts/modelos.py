@@ -130,7 +130,7 @@ def _set_key(fm, key, value, eol):
         if l.startswith(key.encode() + b":"):
             linhas[i] = linha
             return eol.join(linhas)
-    return eol.join(linhas + [linha])
+    return eol.join([*linhas, linha])
 
 
 def render(raw, p):

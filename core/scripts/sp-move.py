@@ -220,7 +220,7 @@ def main(argv=None):
     ap.add_argument("--project")
     ap.add_argument("--next", action="store_true", help="com done: abre o próximo filho elegível do programa")
     ap.add_argument("--start", action="store_true", help="arranque: move o SP e as mães em TODO para Doing")
-    ap.add_argument("--tipo", choices=("sp",) + doc_ops.TYPES, default="sp", help="sp (predefinido) | dr | dp: move um DR/DP")
+    ap.add_argument("--tipo", choices=("sp", *doc_ops.TYPES), default="sp", help="sp (predefinido) | dr | dp: move um DR/DP")
     ap.add_argument("--root", default=None, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     if args.tipo != "sp":

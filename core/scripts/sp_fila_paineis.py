@@ -185,7 +185,7 @@ def _lancar_um(alvo, fila, backend, run, sleep, verificar, root, estado_root):
         pe.registar(fila, alvo.slug, root=estado_root, worktree=wt)
         texto = prompt_painel(alvo.slug, wt)
         interativo = getattr(backend, "interativo", True)
-        pane = painel_backend.abrir_painel(backend, cmd if interativo else cmd + [texto], wt, getattr(alvo, "project", None))
+        pane = painel_backend.abrir_painel(backend, cmd if interativo else [*cmd, texto], wt, getattr(alvo, "project", None))
         titulo = titulo_livre(alvo.slug, _titulos(backend))
         _por_titulo(backend, pane, titulo)
         res["titulo"] = titulo

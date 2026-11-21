@@ -20,7 +20,7 @@ def sp_text(*gates):
     lines = ["---", "status: Doing", "slug: x", "gates:"]
     for cmd, extra in gates:
         lines += [f"  - cmd: {cmd}"] + [f"    {k}: {v}" for k, v in extra.items()]
-    return "\n".join(lines + ["prova: ver output", "---", "# corpo", "- cmd: rm -rf /"])
+    return "\n".join([*lines, "prova: ver output", "---", "# corpo", "- cmd: rm -rf /"])
 
 
 def test_parse_gates_le_so_o_frontmatter():

@@ -509,8 +509,7 @@ def open_layout(lay):
             run_cli(["set-tab-title", "--pane-id", ids[p["nome"]], lay["titulo"]])
         else:
             s = p["split"]
-            cmd = ["split-pane", "--pane-id", ids[s["de"]], f"--{s['dir']}",
-                   "--percent", str(s["percent"])] + extra
+            cmd = ["split-pane", "--pane-id", ids[s["de"]], f"--{s['dir']}", "--percent", str(s["percent"]), *extra]
             ids[p["nome"]] = _pid(run_cli(cmd), "split-pane")
     return ids
 
