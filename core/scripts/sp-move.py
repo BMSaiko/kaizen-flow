@@ -223,6 +223,21 @@ def _mover_doc(ap, args):
     return 0
 
 
+def _executar(args):
+    if args.start:
+        if args.dest.lower() != "doing" or args.next:
+            raise SpMoveError("--start não se combina com outro destino nem com --next")
+        print(start(args.root, args.slug, args.project))
+        for linha in avisos_fecho(args.root, args.slug, args.project):
+            print(linha, file=sys.stderr)
+    elif args.next:
+        if args.dest.lower() != "done":
+            raise SpMoveError(f"--next só se usa com 'done'; corre sp-move.py {args.slug} done --next")
+        print(advance(args.root, args.slug, args.project))
+    else:
+        print(move(args.root, args.slug, args.dest, args.project))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Move um SP entre TODO, Doing e Done")
     ap.add_argument("slug", nargs="?")
@@ -249,18 +264,7 @@ def main(argv=None):
         if rc is not None:
             return rc
     try:
-        if args.start:
-            if args.dest.lower() != "doing" or args.next:
-                raise SpMoveError("--start não se combina com outro destino nem com --next")
-            print(start(args.root, args.slug, args.project))
-            for linha in avisos_fecho(args.root, args.slug, args.project):
-                print(linha, file=sys.stderr)
-        elif args.next:
-            if args.dest.lower() != "done":
-                raise SpMoveError(f"--next só se usa com 'done'; corre sp-move.py {args.slug} done --next")
-            print(advance(args.root, args.slug, args.project))
-        else:
-            print(move(args.root, args.slug, args.dest, args.project))
+        _executar(args)
     except SpMoveError as exc:
         print(f"erro: {exc}", file=sys.stderr)
         return 1
