@@ -93,15 +93,30 @@ def _resolver(root, slug, target, project):
     return matches[0], dups
 
 
+def _remover_dups(sp, dups):
+    """A cópia desatualizada sai sempre, mesmo que o SP já esteja no destino."""
+    for d in dups:
+        if d.path != sp.path and d.path.exists():
+            kaizen_engine.relocate(d.path, d.path.with_suffix(".md.dup"))
+            d.path.with_suffix(".md.dup").unlink()
+
+
+def _registar_metricas(root, dst, project):
+    """Sufixo do resumo; métricas nunca bloqueiam o fecho."""
+    if not sp_metricas:
+        return ""
+    try:
+        return " (+métricas)" if sp_metricas.registar(root, dst, project) else ""
+    except Exception as exc:
+        return f" (métricas falharam: {exc})"
+
+
 def move(root, slug, dest, project=None):
     if dest.lower() not in DESTS:
         raise SpMoveError(f"destino inválido '{dest}' (todo|doing|done)")
     target = DESTS[dest.lower()]
     sp, dups = _resolver(root, slug, target, project)
-    for d in dups:  # a cópia desatualizada sai sempre, mesmo que o SP já esteja no destino
-        if d.path != sp.path and d.path.exists():
-            kaizen_engine.relocate(d.path, d.path.with_suffix(".md.dup"))
-            d.path.with_suffix(".md.dup").unlink()
+    _remover_dups(sp, dups)
     if sp.status == target:
         return f"{slug}: já está em {target} ({sp.path})"
     if target == "Doing":
@@ -125,12 +140,8 @@ def move(root, slug, dest, project=None):
     if target == "Done":
         _agent_claim(slug, target)
     extra = f" (+{n} provas)" if n else ""
-    if target == "Done" and sp_metricas:
-        try:
-            if sp_metricas.registar(root, dst, sp.project):
-                extra += " (+métricas)"
-        except Exception as exc:  # métricas nunca bloqueiam o fecho
-            extra += f" (métricas falharam: {exc})"
+    if target == "Done":
+        extra += _registar_metricas(root, dst, sp.project)
     ctx["path"] = str(dst)
     avisos = "".join(f"\naviso: {w}" for w in kaizen_hooks.fire("sp.moved", ctx, phase="post"))
     return f"{slug}: {sp.status} → {target} ({dst}){extra}{avisos}"
