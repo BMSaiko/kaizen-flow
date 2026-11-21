@@ -59,7 +59,7 @@ What counts as a piece is defined once, in `bin/sync.js`. Project SPs stay in th
 - `adapters/` renders the core per harness (`claude`, `codex`, `agents-md`); the last two share `agentsAdapter()` in `adapters/util.js`.
 - `core/scripts/` shares helpers through `kaizen_engine.py` (`load`, `relocate`, frontmatter). `sp-fila.py` and `sp-handoff.py` are thin entry points over `sp_fila_*.py`, `handoff_pane.py`, `handoff_spawn.py` and `sp_progresso.py`; no module is above 300 lines.
 - Dead imports and exports were removed; public behaviour (CLI, commands, skills) is unchanged.
-- Architecture diagram: `docs/assets/architecture.svg`, regenerated with `python -I docs/assets/build-diagrams.py` run from `docs/assets/`.
+- Diagrams (`architecture.svg`, `michi-cycle.svg`, `sp-workflow.svg`, `sp-fila-parallel.svg` in `docs/assets/`): regenerate from the repo root with `python -I docs/assets/build-diagrams.py docs/assets`.
 
 ### Before / after the cleanup (non-test `.py`/`.js`)
 
