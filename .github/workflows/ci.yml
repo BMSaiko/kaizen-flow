@@ -8,7 +8,7 @@ jobs:
   test:
     uses: ./.github/workflows/test.yml
     with:
-      matrix: '{"os":["ubuntu-latest","windows-latest","macos-latest"],"node":[18,22],"python":["3.10","3.13"]}'
+      matrix: '{"os":["ubuntu-latest","windows-latest","macos-latest"],"node":[18,22],"python":["3.10","3.13"],"exclude":[{"os":"ubuntu-latest","node":22,"python":"3.13"}]}'  # essa combinação corre no job coverage
   coverage:
     uses: ./.github/workflows/test.yml
     with:
