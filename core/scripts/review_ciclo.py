@@ -52,8 +52,8 @@ def alterados(estado, novos):
 
 def resumo(estado):
     linhas = ["| iteração | bloqueantes | menores | a rever |", "|---|---|---|---|"]
-    for h in estado.get("historico", []):
-        linhas.append(f"| {h['iteracao']} | {h['bloqueantes']} | {h['menores']} | {len(h['rever']) if 'rever' in h else '-'} |")
+    linhas += [f"| {h['iteracao']} | {h['bloqueantes']} | {h['menores']} | {len(h['rever']) if 'rever' in h else '-'} |"
+               for h in estado.get("historico", [])]
     return "\n".join(linhas)
 
 
