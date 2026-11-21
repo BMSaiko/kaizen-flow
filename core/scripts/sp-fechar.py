@@ -282,6 +282,13 @@ def _verificar(sp, slug, testes, sem_prova, commit_dir):
     return None, lines
 
 
+def _linha_commit(commit_dir, slug, msg):
+    paths = changed_paths(commit_dir)
+    if not paths:
+        return "COMMIT: nada para stage (sem alterações ou fora de repo git)"
+    return f"COMMIT: {write_commit(commit_dir, slug, msg or f'vault: fecha {slug}', paths)}"
+
+
 def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True, sem_prova=None):
     """Corre o fecho. Devolve (rc, linhas)."""
     t_total = time.monotonic()
@@ -310,11 +317,7 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
     if prox:
         lines.append(prox)
     if commit:
-        paths = changed_paths(commit_dir)
-        if paths:
-            lines.append(f"COMMIT: {write_commit(commit_dir, slug, msg or f'vault: fecha {slug}', paths)}")
-        else:
-            lines.append("COMMIT: nada para stage (sem alterações ou fora de repo git)")
+        lines.append(_linha_commit(commit_dir, slug, msg))
     hint = worktree_hint(commit_dir, slug)
     if hint:
         lines.append(hint)
