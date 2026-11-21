@@ -6,7 +6,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 ## [Unreleased]
 
 ### Changed
-- Refactor sem mudança de comportamento: `main`/funções longas divididas em passos nomeados em `sp-handoff`, `sp-fila`, `sp-new`, `sp-move`, `sp-fechar`, `sp-resume`, `sp-preflight`, `sp-provas`, `sp-validate`, `sp-organize`, `sp_fila_execucao`, `kf_catalogo` e `wez` (ruff PLR0912/PLR0915 de 20 para 11 funções).
+- Refactor sem mudança de comportamento: `main`/funções longas divididas em passos nomeados em `sp-handoff`, `sp-fila`, `sp-new`, `sp-move`, `sp-fechar`, `sp-resume`, `sp-preflight`, `sp-provas`, `sp-validate`, `sp-organize`, `sp_fila_execucao`, `kf_catalogo` e `wez` (menos avisos ruff PLR0912/PLR0915).
 - Simplificações do `ruff` (`removeprefix`, variáveis por usar, espaços e linhas em branco).
 - CI: a combinação ubuntu/node 22/python 3.13 deixa a matriz `test` (já corre no job `coverage`).
 
