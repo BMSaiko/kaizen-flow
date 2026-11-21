@@ -1,6 +1,7 @@
 name: ci
 on:
   push:
+    branches: [main]  # PRs já correm em pull_request (evita a matriz em dobro)
   pull_request:
 permissions:
   contents: read
