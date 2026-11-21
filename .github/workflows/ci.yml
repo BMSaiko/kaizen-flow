@@ -8,7 +8,7 @@ jobs:
   test:
     uses: ./.github/workflows/test.yml
     with:
-      matrix: '{"os":["ubuntu-latest","windows-latest","macos-latest"],"node":[18,22],"python":["3.10","3.13"]}'
+      matrix: '{"os":["ubuntu-latest","windows-latest","macos-latest"],"node":[18,22],"python":["3.10","3.13"],"exclude":[{"os":"ubuntu-latest","node":22,"python":"3.13"}]}'  # essa combinação corre no job coverage
   coverage:
     uses: ./.github/workflows/test.yml
     with:
@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
-      - name: npm audit (n�o bloqueante)
+      - name: npm audit (não bloqueante)
         continue-on-error: true
         run: |
           npm audit --omit=dev 2>&1 | tee audit.txt

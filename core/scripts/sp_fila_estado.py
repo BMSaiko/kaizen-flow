@@ -91,5 +91,3 @@ def atualizar(path, fn):
         fn(estado)
         guardar(path, estado)
         return estado
-
-

@@ -143,8 +143,8 @@ def _slug_valido(slug):
     return bool(slug) and slug not in (".", "..") and not any(c in slug for c in ("/", chr(92), ":"))
 
 
-def resume(raiz, slug, from_fase=None, restart=False, confirmar=None, agora=None, painel_root=None):
-    """Devolve (rc, mensagem). `confirmar` é um callable sem argumentos (True = confirmado)."""
+def _pedido_invalido(slug, from_fase, restart):
+    """(2, mensagem) se o pedido é inválido; None se pode seguir."""
     if not _slug_valido(slug):
         return 2, _msg(f"slug inválido «{slug}»", "o slug é um nome de ficheiro (sem /, \\ nem :)", "nada alterado",
                        "`kaizen resume` sem argumentos lista os SPs interrompidos", "EC-067")
@@ -154,6 +154,31 @@ def resume(raiz, slug, from_fase=None, restart=False, confirmar=None, agora=None
     if restart and from_fase is not None:
         return 2, _msg("--restart e --from não se combinam", "--restart recomeça sempre em grill", "nada alterado",
                        f"`kaizen resume {slug} --restart` ou `kaizen resume {slug} --from <fase>`", "EC-067")
+    return None
+
+
+def _texto_retoma(slug, ponto, fase, from_fase, antes):
+    ult = ponto["ultimo_fim"]
+    texto = f"retomar {slug} em {fase}; último passo concluído: {ult['fase'] + '/' + ult['passo'] if ult else 'nenhum'}"
+    if from_fase is None and ponto["abertos"]:
+        nomes = ", ".join(f"{a['fase']}/{a['passo']}" for a in ponto["abertos"])
+        if ponto["acao"] == "repetir":
+            texto += f"; repetir (idempotente): {nomes}"
+        else:
+            texto += (
+                f"; reverter antes de repetir: {nomes} — plano: "
+                f"`python -I scripts/michi-checkpoint.py restore --slug {slug}` (sem --apply só mostra)"
+            )
+    if from_fase is not None and antes:
+        texto += f"; atenção: passos abertos em fases anteriores ficam por fechar: {', '.join(antes)}"
+    return texto
+
+
+def resume(raiz, slug, from_fase=None, restart=False, confirmar=None, agora=None, painel_root=None):
+    """Devolve (rc, mensagem). `confirmar` é um callable sem argumentos (True = confirmado)."""
+    erro = _pedido_invalido(slug, from_fase, restart)
+    if erro:
+        return erro
     d = sp_disco.dono(raiz, slug)
     if d["estado"] == "vivo":
         return 1, _msg_ocupado(slug, d)
@@ -180,6 +205,7 @@ def resume(raiz, slug, from_fase=None, restart=False, confirmar=None, agora=None
                        "`kaizen resume` lista os SPs interrompidos", "EC-067")
     ponto = ponto_de_retoma(raiz, slug)
     fase = ponto["fase"]
+    antes = []
     if from_fase is not None:
         idx = FASES.index(from_fase)
         for a in ponto["abertos"]:
@@ -188,20 +214,7 @@ def resume(raiz, slug, from_fase=None, restart=False, confirmar=None, agora=None
         fase = from_fase
         antes = [f"{a['fase']}/{a['passo']}" for a in ponto["abertos"] if a["fase"] in FASES and FASES.index(a["fase"]) < idx]
         ponto = ponto_de_retoma(raiz, slug)
-    ult = ponto["ultimo_fim"]
-    texto = f"retomar {slug} em {fase}; último passo concluído: {ult['fase'] + '/' + ult['passo'] if ult else 'nenhum'}"
-    if from_fase is None and ponto["abertos"]:
-        nomes = ", ".join(f"{a['fase']}/{a['passo']}" for a in ponto["abertos"])
-        if ponto["acao"] == "repetir":
-            texto += f"; repetir (idempotente): {nomes}"
-        else:
-            texto += (
-                f"; reverter antes de repetir: {nomes} — plano: "
-                f"`python -I scripts/michi-checkpoint.py restore --slug {slug}` (sem --apply só mostra)"
-            )
-    if from_fase is not None and antes:
-        texto += f"; atenção: passos abertos em fases anteriores ficam por fechar: {', '.join(antes)}"
-    return 0, texto + " (EC-001, EC-027, UC-031)"
+    return 0, _texto_retoma(slug, ponto, fase, from_fase, antes) + " (EC-001, EC-027, UC-031)"
 
 
 def _perguntar():

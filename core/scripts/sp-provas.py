@@ -176,6 +176,23 @@ def gates_svg(gates):
     return "\n".join(o)
 
 
+def _problemas_imagens(imagens, pasta):
+    """(problemas, tipos) das imagens do pacote."""
+    p, tipos = [], []
+    for im in imagens:
+        if not isinstance(im, dict) or not {"ficheiro", "legenda", "tipo"} <= set(im):
+            p.append("imagens: cada item precisa de ficheiro, legenda e tipo")
+            continue
+        if im["tipo"] not in TIPOS:
+            p.append(f"imagens: tipo inválido {im['tipo']!r}")
+        if caminho_proibido(im["ficheiro"]):
+            p.append(f"imagens: caminho proibido {im['ficheiro']}")
+        tipos.append(im["tipo"])
+        if pasta is not None and not (Path(pasta) / im["ficheiro"]).is_file():
+            p.append(f"imagens: ficheiro em falta {im['ficheiro']}")
+    return p, tipos
+
+
 def validar(d, ui=False, pasta=None):
     """Lista de problemas (vazia = válido)."""
     p = [f"campo em falta: {c}" for c in CAMPOS if c not in d]
@@ -190,18 +207,8 @@ def validar(d, ui=False, pasta=None):
     for r in d["reverter"] if isinstance(d["reverter"], list) else [d["reverter"]]:
         if PERIGOSO.search(str(r)):
             p.append(f"reverter: comando perigoso (reset/force): {r}")
-    tipos = []
-    for im in d["imagens"]:
-        if not isinstance(im, dict) or not {"ficheiro", "legenda", "tipo"} <= set(im):
-            p.append("imagens: cada item precisa de ficheiro, legenda e tipo")
-            continue
-        if im["tipo"] not in TIPOS:
-            p.append(f"imagens: tipo inválido {im['tipo']!r}")
-        if caminho_proibido(im["ficheiro"]):
-            p.append(f"imagens: caminho proibido {im['ficheiro']}")
-        tipos.append(im["tipo"])
-        if pasta is not None and not (Path(pasta) / im["ficheiro"]).is_file():
-            p.append(f"imagens: ficheiro em falta {im['ficheiro']}")
+    erros_im, tipos = _problemas_imagens(d["imagens"], pasta)
+    p += erros_im
     if ui and "depois" not in tipos:
         p.append("SP com ui: sim exige uma imagem `depois` (app a correr)")
     if not ui and not ({"diagrama", "terminal"} & set(tipos)):

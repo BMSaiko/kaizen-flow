@@ -263,6 +263,76 @@ def _imprimir(out, estado):
             print(f"fechar-mae: {m} · `sb-worktree.py ensure {m}` → `sp-move.py {m} done` → commit → `sb-worktree.py merge {m}`")
 
 
+def _cmd_dry_run(args, items, so):
+    """`--dry-run`: mostra o plano, os painéis previstos e os limites, sem criar estado."""
+    fila, excluidos = plan(items, args.max, so, sem_commit(items))
+    print(render_plan(fila, excluidos))
+    if args.concorrencia:  # o que o lançador de painéis abriria (slug · modelo · worktree), sem abrir nada
+        print("Painéis previstos:")
+        print(sp_fila_paineis.render_dry_run(sp_fila_paineis.plano_dry_run(fila, maximo=args.concorrencia)))
+    print(f"Limites: máx {args.max or 'sem'} SPs · {args.max_falhas or 'sem'} falhas seguidas · "
+          f"{'até ' + args.ate if args.ate else 'sem hora limite'} · {args.orcamento or 'sem'} requests")
+    return 0
+
+
+def _preparar_estado(args, estado, mae, modo, so):
+    """`--seguinte` exige fila em curso; senão cria o estado novo. Devolve o rc se não pode avançar, ou None."""
+    if args.seguinte:
+        if not estado.exists():
+            _erro("EC-067", "sem fila em curso", "`--seguinte` só continua uma fila arrancada", "nada alterado",
+                  "arrancar com `sp-fila.py`")
+            return 1
+    else:
+        if estado.exists():
+            try:
+                atual = ler(estado)
+                motivo = fila_obsoleta(atual, load(args.root, None), datetime.now())
+            except ValueError:  # ilegível: o user decide com `--parar`
+                atual = motivo = None
+            if motivo and abandonar_obsoleta(estado, atual, motivo, args):
+                pass
+            elif motivo:
+                return 1
+        if estado.exists():
+            with contextlib.suppress(ValueError):
+                print(_resumo_antigo(estado, args), file=sys.stderr)
+            _erro("EC-067", f"fila já em curso ({estado})", "só há uma fila por estado", "fila em curso intacta",
+                  "`--seguinte` continua, `--parar` abandona")
+            return 1
+        if args.concorrencia and sp_fila_execucao._backend_defeito() is None:
+            _erro("EC-036", sp_fila_execucao.falta_backend(), "a fila em paralelo abre painéis num multiplexador",
+                  "nenhum estado criado", "instalar/abrir o WezTerm, tmux ou herdr, ou correr sem `--concorrencia`")
+            return 1
+        estado.parent.mkdir(parents=True, exist_ok=True)
+        novo = _novo_estado(args, mae, modo, so)
+        guardar(estado, novo)
+    return None
+
+
+def _resolver_programa(args, max_dado):
+    """Carrega os SPs e, com `--programa`, a mãe e o modo da fila (`execucao:`). Devolve (items, mae, modo, rc); rc != None = erro."""
+    items = load(args.root, args.projeto)
+    mae = modo = None
+    if args.programa:
+        mae = next(((sp, fm) for sp, fm in items if sp.slug == args.programa), None)
+        if mae is None:
+            _erro("EC-067", f"SP-mãe desconhecido: {args.programa}", "nenhum SP em TODO/Doing tem esse slug", "nada alterado",
+                  "`sp-list.py` para ver os slugs")
+            return items, mae, modo, 1
+        args.projeto = mae[0].project
+        items = load(args.root, args.projeto)
+    if mae and not args.dry_run and not args.seguinte:  # o modo é da mãe (`execucao:`), nunca escolhido pela fila
+        modo = str(mae[1].get("execucao") or "").strip()
+        if modo not in MODOS:
+            _erro("EC-067", f"modo por escolher: sp-execucao.py {args.programa} sequencial|paralelo",
+                  "o modo da fila é da mãe (`execucao:`), nunca escolhido pela fila", "nada alterado",
+                  f"`python -I scripts/sp-execucao.py {args.programa} sequencial|paralelo`")
+            return items, mae, modo, 1
+        args.concorrencia = 1 if modo == "sequencial" else min(args.concorrencia or MAX_PARALELO, MAX_PARALELO)
+        args.max = max_dado
+    return items, mae, modo, None
+
+
 def main(argv=None):
     args = _parser().parse_args(argv)
     max_dado = args.max
@@ -284,65 +354,15 @@ def main(argv=None):
         return _cmd_parar(args, estado)
     if args.gastos:
         return _cmd_gastos(args, estado)
-    items = load(args.root, args.projeto)
-    mae = None
-    if args.programa:
-        mae = next(((sp, fm) for sp, fm in items if sp.slug == args.programa), None)
-        if mae is None:
-            _erro("EC-067", f"SP-mãe desconhecido: {args.programa}", "nenhum SP em TODO/Doing tem esse slug", "nada alterado",
-                  "`sp-list.py` para ver os slugs")
-            return 1
-        args.projeto = mae[0].project
-        items = load(args.root, args.projeto)
-    modo = None
-    if mae and not args.dry_run and not args.seguinte:  # o modo é da mãe (`execucao:`), nunca escolhido pela fila
-        modo = str(mae[1].get("execucao") or "").strip()
-        if modo not in MODOS:
-            _erro("EC-067", f"modo por escolher: sp-execucao.py {args.programa} sequencial|paralelo",
-                  "o modo da fila é da mãe (`execucao:`), nunca escolhido pela fila", "nada alterado",
-                  f"`python -I scripts/sp-execucao.py {args.programa} sequencial|paralelo`")
-            return 1
-        args.concorrencia = 1 if modo == "sequencial" else min(args.concorrencia or MAX_PARALELO, MAX_PARALELO)
-        args.max = max_dado
+    items, mae, modo, rc = _resolver_programa(args, max_dado)
+    if rc is not None:
+        return rc
     so = descendentes(items, args.programa) if args.programa else None
     if args.dry_run:
-        fila, excluidos = plan(items, args.max, so, sem_commit(items))
-        print(render_plan(fila, excluidos))
-        if args.concorrencia:  # o que o lançador de painéis abriria (slug · modelo · worktree), sem abrir nada
-            print("Painéis previstos:")
-            print(sp_fila_paineis.render_dry_run(sp_fila_paineis.plano_dry_run(fila, maximo=args.concorrencia)))
-        print(f"Limites: máx {args.max or 'sem'} SPs · {args.max_falhas or 'sem'} falhas seguidas · "
-              f"{'até ' + args.ate if args.ate else 'sem hora limite'} · {args.orcamento or 'sem'} requests")
-        return 0
-    if args.seguinte:
-        if not estado.exists():
-            _erro("EC-067", "sem fila em curso", "`--seguinte` só continua uma fila arrancada", "nada alterado",
-                  "arrancar com `sp-fila.py`")
-            return 1
-    else:
-        if estado.exists():
-            try:
-                atual, motivo = ler(estado), None
-                motivo = fila_obsoleta(atual, load(args.root, None), datetime.now())
-            except ValueError:  # ilegível: o user decide com `--parar`
-                atual = motivo = None
-            if motivo and abandonar_obsoleta(estado, atual, motivo, args):
-                pass
-            elif motivo:
-                return 1
-        if estado.exists():
-            with contextlib.suppress(ValueError):
-                print(_resumo_antigo(estado, args), file=sys.stderr)
-            _erro("EC-067", f"fila já em curso ({estado})", "só há uma fila por estado", "fila em curso intacta",
-                  "`--seguinte` continua, `--parar` abandona")
-            return 1
-        if args.concorrencia and sp_fila_execucao._backend_defeito() is None:
-            _erro("EC-036", sp_fila_execucao.falta_backend(), "a fila em paralelo abre painéis num multiplexador",
-                  "nenhum estado criado", "instalar/abrir o WezTerm, tmux ou herdr, ou correr sem `--concorrencia`")
-            return 1
-        estado.parent.mkdir(parents=True, exist_ok=True)
-        novo = _novo_estado(args, mae, modo, so)
-        guardar(estado, novo)
+        return _cmd_dry_run(args, items, so)
+    rc = _preparar_estado(args, estado, mae, modo, so)
+    if rc is not None:
+        return rc
     try:
         out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug)
     except (IntegracaoPendente, SlugObrigatorio) as e:
@@ -361,9 +381,6 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")
     sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
     import kf_errlog
     sys.exit(kf_errlog.executar("sp-fila", main))

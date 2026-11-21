@@ -104,6 +104,32 @@ def _nome_painel(modo, alvo):
     return f"fila-{alvo}" if modo == "fila" else alvo
 
 
+def _escolher_alvo(a, root, escrever, entrada, saida):
+    """(escolha, rc): `escolha` = (slug, caminho); None com o rc a devolver (pedido inválido, nada elegível ou cancelado)."""
+    if a.modo == "michi":
+        opcoes = [(s.slug, s.path) for s in elegiveis(root)]
+        pedido = a.slug
+    else:
+        opcoes = [(m.slug, m.path) for m, _ in programas(root)]
+        pedido = a.programa
+    if pedido:
+        if pedido not in dict(opcoes):
+            print(f"erro: {pedido} não elegível (precisa de TODO/Doing, não ser mãe e ter dependências em Done)"
+                  if a.modo == "michi" else f"erro: programa {pedido} não elegível (sem filhos elegíveis)", file=sys.stderr)
+            return None, 2
+        escolha = (pedido, dict(opcoes)[pedido])
+        escrever(f"--- {pedido} ---\n{preview(escolha[1])}\n---\n")
+    elif not opcoes:
+        escrever("sem SPs elegíveis\n" if a.modo == "michi" else "sem programas com SPs elegíveis\n")
+        return None, 0
+    else:
+        escolha = escolher(opcoes, entrada, saida)
+        if escolha is None:
+            escrever("cancelado\n")
+            return None, 0
+    return escolha, 0
+
+
 def main(argv=None, root=None, backend="auto", spawn=None, entrada=input, saida=print, aviso_backend=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("modo", choices=("fila", "michi"))
@@ -115,27 +141,9 @@ def main(argv=None, root=None, backend="auto", spawn=None, entrada=input, saida=
     escrever = saida.write if hasattr(saida, "write") else (lambda t: saida(t.rstrip("\n")))
     root = Path(root or a.root or sp_list.DEFAULT_ROOT)
 
-    if a.modo == "michi":
-        opcoes = [(s.slug, s.path) for s in elegiveis(root)]
-        pedido = a.slug
-    else:
-        opcoes = [(m.slug, m.path) for m, _ in programas(root)]
-        pedido = a.programa
-    if pedido:
-        if pedido not in dict(opcoes):
-            print(f"erro: {pedido} não elegível (precisa de TODO/Doing, não ser mãe e ter dependências em Done)"
-                  if a.modo == "michi" else f"erro: programa {pedido} não elegível (sem filhos elegíveis)", file=sys.stderr)
-            return 2
-        escolha = (pedido, dict(opcoes)[pedido])
-        escrever(f"--- {pedido} ---\n{preview(escolha[1])}\n---\n")
-    elif not opcoes:
-        escrever("sem SPs elegíveis\n" if a.modo == "michi" else "sem programas com SPs elegíveis\n")
-        return 0
-    else:
-        escolha = escolher(opcoes, entrada, saida)
-        if escolha is None:
-            escrever("cancelado\n")
-            return 0
+    escolha, rc = _escolher_alvo(a, root, escrever, entrada, saida)
+    if escolha is None:
+        return rc
     alvo = escolha[0]
     if not a.sim and not confirmar(f"lançar {a.modo} de {alvo} num painel novo?", entrada, saida):
         escrever("cancelado\n")

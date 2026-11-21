@@ -82,6 +82,23 @@ def _problemas_teste(iid, teste, root):
     return []
 
 
+def _problemas_item(secao, n, iid, item, campos, vistos, ids_cat, filhos, root):
+    """Problemas de um item do catálogo (campos, categoria, filho, teste)."""
+    probs = _problemas_id(secao, n, iid, vistos)
+    for campo in campos[1:]:
+        v = item.get(campo)
+        if not (isinstance(v, str) and v.strip()):
+            probs.append(f"{iid}: campo {campo} em falta ou vazio")
+    if secao == "edge_cases" and item.get("categoria") and item["categoria"] not in ids_cat:
+        probs.append(f"{iid}: categoria desconhecida {item['categoria']}")
+    if item.get("filho") and filhos and item["filho"] not in filhos:
+        probs.append(f"{iid}: filho desconhecido {item['filho']}")
+    teste = item.get("teste")
+    if isinstance(teste, str) and teste.strip() and teste != POR_COBRIR:
+        probs += _problemas_teste(iid, teste, root)
+    return probs
+
+
 def problemas(cat, root):
     """Lista de problemas de estrutura (vazia = catálogo válido)."""
     root = Path(root)
@@ -111,19 +128,8 @@ def problemas(cat, root):
                 probs.append(f"{secao}[{n}]: tem de ser um objeto")
                 continue
             iid = item.get("id", f"{secao}[{n}]")
-            probs += _problemas_id(secao, n, iid, vistos)
+            probs += _problemas_item(secao, n, iid, item, campos, vistos, ids_cat, filhos, root)
             vistos.add(iid)
-            for campo in campos[1:]:
-                v = item.get(campo)
-                if not (isinstance(v, str) and v.strip()):
-                    probs.append(f"{iid}: campo {campo} em falta ou vazio")
-            if secao == "edge_cases" and item.get("categoria") and item["categoria"] not in ids_cat:
-                probs.append(f"{iid}: categoria desconhecida {item['categoria']}")
-            if item.get("filho") and filhos and item["filho"] not in filhos:
-                probs.append(f"{iid}: filho desconhecido {item['filho']}")
-            teste = item.get("teste")
-            if isinstance(teste, str) and teste.strip() and teste != POR_COBRIR:
-                probs += _problemas_teste(iid, teste, root)
     for cid in ids_cat:
         if not any(isinstance(e, dict) and e.get("categoria") == cid for e in cat.get("edge_cases") or []):
             probs.append(f"categoria {cid}: vazia (sem EC)")
@@ -351,7 +357,7 @@ def main(argv=None):
     for s in (sys.stdout, sys.stderr):
         if hasattr(s, "reconfigure"):
             s.reconfigure(encoding="utf-8")
-    ap =argparse.ArgumentParser(prog="kaizen catalog", description="Catálogo EC/UC: validar, gerar e medir a cobertura.")
+    ap = argparse.ArgumentParser(prog="kaizen catalog", description="Catálogo EC/UC: validar, gerar e medir a cobertura.")
     ap.add_argument("acao", nargs="?", choices=("report", "render"), default="report")
     ap.add_argument("--check", action="store_true", help="validar estrutura e .md gerados")
     ap.add_argument("--json", action="store_true", help="report em JSON")

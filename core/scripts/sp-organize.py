@@ -39,57 +39,57 @@ def set_field(text, key, value):
     return re.sub(rf"^{key}:.*$", f"{key}: {value}", text, count=1, flags=re.M)
 
 
+def _acao(root, path, project):
+    """Ação de arrumação para um SP (None = já arrumado, ou fora do âmbito)."""
+    parts = path.relative_to(root).parts
+    if (SKIP_DIRS & set(parts) or path.name == "MOC.md" or ATTACHMENT_RE.search(path.stem)
+            or "sp" not in parts[:-1]):
+        return None
+    idx = parts.index("sp")
+    try:
+        fm = sp_indice.frontmatter(path)
+    except (OSError, UnicodeDecodeError):
+        return None
+    if fm.get("phase") != "SP":
+        return None
+    folder_proj = parts[idx - 1] if idx >= 1 else None
+    proj = folder_proj or fm.get("project", "")
+    rest = parts[idx + 1:-1]
+    folder = rest[0] if len(rest) == 1 and rest[0] in sp_list.FOLDERS else None
+    if project and proj != project:
+        return None
+    status = folder or fm.get("status", "")
+    if status not in sp_list.FOLDERS:
+        return Action(path, path, {}, "pasta/estado desconhecido", "manual")
+    if not proj or not (root / proj).is_dir():
+        return Action(path, path, {}, "projeto inexistente", "manual")
+    reasons, fixes = [], {}
+    if not folder:
+        reasons.append("fora de sp/{TODO,Doing,Done}")
+    if not folder_proj:
+        reasons.append("SP sem projeto na raiz")
+    if fm.get("status") and fm["status"] != status:
+        fixes["status"] = status
+        reasons.append(f"status {fm['status']}≠{status}")
+    if fm.get("project") and fm["project"] != proj:
+        fixes["project"] = proj
+        reasons.append(f"project {fm['project']}≠{proj}")
+    name = path.name
+    if fm.get("slug") and fm.get("date"):
+        expected = f"{fm['slug']}-{fm['date']}.md"
+        if name != expected:
+            name = expected
+            reasons.append("nome fora do padrão")
+    if not reasons:
+        return None
+    target = root / proj / "sp" / status / name
+    blocked = "destino já existe" if target != path and target.exists() else ""
+    return Action(path, target, fixes, "; ".join(reasons), blocked)
+
+
 def plan(root, project=None):
     root = Path(root)
-    actions = []
-    for path in sp_indice.listar(root):
-        parts = path.relative_to(root).parts
-        if (SKIP_DIRS & set(parts) or path.name == "MOC.md" or ATTACHMENT_RE.search(path.stem)
-                or "sp" not in parts[:-1]):
-            continue
-        idx = parts.index("sp")
-        try:
-            fm = sp_indice.frontmatter(path)
-        except (OSError, UnicodeDecodeError):
-            continue
-        if fm.get("phase") != "SP":
-            continue
-        folder_proj = parts[idx - 1] if idx >= 1 else None
-        proj = folder_proj or fm.get("project", "")
-        rest = parts[idx + 1:-1]
-        folder = rest[0] if len(rest) == 1 and rest[0] in sp_list.FOLDERS else None
-        if project and proj != project:
-            continue
-        status = folder or fm.get("status", "")
-        if status not in sp_list.FOLDERS:
-            actions.append(Action(path, path, {}, "pasta/estado desconhecido", "manual"))
-            continue
-        if not proj or not (root / proj).is_dir():
-            actions.append(Action(path, path, {}, "projeto inexistente", "manual"))
-            continue
-        reasons, fixes = [], {}
-        if not folder:
-            reasons.append("fora de sp/{TODO,Doing,Done}")
-        if not folder_proj:
-            reasons.append("SP sem projeto na raiz")
-        if fm.get("status") and fm["status"] != status:
-            fixes["status"] = status
-            reasons.append(f"status {fm['status']}≠{status}")
-        if fm.get("project") and fm["project"] != proj:
-            fixes["project"] = proj
-            reasons.append(f"project {fm['project']}≠{proj}")
-        name = path.name
-        if fm.get("slug") and fm.get("date"):
-            expected = f"{fm['slug']}-{fm['date']}.md"
-            if name != expected:
-                name = expected
-                reasons.append("nome fora do padrão")
-        if not reasons:
-            continue
-        target = root / proj / "sp" / status / name
-        blocked = "destino já existe" if target != path and target.exists() else ""
-        actions.append(Action(path, target, fixes, "; ".join(reasons), blocked))
-    return actions
+    return [a for a in (_acao(root, path, project) for path in sp_indice.listar(root)) if a]
 
 
 def apply(action):
@@ -136,9 +136,6 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")
     sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
     import kf_errlog
     sys.exit(kf_errlog.executar("sp-organize", main))

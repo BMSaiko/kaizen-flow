@@ -71,7 +71,7 @@ def test_guarda_ramo_principal(tmp_path):
     assert cfg.metodo_autorizacoes(tmp_path, "agent/x") == {"commit": "auto", "push": "auto", "pr": "auto"}
     assert cfg.metodo_autorizacoes(tmp_path, "main") == {"commit": "pergunta", "push": "pergunta", "pr": "pergunta"}
     assert cfg.metodo_autorizacoes(tmp_path, "master")["commit"] == "pergunta"
-    assert cfg.metodo_autorizacoes(tmp_path, "") ["push"] == "pergunta"
+    assert cfg.metodo_autorizacoes(tmp_path, "")["push"] == "pergunta"
     (tmp_path / "kaizen.config.json").write_text("{}")
     assert cfg.metodo_autorizacoes(tmp_path, "agent/x") is None
 

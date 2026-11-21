@@ -200,6 +200,18 @@ def avisos_fecho(root, slug, project=None):
     return [f"aviso: o sp-fechar vai exigir {x}" for x in falta]
 
 
+def _mover_doc(ap, args):
+    """`--tipo dr|dp`: move um DR/DP."""
+    if not args.slug or not args.dest or args.start or args.next or args.project:
+        ap.error("--tipo dr|dp exige <slug> <todo|doing|done> e não aceita --start, --next nem --project")
+    try:
+        print(doc_ops.move(args.root or doc_ops.DEFAULT_ROOT, args.tipo, args.slug, args.dest))
+    except doc_ops.DocMoveError as exc:
+        print(f"erro: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Move um SP entre TODO, Doing e Done")
     ap.add_argument("slug", nargs="?")
@@ -212,14 +224,7 @@ def main(argv=None):
     ap.add_argument("--root", default=None, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     if args.tipo != "sp":
-        if not args.slug or not args.dest or args.start or args.next or args.project:
-            ap.error("--tipo dr|dp exige <slug> <todo|doing|done> e não aceita --start, --next nem --project")
-        try:
-            print(doc_ops.move(args.root or doc_ops.DEFAULT_ROOT, args.tipo, args.slug, args.dest))
-        except doc_ops.DocMoveError as exc:
-            print(f"erro: {exc}", file=sys.stderr)
-            return 1
-        return 0
+        return _mover_doc(ap, args)
     args.root = args.root or str(sp_list.DEFAULT_ROOT)
     if args.slug_opt:
         args.slug, args.dest = args.slug_opt, args.dest or args.slug
@@ -252,9 +257,6 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")
     sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
     import kf_errlog
     sys.exit(kf_errlog.executar("sp-move", main))

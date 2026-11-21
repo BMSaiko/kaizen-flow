@@ -139,8 +139,6 @@ def test_decisao_de_retoma_menos_de_2s(tmp_path):
 
 @settings(max_examples=40, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(st.lists(st.tuples(st.sampled_from(["dp", "da", "gates"]), st.sampled_from(["p1", "p2", "p3"]), st.sampled_from(["inicio", "fim"])), max_size=12))
-
-
 def test_ponto_de_retoma_nunca_repete_passo_fechado(tmp_path_factory, seq):
     raiz = tmp_path_factory.mktemp("h")
     _passos(raiz, SLUG, seq)
@@ -186,8 +184,6 @@ def test_restart_de_slug_inexistente_rc1_sem_criar_pastas(tmp_path):
 
 
 @pytest.mark.parametrize("mau", ["../x", "a/b", "a" + chr(92) + "b", ".."])
-
-
 def test_slug_com_separadores_rc2(tmp_path, mau):
     assert SR.resume(tmp_path, mau)[0] == 2
 
@@ -222,11 +218,7 @@ def test_from_em_slug_sem_estado_rc1_sem_tocar_no_journal(tmp_path):
 
 
 @pytest.mark.parametrize("mau", ["../x", "a/b", ".."])
-
-
 @pytest.mark.parametrize("flag", ["--lock", "--unlock"])
-
-
 def test_lock_unlock_slug_invalido_rc2_sem_ficheiros(tmp_path, mau, flag):
     assert SR.main([mau, flag, "--raiz", str(tmp_path)]) == 2
     assert not list(tmp_path.rglob("*.lock.json"))

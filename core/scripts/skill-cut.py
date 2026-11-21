@@ -59,7 +59,7 @@ def main():
         (i for i in range(begin + 1, len(lines)) if re.match(r"^#{1,%d} " % level, lines[i])),
         len(lines),
     )
-    preamble, blocks = split_blocks(lines[begin + 1 : end], args.numbered)
+    _, blocks = split_blocks(lines[begin + 1 : end], args.numbered)
     assert blocks, "nenhum bloco encontrado"
 
     rel = ref.relative_to(skill.parent).as_posix()

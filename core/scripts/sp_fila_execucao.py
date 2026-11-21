@@ -123,14 +123,8 @@ def _lancar(alvo, doing, estado, paralelo, backend, run, root):
     return erro, item
 
 
-def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, backend=None):
-    estado = ler(estado_path)
-    if not slug and estado.get("concorrencia") and estado["sessoes"]:
-        raise SlugObrigatorio("em modo paralelo `--seguinte` exige `--slug <SP que fechou>`; sem ele fecharia sessões ainda vivas")
-    items = load(root, estado.get("projeto"))
-    if estado.get("concorrencia"):  # worktrees atrasadas: o estado dos SPs é o de master
-        aplicar_master(items)
-    so = descendentes(items, estado["programa"]) if estado.get("programa") else None
+def _registar_fechadas(root, estado, items, slug, run):
+    """Passa as sessões fechadas a feitas/falhadas (só o `slug` dado, ou todas); recusa um Done que só existe na worktree."""
     for fechada in ([slug] if slug else list(estado["sessoes"])):
         sp = next((s for s, _ in items if s.slug == fechada), None)
         if fechada in estado["sessoes"] and (sp is None or sp.status != "Done"):
@@ -147,6 +141,17 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
         estado["seguidas"] = 0 if feito else estado.get("seguidas", 0) + 1
         del estado["sessoes"][fechada]
         _fechar_painel(estado, fechada, feito)
+
+
+def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, backend=None):
+    estado = ler(estado_path)
+    if not slug and estado.get("concorrencia") and estado["sessoes"]:
+        raise SlugObrigatorio("em modo paralelo `--seguinte` exige `--slug <SP que fechou>`; sem ele fecharia sessões ainda vivas")
+    items = load(root, estado.get("projeto"))
+    if estado.get("concorrencia"):  # worktrees atrasadas: o estado dos SPs é o de master
+        aplicar_master(items)
+    so = descendentes(items, estado["programa"]) if estado.get("programa") else None
+    _registar_fechadas(root, estado, items, slug, run)
     # Paralelo (--concorrencia N): sem orçamento; só `--ate` e `--max` explícito; o único travão é o guard de contexto, que continua a sessão por handoff.
     teto = estado.get("concorrencia") or 1
     paralelo = bool(estado.get("concorrencia"))  # um só critério: com `concorrencia` (mesmo 1) lança num painel
@@ -210,27 +215,32 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
         return {"acao": "espera", "sessoes": list(estado["sessoes"]), "pendentes": pendentes}
     if not lancados and not estado["sessoes"]:
         motivo = parada or motivo or (limite_paralelo(estado, agora) if paralelo else limite(estado, agora, custo)) or "fila vazia"
-        sps = {sp.slug: (sp.status, _ler_sp(sp)) for sp, _ in items
-               if sp.slug in estado["feitos"] + estado["falhados"]}
-        rel_dir, wt_slug = destino_relatorio(rel_dir, agora, run)
-        path = relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora, _custos_seguros(custo_fn), sps)
-        if wt_slug:
-            escrever_commit_md(path.parents[len(RELATORIOS.relative_to(REPO).parts)], path, agora)
-        if estado.get("programa"):
-            mae = next((sp for sp, _ in items if sp.slug == estado["programa"]), None)
-            alvo_mae = _mae_na_worktree(mae, run) if mae is not None else None
-            if alvo_mae is not None:
-                progresso(alvo_mae, estado, fila, motivo, agora)
-        Path(estado_path).replace(Path(estado_path).with_name("ultima.json"))  # `--gastos` lê-o depois do fim
-        # Programa com a árvore toda em Done (em master): o principal fecha a mãe na worktree dela.
-        fechar = estado.get("programa") if so and all(sp.status == "Done" for sp, _ in items if sp.slug in so) else None
-        return {"acao": "fim", "motivo": motivo, "relatorio": str(path), "fechar_mae": fechar}
+        return _fim(estado, estado_path, items, so, fila, excluidos, motivo, rel_dir, run, agora, custo_fn)
     guardar(estado_path, estado)
     if not lancados:
         return {"acao": "espera", "sessoes": list(estado["sessoes"])}
     alvo = lancados[0]
     return {"acao": "lancou", "slug": alvo.slug, "slugs": [sp.slug for sp in lancados], "itens": itens,
             "caminho": str(alvo.path.parent.parent / "Doing" / alvo.path.name)}
+
+
+def _fim(estado, estado_path, items, so, fila, excluidos, motivo, rel_dir, run, agora, custo_fn):
+    """Relatório final, progresso da mãe e `ultima.json`; devolve o resultado `fim`."""
+    sps = {sp.slug: (sp.status, _ler_sp(sp)) for sp, _ in items
+           if sp.slug in estado["feitos"] + estado["falhados"]}
+    rel_dir, wt_slug = destino_relatorio(rel_dir, agora, run)
+    path = relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora, _custos_seguros(custo_fn), sps)
+    if wt_slug:
+        escrever_commit_md(path.parents[len(RELATORIOS.relative_to(REPO).parts)], path, agora)
+    if estado.get("programa"):
+        mae = next((sp for sp, _ in items if sp.slug == estado["programa"]), None)
+        alvo_mae = _mae_na_worktree(mae, run) if mae is not None else None
+        if alvo_mae is not None:
+            progresso(alvo_mae, estado, fila, motivo, agora)
+    Path(estado_path).replace(Path(estado_path).with_name("ultima.json"))  # `--gastos` lê-o depois do fim
+    # Programa com a árvore toda em Done (em master): o principal fecha a mãe na worktree dela.
+    fechar = estado.get("programa") if so and all(sp.status == "Done" for sp, _ in items if sp.slug in so) else None
+    return {"acao": "fim", "motivo": motivo, "relatorio": str(path), "fechar_mae": fechar}
 
 
 def _custos_seguros(custo_fn=None):
