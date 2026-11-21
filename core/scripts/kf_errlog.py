@@ -163,7 +163,10 @@ def _msg_inesperado(script, e, gravou):
 
 
 def executar(script, main, argv=None):
-    """Corre `main()` (lê `sys.argv`; `argv` só serve para o log) e regista exceções e rc != 0 sem mudar o resultado (re-raise, mesmo rc)."""
+    """Corre `main()` (lê `sys.argv`; `argv` só serve para o log) com stdout/stderr em UTF-8 e regista exceções e rc != 0 sem mudar o resultado (re-raise, mesmo rc)."""
+    for stream in (sys.stdout, sys.stderr):  # pipe no Windows: sem isto os acentos saem em cp1252
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     real = sys.stderr
     tee = _Tee(real)
     sys.stderr = tee
