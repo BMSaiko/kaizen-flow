@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
-      - name: npm audit (não bloqueante)
+      - name: npm audit (nÃ£o bloqueante)
         continue-on-error: true
         run: |
           npm audit --omit=dev 2>&1 | tee audit.txt
