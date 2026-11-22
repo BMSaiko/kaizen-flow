@@ -45,6 +45,7 @@ from sp_fila_estado import estado_de  # noqa: E402
 import sp_fila_execucao  # noqa: E402
 import sp_fila_paineis  # noqa: E402
 import sp_vigia  # noqa: E402
+import sp_fila_nucleo as nucleo  # noqa: E402
 import kf_erros  # noqa: E402
 import contextlib
 import time
@@ -216,6 +217,7 @@ def _parser():
     ap.add_argument("--orcamento", type=int, default=ORCAMENTO, help=f"teto opcional de requests totais; cada SP gasta {REQ_POR_SP} (sem ele, sem limite)")
     ap.add_argument("--max-falhas", type=int, default=MAX_FALHAS_DEFEITO, metavar="N", help=f"para a fila após N SPs falhados seguidos (defeito {MAX_FALHAS_DEFEITO}; 0 = sem este limite)")
     ap.add_argument("--projeto")
+    ap.add_argument("--motor", choices=nucleo.MOTORES, default="antigo", help="motor de painéis: `antigo` (config) ou `herdr` (núcleo novo sobre herdr_ops)")
     ap.add_argument("--programa", metavar="SLUG", help="só a árvore deste SP-mãe; orçamento lido do frontmatter dela")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     ap.add_argument("--estado", default=str(ESTADO), help=argparse.SUPPRESS)
@@ -399,7 +401,7 @@ def _estado_path(args):
 
 def _cmd_seguinte(args, estado):
     try:
-        out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug)
+        out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug, **({'run': nucleo.RUN} if nucleo.RUN else {}))
     except (IntegracaoPendente, SlugObrigatorio) as e:
         _erro("EC-067", str(e), "o pedido à fila não pode avançar assim", "estado da fila intacto",
               "seguir a indicação acima e repetir `--seguinte`")
@@ -415,8 +417,58 @@ def _cmd_seguinte(args, estado):
     return 0
 
 
+def _cmd_resume(argv):
+    """`resume`: reconcilia a fila com os painéis vivos do herdr e relança o vigia (idempotente)."""
+    ap = argparse.ArgumentParser(prog="sp-fila resume")
+    ap.add_argument("--estado", default=str(ESTADO))
+    ap.add_argument("--programa", metavar="SLUG")
+    ap.add_argument("--slug")
+    a = ap.parse_args(argv)
+    estado = Path(a.estado)
+    if a.estado == str(ESTADO):
+        estado = estado_de(a.programa) if a.programa else (sp_fila_estado.localizar(a.slug) or estado)
+    if not estado.exists():
+        _erro("EC-067", "sem fila em curso", "`resume` só retoma uma fila arrancada", "nada alterado", "arrancar com `sp-fila.py run`")
+        return 1
+    try:
+        with bloqueio(estado):
+            atual = ler(estado)
+            out = nucleo.retomar(atual)
+            guardar(estado, atual)
+    except ValueError as e:
+        _erro("EC-045", f"estado da fila ilegível ({estado}): {e}", "o JSON da fila está truncado", "ficheiro intacto", "`sp-fila.py stop` abandona")
+        return 1
+    except TimeoutError as e:
+        _erro("EC-042", str(e), "outro processo tem o lock da fila", "estado intacto", "repetir `resume`")
+        return 1
+    print(f"retoma · adotados: {', '.join(out['adotados']) or '-'} · mortos: {', '.join(out['mortos']) or '-'}")
+    _arrancar_vigia(estado)
+    return 0
+
+
+def _cmd_status():
+    """`status`: filas de painéis e o estado de cada SP (só leitura)."""
+    filas = sp_fila_paineis.pe.filas()
+    if not filas:
+        print("sem filas de painéis")
+    for f in filas:
+        print(f"fila {f['fila']} · {f.get('programa') or '-'}")
+        for sp in f["sps"]:
+            print(f"  {sp.get('slug', '?')} · {sp.get('estado', '?')}")
+    return 0
+
+
 def main(argv=None):
-    args = _parser().parse_args(argv)
+    sub, resto = nucleo.traduzir(sys.argv[1:] if argv is None else argv)
+    if sub == "resume":
+        return _cmd_resume(resto)
+    if sub == "status":
+        return _cmd_status()
+    if sub == "watch":
+        import sp_fila_vigiar
+        return sp_fila_vigiar.main(resto)
+    args = _parser().parse_args(resto)
+    nucleo.MOTOR_ATUAL = args.motor
     max_dado = args.max
     if args.max is None and not args.concorrencia:
         args.max = MAX_DEFEITO  # em paralelo None = sem máximo

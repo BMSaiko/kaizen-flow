@@ -14,6 +14,7 @@ import kf_git  # noqa: E402
 import kaizen_config  # noqa: E402
 import kaizen_engine  # noqa: E402
 import painel_backend  # noqa: E402
+import sp_fila_nucleo as nucleo  # noqa: E402
 import sp_painel_estado as pe  # noqa: E402
 from sp_fila_estado import RELATORIOS, REPO, REQ_POR_SP, SCRIPTS, bloqueio, guardar, ler, registar_sessao, run_hidden
 import sp_fila_paineis  # noqa: E402
@@ -23,6 +24,8 @@ from sp_fila_relatorio import destino_relatorio, escrever_commit_md, progresso, 
 
 def _backend_defeito():
     """Backend de painéis da config (`painelBackend` do kaizen.config.json); None se não houver (os testes trocam-no)."""
+    if nucleo.MOTOR_ATUAL == "herdr":
+        return nucleo.backend_herdr()
     return painel_backend.escolher(kaizen_config.painel_backend(REPO), herdr=kaizen_config.herdr(REPO))
 
 
