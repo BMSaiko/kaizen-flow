@@ -5,8 +5,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const BIN = path.join(__dirname, "..", "bin", "kaizen.js");
-const { kaizen } = require("./helpers/sandbox");
+const { BIN, kaizen } = require("./helpers/sandbox");
 const run = (cwd, ...a) => kaizen(a, { cwd });
 
 function repo() {
