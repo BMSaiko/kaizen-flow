@@ -11,10 +11,6 @@
 
 Contagem = perguntas feitas ao user; factos descobertos com `Read`/`Grep` não contam.
 
-## Caso «redirecionar» (veredicto do /rever)
-
-Semente de `sp_veredicto.prompt_grill`: SP original, provas e a frase do user. Ronda 1 obrigatória: «reverter o trabalho anterior?», com o comando de «Reverter» da semente já pronto (revert por commit novo ou fecho do PR; nunca `reset --hard` nem force). O SP que sair passa pelo portão normal (resumo e aprovação).
-
 ## Fronteira de âmbito em mudanças em bloco
 
 Num rename/refactor/rebrand em bloco a árvore tem uma raiz escondida, o **âmbito**; perguntar-lhe na Ronda 1, antes do design:
