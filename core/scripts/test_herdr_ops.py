@@ -1,0 +1,72 @@
+import pytest
+
+from herdr_fake import FakeHerdr
+from herdr_ops import HerdrErro, HerdrOps
+
+
+def _ops(**kw):
+    f = FakeHerdr(**kw)
+    return f, HerdrOps(f, sleep=lambda s: None)
+
+
+def test_painel_novo_cria_workspace_e_reutiliza(tmp_path):
+    f, o = _ops()
+    p1 = o.painel_novo(tmp_path)
+    assert p1 and len(f.workspaces) == 1
+    p2 = o.painel_novo(tmp_path)  # workspace do projeto já existe: tab nova
+    assert p2 != p1 and len(f.workspaces) == 1 and f.chamadas[-1][1:3] == ["tab", "create"]
+
+
+def test_painel_novo_sem_id_devolve_none():
+    o = HerdrOps(lambda argv, **kw: type("R", (), {"returncode": 0, "stdout": "{}", "stderr": ""})())
+    assert o.painel_novo("/x", workspace_por_projeto=False) is None
+
+
+def test_lancar_agente_usa_cd_e_command(tmp_path):
+    f, o = _ops()
+    p = o.painel_novo(tmp_path)
+    o.lancar_agente(p, "/work/wt", ["claude", "--model", "haiku"])
+    assert f.chamadas[-1][-1] == "cd /work/wt && command claude --model haiku"
+    assert o.estado(p) == "idle"
+
+
+def test_estado_unknown_sem_agente():
+    f, o = _ops()
+    assert o.estado("w9:p9") == "unknown"
+
+
+def test_prompt_e_esperar():
+    f, o = _ops()
+    p = o.painel_novo("/w")
+    o.lancar_agente(p, "/w")
+    a = o.prompt(p, "/michi x", esperar=True, timeout_ms=1000)
+    assert a["completion_seq"] == 1 and "--wait" in f.chamadas[-1]
+    assert o.esperar(p, ate=["idle", "done"], timeout_ms=5)["agent_status"] == "idle"
+    assert f.chamadas[-1][-4:] == ["--until", "done", "--timeout", "5"]
+
+
+def test_prompt_blocked_levanta_codigo():
+    f, o = _ops(agente_estado="blocked")
+    p = o.painel_novo("/w")
+    o.lancar_agente(p, "/w")
+    with pytest.raises(HerdrErro) as e:
+        o.prompt(p, "x")
+    assert e.value.code == "agent_blocked"
+
+
+def test_prompt_agente_inexistente():
+    f, o = _ops()
+    with pytest.raises(HerdrErro) as e:
+        o.prompt("w1:p1", "x")
+    assert e.value.code == "agent_not_found"
+
+
+def test_renomear_metadata_foco_fechar():
+    f, o = _ops()
+    p = o.painel_novo("/w")
+    o.lancar_agente(p, "/w")
+    o.renomear_agente(p, "sp1")
+    assert o.agentes()[p]["name"] == "sp1"
+    o.metadata(p, "kf", "SP x")
+    o.fechar(p)
+    assert p not in o.agentes() and p not in {x["pane_id"] for x in o.paineis()}
