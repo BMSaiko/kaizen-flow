@@ -7,4 +7,4 @@ const RE = new RegExp(`\\{\\{(${MARKER_KEYS.join("|")})\\}\\}`, "g");
 
 const render = (text, cfg = {}) => text.replace(RE, (_, k) => (cfg[k] != null && cfg[k] !== "" ? cfg[k] : DEFAULTS[k]));
 
-module.exports = { MARKER_KEYS, DEFAULTS, render };
+module.exports = { MARKER_KEYS, render };

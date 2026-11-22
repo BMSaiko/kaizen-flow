@@ -27,4 +27,4 @@ function run(argv, cwd = process.cwd()) {
   return py([s.script, ...s.args, ...rest], path.resolve(cwd));
 }
 
-module.exports = { run, SUBS };
+module.exports = { run };

@@ -89,4 +89,4 @@ function esperarSaida(child) {
   return new Promise((res) => { if (child.exitCode !== null || child.signalCode) res(); else child.on("exit", () => res()); });
 }
 
-module.exports = { ROOT, BIN, kaizen, PY, TIMEOUT, sandbox, caminhoSp, preencherSp, matar, lancarPy, esperarSaida };
+module.exports = { ROOT, BIN, kaizen, TIMEOUT, sandbox, caminhoSp, preencherSp, matar, lancarPy, esperarSaida };
