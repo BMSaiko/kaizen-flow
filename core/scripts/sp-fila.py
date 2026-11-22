@@ -333,17 +333,40 @@ def _resolver_programa(args, max_dado):
     return items, mae, modo, None
 
 
-def main(argv=None):
-    args = _parser().parse_args(argv)
-    max_dado = args.max
-    if args.max is None and not args.concorrencia:
-        args.max = MAX_DEFEITO  # em paralelo None = sem máximo
+def _estado_path(args):
     estado = Path(args.estado)
     if args.estado == str(ESTADO):  # defeito: o estado é da mãe (`--programa`) ou onde está o SP (`--seguinte --slug`)
         if args.programa:
             estado = estado_de(args.programa)
         elif args.seguinte or args.gastos or args.parar:
             estado = sp_fila_estado.localizar(args.slug) or estado
+    return estado
+
+
+def _cmd_seguinte(args, estado):
+    try:
+        out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug)
+    except (IntegracaoPendente, SlugObrigatorio) as e:
+        _erro("EC-067", str(e), "o pedido à fila não pode avançar assim", "estado da fila intacto",
+              "seguir a indicação acima e repetir `--seguinte`")
+        return 1
+    except ValueError as e:  # estado ilegível (JSON truncado/corrompido): não adivinhar, o user decide
+        _erro("EC-045", f"estado da fila ilegível ({estado}): {e}", "o JSON da fila está truncado ou corrompido",
+              "ficheiro intacto (nada adivinhado)", "`sp-fila.py --parar` abandona e apaga-o")
+        return 1
+    except TimeoutError as e:  # lock preso: o estado fica intacto (sem «fila vazia» nem falhados); repetir `--seguinte --slug`
+        _erro("EC-042", str(e), "outro processo tem o lock da fila", "o estado não foi alterado", "repetir `--seguinte`")
+        return 1
+    _imprimir(out, estado)
+    return 0
+
+
+def main(argv=None):
+    args = _parser().parse_args(argv)
+    max_dado = args.max
+    if args.max is None and not args.concorrencia:
+        args.max = MAX_DEFEITO  # em paralelo None = sem máximo
+    estado = _estado_path(args)
     if _concorrencia_invalida(args):
         return 1
 
@@ -363,21 +386,7 @@ def main(argv=None):
     rc = _preparar_estado(args, estado, mae, modo, so)
     if rc is not None:
         return rc
-    try:
-        out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug)
-    except (IntegracaoPendente, SlugObrigatorio) as e:
-        _erro("EC-067", str(e), "o pedido à fila não pode avançar assim", "estado da fila intacto",
-              "seguir a indicação acima e repetir `--seguinte`")
-        return 1
-    except ValueError as e:  # estado ilegível (JSON truncado/corrompido): não adivinhar, o user decide
-        _erro("EC-045", f"estado da fila ilegível ({estado}): {e}", "o JSON da fila está truncado ou corrompido",
-              "ficheiro intacto (nada adivinhado)", "`sp-fila.py --parar` abandona e apaga-o")
-        return 1
-    except TimeoutError as e:  # lock preso: o estado fica intacto (sem «fila vazia» nem falhados); repetir `--seguinte --slug`
-        _erro("EC-042", str(e), "outro processo tem o lock da fila", "o estado não foi alterado", "repetir `--seguinte`")
-        return 1
-    _imprimir(out, estado)
-    return 0
+    return _cmd_seguinte(args, estado)
 
 
 if __name__ == "__main__":
