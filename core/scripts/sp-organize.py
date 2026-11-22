@@ -39,6 +39,28 @@ def set_field(text, key, value):
     return re.sub(rf"^{key}:.*$", f"{key}: {value}", text, count=1, flags=re.M)
 
 
+def _razoes(path, fm, folder, folder_proj, status, proj):
+    """Razões e correções de frontmatter para arrumar um SP."""
+    reasons, fixes = [], {}
+    if not folder:
+        reasons.append("fora de sp/{TODO,Doing,Done}")
+    if not folder_proj:
+        reasons.append("SP sem projeto na raiz")
+    if fm.get("status") and fm["status"] != status:
+        fixes["status"] = status
+        reasons.append(f"status {fm['status']}≠{status}")
+    if fm.get("project") and fm["project"] != proj:
+        fixes["project"] = proj
+        reasons.append(f"project {fm['project']}≠{proj}")
+    name = path.name
+    if fm.get("slug") and fm.get("date"):
+        expected = f"{fm['slug']}-{fm['date']}.md"
+        if name != expected:
+            name = expected
+            reasons.append("nome fora do padrão")
+    return reasons, fixes, name
+
+
 def _acao(root, path, project):
     """Ação de arrumação para um SP (None = já arrumado, ou fora do âmbito)."""
     parts = path.relative_to(root).parts
@@ -63,23 +85,7 @@ def _acao(root, path, project):
         return Action(path, path, {}, "pasta/estado desconhecido", "manual")
     if not proj or not (root / proj).is_dir():
         return Action(path, path, {}, "projeto inexistente", "manual")
-    reasons, fixes = [], {}
-    if not folder:
-        reasons.append("fora de sp/{TODO,Doing,Done}")
-    if not folder_proj:
-        reasons.append("SP sem projeto na raiz")
-    if fm.get("status") and fm["status"] != status:
-        fixes["status"] = status
-        reasons.append(f"status {fm['status']}≠{status}")
-    if fm.get("project") and fm["project"] != proj:
-        fixes["project"] = proj
-        reasons.append(f"project {fm['project']}≠{proj}")
-    name = path.name
-    if fm.get("slug") and fm.get("date"):
-        expected = f"{fm['slug']}-{fm['date']}.md"
-        if name != expected:
-            name = expected
-            reasons.append("nome fora do padrão")
+    reasons, fixes, name = _razoes(path, fm, folder, folder_proj, status, proj)
     if not reasons:
         return None
     target = root / proj / "sp" / status / name
