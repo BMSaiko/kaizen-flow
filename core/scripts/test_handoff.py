@@ -193,6 +193,10 @@ def test_write_acrescenta_loops_ativos_fora_do_limite(tmp_path, monkeypatch):
     monkeypatch.setenv("SB_LOOPS_DIR", str(tmp_path / "loops"))
     sem = handoff.write(tmp_path / "h1", BODY, "a", now=datetime(2026, 10, 18, 9, 5)).read_text(encoding="utf-8")
     assert "Loops ativos" not in sem
-    loop_estado.set_estado("ronda", int(time.time()) + 3600, perm="SB: commit,merge")
+    loop_estado.set_estado("ronda", int(time.time()) + 3600, perm="SB: commit,merge", sessao="dono", pid=999_999_991)
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "alheia")
+    alheia = handoff.write(tmp_path / "h3", BODY, "a", now=datetime.now()).read_text(encoding="utf-8")
+    assert "Loops ativos" not in alheia  # loop de outra sessão não vai no handoff desta
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "dono")
     com = handoff.write(tmp_path / "h2", BODY, "a", now=datetime.now()).read_text(encoding="utf-8")
     assert "## Loops ativos" in com and "/ronda" in com and "SB: commit,merge" in com

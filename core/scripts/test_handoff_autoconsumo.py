@@ -93,9 +93,10 @@ def test_loop_ativo_manda_retomar_mesmo_sem_handoff(tmp_path, monkeypatch):
     import loop_estado
     monkeypatch.setenv("SB_LOOPS_DIR", str(tmp_path / "loops"))
     assert hr.hook('{"source":"clear"}', tmp_path) == ""
-    loop_estado.set_estado("ronda", int(time.time()) + 600)
-    out = json.loads(hr.hook('{"source":"clear"}', tmp_path))["hookSpecificOutput"]["additionalContext"]
+    loop_estado.set_estado("ronda", int(time.time()) + 600, sessao="dono", pid=999_999_991)
+    assert hr.hook('{"source":"clear","session_id":"alheia"}', tmp_path) == ""  # loop de outra sessão
+    out = json.loads(hr.hook('{"source":"clear","session_id":"dono"}', tmp_path))["hookSpecificOutput"]["additionalContext"]
     assert "[loop]" in out and "/ronda" in out
     _mk(tmp_path, "2026-11-19-conversa.md")
-    out = json.loads(hr.hook('{"source":"clear"}', tmp_path))["hookSpecificOutput"]["additionalContext"]
+    out = json.loads(hr.hook('{"source":"clear","session_id":"dono"}', tmp_path))["hookSpecificOutput"]["additionalContext"]
     assert "[handoff]" in out and "[loop]" in out
