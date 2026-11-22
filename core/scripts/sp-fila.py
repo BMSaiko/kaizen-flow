@@ -217,7 +217,7 @@ def _parser():
     ap.add_argument("--orcamento", type=int, default=ORCAMENTO, help=f"teto opcional de requests totais; cada SP gasta {REQ_POR_SP} (sem ele, sem limite)")
     ap.add_argument("--max-falhas", type=int, default=MAX_FALHAS_DEFEITO, metavar="N", help=f"para a fila após N SPs falhados seguidos (defeito {MAX_FALHAS_DEFEITO}; 0 = sem este limite)")
     ap.add_argument("--projeto")
-    ap.add_argument("--motor", choices=nucleo.MOTORES, default="antigo", help="motor de painéis: `antigo` (config) ou `herdr` (núcleo novo sobre herdr_ops)")
+    ap.add_argument("--motor", choices=nucleo.MOTORES, default=nucleo.motor_defeito(), help="motor de painéis: `herdr` (defeito se o CLI existir) ou `antigo` (fallback: WezTerm/tmux/background da config)")
     ap.add_argument("--programa", metavar="SLUG", help="só a árvore deste SP-mãe; orçamento lido do frontmatter dela")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     ap.add_argument("--estado", default=str(ESTADO), help=argparse.SUPPRESS)
