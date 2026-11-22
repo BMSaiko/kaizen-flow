@@ -362,6 +362,22 @@ def _imagem(pasta, img):
             f'<figcaption>{_e(img.get("legenda", nome))}</figcaption></figure>')
 
 
+def _gates_criterios(p):
+    """HTML dos gates e critérios do pacote de provas."""
+    h = []
+    gates = [g for g in p.get("gates") or [] if isinstance(g, dict)]
+    if gates:
+        h.append("<b>Gates</b>")
+        for g in gates:
+            ok = g.get("rc") == 0
+            h.append(f'<div class="g {"p" if ok else "f"}"><b>{"✔ PASSOU" if ok else "✘ FALHOU"}</b> rc {_e(g.get("rc"))} · {_e(g.get("cmd", ""))}</div>')
+    cr = p.get("criterios") if isinstance(p.get("criterios"), dict) else {}
+    if cr.get("cumpridos") or cr.get("por_cumprir"):
+        h.append("<b>Critérios</b><ul>" + "".join(f"<li>☑ {_e(x)}</li>" for x in cr.get("cumpridos") or [])
+                 + "".join(f"<li>☐ {_e(x)}</li>" for x in cr.get("por_cumprir") or []) + "</ul>")
+    return h
+
+
 def _cartao(c):
     p = c["provas"]
     pr = f' · <a href="{_e(c["pr"])}" rel="noopener noreferrer" target="_blank">PR ↗</a>' if c["pr"] else ""
@@ -384,16 +400,7 @@ def _cartao(c):
     imgs = "".join(_imagem(c["pasta"], i) for i in p.get("imagens") or [])
     if imgs:
         h.append(f'<div class="imgs">{imgs}</div>')
-    gates = [g for g in p.get("gates") or [] if isinstance(g, dict)]
-    if gates:
-        h.append("<b>Gates</b>")
-        for g in gates:
-            ok = g.get("rc") == 0
-            h.append(f'<div class="g {"p" if ok else "f"}"><b>{"✔ PASSOU" if ok else "✘ FALHOU"}</b> rc {_e(g.get("rc"))} · {_e(g.get("cmd", ""))}</div>')
-    cr = p.get("criterios") if isinstance(p.get("criterios"), dict) else {}
-    if cr.get("cumpridos") or cr.get("por_cumprir"):
-        h.append("<b>Critérios</b><ul>" + "".join(f"<li>☑ {_e(x)}</li>" for x in cr.get("cumpridos") or [])
-                 + "".join(f"<li>☐ {_e(x)}</li>" for x in cr.get("por_cumprir") or []) + "</ul>")
+    h += _gates_criterios(p)
     for chave, tit in (("experimentar", "Experimentar"), ("reverter", "Reverter")):
         if p.get(chave):
             h.append(f"<b>{tit}</b><pre>" + _e("\n".join(map(str, p[chave]))) + "</pre>")
