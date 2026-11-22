@@ -143,6 +143,30 @@ def _registar_fechadas(root, estado, items, slug, run):
         _fechar_painel(estado, fechada, feito)
 
 
+def _custo_gasto(estado, so, paralelo, custo_fn):
+    """USD gastos pela fila desde o início (0 em paralelo ou sem orçamento)."""
+    if estado.get("usd") is None or paralelo:
+        return 0.0
+    custos = (custo_fn or _custos)()
+    return sum(custos.get(s, 0.0) for s in so) - estado.get("custo_inicio", 0.0)
+
+
+def _registar_lancamento(estado, alvo, erro, item, agora, lancados, itens):
+    """Regista no estado o resultado do lançamento; devolve o motivo de paragem (None se lançou)."""
+    if erro:
+        estado["sessoes"].pop(alvo.slug, None)
+        estado["falhados"].append(alvo.slug)
+        estado["seguidas"] = estado.get("seguidas", 0) + 1
+        return erro
+    registar_sessao(estado, alvo.slug, agora.isoformat(timespec="seconds"), requests=REQ_POR_SP,
+                    **({"worktree": item["worktree"], "painel": True} if item else {}))
+    estado["usados"] += REQ_POR_SP
+    lancados.append(alvo)
+    if item:
+        itens.append(item)
+    return None
+
+
 def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, backend=None):
     estado = ler(estado_path)
     if not slug and estado.get("concorrencia") and estado["sessoes"]:
@@ -163,10 +187,7 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
     parada = (f"cadeia parada: {', '.join(estado['falhados'])} não chegou a Done"
               if estado.get("modo") == "sequencial" and estado["falhados"] else None)
     done = {sp.slug for sp, _ in items if sp.status == "Done"}
-    custo = 0.0
-    if estado.get("usd") is not None and not paralelo:
-        custos = (custo_fn or _custos)()
-        custo = sum(custos.get(s, 0.0) for s in so) - estado.get("custo_inicio", 0.0)
+    custo = _custo_gasto(estado, so, paralelo, custo_fn)
     lancados, itens, pendentes, motivo = [], [], [], None
     # Único decisor: nunca lançar SP já iniciado (Doing), nem um que a fila já lançou/fechou ou reservou (outro `--seguinte` corre enquanto o spawn tem o lock solto).
     for alvo in (sp for sp in ([] if parada else fila) if sp.status == "TODO" and all(d in done for d in sp.depends_on)):
@@ -196,19 +217,7 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
             motivo = None
             guardar(estado_path, estado)
             break
-        if erro:
-            motivo = erro
-            estado["sessoes"].pop(alvo.slug, None)
-            estado["falhados"].append(alvo.slug)
-            estado["seguidas"] = estado.get("seguidas", 0) + 1
-        else:
-            registar_sessao(estado, alvo.slug, agora.isoformat(timespec="seconds"), requests=REQ_POR_SP,
-                            **({"worktree": item["worktree"], "painel": True} if item else {}))
-            estado["usados"] += REQ_POR_SP
-            lancados.append(alvo)
-            if item:
-                itens.append(item)
-            motivo = None
+        motivo = _registar_lancamento(estado, alvo, erro, item, agora, lancados, itens)
         guardar(estado_path, estado)
     if pendentes and not lancados:
         guardar(estado_path, estado)
