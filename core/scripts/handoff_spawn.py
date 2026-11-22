@@ -88,7 +88,7 @@ def _send_line(backend, pane, text, run, sleep):
                    tries=SPAWN_ENTER_TRIES, settle=SPAWN_SETTLE)
 
 
-def _spawn_herdr(wt, claude, cmd, run, res):
+def _spawn_herdr(wt, claude, cmd, run, res, sleep=time.sleep):
     """herdr: painel novo (layout do HerdrBackend), `claude` como agente e `agent prompt` com o comando; id em `res`."""
     backend = painel_backend.por_nome("herdr", run)
     ops = backend._ops
@@ -97,10 +97,14 @@ def _spawn_herdr(wt, claude, cmd, run, res):
         raise painel_backend.BackendError("herdr não devolveu o id do painel novo (o servidor está a correr? `herdr status`)")
     res["painel"] = pane
     ops.lancar_agente(pane, wt, claude)
-    try:
-        ops.prompt(pane, cmd)
-    except herdr_ops.HerdrErro as exc:
-        raise HandoffError(f"painel {pane}: {exc}") from exc
+    for i in range(SPAWN_READY_S):  # o herdr só deteta o agente uns segundos depois de o `claude` arrancar
+        try:
+            ops.prompt(pane, cmd)
+            return
+        except herdr_ops.HerdrErro as exc:
+            if exc.code != "agent_not_found" or i == SPAWN_READY_S - 1:
+                raise HandoffError(f"painel {pane}: {exc}") from exc
+        sleep(1)
 
 
 def _adiado(slug, maximo):
@@ -120,7 +124,7 @@ def _spawn_um(slug, backend, run, sleep, res):
     elif backend == "background":  # sem terminal: não há prompt a esperar, o comando corre direto em `claude -p`
         res["painel"] = _spawn_pane(backend, wt, run, (*claude, "-p", cmd))
     elif backend == "herdr":  # herdr_ops único: painel, agente e prompt sem ler o ecrã
-        _spawn_herdr(wt, claude, cmd, run, res)
+        _spawn_herdr(wt, claude, cmd, run, res, sleep)
     else:
         res["painel"] = _spawn_pane(backend, wt, run, claude)
         _wait_prompt(backend, res["painel"], run, sleep)

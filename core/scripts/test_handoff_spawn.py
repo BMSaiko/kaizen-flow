@@ -10,8 +10,10 @@ import handoff_spawn as hs  # noqa: E402
 
 
 class _Res:
-    def __init__(self, stdout=""):
+    def __init__(self, stdout="", returncode=0):
         self.stdout = stdout
+        self.returncode = returncode
+        self.stderr = ""
 
 
 class FakeRun:
@@ -179,3 +181,24 @@ def test_herdr_lanca_agente_e_envia_o_michi_por_herdr_ops(monkeypatch):
     assert ["herdr", "agent", "prompt", pane, "/michi --auto meu-sp"] in fake.chamadas
     assert not any(c[:3] in (["herdr", "pane", "send-text"], ["herdr", "pane", "read"]) for c in fake.chamadas)
     assert any(c[:3] == ["herdr", "pane", "run"] and "command claude" in c[4] for c in fake.chamadas)
+
+
+def test_herdr_espera_pela_deteccao_do_agente_antes_do_prompt(monkeypatch):
+    """Corrida real: `agent prompt` logo após o `claude` arrancar dá agent_not_found; repete até o agente ser detetado."""
+    import json
+    from herdr_fake import FakeHerdr
+    fake = FakeHerdr()
+    falhas = {"n": 2}
+
+    def run(argv, **kw):
+        if "ensure" in argv:
+            return _Res("/wt/meu-sp\n")
+        if argv[1:3] == ["agent", "prompt"] and falhas["n"]:
+            falhas["n"] -= 1
+            fake.chamadas.append(list(argv))
+            return _Res(json.dumps({"error": {"code": "agent_not_found", "message": "x"}}), 1)
+        return fake(argv, **kw)
+
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    res = _spawn(["meu-sp"], backend="herdr", run=run, sleep=lambda s: None)
+    assert res[0]["ok"] and falhas["n"] == 0
