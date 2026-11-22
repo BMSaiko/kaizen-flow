@@ -186,6 +186,6 @@ def test_corpo_pr_com_validar_reverter_e_imagens(tmp_path):
 
 
 def test_limpar_nao_confunde_slug_com_chave_sk():
-    slug = "sp/Doing/{{agentSlug}}-core-ask-guard-inteligente-2026-11-20.md | 4 +-"
+    slug = "sp/Doing/agent-core-ask-guard-inteligente-2026-11-20.md | 4 +-"
     assert provas.limpar(slug) == slug
     assert "[linha cortada" in provas.limpar("k = " + "s" + "k-" + "a" * 20)
