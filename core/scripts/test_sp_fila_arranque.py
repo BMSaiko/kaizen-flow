@@ -15,7 +15,7 @@ def test_sequencial_no_repo_move_para_doing_so_na_worktree(tmp_path, monkeypatch
     calls = []
     out = sp_fila.seguinte(root, _estado(tmp_path), tmp_path / "rel", _runner(calls), datetime(2026, 11, 22, 12, 0))
     assert out["acao"] == "lancou"
-    flat = [" ".join(map(str, c)) for c in calls]
+    flat = [" ".join(map(str, c)).replace("\\", "/") for c in calls]  # Windows: caminhos com \\
     assert any("ensure a" in c for c in flat)
     move = next(c for c in flat if "sp-move.py" in c)
     assert move.split()[2].startswith("/wt/sb-a/")  # o sp-move da worktree, nunca o do checkout
