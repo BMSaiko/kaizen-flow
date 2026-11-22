@@ -95,6 +95,12 @@ def _erros_politica(fm):
     bad = [x for x in sp_list.parse_list(fm.get("parar_se")) if x not in ("gate-falha", "ambiguidade", "ficheiro-fora-de-escopo", "custo")]
     if bad:
         errors.append(f"parar_se inválido {bad}")
+    return errors + _erros_escopo(fm)
+
+
+def _erros_escopo(fm):
+    """`escopo`/`fora_de_escopo`: não vazios, sem `..`, e fora_de_escopo só com escopo."""
+    errors = []
     globs = {k: sp_list.parse_list(fm.get(k)) for k in ("escopo", "fora_de_escopo")}
     for key, vals in globs.items():
         if key in fm and not vals:
