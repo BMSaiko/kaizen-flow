@@ -7,7 +7,8 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const BIN = path.join(__dirname, "..", "bin", "kaizen.js");
-const run = (...a) => spawnSync("node", [BIN, ...a], { encoding: "utf8", env: { ...process.env, HERDR_PANE_ID: "", WEZTERM_PANE: "", TMUX_PANE: "" } });
+const { kaizen } = require("./helpers/sandbox");
+const run = (...a) => kaizen(a);
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-hard-"));
 
 test("harness inválido ou em falta aborta sem escrever", () => {
