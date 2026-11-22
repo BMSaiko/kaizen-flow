@@ -289,6 +289,22 @@ def _linha_commit(commit_dir, slug, msg):
     return f"COMMIT: {write_commit(commit_dir, slug, msg or f'vault: fecha {slug}', paths)}"
 
 
+def _bloqueado(slug, lines, commit, budget, commit_dir):
+    """Acrescenta a `lines` o motivo e devolve True se o fecho não pode avançar (sync/orçamento)."""
+    if commit:
+        bloqueio = kf_por_sincronizar(commit_dir)
+        if bloqueio:
+            lines += [bloqueio, f"{slug}: kaizen-flow por sincronizar, SP continua em Doing"]
+            return True
+    if budget:
+        rc, text = passo("context-budget", run_budget)
+        lines.append(text)
+        if rc:
+            lines.append(f"{slug}: orçamento de contexto excedido, SP continua em Doing")
+            return True
+    return False
+
+
 def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True, sem_prova=None):
     """Corre o fecho. Devolve (rc, linhas)."""
     t_total = time.monotonic()
@@ -297,15 +313,8 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
     rc, lines = _verificar(sp, slug, testes, sem_prova, commit_dir)
     if rc is not None:
         return rc, lines
-    if commit:
-        bloqueio = kf_por_sincronizar(commit_dir)
-        if bloqueio:
-            return 1, [*lines, bloqueio, f"{slug}: kaizen-flow por sincronizar, SP continua em Doing"]
-    if budget:
-        rc, text = passo("context-budget", run_budget)
-        lines.append(text)
-        if rc:
-            return 1, [*lines, f"{slug}: orçamento de contexto excedido, SP continua em Doing"]
+    if _bloqueado(slug, lines, commit, budget, commit_dir):
+        return 1, lines
     fila = em_fila(slug)
     if nxt and fila:
         return 1, [*lines, f"{slug}: sessão da fila, --next não se aplica (o driver lança o seguinte)"]
