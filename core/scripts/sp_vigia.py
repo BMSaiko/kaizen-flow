@@ -391,7 +391,9 @@ class ContextoReal(Contexto):
         self.pe, self.fila, self.log_path = pe, fila, Path(log_path)
         self.run = run or fe.run_hidden
         self.scripts, self.repo = fe.SCRIPTS, fe.REPO
-        self.estado_path = Path(estado_path or fe.estado_de(fila))
+        self.fe = fe
+        self._estado_path = Path(estado_path) if estado_path else None
+        self.painel_path = fe.estado_de(fila)  # fila.json dos painéis: nunca é o estado da sp-fila
         self.rel_dir = Path(rel_dir or fe.RELATORIOS)
         self.root = root
         if backend is None:
@@ -447,6 +449,9 @@ class ContextoReal(Contexto):
         import sp_fila_execucao as fx
         root = self.root or kaizen_engine.load("sp-list").DEFAULT_ROOT
         try:
+            if self.estado_path is None:
+                self.log(f"seguinte {slug}: fila sem estado da sp-fila (painéis avulsos)")
+                return {"acao": "erro"}
             return fx.seguinte(root, self.estado_path, self.rel_dir, slug=slug, backend=self.backend)
         except (fx.IntegracaoPendente, fx.SlugObrigatorio, TimeoutError, ValueError) as e:
             self.log(f"seguinte {slug}: {e}")
@@ -486,7 +491,8 @@ class ContextoReal(Contexto):
             self.log(f"escalada {sp['slug']} falhou: {res.get('msg')}")
             return {"de": de, "para": para, **res}
         sp_escalada.registar_report(path, sp_escalada.linha_report(de, para, causa))
-        _seguro(self, sp_escalada.registar_fila, self.estado_path, sp["slug"], de, para)
+        if self.estado_path is not None:
+            _seguro(self, sp_escalada.registar_fila, self.estado_path, sp["slug"], de, para)
         return {"de": de, "para": para, "causa": causa, **res}
 
     def toast(self, texto):
@@ -496,8 +502,18 @@ class ContextoReal(Contexto):
         with open(path, "a", encoding="utf-8") as f:
             f.write(texto)
 
+    @property
+    def estado_path(self):
+        """Estado da fila-mãe (`fila_paineis` == esta fila), procurado a cada uso; None sem mãe."""
+        return self._estado_path or self.fe.da_fila_paineis(self.fila)
+
+    @estado_path.setter
+    def estado_path(self, valor):
+        self._estado_path = Path(valor) if valor else None
+
     def estado_global(self):
-        return self.estado_path.exists()
+        p = self.estado_path
+        return (p or self.painel_path).exists()
 
     def log(self, msg):
         from datetime import datetime

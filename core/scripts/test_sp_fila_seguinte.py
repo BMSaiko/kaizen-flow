@@ -224,3 +224,14 @@ def test_fim_e_parar_nao_deixam_estado_orfao(tmp_path):
     st = _estado(tmp_path, sessoes={"a": {}})
     assert sp_fila.main(["--parar", "--estado", str(st)]) == 0
     assert not st.exists() and not list(tmp_path.glob("**/fila.json"))
+
+
+def test_registar_lancamento_sem_usados():
+    """Fila de painéis (sem `usados`) não rebenta ao registar o lançamento."""
+    from types import SimpleNamespace
+    from sp_fila_execucao import _registar_lancamento, REQ_POR_SP
+    estado = {"sessoes": {}, "falhados": []}
+    lancados, itens = [], []
+    alvo = SimpleNamespace(slug="x")
+    assert _registar_lancamento(estado, alvo, None, None, __import__("datetime").datetime(2026, 11, 22), lancados, itens) is None
+    assert estado["usados"] == REQ_POR_SP and lancados == [alvo]
