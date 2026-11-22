@@ -157,8 +157,9 @@ def limite(estado, agora, custo=0.0):
     """Motivo para parar a fila, ou None. `custo`: USD gasto nesta corrida (só conta com orcamento_usd)."""
     if motivo := falhas(estado):
         return motivo
-    if len(estado["feitos"]) + len(estado["falhados"]) + len(estado.get("sessoes", {})) >= estado["max"]:
-        return f"atingido o máximo de {estado['max']} SPs"
+    maximo = estado.get("max")  # `--concorrencia` sem `--max` grava None: sem teto de SPs
+    if maximo is not None and len(estado["feitos"]) + len(estado["falhados"]) + len(estado.get("sessoes", {})) >= maximo:
+        return f"atingido o máximo de {maximo} SPs"
     if estado.get("ate"):
         h, m = (int(x) for x in estado["ate"].split(":"))
         if (agora.hour, agora.minute) >= (h, m):

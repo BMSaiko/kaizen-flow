@@ -12,7 +12,6 @@ rc: 0 ok, 2 review não aprovado, 3 política `pergunta`, 4 política não é `a
 import argparse
 import json
 import re
-import subprocess
 from pathlib import Path as _P
 import sys as _s
 _s.path.insert(0, str(_P(__file__).resolve().parent))
@@ -68,7 +67,7 @@ def audit_kaizen(repo):
     """None se limpo ou repo sem `bin/kaizen.js`; senão o output do `kaizen audit` falhado."""
     if not (Path(repo) / "bin" / "kaizen.js").is_file():
         return None
-    r = subprocess.run(["node", "bin/kaizen.js", "audit", "."], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    r = run_hidden(["node", "bin/kaizen.js", "audit", "."], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return None if r.returncode == 0 else ((r.stdout or "") + (r.stderr or "")).strip() or f"rc {r.returncode}"
 
 

@@ -16,7 +16,9 @@ Uso:
 
 O estado vive em `~/.claude/sp-fila-estado.json` (uma entrada por sessão em `sessoes`, escrita atómica e
 bloqueio `.lock`; o formato antigo com `lancado` migra sozinho); no fim (fila vazia, limite ou erro) escreve o
-relatório em `knowledge/infra/reports/sp-fila/` e apaga o estado. Um SP lançado que não chegou a Done
+relatório em `knowledge/infra/reports/sp-fila/` e apaga o estado. Ao arrancar, um estado obsoleto (sem data
+legível ou com mais de 60 min, sem SP em Doing nem vigia vivo) é arquivado em `obsoletas/` ao lado do estado,
+com um aviso; fila viva ou JSON ilegível (EC-045) nunca são tocados. Um SP lançado que não chegou a Done
 conta como falhado: os dependentes ficam de fora e só continuam os independentes.
 
 Orçamento por programa: o SP-mãe pode ter `orcamento_horas`, `orcamento_usd`, `orcamento_requests` no
@@ -121,24 +123,35 @@ def _limpar_paineis(fid):
         print(f"aviso: fila de painéis {fid} não removida: {e}", file=sys.stderr)
 
 
-def abandonar_obsoleta(estado, atual, motivo, args, entrada=input, tty=None):
-    """Propõe abandonar a fila obsoleta e, confirmado, apaga o estado. True = abandonada."""
-    print(f"fila obsoleta ({estado}): {motivo}", file=sys.stderr)
-    tty = sys.stdin.isatty() if tty is None else tty
-    ok = args.abandonar_obsoleta
-    if not ok and tty:
-        try:  # no Windows, stdin em NUL diz isatty() True e o input() dá EOF: vale como «não»
-            ok = entrada("abandonar e arrancar uma nova? [s/N] ").strip().lower() in ("s", "sim", "y", "yes")
-        except EOFError:
-            ok = False
-    if not ok:
-        _erro("EC-038", "fila obsoleta por abandonar", motivo, "fila intacta",
-              "repetir com `--abandonar-obsoleta` (ou `--parar`)")
+def vigia_vivo(atual):
+    """True se o vigia da fila de painéis do estado vive ou se não dá para saber (dúvida = fila viva)."""
+    fid = (atual or {}).get("fila_paineis")
+    if not fid:
         return False
+    try:
+        pidfile = sp_vigia.caminhos(sp_fila_paineis.pe.raiz() / fid)[0]
+        if not Path(pidfile).exists():
+            return False
+        return bool(sp_fila_paineis.pe.pid_vivo(int(Path(pidfile).read_text(encoding="utf-8").strip())))
+    except Exception:  # noqa: BLE001  # pidfile ilegível ou pid_vivo a falhar: tratar como viva
+        return True
+
+
+def arquivar_obsoleta(estado, atual, motivo, agora=None):
+    """Arquiva o estado obsoleto em `<pasta>/obsoletas/<AAAAMMDD-HHMMSS>.json` (nada se perde) e devolve o arquivo.
+
+    Antes pára o vigia e remove a fila de painéis; se isso falhar só avisa. Sem pergunta: arranque sem TTY."""
     _limpar_paineis((atual or {}).get("fila_paineis"))  # sem isto o vigia velho fecha a fila nova com o mesmo id
-    estado.unlink(missing_ok=True)
-    print("fila obsoleta abandonada")
-    return True
+    pasta = Path(estado).parent / "obsoletas"
+    pasta.mkdir(parents=True, exist_ok=True)
+    destino = pasta / f"{(agora or datetime.now()).strftime('%Y%m%d-%H%M%S')}.json"
+    n = 1
+    while destino.exists():
+        destino = destino.with_name(f"{destino.stem.split('_')[0]}_{n}.json")
+        n += 1
+    Path(estado).replace(destino)
+    print(f"fila obsoleta arquivada: {motivo} → {destino}", file=sys.stderr)
+    return destino
 
 
 def _arrancar_vigia(estado):
@@ -164,7 +177,7 @@ def _arrancar_vigia(estado):
 
 def _parser():
     ap = argparse.ArgumentParser(description="Fila autónoma de SPs")
-    ap.add_argument("--abandonar-obsoleta", action="store_true", help="ao arrancar: abandona sem perguntar uma fila obsoleta (arrancada há mais de 60 min e nenhum SP em Doing); fila viva nunca é tocada")
+    ap.add_argument("--abandonar-obsoleta", action="store_true", help="compatibilidade (no-op): a fila obsoleta (sem data legível ou arrancada há mais de 60 min, sem SP em Doing nem vigia vivo) é arquivada sempre em `obsoletas/`; fila viva nunca é tocada")
     ap.add_argument("--dry-run", action="store_true", help="mostra a ordem e as exclusões, sem lançar")
     ap.add_argument("--seguinte", action="store_true", help="no fecho de um SP da fila: regista e lança o seguinte")
     ap.add_argument("--slug", help="com --seguinte: o SP que fechou (só essa sessão; sem ele fecham todas)")
@@ -195,6 +208,19 @@ def _concorrencia_invalida(args):
               "o teto de painéis é global a todas as filas", "nada alterado", f"repetir com `--concorrencia {MAX_PARALELO}`")
         return True
     return False
+
+
+def _dry_obsoleta(estado, items):
+    """`--dry-run`: diz se o arranque arquivaria um estado obsoleto, sem lhe tocar."""
+    if not estado.exists():
+        return
+    try:
+        atual = ler(estado)
+        motivo = fila_obsoleta(atual, items, datetime.now())
+    except ValueError:
+        return
+    if motivo and not vigia_vivo(atual):
+        print(f"arquivaria a fila obsoleta ({estado}): {motivo}")
 
 
 def _cmd_parar(args, estado):
@@ -263,8 +289,9 @@ def _imprimir(out, estado):
             print(f"fechar-mae: {m} · `sb-worktree.py ensure {m}` → `sp-move.py {m} done` → commit → `sb-worktree.py merge {m}`")
 
 
-def _cmd_dry_run(args, items, so):
+def _cmd_dry_run(args, items, so, estado):
     """`--dry-run`: mostra o plano, os painéis previstos e os limites, sem criar estado."""
+    _dry_obsoleta(estado, items)
     fila, excluidos = plan(items, args.max, so, sem_commit(items))
     print(render_plan(fila, excluidos))
     if args.concorrencia:  # o que o lançador de painéis abriria (slug · modelo · worktree), sem abrir nada
@@ -289,10 +316,8 @@ def _preparar_estado(args, estado, mae, modo, so):
                 motivo = fila_obsoleta(atual, load(args.root, None), datetime.now())
             except ValueError:  # ilegível: o user decide com `--parar`
                 atual = motivo = None
-            if motivo and abandonar_obsoleta(estado, atual, motivo, args):
-                pass
-            elif motivo:
-                return 1
+            if motivo and not vigia_vivo(atual):
+                arquivar_obsoleta(estado, atual, motivo)
         if estado.exists():
             with contextlib.suppress(ValueError):
                 print(_resumo_antigo(estado, args), file=sys.stderr)
@@ -382,7 +407,7 @@ def main(argv=None):
         return rc
     so = descendentes(items, args.programa) if args.programa else None
     if args.dry_run:
-        return _cmd_dry_run(args, items, so)
+        return _cmd_dry_run(args, items, so, estado)
     rc = _preparar_estado(args, estado, mae, modo, so)
     if rc is not None:
         return rc

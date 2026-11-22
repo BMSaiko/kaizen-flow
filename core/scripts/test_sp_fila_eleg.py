@@ -118,6 +118,12 @@ def test_sem_orcamento_de_requests_nao_ha_limite():
     assert sp_fila.limite(estado, datetime(2026, 10, 25, 12, 0)) is None
 
 
+def test_concorrencia_sem_max_nao_ha_teto():
+    noon = datetime(2026, 10, 25, 12, 0)
+    for estado in ({"max": None, "feitos": ["a"] * 9, "falhados": []}, {"feitos": ["a"] * 9, "falhados": []}):
+        assert sp_fila.limite(estado, noon) is None
+
+
 def test_cli_dry_run_mostra_ordem_e_exclusoes(tmp_path, capsys):
     make_sp(tmp_path, "um", priority="P1")
     make_sp(tmp_path, "man", modo="manual")
