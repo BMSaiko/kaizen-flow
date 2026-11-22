@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 
 import sp_fila_execucao
-from sp_fila_testlib import _estado, _pid_morto, _runner, make_sp, sp_fila
+from sp_fila_testlib import _estado, _pid_morto, make_sp, sp_fila
 import contextlib
 
 
