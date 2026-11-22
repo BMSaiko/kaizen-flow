@@ -174,6 +174,18 @@ def _texto_retoma(slug, ponto, fase, from_fase, antes):
     return texto
 
 
+def _recomecar(raiz, slug, confirmar):
+    """--restart: arquiva o estado e recomeça do início (pede confirmação)."""
+    if confirmar is None or not confirmar():
+        return 1, _msg("--restart não confirmado", "arquivar o estado pede confirmação explícita (EOF vale não)",
+                       "nada alterado (EC-001)", f"`kaizen resume {slug} --restart --sim`", "EC-006")
+    destino = _arquivar(raiz, slug)
+    if destino is None:
+        return 1, _msg(f"SP {slug} sem estado a arquivar", "não há checkpoint nem journal em .kaizen/estado",
+                       "nada alterado (EC-001)", "`kaizen resume` lista os SPs com estado", "EC-050")
+    return 0, f"recomeçado do início em {FASES[0]}; estado anterior arquivado em {destino} (UC-032)"
+
+
 def resume(raiz, slug, from_fase=None, restart=False, confirmar=None, agora=None, painel_root=None):
     """Devolve (rc, mensagem). `confirmar` é um callable sem argumentos (True = confirmado)."""
     erro = _pedido_invalido(slug, from_fase, restart)
@@ -188,14 +200,7 @@ def resume(raiz, slug, from_fase=None, restart=False, confirmar=None, agora=None
         return 1, _msg(f"SP {slug} em pausa até {p[1]}", p[0], "checkpoint e journal intactos",
                        f"esperar até {p[1]} (a fila retoma sozinha se o painel estiver vivo) e `kaizen resume {slug}`", ec)
     if restart:
-        if confirmar is None or not confirmar():
-            return 1, _msg("--restart não confirmado", "arquivar o estado pede confirmação explícita (EOF vale não)",
-                           "nada alterado (EC-001)", f"`kaizen resume {slug} --restart --sim`", "EC-006")
-        destino = _arquivar(raiz, slug)
-        if destino is None:
-            return 1, _msg(f"SP {slug} sem estado a arquivar", "não há checkpoint nem journal em .kaizen/estado",
-                           "nada alterado (EC-001)", "`kaizen resume` lista os SPs com estado", "EC-050")
-        return 0, f"recomeçado do início em {FASES[0]}; estado anterior arquivado em {destino} (UC-032)"
+        return _recomecar(raiz, slug, confirmar)
     estado_p, jp = sp_journal.caminhos(raiz, slug)
     if not estado_p.exists() and not jp.exists():
         return 1, _msg(f"SP {slug} sem estado a retomar", "não há checkpoint nem journal em .kaizen/estado",
