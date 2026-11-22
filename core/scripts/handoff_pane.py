@@ -242,6 +242,18 @@ def send_confirmed(pane, text, text_argv, key_argv, screen, run=run_hidden, slee
     raise HandoffError(f"painel {pane}: o Enter não submeteu {text!r}")
 
 
+BUSY = "esc to interrupt"  # linha de estado do Claude Code enquanto o turno corre (o Enter só enfileirava o /clear)
+IDLE_TIMEOUT = 180.0
+
+
+def wait_idle(pane, screen, sleep=time.sleep, timeout=IDLE_TIMEOUT, step=2.0):
+    """Espera que o Claude Code acabe o turno (hooks Stop incluídos) antes de escrever; esgotado o tempo, segue."""
+    waited = 0.0
+    while waited < timeout and BUSY in screen(pane):
+        sleep(step)
+        waited += step
+
+
 def send_lines(lines, pane, text_argv, key_argv, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=run_hidden,
                sleep=time.sleep, inspect=None, screen=None):
     """Espera `delay`, confere o prompt (`inspect`) e envia cada linha de `lines` com Enter, com `gap` entre elas.
@@ -257,6 +269,8 @@ def send_lines(lines, pane, text_argv, key_argv, delay=SEND_DELAY, gap=SEND_GAP,
         run(key_argv(pane), check=True)
 
     sleep(delay)
+    if screen:
+        wait_idle(pane, screen, sleep)
     if inspect:
         inspect(pane)
     for n, text in enumerate(lines):
