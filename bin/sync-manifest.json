@@ -65,6 +65,10 @@
     "tab-title.py",
     "test_tab_title.py"
   ],
+  "dirs": [
+    "scripts/fixtures/par-watch",
+    "scripts/wez-layouts"
+  ],
   "skip": [
     "test_michi_nucleo.py",
     "test_context_guard.py",
