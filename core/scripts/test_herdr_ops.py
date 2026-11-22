@@ -70,3 +70,11 @@ def test_renomear_metadata_foco_fechar():
     o.metadata(p, "kf", "SP x")
     o.fechar(p)
     assert p not in o.agentes() and p not in {x["pane_id"] for x in o.paineis()}
+
+
+def test_workspace_metadata_e_workspace_do_pane():
+    fake = FakeHerdr()
+    ops = HerdrOps(run=fake)
+    ops.workspace_metadata("w1", "sp-fila", "fila 1/3 · 2 vagas")
+    assert ["herdr", "workspace", "report-metadata", "--source", "sp-fila", "--token", "fila=fila 1/3 · 2 vagas", "w1"] in fake.chamadas
+    assert ops.workspace_do_pane("nao-existe") is None

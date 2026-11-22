@@ -14,6 +14,7 @@ class Backend:
     def __init__(self, mortos=()):
         self.mortos = set(mortos)
         self.titulos, self.fechados = {}, []
+        self.agentes = {}
 
     def estado(self, pane):
         return "morto" if pane in self.mortos else "vivo"
@@ -36,7 +37,7 @@ class Ctx(sp_vigia.Contexto):
         self.merges = merges or {}
         self.fim_apos = fim_apos
         self.backend = backend or Backend()
-        self.chamadas, self.toasts, self.notas, self.maes = [], [], [], []
+        self.chamadas, self.notas, self.maes, self.metas, self.logs = [], [], [], [], []
         self.global_existe = True
         self.arrumos = {}
 
@@ -75,8 +76,11 @@ class Ctx(sp_vigia.Contexto):
         self.maes.append(mae)
         return 0, "ok"
 
-    def toast(self, texto):
-        self.toasts.append(texto)
+    def agente_estado(self, pane):
+        return self.backend.agentes.get(pane)
+
+    def metadata(self, texto):
+        self.metas.append(texto)
 
     def nota_relatorio(self, path, texto):
         self.notas.append((path, texto))
@@ -85,7 +89,7 @@ class Ctx(sp_vigia.Contexto):
         return self.global_existe
 
     def log(self, msg):
-        pass
+        self.logs.append(msg)
 
 
 def nomes(ctx):
@@ -107,7 +111,7 @@ def test_done_manual_fica_bloqueado_sem_merge_e_avisa():
     assert ("merge", "a") not in ctx.chamadas
     assert ctx.sps["a"]["estado"] == "bloqueado" and "manual" in ctx.sps["a"]["msg"]
     assert ctx.backend.fechados == []
-    assert ctx.backend.titulos["p-a"] == "! a" and ctx.toasts and "a" in ctx.toasts[0]
+    assert not ctx.backend.titulos and any("aviso bloqueado a" in l for l in ctx.logs)
 
 
 def test_gates_vermelhos_ou_conflito_bloqueiam_com_motivo():
@@ -201,31 +205,63 @@ def test_duas_filas_disputam_o_lock_de_merge():
     assert "seguinte" in nomes(b)
 
 
-def test_avisos_por_transicao_sem_repetir():
+def test_avisos_por_transicao_sem_repetir_e_sem_titulo_nem_toast():
     ctx, mem = Ctx({"a": {"estado": "pergunta"}}), sp_vigia.memoria_nova()
     sp_vigia.passo(ctx, mem)
     sp_vigia.passo(ctx, mem)
-    assert ctx.backend.titulos["p-a"] == "? a" and len(ctx.toasts) == 1
+    assert not ctx.backend.titulos and not hasattr(ctx, "toasts")
+    assert sum("aviso pergunta a" in l for l in ctx.logs) == 1
     ctx.sps["a"]["estado"] = "a-correr"
     sp_vigia.passo(ctx, mem)
-    assert ctx.backend.titulos["p-a"] == "a"
     ctx.sps["a"]["estado"] = "pergunta"
     sp_vigia.passo(ctx, mem)
-    assert len(ctx.toasts) == 2
+    assert sum("aviso pergunta a" in l for l in ctx.logs) == 2
 
 
-def test_falhou_marca_avisa_e_liberta_uma_vez():
+def test_falhou_avisa_e_liberta_uma_vez():
     ctx, mem = Ctx({"a": {"estado": "falhou"}}), sp_vigia.memoria_nova()
     sp_vigia.passo(ctx, mem)
     sp_vigia.passo(ctx, mem)
-    assert ctx.backend.titulos["p-a"] == "x a" and len(ctx.toasts) == 1
+    assert sum("aviso falhou a" in l for l in ctx.logs) == 1
     assert nomes(ctx).count("seguinte") == 1
+
+
+def test_agente_blocked_no_herdr_vira_pergunta_e_volta_a_correr():
+    ctx, mem = Ctx({"a": {"estado": "a-correr"}}), sp_vigia.memoria_nova()
+    ctx.backend.agentes["p-a"] = "blocked"
+    sp_vigia.passo(ctx, mem)
+    assert ctx.sps["a"]["estado"] == "pergunta" and "herdr" in ctx.sps["a"]["msg"]
+    ctx.backend.agentes["p-a"] = "working"
+    sp_vigia.passo(ctx, mem)
+    assert ctx.sps["a"]["estado"] == "a-correr"
+    ctx.backend.agentes["p-a"] = "idle"
+    sp_vigia.passo(ctx, mem)
+    assert ctx.sps["a"]["estado"] == "a-correr"
+
+
+def test_metadata_so_quando_muda():
+    ctx, mem = Ctx({"a": {"estado": "done"}, "b": {"estado": "a-correr"}, "c": {"estado": "pendente"}}), sp_vigia.memoria_nova()
+    sp_vigia.passo(ctx, mem)
+    sp_vigia.passo(ctx, mem)
+    assert len(ctx.metas) >= 1 and len(ctx.metas) == len(set(ctx.metas))
+    assert sp_vigia.texto_fila({"a": {"estado": "done"}, "b": {"estado": "a-correr"}, "c": {"estado": "pergunta"}}) == "fila 1/3 · 1 vagas"
+
+
+def test_correr_espera_pelo_contexto():
+    ctx = Ctx({"a": {"estado": "a-correr"}})
+    esperas = []
+    ctx.esperar = lambda intervalo, dormir: (esperas.append(intervalo), setattr(ctx, "global_existe", False))
+    import os
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        assert sp_vigia.correr(ctx, os.path.join(d, "m.json"), intervalo=7, dormir=lambda s: None) == "fim"
+    assert esperas == [7]
 
 
 def test_bloqueado_nao_chama_seguinte():
     ctx = Ctx({"a": {"estado": "bloqueado"}})
     sp_vigia.passo(ctx, sp_vigia.memoria_nova())
-    assert "seguinte" not in nomes(ctx) and ctx.backend.titulos["p-a"] == "! a"
+    assert "seguinte" not in nomes(ctx) and any("aviso bloqueado a" in l for l in ctx.logs)
 
 
 def test_painel_morto_sem_estado_passa_a_falhou():
@@ -261,7 +297,7 @@ def test_erro_inesperado_num_sp_nao_para_os_outros():
         raise RuntimeError("boom")
     ctx.merge = rebenta
     sp_vigia.passo(ctx, sp_vigia.memoria_nova())
-    assert ctx.backend.titulos["p-b"] == "? b"
+    assert any("aviso pergunta b" in l for l in ctx.logs)
 
 
 def test_pidfile_um_so_vigia(tmp_path):
@@ -289,6 +325,9 @@ class CtxCiclo:
 
     def __init__(self, ticks):
         self.ticks, self.logs = ticks, []
+
+    def esperar(self, intervalo, dormir):
+        dormir(intervalo)
 
     def estado_global(self):
         self.ticks -= 1
@@ -498,7 +537,6 @@ def test_vigia_escalada_relanca_sem_avancar_a_fila():
     ctx, mem = CtxEsc({"a": {"estado": "falhou"}}), sp_vigia.memoria_nova()
     sp_vigia.passo(ctx, mem)
     assert nomes(ctx) == ["escalar"] and mem["escalados"] == ["a"]
-    assert any("escalado simples → default" in t for t in ctx.toasts)
     ctx.sps["a"]["estado"] = "falhou"  # falha de novo no nível novo: a fila avança como hoje
     sp_vigia.passo(ctx, mem)
     assert nomes(ctx) == ["escalar", "seguinte"]
@@ -581,7 +619,7 @@ def test_quota_no_ecra_parado_bloqueia_com_motivo_e_retoma_em():
     sp = ctx.sps["a"]
     assert sp["estado"] == "bloqueado" and sp["motivo"].startswith("EC-016") and sp["retoma_em"] == "2026-11-18T15:00:00"
     assert "retoma automática às 2026-11-18T15:00:00" in sp["msg"]
-    assert ctx.backend.titulos["p-a"].startswith("! ")
+    assert any("aviso bloqueado a" in l for l in ctx.logs)
     sp_vigia.passo(ctx, mem)
     assert ctx.escaladas == []  # pausa de quota não escala de modelo
 
@@ -691,3 +729,21 @@ def test_ec_032_paineis_orfaos_reconciliados_libertam_as_vagas(tmp_path):
     assert {pe.ler(fila, s, root=root)["estado"] for s in ("a", "b")} == {"falhou"}
     assert pe.vagas_livres(root=root) == pe.MAX_PARALELO
     assert ("seguinte", "a") in ctx.chamadas and ("seguinte", "b") in ctx.chamadas
+
+
+def test_contexto_real_herdr_publica_metadata_e_le_agente(tmp_path):
+    from herdr_fake import FakeHerdr
+    fake = FakeHerdr(agente_estado="blocked")
+    backend = painel_backend.HerdrBackend(run=fake)
+    pane = backend._ops.painel_novo("/tmp", None, workspace_por_projeto=False) or next(iter(fake.panes), None)
+    if pane is None:
+        fake(["herdr", "workspace", "create", "--cwd", "/tmp", "--label", "x"])
+        pane = next(iter(fake.panes))
+    fake(["herdr", "pane", "run", pane, "command claude"])
+    ctx = sp_vigia.ContextoReal("f1", tmp_path / "v.log", backend=backend)
+    ctx.ler_fila = lambda: {"sps": {"a": {"slug": "a", "pane": pane, "estado": "a-correr"}}}
+    assert ctx.agente_estado(pane) == "blocked"
+    ctx.metadata("fila 0/1 · 2 vagas")
+    assert any(c[1:4] == ["workspace", "report-metadata", "--source"] and "fila=fila 0/1 · 2 vagas" in c for c in fake.chamadas)
+    ctx.esperar(0.01, lambda s: None)
+    assert any(c[1:3] == ["agent", "wait"] for c in fake.chamadas)

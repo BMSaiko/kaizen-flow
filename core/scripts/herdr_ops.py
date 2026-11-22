@@ -144,6 +144,14 @@ class HerdrOps:
         """Metadata só de apresentação (título); sem efeito no estado."""
         self._exec(["pane", "report-metadata", "--source", fonte, "--title", titulo, str(pane)])
 
+    def workspace_do_pane(self, pane):
+        """workspace_id do painel (None se não aparece em `pane list`)."""
+        return next((p.get("workspace_id") for p in self.paineis() if p.get("pane_id") == str(pane)), None)
+
+    def workspace_metadata(self, workspace, fonte, texto):
+        """Metadata do workspace (`workspace report-metadata`, token `fila`): só apresentação, nunca estado."""
+        self._exec(["workspace", "report-metadata", "--source", fonte, "--token", f"fila={texto}", str(workspace)])
+
     def foco_tab(self, tab):
         self._exec(["tab", "focus", tab])
 
