@@ -130,12 +130,16 @@ def test_lock_sp_corrompido_vai_para_quarentena(tmp_path):
 def test_lock_sp_corrida_de_dois_processos_so_um_ganha(tmp_path):
     """EC-043: duas tentativas simultâneas, exatamente uma entra."""
     codigo = (
-        "import sys, time, sp_disco\n"
+        "import sys, time, pathlib, sp_disco\n"
+        "sinal = pathlib.Path(sys.argv[1], 'recusou.flag')\n"
         "try:\n"
         "    with sp_disco.lock_sp(sys.argv[1], 'sp-a', painel=sys.argv[2]):\n"
-        "        print('ganhou', flush=True); time.sleep(1.5)\n"
+        "        print('ganhou', flush=True)\n"
+        "        limite = time.monotonic() + 10\n"  # segura o lock até o outro ser recusado
+        "        while not sinal.exists() and time.monotonic() < limite:\n"
+        "            time.sleep(0.01)\n"
         "except sp_disco.LockOcupado:\n"
-        "    print('recusado', flush=True)\n"
+        "    print('recusado', flush=True); sinal.touch()\n"
     )
     scripts = os.path.dirname(os.path.abspath(__file__))
     env = {**os.environ, "PYTHONPATH": scripts}
