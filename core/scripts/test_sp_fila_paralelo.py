@@ -158,7 +158,7 @@ def test_concorrencia_1_sp_move_doing_corre_na_worktree_do_filho(tmp_path):
     assert len(moves) == 1
     argv, cwd = moves[0]
     assert Path(cwd) == Path("/wt/sb-a") and Path(argv[2]) == Path("/wt/sb-a") / "scripts" / "sp-move.py"
-    assert str(sys.modules["sp_fila_execucao"].SCRIPTS) not in " ".join(map(str, argv))
+    assert str(sys.modules["sp_fila_estado"].SCRIPTS) not in " ".join(map(str, argv))
 
 
 def test_concorrencia_cheia_espera_e_vaga_lanca_so_uma(tmp_path):
