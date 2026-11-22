@@ -191,6 +191,23 @@ def check_permitir(permitir):
             raise SpNewError(f"permitir proibido ({sp_gates.forbidden(cmd)}): {cmd}")
 
 
+def _listas(**campos):
+    """Linhas «chave: [a, b]» do frontmatter, só para as listas não vazias, pela ordem dada."""
+    return [f"{k}: [{', '.join(v)}]" for k, v in campos.items() if v]
+
+
+def _corpo(slug, today, decisoes, ui):
+    """Corpo do SP: título, secções vazias e, se houver, Decisões e Esboço."""
+    body = [f"# Super Prompt - {slug} ({today.isoformat()})", ""]
+    for title in SECTIONS:
+        body += [f"## {title}", "", ""]
+    if decisoes:
+        body += ["## Decisões", ""] + [f"- {d.strip()}" for d in decisoes] + [""]
+    if ui:
+        body += ["## Esboço", "", "(ASCII ou mermaid do ecrã; o resumo mostra-o)", ""]
+    return body
+
+
 def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None, perfil=None, escopo=(), fora_de_escopo=(), permitir=(), decisoes=(), michi="default", programa=False, ui=False, origem=None):
     root = Path(root)
     check(root, project, slug, priority, modo)
@@ -211,12 +228,7 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
         head.append("execucao:")
     head += [f"{k}: {auth[k]}" for k in ("commit", "push", "pr", "merge", "restricoes") if k in auth]
     head += [f"{k}: {perfil[k]}" for k in ("perfil", "max_tentativas", "max_requests", "escalar") if k in perfil]
-    if "parar_se" in perfil:
-        head.append(f"parar_se: [{', '.join(perfil['parar_se'])}]")
-    if escopo:
-        head.append(f"escopo: [{', '.join(escopo)}]")
-    if fora_de_escopo:
-        head.append(f"fora_de_escopo: [{', '.join(fora_de_escopo)}]")
+    head += _listas(parar_se=perfil.get("parar_se"), escopo=escopo, fora_de_escopo=fora_de_escopo)
     if gates:
         head.append("gates:")
         head += [f"  - cmd: {g.strip()}" for g in gates]
@@ -231,16 +243,9 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
         head.append(f"origem: {origem.strip()}")
     if parent:
         head.append(f"parent: {parent}")
-    if depends_on:
-        head.append(f"depends_on: [{', '.join(depends_on)}]")
+    head += _listas(depends_on=depends_on)
     head.append("---")
-    body = [f"# Super Prompt - {slug} ({today.isoformat()})", ""]
-    for title in SECTIONS:
-        body += [f"## {title}", "", ""]
-    if decisoes:
-        body += ["## Decisões", ""] + [f"- {d.strip()}" for d in decisoes] + [""]
-    if ui:
-        body += ["## Esboço", "", "(ASCII ou mermaid do ecrã; o resumo mostra-o)", ""]
+    body = _corpo(slug, today, decisoes, ui)
     path = root / project / "sp" / "TODO" / f"{slug}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(head + body), encoding="utf-8")
