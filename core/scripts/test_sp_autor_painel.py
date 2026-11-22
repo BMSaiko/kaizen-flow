@@ -284,3 +284,11 @@ def test_ec_022_prompt_nao_submetido_mantem_a_semente_e_permite_relancar(modelos
     res = sa.lancar(sp_vazio, s, ok, cwd=tmp_path, estado_root=root, sleep=lambda x: None)
     assert res["estado"] == "a-correr" and len(ok.abertos) == 1
     assert any(str(s) in texto for _, texto in ok.enviados)
+
+
+def test_main_fechar_nao_rebenta_com_import_local(monkeypatch, capsys):
+    """Regressão: `import painel_backend` dentro de main tornava o nome local e o --fechar dava UnboundLocalError."""
+    monkeypatch.setattr(sa.painel_backend, "escolher_por_config", lambda b: FakeBackend())
+    monkeypatch.setattr(sa, "fechar", lambda *a, **k: "ok")
+    assert sa.main(["--fechar", "x-2026-11-22", "--papel", "revisor"]) in (0, None)
+    assert "fechar · ok" in capsys.readouterr().out

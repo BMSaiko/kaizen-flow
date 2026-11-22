@@ -101,6 +101,18 @@ def _mae_na_worktree(mae, run):
     return wt / rel
 
 
+def _doing_sequencial(root, alvo, run):
+    """Sequencial sem painel: no repo, `ensure` e Doing só na worktree do SP (o checkout principal fica só leitura);
+    fora do repo (testes) o `sp-move` do root. Devolve (argv do sp-move, caminho do Doing)."""
+    doing = alvo.path.parent.parent / "Doing" / alvo.path.name
+    try:
+        rel = Path(doing).resolve().relative_to(REPO.resolve())
+    except ValueError:
+        return [sys.executable, "-I", str(SCRIPTS / "sp-move.py"), "--root", str(root), "--project", alvo.project, alvo.slug, "doing"], doing
+    wt = Path(sp_fila_paineis._ensure(alvo.slug, run))
+    return sp_fila_paineis.sp_move_na_worktree(root, wt, alvo), wt / rel
+
+
 def _lancar(alvo, doing, estado, paralelo, backend, run, root):
     """Lança o filho (painel ou sp-handoff); devolve (erro|None, item|None)."""
     erro, item = None, None
@@ -112,9 +124,12 @@ def _lancar(alvo, doing, estado, paralelo, backend, run, root):
         if item["estado"] == "falhou":
             erro = item["msg"]
     else:
-        r = run([sys.executable, "-I", str(SCRIPTS / "sp-move.py"), "--root", str(root), "--project", alvo.project, alvo.slug, "doing"],
-                capture_output=True, text=True, encoding="utf-8")
-        if r.returncode != 0:
+        try:
+            cmd, doing = _doing_sequencial(root, alvo, run)
+        except RuntimeError as e:
+            cmd, erro = None, f"erro a lançar {alvo.slug}: {e}"
+        r = run(cmd, capture_output=True, text=True, encoding="utf-8") if cmd else None
+        if r is not None and r.returncode != 0:
             erro = f"erro a lançar {alvo.slug}: {(r.stderr or r.stdout).strip()}"
         if not erro:
             r = run([sys.executable, "-I", str(SCRIPTS / "sp-handoff.py"), "--launch", str(doing), "--auto"], capture_output=True, text=True, encoding="utf-8")

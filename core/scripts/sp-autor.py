@@ -198,7 +198,6 @@ def main(argv=None):
         return 0
     if args.avisar:
         try:
-            import painel_backend
             print(f"{chave(args.avisar)} · aviso · {avisar(args.avisar, painel_backend.escolher_por_config(args.backend), sp=args.sp)}")
         except Exception as e:  # noqa: BLE001 — falhar a avisar nunca muda o resultado do sp-autor
             print(f"aviso falhou (ignorado): {e}", file=sys.stderr)
@@ -212,7 +211,6 @@ def main(argv=None):
         if args.dry_run:
             print(f"{titulo(slug_de(args.sp))} · {' '.join(comando())} · {args.cwd}\n{prompt(args.sp, args.semente)}")
             return 0
-        import painel_backend
         backend = painel_backend.escolher_por_config(args.backend)
         res = lancar(args.sp, args.semente, backend, args.cwd, run=painel_backend.run_hidden)
     except (SpAutorErro, modelos.ModelosError, pe.ErroEstado) as e:
