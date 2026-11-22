@@ -21,7 +21,6 @@ from painel_backend import run_hidden  # noqa: E402
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 import painel_backend as pb  # noqa: E402
 import sp_painel_estado as pe  # noqa: E402

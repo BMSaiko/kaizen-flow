@@ -20,7 +20,6 @@ from painel_backend import run_hidden, run_visivel  # noqa: E402
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kf_git  # noqa: E402
 import sp_leitura  # noqa: E402
 

@@ -24,7 +24,6 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 import modelos  # noqa: E402
 import sp_painel_estado as pe  # noqa: E402
 from review_ciclo import CHECKLISTS, checklist  # noqa: E402
