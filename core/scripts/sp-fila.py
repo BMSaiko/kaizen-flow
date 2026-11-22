@@ -47,6 +47,9 @@ import sp_fila_paineis  # noqa: E402
 import sp_vigia  # noqa: E402
 import kf_erros  # noqa: E402
 import contextlib
+import time
+
+ORFA_MIN = 10  # fila sem vigia.pid mais nova do que isto: arranque a meio, não é órfã
 
 
 def _erro(ec, oque, porque, estado, proximo):
@@ -123,13 +126,36 @@ def _limpar_paineis(fid):
         print(f"aviso: fila de painéis {fid} não removida: {e}", file=sys.stderr)
 
 
-def vigia_vivo(atual):
+def filas_orfas(root=None):
+    """Filas de painéis sem programa (`fila-*`) com o vigia morto: ninguém as fecha e o arranque seguinte reata-as.
+
+    Ficam intactas: filas de outros donos (mães, `sp-autor`), com vigia vivo ou ilegível, com SP ativo
+    (`a-correr`/`pergunta`) e filas sem `vigia.pid` criadas há menos de `ORFA_MIN` min (arranque a meio)."""
+    pe = sp_fila_paineis.pe
+    r = pe.raiz(root)
+    out = []
+    for d in sorted(r.glob("fila-*/fila.json")) if r.is_dir() else []:
+        fid = d.parent.name
+        if vigia_vivo({"fila_paineis": fid}, root=root):
+            continue
+        try:
+            if any(sp.get("estado") in pe.ATIVOS for sp in pe.ler(fid, root=root)["sps"].values()):
+                continue
+            if not sp_vigia.caminhos(d.parent)[0].exists() and time.time() - d.stat().st_mtime < ORFA_MIN * 60:
+                continue
+        except Exception:  # noqa: BLE001  # fila ilegível: dúvida = viva
+            continue
+        out.append(fid)
+    return out
+
+
+def vigia_vivo(atual, root=None):
     """True se o vigia da fila de painéis do estado vive ou se não dá para saber (dúvida = fila viva)."""
     fid = (atual or {}).get("fila_paineis")
     if not fid:
         return False
     try:
-        pidfile = sp_vigia.caminhos(sp_fila_paineis.pe.raiz() / fid)[0]
+        pidfile = sp_vigia.caminhos(sp_fila_paineis.pe.raiz(root) / fid)[0]
         if not Path(pidfile).exists():
             return False
         return bool(sp_fila_paineis.pe.pid_vivo(int(Path(pidfile).read_text(encoding="utf-8").strip())))
@@ -233,6 +259,9 @@ def _cmd_parar(args, estado):
     except ValueError:  # corrompido: abandonar na mesma
         pass
     _limpar_paineis(fid)
+    for orfa in filas_orfas():
+        print(f"fila de painéis órfã removida: {orfa}")
+        _limpar_paineis(orfa)
     estado.unlink(missing_ok=True)
     print("fila abandonada")
     return 0
@@ -406,6 +435,8 @@ def main(argv=None):
     if rc is not None:
         return rc
     so = descendentes(items, args.programa) if args.programa else None
+    if not (args.programa or args.concorrencia or args.seguinte or args.dry_run) and sp_fila_execucao._backend_defeito() is not None:
+        args.concorrencia = 1  # sequencial em painel: worktree, Doing só lá e vigia, como o paralelo (nunca no checkout)
     if args.dry_run:
         return _cmd_dry_run(args, items, so, estado)
     rc = _preparar_estado(args, estado, mae, modo, so)
