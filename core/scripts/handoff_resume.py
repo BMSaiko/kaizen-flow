@@ -51,7 +51,7 @@ def hook(stdin_text, folder, now=None):
         data = {}
     if data.get("source", "startup") not in SOURCES:
         return ""
-    ctx = " ".join(p for p in (build_context(pending(folder, now)), loop_estado.ordem_retoma(now=now)) if p)
+    ctx = " ".join(p for p in (build_context(pending(folder, now)), loop_estado.ordem_retoma(now=now, session_id=data.get("session_id"))) if p)
     if not ctx:
         return ""
     return json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ctx}},
