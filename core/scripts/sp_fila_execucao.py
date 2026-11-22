@@ -175,7 +175,7 @@ def _registar_lancamento(estado, alvo, erro, item, agora, lancados, itens):
         return erro
     registar_sessao(estado, alvo.slug, agora.isoformat(timespec="seconds"), requests=REQ_POR_SP,
                     **({"worktree": item["worktree"], "painel": True} if item else {}))
-    estado["usados"] += REQ_POR_SP
+    estado["usados"] = estado.get("usados", 0) + REQ_POR_SP
     lancados.append(alvo)
     if item:
         itens.append(item)

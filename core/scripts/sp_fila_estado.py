@@ -52,6 +52,18 @@ def _fila_de_paineis(path):
         return False
 
 
+def da_fila_paineis(fila, base=None, legado=None):
+    """Estado da fila-mãe (`sp-fila`) cuja `fila_paineis` é `fila`; None se a fila de painéis não tem mãe."""
+    legado = Path(legado or ESTADO)
+    for c in estados_existentes(base) + ([legado] if legado.exists() else []):
+        try:
+            if ler(c).get("fila_paineis") == fila:
+                return c
+        except (OSError, ValueError):
+            continue
+    return None
+
+
 def localizar(slug=None, base=None, legado=None):
     """Estado onde está o SP `slug` (em `sessoes`); sem slug, o único existente; None se não há ou é ambíguo."""
     legado = Path(legado or ESTADO)

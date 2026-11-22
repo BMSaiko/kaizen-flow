@@ -170,8 +170,8 @@ def limite(estado, agora, custo=0.0):
             return f"orçamento de tempo esgotado ({gastas:.1f}/{estado['horas']} h)"
     if estado.get("usd") is not None and custo >= estado["usd"]:
         return f"orçamento de custo esgotado ({custo:.2f}/{estado['usd']} USD)"
-    if estado.get("orcamento") is not None and estado["usados"] + REQ_POR_SP > estado["orcamento"]:
-        return f"orçamento de requests esgotado ({estado['usados']}/{estado['orcamento']})"
+    if estado.get("orcamento") is not None and estado.get("usados", 0) + REQ_POR_SP > estado["orcamento"]:
+        return f"orçamento de requests esgotado ({estado.get('usados', 0)}/{estado['orcamento']})"
     return None
 
 

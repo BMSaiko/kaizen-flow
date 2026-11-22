@@ -391,11 +391,24 @@ def test_cli_erro_fatal_vai_para_o_log(tmp_path, monkeypatch):
     assert not (tmp_path / "f1" / "vigia.pid").exists()
 
 
-def test_contexto_real_usa_o_estado_da_fila(tmp_path):
+def test_contexto_real_usa_o_estado_da_mae(tmp_path, monkeypatch):
+    """O estado do `seguinte` é o da fila-mãe (`fila_paineis` == fila), nunca o fila.json dos painéis."""
+    import json
     import sp_fila_estado as fe
+    monkeypatch.setattr(fe, "ESTADOS_DIR", tmp_path / "sp-fila")
+    monkeypatch.setattr(fe, "ESTADO", tmp_path / "legado.json")
+    paineis = tmp_path / "sp-fila" / "fila-x" / "fila.json"
+    paineis.parent.mkdir(parents=True)
+    paineis.write_text(json.dumps({"fila": "fila-x", "sessoes": {}}), encoding="utf-8")
     c = sp_vigia.ContextoReal("fila-x", tmp_path / "v.log", backend=object())
-    assert c.estado_path == fe.estado_de("fila-x")
-    assert c.estado_path != fe.ESTADO
+    assert c.estado_path is None and c.estado_global()
+    assert c.seguinte("a") == {"acao": "erro"}
+    fe.ESTADO.write_text(json.dumps({"fila_paineis": "fila-x", "sessoes": {}}), encoding="utf-8")
+    assert c.estado_path == fe.ESTADO
+    mae = tmp_path / "sp-fila" / "mae" / "fila.json"
+    mae.parent.mkdir()
+    mae.write_text(json.dumps({"fila_paineis": "fila-y", "max": 3}), encoding="utf-8")
+    assert sp_vigia.ContextoReal("fila-y", tmp_path / "v.log", backend=object()).estado_path == mae
 
 
 # --- escalada de modelo (sp_escalada) ------------------------------------------------------------
