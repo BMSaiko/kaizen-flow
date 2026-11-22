@@ -38,7 +38,6 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 import painel_backend  # noqa: E402
 from handoff_pane import (ENTER_GAP, SEND_DELAY, SEND_GAP, HandoffError, _argvs, _copy, check_prompt,  # noqa: E402,F401
