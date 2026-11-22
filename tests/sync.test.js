@@ -6,7 +6,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const { plan, overlay, SKILLS } = require("../bin/sync.js");
+const { plan, overlay, SKILLS, MANIFEST } = require("../bin/sync.js");
 
 const KZ = path.join(__dirname, "..", "bin", "kaizen.js");
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-sync-"));
@@ -17,7 +17,8 @@ function fakeVault() {
   for (const s of SKILLS) put(v, `.claude/skills/${s}/SKILL.md`);
   for (const c of ["sp", "sp-list", "sp-handoff", "handoff"]) put(v, `.claude/commands/${c}.md`);
   put(v, ".claude/modelos.json", "{}");
-  for (const s of ["conftest", "context-guard", "da-stop", "context-budget", "handoff", "handoff_pane", "handoff_spawn", "handoff_resume", "test_handoff_autoconsumo", "modelos", "michi_handoff_auto", "test_michi_handoff_auto", "painel_backend", "wez", "test_wez", "open-doc", "sp_progresso", "skill-cut", "auto_commit", "kaizen_config", "kaizen_engine", "kaizen_hooks", "wt_redirect", "kf_ligados", "kf_painel_hook", "test_kf_painel_hook", "kf_term_ls", "test_kf_term_ls", "kf_term_arranque", "test_kf_term_arranque", "kf_term_limpar", "test_kf_term_limpar", "kf_term_orq", "test_kf_term_orq", "kf_errlog", "test_kf_errlog", "kf_git", "test_kf_git", "kf_erros", "test_kf_erros_formato", "pentest", "test_pentest", "review_ciclo", "test_review_ciclo", "pr_corpo", "test_pr_corpo", "pr_watch", "test_pr_watch", "pr_fechar", "test_pr_fechar", "test_kaizen_engine", "test_kaizen_hooks", "test_michi_tree_close", "sp-autor", "test_sp_autor_painel", "test_handoff_socket", "michi-checkpoint", "test_michi_checkpoint", "plan-validate", "test_plan_validate", "dr-check", "test_dr_check", "tab-title", "test_tab_title", "sp-list", "sp-move"]) put(v, `scripts/${s}.py`);
+  for (const n of MANIFEST.scriptNames) put(v, `scripts/${n}`);
+  for (const d of MANIFEST.dirs) put(v, `${d}/x.txt`);
   return v;
 }
 
@@ -325,4 +326,13 @@ test("core/ guarda marcadores e loadCore renderiza-os (defeitos neutros sem conf
   assert.strictEqual(neutral["x.bin"], "{{userName}}");
   const own = loadCore(c, { agentName: "ODIN", userName: "AC", agentSlug: "odin" });
   assert.strictEqual(own.find((f) => f.rel === "skills/a/SKILL.md").data.toString(), "ODIN e AC em odin/");
+});
+
+test("pasta listada em dirs é copiada pelo plan e reconhecida por owns", () => {
+  const { owns } = require("../bin/sync.js");
+  const v = fakeVault();
+  const d = MANIFEST.dirs[0];
+  assert.ok(plan(v).parts.some((p) => p[1] === d));
+  assert.ok(owns(`${d}/x.txt`));
+  assert.ok(!owns("scripts/outra-pasta/x.txt"));
 });
