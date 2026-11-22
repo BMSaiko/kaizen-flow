@@ -6,8 +6,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const BIN = path.join(__dirname, "..", "bin", "kaizen.js");
-const { kaizen } = require("./helpers/sandbox");
+const { BIN, kaizen } = require("./helpers/sandbox");
 const run = (...a) => kaizen(a);
 
 test("term --help lista ls|fila|michi|limpar|retomar|orq", () => {
