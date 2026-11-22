@@ -108,7 +108,13 @@ def plan(items, maximo=None, so=None, por_commitar=()):
         fila.append(sp)
         feitos.add(sp.slug)
 
-    resto = {s: sp for s, sp in cand.items() if s not in feitos}
+    excluidos += _motivos_resto({s: sp for s, sp in cand.items() if s not in feitos}, feitos)
+    return (fila[:maximo] if maximo else fila), sorted(excluidos)
+
+
+def _motivos_resto(resto, feitos):
+    """[(slug, motivo)] dos candidatos que não entraram na fila: dependência em falta (direta ou herdada) ou ciclo."""
+    excluidos = []
     bloqueados = {s: [d for d in sp.depends_on if d not in feitos and d not in resto] for s, sp in resto.items()}
     bloqueados = {s: ds for s, ds in bloqueados.items() if ds}
     mudou = True
@@ -122,7 +128,7 @@ def plan(items, maximo=None, so=None, por_commitar=()):
             excluidos.append((s, f"dependência em falta ({', '.join(bloqueados[s])})"))
         else:
             excluidos.append((s, "ciclo de dependências"))
-    return (fila[:maximo] if maximo else fila), sorted(excluidos)
+    return excluidos
 
 
 def falhas(estado):
