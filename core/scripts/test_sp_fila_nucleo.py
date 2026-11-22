@@ -114,7 +114,12 @@ def test_status_lista_filas(tmp_path, monkeypatch, capsys):
     assert "a" in capsys.readouterr().out
 
 
-def test_motor_antigo_continua_por_omissao(tmp_path, monkeypatch):
+def test_motor_defeito_herdr_com_fallback():
+    assert nucleo.motor_defeito(which=lambda _: "/usr/bin/herdr") == "herdr"
+    assert nucleo.motor_defeito(which=lambda _: None) == "antigo"
+
+
+def test_motor_antigo_ainda_escolhivel(tmp_path):
     nucleo.MOTOR_ATUAL = "herdr"
-    sp_fila.main(["--dry-run", "--root", str(tmp_path / "sps"), "--estado", str(tmp_path / "e.json")])
+    sp_fila.main(["--motor", "antigo", "--dry-run", "--root", str(tmp_path / "sps"), "--estado", str(tmp_path / "e.json")])
     assert nucleo.MOTOR_ATUAL == "antigo"

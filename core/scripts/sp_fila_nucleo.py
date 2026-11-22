@@ -7,6 +7,7 @@ reconcilia o estado com os painéis vivos do herdr (re-adota vivos, marca mortos
 Uso: módulo importado por sp-fila.py; sem execução direta
 rc: n/a
 """
+import shutil
 import sys
 from pathlib import Path
 
@@ -18,6 +19,11 @@ import sp_painel_estado as pe  # noqa: E402
 SUBCOMANDOS = ("run", "status", "watch", "stop", "resume", "gastos")
 MOTORES = ("herdr", "antigo")
 MOTOR_ATUAL = "antigo"  # fixado por sp-fila.py a cada arranque
+
+
+def motor_defeito(which=shutil.which):
+    """`herdr` se o CLI existir; senão `antigo` (fallback mínimo: WezTerm/tmux/background da config)."""
+    return "herdr" if which("herdr") else "antigo"
 HERDR_RUN = None  # os testes trocam-no pelo FakeHerdr; None = CLI real
 RUN = None  # idem para o `run` do `seguinte` (worktree, git, sp-move)
 

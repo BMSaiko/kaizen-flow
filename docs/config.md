@@ -115,3 +115,5 @@ Layout of the herdr backend (herdr is also picked by `auto`, before WezTerm and 
 | `workspacePorProjeto` | `true` | each repo gets one herdr workspace (label = repo name, reused if it exists, created otherwise); a git worktree uses the workspace of its main repo. `false` keeps the launching pane's workspace |
 
 Invalid values (non-integer or below 1, non-boolean) fall back to the defaults.
+
+End-to-end check of the herdr engine (isolated herdr session, 2 projects, 3 panes, cap and resume; never touches the default session): `python -I core/scripts/herdr-e2e-multiprojeto.py --isolado`.

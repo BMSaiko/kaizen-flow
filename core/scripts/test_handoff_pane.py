@@ -134,6 +134,14 @@ def test_send_lines_com_screen_confirma_cada_linha():
     assert p.enters == 3  # 1.ª linha: Enter perdido + reenvio; 2.ª linha: um Enter (o contador perdido já passou)
 
 
+def test_wait_idle_espera_pelo_fim_do_turno():
+    ecras = iter(["⏵⏵ auto · esc to interrupt", "⏵⏵ auto · esc to interrupt", "❯ "])
+    dormiu = []
+    hp.wait_idle(1, lambda p: next(ecras), sleep=dormiu.append)
+    assert len(dormiu) == 2
+    hp.wait_idle(1, lambda p: "esc to interrupt", sleep=lambda s: None, timeout=4)  # esgota e segue
+
+
 def test_pane_exists_e_check_prompt_com_run_falso():
     run = lambda *a, **k: _Res('[{"pane_id": 4}]')  # noqa: E731
     hp.pane_exists(4, run=run)

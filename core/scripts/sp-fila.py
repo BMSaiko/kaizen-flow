@@ -36,7 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # Módulos irmãos (a CLI e os testes continuam a ver tudo aqui): estado, plano, relatório, execução, painéis.
 from sp_fila_estado import (MAX_DEFEITO, MAX_FALHAS_DEFEITO, ORCAMENTO, REQ_POR_SP, RELATORIOS, ESTADO, USER,  # noqa: E402,F401
                             atualizar, bloqueio, guardar, ler, migrar, run_hidden)
-from sp_fila_plano import descendentes, limite, load, plan, render_plan, sem_commit, sp_list  # noqa: E402,F401
+from sp_fila_plano import descendentes, limite_paralelo, load, plan, render_plan, sem_commit, sp_list  # noqa: E402,F401
 from sp_fila_relatorio import gastos, relatorio, render_gastos  # noqa: E402,F401
 from sp_fila_execucao import (_custos, _ler_sp,  # noqa: E402,F401
                               seguinte, IntegracaoPendente, SlugObrigatorio)
@@ -217,7 +217,7 @@ def _parser():
     ap.add_argument("--orcamento", type=int, default=ORCAMENTO, help=f"teto opcional de requests totais; cada SP gasta {REQ_POR_SP} (sem ele, sem limite)")
     ap.add_argument("--max-falhas", type=int, default=MAX_FALHAS_DEFEITO, metavar="N", help=f"para a fila após N SPs falhados seguidos (defeito {MAX_FALHAS_DEFEITO}; 0 = sem este limite)")
     ap.add_argument("--projeto")
-    ap.add_argument("--motor", choices=nucleo.MOTORES, default="antigo", help="motor de painéis: `antigo` (config) ou `herdr` (núcleo novo sobre herdr_ops)")
+    ap.add_argument("--motor", choices=nucleo.MOTORES, default=nucleo.motor_defeito(), help="motor de painéis: `herdr` (defeito se o CLI existir) ou `antigo` (fallback: WezTerm/tmux/background da config)")
     ap.add_argument("--programa", metavar="SLUG", help="só a árvore deste SP-mãe; orçamento lido do frontmatter dela")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     ap.add_argument("--estado", default=str(ESTADO), help=argparse.SUPPRESS)
@@ -487,8 +487,8 @@ def main(argv=None):
     if rc is not None:
         return rc
     so = descendentes(items, args.programa) if args.programa else None
-    if not (args.programa or args.concorrencia or args.seguinte or args.dry_run) and sp_fila_execucao._backend_defeito() is not None:
-        args.concorrencia = 1  # sequencial em painel: worktree, Doing só lá e vigia, como o paralelo (nunca no checkout)
+    if not (args.programa or args.concorrencia or args.seguinte or args.dry_run):
+        args.concorrencia = 1  # sempre em painel: worktree, Doing só lá e vigia (nunca no checkout)
     if args.dry_run:
         return _cmd_dry_run(args, items, so, estado)
     rc = _preparar_estado(args, estado, mae, modo, so)
