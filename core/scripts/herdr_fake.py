@@ -60,7 +60,7 @@ class FakeHerdr:
             if "command claude" in a[3]:
                 self.agentes[a[2]] = {"pane_id": a[2], "agent": "claude", "agent_status": self.agente_estado, "completion_seq": 0}
             return {"type": "ok"}
-        if (g, c) in (("pane", "rename"), ("pane", "report-metadata"), ("tab", "focus")):
+        if (g, c) in (("pane", "rename"), ("pane", "report-metadata"), ("workspace", "report-metadata"), ("tab", "focus")):
             return {"type": "ok"}
         if (g, c) == ("pane", "close"):
             self.panes.pop(a[2], None)

@@ -2,12 +2,15 @@
 
 `passo(ctx, mem)` é um tick: `done` de SP auto → merge (lock global do `sb-agent`), fecha o painel, limpa a worktree e
 lança o seguinte; SP manual, gates vermelhos ou conflito → `bloqueado` com motivo; `pergunta`/`bloqueado`/`falhou` →
-título `? `/`! `/`x ` + toast, um por transição; painel morto sem estado → `falhou`. `falhou`/`bloqueado` por gate com
+log, um por transição (sem toasts nem prefixos de título: o herdr avisa por si); painel morto sem estado → `falhou`;
+agente herdr `blocked` → `pergunta` (e de volta a `a-correr` quando volta a trabalhar). Cada tick publica «fila n/N · vagas»
+como metadata do workspace e a espera entre ticks acorda por evento do herdr (`agent wait`). `falhou`/`bloqueado` por gate com
 nível de modelo acima → relançado uma vez nesse nível (`sp_escalada`), sem avançar a fila. Devolve "continua" ou "fim".
 Os efeitos vivem no `Contexto` (o real é `ContextoReal`; os testes trocam-no).
 
 Uso: módulo importado por sp-vigia.py; sem execução direta
 rc: sem execução direta"""
+import contextlib
 import hashlib
 import os
 import subprocess
@@ -21,7 +24,9 @@ from painel_backend import popen_sem_janela, run_hidden  # noqa: E402
 from sp_disco import guardar, ler_json  # noqa: E402
 import kf_erros  # noqa: E402
 
-MARCAS = {"pergunta": "? ", "bloqueado": "! ", "falhou": "x "}
+AVISAM = ("pergunta", "bloqueado", "falhou")
+MAX_PARALELO = 3
+ESPERA_MIN = 1.0  # um evento já «em curso» (agente blocked) não pode fazer girar o ciclo
 LOCK_OCUPADO = "outro merge em curso"
 INTERVALO = 10.0
 ECRA_LINHAS = 15  # cauda do ecrã lida para quota/rede/sessão (o resto é histórico)
@@ -74,13 +79,23 @@ class Contexto:
     def clean(self, slug): raise NotImplementedError
     def seguinte(self, slug): raise NotImplementedError
     def fechar_mae(self, mae): raise NotImplementedError
-    def toast(self, texto): raise NotImplementedError
     def nota_relatorio(self, path, texto): raise NotImplementedError
     def estado_global(self): raise NotImplementedError
     def log(self, msg): raise NotImplementedError
 
     def agora(self):
         return datetime.now()
+
+    def agente_estado(self, pane):
+        """Estado do agente no painel segundo o multiplexer (herdr: idle/working/blocked/done); None se não sabe."""
+        return  # noqa: RET501
+
+    def metadata(self, texto):
+        """Publica `texto` como metadata do workspace (herdr); sem efeito nos outros backends."""
+
+    def esperar(self, intervalo, dormir):
+        """Pausa entre ticks; o contexto real acorda mais cedo por evento do herdr."""
+        dormir(intervalo)
 
     def pausar(self, slug, msg, motivo, retoma_em):
         """SP a-correr → bloqueado por quota/rede/sessão, com `motivo` e `retoma_em` (o contexto real grava os campos)."""
@@ -104,21 +119,30 @@ def _seguro(ctx, f, *a):
 
 
 def _avisar(ctx, mem, sp):
-    slug, estado, pane = sp["slug"], sp.get("estado"), sp.get("pane")
+    """Uma linha de log por transição para pergunta/bloqueado/falhou (o aviso ao utilizador é nativo do herdr)."""
+    slug, estado = sp["slug"], sp.get("estado")
     if mem["avisos"].get(slug) == estado:
         return
-    marca = MARCAS.get(estado)
-    if marca is None:  # voltou a correr: título limpo, aviso seguinte volta a sair
-        if slug in mem["avisos"] and pane:
-            _seguro(ctx, ctx.backend.titulo, pane, slug)
+    if estado not in AVISAM:  # voltou a correr: a próxima transição volta a registar-se
         mem["avisos"].pop(slug, None)
         return
-    if pane:
-        _seguro(ctx, ctx.backend.titulo, pane, marca + slug)
-    msg = sp.get("msg")
-    _seguro(ctx, ctx.toast, f"{marca}{slug}" + (f": {msg}" if msg else ""))
     mem["avisos"][slug] = estado
-    ctx.log(f"aviso {estado} {slug}")
+    msg = sp.get("msg")
+    ctx.log(f"aviso {estado} {slug}" + (f": {msg}" if msg else ""))
+
+
+def texto_fila(sps):
+    """«fila n/N · v vagas»: SPs done sobre o total e vagas livres do teto global."""
+    estados = [sp.get("estado") for sp in sps.values()]
+    ativos = sum(1 for e in estados if e in ("a-correr", "pergunta"))
+    return f"fila {sum(1 for e in estados if e == 'done')}/{len(estados)} · {max(MAX_PARALELO - ativos, 0)} vagas"
+
+
+def _publicar(ctx, mem, sps):
+    texto = texto_fila(sps)
+    if mem.get("meta") != texto:
+        mem["meta"] = texto
+        _seguro(ctx, ctx.metadata, texto)
 
 
 def _fim(ctx, res):
@@ -223,9 +247,21 @@ def _retomar_pausa(ctx, mem, sp):
         return False
     mem.setdefault("ecras", {}).pop(sp["slug"], None)
     mem["avisos"].pop(sp["slug"], None)
-    _seguro(ctx, ctx.backend.titulo, pane, sp["slug"])
     ctx.log(f"retoma {sp['slug']}: {RETOMA_TEXTO} enviado")
     return True
+
+
+def _evento_agente(ctx, sp):
+    """Agente herdr `blocked` num SP a-correr → `pergunta`; a trabalhar outra vez → `a-correr`. True se transitou."""
+    ag = _seguro(ctx, ctx.agente_estado, sp["pane"])
+    if sp.get("estado") == "a-correr" and ag == "blocked":
+        ctx.transitar(sp["slug"], "pergunta", "agente bloqueado (herdr)")
+        ctx.log(f"aviso pergunta {sp['slug']}: agente bloqueado (herdr)")
+        return True
+    if sp.get("estado") == "pergunta" and ag == "working":
+        ctx.transitar(sp["slug"], "a-correr", "agente voltou a trabalhar (herdr)")
+        return True
+    return False
 
 
 def _um(ctx, mem, sp):
@@ -238,6 +274,8 @@ def _um(ctx, mem, sp):
         ctx.transitar(slug, "falhou", "painel fechou sem estado")
         sp = {**sp, "estado": "falhou", "msg": "painel fechou sem estado"}
         estado = "falhou"
+    if sp.get("pane") and estado in ("a-correr", "pergunta") and _evento_agente(ctx, sp):
+        return None
     if estado == "a-correr" and sp.get("pane") and _falha_no_ecra(ctx, mem, sp):
         return None
     if estado == "bloqueado" and _retomar_pausa(ctx, mem, sp):
@@ -248,7 +286,6 @@ def _um(ctx, mem, sp):
             mem.setdefault("escalados", []).append(slug)  # uma tentativa por SP, mesmo se o relançamento falhou
         if esc and esc.get("estado", "a-correr") == "a-correr":
             ctx.log(f"escalada {slug}: {esc.get('de')} → {esc.get('para')}")
-            _seguro(ctx, ctx.toast, f"^ {slug}: escalado {esc.get('de')} → {esc.get('para')}")
             mem["avisos"].pop(slug, None)
             return None
     _avisar(ctx, mem, sp)
@@ -273,6 +310,7 @@ def passo(ctx, mem):
                     _bloquear(ctx, mem, sp, f"erro do vigia: {e}")
             except Exception as e2:  # noqa: BLE001
                 ctx.log(f"erro a bloquear {sp.get('slug')}: {e2!r}")
+    _seguro(ctx, _publicar, ctx, mem, ctx.ler_fila().get("sps", {}))
     return "continua"
 
 
@@ -286,7 +324,7 @@ def correr(ctx, mem_path, intervalo=INTERVALO, uma_vez=False, dormir=None):
         guardar_memoria(mem_path, mem)
         if res == "fim" or uma_vez:
             return res
-        dormir(intervalo)
+        ctx.esperar(intervalo, dormir)
 
 
 def caminhos(pasta):
@@ -368,19 +406,6 @@ def modo_do_sp(path):
     except (OSError, TypeError):
         return None
     return sp_leitura.frontmatter(texto).get("modo") or None
-
-
-def toast_windows(texto, run=None):
-    """Balão do Windows por PowerShell `NotifyIcon` (spike 2026-11-11); no Linux, `notify-send`. Processo destacado, sem esperar."""
-    if sys.platform != "win32":
-        return popen_sem_janela(["notify-send", "-a", "sp-fila", "sp-fila", str(texto)[:200]], run=run,
-                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    t = str(texto).replace("'", "''")[:200]
-    ps = ("Add-Type -AssemblyName System.Windows.Forms; $n=New-Object System.Windows.Forms.NotifyIcon; "
-          "$n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; "
-          f"$n.ShowBalloonTip(8000,'sp-fila','{t}','Info'); Start-Sleep 9; $n.Dispose()")
-    return popen_sem_janela(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], run=run,
-                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 class ContextoReal(Contexto):
@@ -495,8 +520,39 @@ class ContextoReal(Contexto):
             _seguro(self, sp_escalada.registar_fila, self.estado_path, sp["slug"], de, para)
         return {"de": de, "para": para, "causa": causa, **res}
 
-    def toast(self, texto):
-        toast_windows(texto)
+    def _ops(self):
+        """HerdrOps sobre o backend atual, ou None se o painel não é herdr."""
+        if getattr(self.backend, "nome", None) != "herdr":
+            return None
+        import herdr_ops
+        return herdr_ops.HerdrOps(run=self.backend.run)
+
+    def agente_estado(self, pane):
+        ops = self._ops()
+        return ops.estado(pane) if ops else None
+
+    def metadata(self, texto):
+        ops = self._ops()
+        pane = next((sp.get("pane") for sp in self.ler_fila().get("sps", {}).values() if sp.get("pane")), None)
+        ws = ops.workspace_do_pane(pane) if ops and pane else None
+        if ws:
+            ops.workspace_metadata(ws, "sp-fila", texto)
+
+    def esperar(self, intervalo, dormir):
+        """Acorda por evento: `agent wait` (blocked/done) no 1.º agente a correr, com o intervalo como teto."""
+        import time
+        import herdr_ops
+        ops = self._ops()
+        pane = next((sp.get("pane") for sp in self.ler_fila().get("sps", {}).values()
+                     if sp.get("pane") and sp.get("estado") == "a-correr"), None)
+        if ops is None or pane is None:
+            return dormir(intervalo)
+        t0 = time.monotonic()
+        with contextlib.suppress(herdr_ops.HerdrErro, OSError):
+            ops.esperar(pane, ate=("blocked", "done"), timeout_ms=int(intervalo * 1000))
+        resto = ESPERA_MIN - (time.monotonic() - t0)
+        if resto > 0:
+            dormir(resto)
 
     def nota_relatorio(self, path, texto):
         with open(path, "a", encoding="utf-8") as f:
