@@ -47,6 +47,12 @@ def test_prompt_has_text_usa_a_ultima_linha_do_prompt():
     assert hp.prompt_has_text("sem prompt") is False
 
 
+def test_prompt_has_text_ignora_a_sugestao_do_prompt_vazio():
+    assert hp.prompt_has_text('❯ Try "edit __main__.py to…"') is False
+    assert hp.text_arrived('❯ Try "fix lint errors"', "Continua a conversa anterior: corre x") is False
+    assert hp.prompt_has_text("❯ Try fazer isto") is True
+
+
 class _Res:
     def __init__(self, stdout):
         self.stdout = stdout
