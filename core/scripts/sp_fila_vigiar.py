@@ -119,7 +119,8 @@ def main(argv=None):
     ap.add_argument("--intervalo", type=float, default=INTERVALO)
     ap.add_argument("--uma-vez", action="store_true", help="um só tick (diagnóstico)")
     args = ap.parse_args(argv)
-    if not _pasta(args.fila).is_dir():
+    args.fila = Path(args.fila).name  # aceita o id ou a pasta da fila (ex.: a pasta do log do vigia)
+    if not args.fila or not _pasta(args.fila).is_dir():
         print(f"erro: fila de painéis desconhecida: {args.fila}", file=sys.stderr)
         return 1
     mem = memoria_nova()
