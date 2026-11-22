@@ -189,6 +189,29 @@ test("ida e volta: --from-vault e depois --to-vault repõe as peças byte a byte
   }
 });
 
+test("slug dentro de outra palavra fica intacto no --from-vault; ocorrências isoladas continuam a virar marcador", () => {
+  const { kz, pkg } = pkgCopy();
+  const v = personalVault();
+  put(v, ".claude/skills/michi/SKILL.md", `${PERSONAL}coding e kaizenodin ODIN odin\n`);
+  const from = spawnSync("node", [kz, "sync", "--from-vault"], { encoding: "utf8", env: { ...process.env, KAIZEN_SOURCE: v } });
+  assert.strictEqual(from.status, 0, from.stdout + from.stderr);
+  const core = fs.readFileSync(path.join(pkg, "core", "skills/michi/SKILL.md"), "utf8");
+  assert.match(core, /coding/);
+  assert.doesNotMatch(core, /c\{\{agentSlug\}\}g|ckaizeng/);
+  assert.match(core, /knowledge\/projects\/\{\{agentSlug\}\}\/x/);
+});
+
+for (const [nome, rel] of [["kaizen.config.json", "kaizen.config.json"], [".kaizen-sync.json", ".kaizen-sync.json"]]) {
+  test(`${nome} com JSON inválido: --to-vault sai com rc≠0, o caminho no stderr e sem stack`, () => {
+    const { kzr, v } = synced();
+    put(v, rel, "{ não é json");
+    const r = kzr("--to-vault");
+    assert.notStrictEqual(r.status, 0);
+    assert.ok(r.stderr.includes(path.join(v, rel)), r.stderr);
+    assert.doesNotMatch(r.stderr, /    at /);
+  });
+}
+
 function synced() {
   const { kz } = pkgCopy();
   const v = personalVault();

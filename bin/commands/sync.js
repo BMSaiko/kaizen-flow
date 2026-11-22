@@ -48,12 +48,15 @@ function sanitizer(cfg) {
   const keys = MARKER_KEYS.filter((k) => cfg[k]).sort((a, b) => cfg[b].length - cfg[a].length);
   for (const k of keys) {
     const v = cfg[k];
-    const b1 = /^\w/.test(v) && k !== "agentSlug" ? "\\b" : "";
-    const b2 = /\w$/.test(v) && k !== "agentSlug" ? "\\b" : "";
+    const b1 = /^\w/.test(v) ? "\\b" : "";
+    const b2 = /\w$/.test(v) ? "\\b" : "";
     rules.push([new RegExp(b1 + esc(v) + b2, "g"), `{{${k}}}`]);
   }
   // outras grafias do agente (ex.: «Heimdall») não têm marcador: saem com perdas
-  if (cfg.agentSlug) rules.push([new RegExp(esc(cfg.agentSlug), "gi"), "kaizen"]);
+  if (cfg.agentSlug) {
+    const s = cfg.agentSlug;
+    rules.push([new RegExp((/^\w/.test(s) ? "\\b" : "") + esc(s) + (/\w$/.test(s) ? "\\b" : ""), "gi"), "kaizen"]);
+  }
   return (t) => rules.reduce((acc, [re, to]) => acc.replace(re, to), t);
 }
 
