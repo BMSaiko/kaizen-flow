@@ -193,6 +193,22 @@ def _problemas_imagens(imagens, pasta):
     return p, tipos
 
 
+def _problemas_pacote(d, ui, pasta):
+    """Problemas de imagens, segredos e tamanho do pacote."""
+    p, tipos = _problemas_imagens(d["imagens"], pasta)
+    if ui and "depois" not in tipos:
+        p.append("SP com ui: sim exige uma imagem `depois` (app a correr)")
+    if not ui and not ({"diagrama", "terminal"} & set(tipos)):
+        p.append("SP sem UI exige pelo menos uma imagem diagrama ou terminal")
+    if SEGREDO.search(json.dumps(d, ensure_ascii=False)):
+        p.append("possível segredo no pacote")
+    if pasta is not None:
+        total = sum(f.stat().st_size for f in Path(pasta).rglob("*") if f.is_file())
+        if total > MAX_BYTES:
+            p.append(f"pacote com {total} bytes (máximo {MAX_BYTES})")
+    return p
+
+
 def validar(d, ui=False, pasta=None):
     """Lista de problemas (vazia = válido)."""
     p = [f"campo em falta: {c}" for c in CAMPOS if c not in d]
@@ -206,18 +222,7 @@ def validar(d, ui=False, pasta=None):
         p.append("criterios: precisa de cumpridos e por_cumprir")
     reverter = d["reverter"] if isinstance(d["reverter"], list) else [d["reverter"]]
     p += [f"reverter: comando perigoso (reset/force): {r}" for r in reverter if PERIGOSO.search(str(r))]
-    erros_im, tipos = _problemas_imagens(d["imagens"], pasta)
-    p += erros_im
-    if ui and "depois" not in tipos:
-        p.append("SP com ui: sim exige uma imagem `depois` (app a correr)")
-    if not ui and not ({"diagrama", "terminal"} & set(tipos)):
-        p.append("SP sem UI exige pelo menos uma imagem diagrama ou terminal")
-    if SEGREDO.search(json.dumps(d, ensure_ascii=False)):
-        p.append("possível segredo no pacote")
-    if pasta is not None:
-        total = sum(f.stat().st_size for f in Path(pasta).rglob("*") if f.is_file())
-        if total > MAX_BYTES:
-            p.append(f"pacote com {total} bytes (máximo {MAX_BYTES})")
+    p += _problemas_pacote(d, ui, pasta)
     return p
 
 
