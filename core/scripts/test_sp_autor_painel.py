@@ -266,11 +266,33 @@ def test_fechar_usa_o_pane_do_estado(modelos_json, sp_vazio, tmp_path):
     assert b.fechados == ["p1"]
 
 
-def test_fechar_sem_estado_usa_o_painel_atual(tmp_path, monkeypatch):
+def test_fechar_sem_estado_nao_fecha_nada(tmp_path, monkeypatch):
     b = FakeBackend()
     monkeypatch.setattr(sa.painel_backend, "painel_atual", lambda env=None: ("herdr", "w3:pX"))
-    assert sa.fechar("nao-existe", b, estado_root=tmp_path / "e") == "w3:pX"
+    assert sa.fechar("nao-existe", b, estado_root=tmp_path / "e") is None
+    assert b.fechados == []
+
+
+def test_fechar_sem_estado_com_atual_fecha_o_atual(tmp_path, monkeypatch):
+    b = FakeBackend()
+    monkeypatch.setattr(sa.painel_backend, "painel_atual", lambda env=None: ("herdr", "w3:pX"))
+    assert sa.fechar("nao-existe", b, estado_root=tmp_path / "e", atual=True) == "w3:pX"
     assert b.fechados == ["w3:pX"]
+
+
+def test_main_fechar_passa_atual(monkeypatch, capsys):
+    visto = {}
+    monkeypatch.setattr(sa.painel_backend, "escolher_por_config", lambda b: FakeBackend())
+    monkeypatch.setattr(sa, "fechar", lambda *a, **k: visto.update(k) or "ok")
+    sa.main(["--fechar", "x", "--atual"])
+    assert visto.get("atual") is True
+    sa.main(["--fechar", "x"])
+    assert visto.get("atual") is False
+
+
+def test_prompts_fecham_com_atual():
+    p = sa.prompt("sp/x.md", None)
+    assert "--fechar x --atual" in p
 
 
 def test_ec_022_prompt_nao_submetido_mantem_a_semente_e_permite_relancar(modelos_json, sp_vazio, tmp_path):

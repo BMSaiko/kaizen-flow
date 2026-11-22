@@ -134,7 +134,7 @@ def prompt(sp, semente_path, achados):
             f"em {achados} (ficheiro vazio se não houver nenhum); não corrijas código, sem commit, sem abrir outros painéis. "
             f"No fim corre `{_py('sp-estado.py')} {_autor.chave(slug, PAPEL)} done --msg '<N bloqueantes, M menores>'` "
             "(ou bloqueado/falhou com o motivo) e fecha este painel com "
-            f"`{_py('sp-autor.py')} --fechar {slug} --papel {PAPEL}` (não uses /quit).")
+            f"`{_py('sp-autor.py')} --fechar {slug} --papel {PAPEL} --atual` (não uses /quit).")
 
 
 def _rearmar(slug, estado_root=None):

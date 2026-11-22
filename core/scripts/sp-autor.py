@@ -64,7 +64,7 @@ def prompt(sp, semente):
             f"`python -I scripts/sp-autor.py --avisar {slug} --sp \"{sp}\"` (avisa o painel que te lançou; se falhar segue) e depois "
             f"`python -I scripts/sp-estado.py {chave(slug)} done --msg '<resumo numa linha>'` "
             f"(ou bloqueado/falhou com o motivo) e fecha este painel com "
-            f"`python -I scripts/sp-autor.py --fechar {slug}` (backend ativo: herdr, wezterm ou tmux; não uses /quit).")
+            f"`python -I scripts/sp-autor.py --fechar {slug} --atual` (backend ativo: herdr, wezterm ou tmux; não uses /quit).")
 
 
 def consume(path, out=print):
@@ -120,15 +120,16 @@ def avisar(slug, backend, sp=None, estado_root=None, rotulo=PAPEL):
     return "origem-ausente"
 
 
-def fechar(slug, backend, estado_root=None, rotulo=PAPEL, env=None):
-    """Fecha o painel do papel pelo backend ativo (herdr/wezterm/tmux): pane guardado no estado ao lançar, senão o atual.
+def fechar(slug, backend, estado_root=None, rotulo=PAPEL, env=None, atual=False):
+    """Fecha o painel do papel pelo backend ativo (herdr/wezterm/tmux): pane guardado no estado ao lançar; o atual só com
+    `atual` (sem ele, nunca fecha quem corre o comando, p. ex. uma prova com slug inexistente).
     Devolve o id fechado ou None (nada a fechar)."""
     k = chave(slug, rotulo)
     try:
         pane = pe.ler(pe.procurar(k, root=estado_root), k, root=estado_root).get("pane")
     except pe.ErroEstado:
         pane = None
-    if not pane:
+    if not pane and atual:
         pane = painel_backend.painel_atual(env)[1]
     if not pane:
         return None
@@ -180,6 +181,7 @@ def main(argv=None):
     ap.add_argument("--consume", metavar="SEMENTE", help="imprime a semente e apaga-a (usado pelo painel)")
     ap.add_argument("--avisar", metavar="SLUG", help="avisa o painel que lançou o sp-autor (usado pelo painel; rc 0 mesmo sem origem)")
     ap.add_argument("--fechar", metavar="SLUG", help="fecha o painel do papel pelo backend ativo (usado pelo painel no fim)")
+    ap.add_argument("--atual", action="store_true", help="com --fechar: sem pane no estado, fecha o painel atual")
     ap.add_argument("--papel", default=PAPEL, help="papel do painel a fechar (sp-autor|revisor)")
     ap.add_argument("--cwd", default=str(Path(__file__).resolve().parent.parent), help="pasta do painel (defeito: o repo)")
     ap.add_argument("--backend", default="auto", help="auto (usa painelBackend)|herdr|wezterm|tmux|background")
@@ -191,7 +193,7 @@ def main(argv=None):
         MODELOS = Path(args.modelos)
     if args.fechar:
         try:
-            print(f"{chave(args.fechar, args.papel)} · fechar · {fechar(args.fechar, painel_backend.escolher_por_config(args.backend), rotulo=args.papel) or 'nada'}")
+            print(f"{chave(args.fechar, args.papel)} · fechar · {fechar(args.fechar, painel_backend.escolher_por_config(args.backend), rotulo=args.papel, atual=args.atual) or 'nada'}")
         except Exception as e:  # noqa: BLE001
             print(f"erro a fechar: {e}", file=sys.stderr)
             return 1
