@@ -36,7 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # Módulos irmãos (a CLI e os testes continuam a ver tudo aqui): estado, plano, relatório, execução, painéis.
 from sp_fila_estado import (MAX_DEFEITO, MAX_FALHAS_DEFEITO, ORCAMENTO, REQ_POR_SP, RELATORIOS, ESTADO, USER,  # noqa: E402,F401
                             atualizar, bloqueio, guardar, ler, migrar, run_hidden)
-from sp_fila_plano import descendentes, limite, load, plan, render_plan, sem_commit, sp_list  # noqa: E402,F401
+from sp_fila_plano import descendentes, limite_paralelo, load, plan, render_plan, sem_commit, sp_list  # noqa: E402,F401
 from sp_fila_relatorio import gastos, relatorio, render_gastos  # noqa: E402,F401
 from sp_fila_execucao import (_custos, _ler_sp,  # noqa: E402,F401
                               seguinte, IntegracaoPendente, SlugObrigatorio)
@@ -487,8 +487,8 @@ def main(argv=None):
     if rc is not None:
         return rc
     so = descendentes(items, args.programa) if args.programa else None
-    if not (args.programa or args.concorrencia or args.seguinte or args.dry_run) and sp_fila_execucao._backend_defeito() is not None:
-        args.concorrencia = 1  # sequencial em painel: worktree, Doing só lá e vigia, como o paralelo (nunca no checkout)
+    if not (args.programa or args.concorrencia or args.seguinte or args.dry_run):
+        args.concorrencia = 1  # sempre em painel: worktree, Doing só lá e vigia (nunca no checkout)
     if args.dry_run:
         return _cmd_dry_run(args, items, so, estado)
     rc = _preparar_estado(args, estado, mae, modo, so)

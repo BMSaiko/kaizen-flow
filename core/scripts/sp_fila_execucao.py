@@ -16,9 +16,9 @@ import kaizen_engine  # noqa: E402
 import painel_backend  # noqa: E402
 import sp_fila_nucleo as nucleo  # noqa: E402
 import sp_painel_estado as pe  # noqa: E402
-from sp_fila_estado import RELATORIOS, REPO, REQ_POR_SP, SCRIPTS, bloqueio, guardar, ler, registar_sessao, run_hidden
+from sp_fila_estado import RELATORIOS, REPO, REQ_POR_SP, bloqueio, guardar, ler, registar_sessao, run_hidden
 import sp_fila_paineis  # noqa: E402
-from sp_fila_plano import aplicar_master, descendentes, limite, limite_paralelo, load, plan, sem_commit
+from sp_fila_plano import aplicar_master, descendentes, limite_paralelo, load, plan, sem_commit
 from sp_fila_relatorio import destino_relatorio, escrever_commit_md, progresso, relatorio
 
 
@@ -104,41 +104,13 @@ def _mae_na_worktree(mae, run):
     return wt / rel
 
 
-def _doing_sequencial(root, alvo, run):
-    """Sequencial sem painel: no repo, `ensure` e Doing só na worktree do SP (o checkout principal fica só leitura);
-    fora do repo (testes) o `sp-move` do root. Devolve (argv do sp-move, caminho do Doing)."""
-    doing = alvo.path.parent.parent / "Doing" / alvo.path.name
+def _lancar(alvo, estado, backend, run, root):
+    """Lança o filho num painel: vaga global, `ensure`, Doing só na worktree do filho, painel com o modelo do SP. Devolve (erro|None, item)."""
     try:
-        rel = Path(doing).resolve().relative_to(REPO.resolve())
-    except ValueError:
-        return [sys.executable, "-I", str(SCRIPTS / "sp-move.py"), "--root", str(root), "--project", alvo.project, alvo.slug, "doing"], doing
-    wt = Path(sp_fila_paineis._ensure(alvo.slug, run))
-    return sp_fila_paineis.sp_move_na_worktree(root, wt, alvo), wt / rel
-
-
-def _lancar(alvo, doing, estado, paralelo, backend, run, root):
-    """Lança o filho (painel ou sp-handoff); devolve (erro|None, item|None)."""
-    erro, item = None, None
-    if paralelo:  # painel: vaga global, `ensure`, Doing só na worktree do filho (nunca o `sp-move` do orquestrador), painel com o modelo do SP
-        try:
-            item = sp_fila_paineis.lancar([alvo], estado["fila_paineis"], backend, run=run, root=root)[0]
-        except Exception as e:  # noqa: BLE001 — registo das filas ilegível ou inválido: falha só este SP
-            item = {"slug": alvo.slug, "estado": "falhou", "msg": f"erro a lançar {alvo.slug}: {e}"}
-        if item["estado"] == "falhou":
-            erro = item["msg"]
-    else:
-        try:
-            cmd, doing = _doing_sequencial(root, alvo, run)
-        except RuntimeError as e:
-            cmd, erro = None, f"erro a lançar {alvo.slug}: {e}"
-        r = run(cmd, capture_output=True, text=True, encoding="utf-8") if cmd else None
-        if r is not None and r.returncode != 0:
-            erro = f"erro a lançar {alvo.slug}: {(r.stderr or r.stdout).strip()}"
-        if not erro:
-            r = run([sys.executable, "-I", str(SCRIPTS / "sp-handoff.py"), "--launch", str(doing), "--auto"], capture_output=True, text=True, encoding="utf-8")
-            if r.returncode != 0:
-                erro = f"erro a lançar {alvo.slug}: {(r.stderr or r.stdout).strip()}"
-    return erro, item
+        item = sp_fila_paineis.lancar([alvo], estado["fila_paineis"], backend, run=run, root=root)[0]
+    except Exception as e:  # noqa: BLE001 — registo das filas ilegível ou inválido: falha só este SP
+        item = {"slug": alvo.slug, "estado": "falhou", "msg": f"erro a lançar {alvo.slug}: {e}"}
+    return (item["msg"] if item["estado"] == "falhou" else None), item
 
 
 def _registar_fechadas(root, estado, items, slug, run):
@@ -159,14 +131,6 @@ def _registar_fechadas(root, estado, items, slug, run):
         estado["seguidas"] = 0 if feito else estado.get("seguidas", 0) + 1
         del estado["sessoes"][fechada]
         _fechar_painel(estado, fechada, feito)
-
-
-def _custo_gasto(estado, so, paralelo, custo_fn):
-    """USD gastos pela fila desde o início (0 em paralelo ou sem orçamento)."""
-    if estado.get("usd") is None or paralelo:
-        return 0.0
-    custos = (custo_fn or _custos)()
-    return sum(custos.get(s, 0.0) for s in so) - estado.get("custo_inicio", 0.0)
 
 
 def _registar_lancamento(estado, alvo, erro, item, agora, lancados, itens):
@@ -196,7 +160,6 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
     _registar_fechadas(root, estado, items, slug, run)
     # Paralelo (--concorrencia N): sem orçamento; só `--ate` e `--max` explícito; o único travão é o guard de contexto, que continua a sessão por handoff.
     teto = estado.get("concorrencia") or 1
-    paralelo = bool(estado.get("concorrencia"))  # um só critério: com `concorrencia` (mesmo 1) lança num painel
     if len(estado["sessoes"]) >= teto:
         guardar(estado_path, estado)
         return {"acao": "espera", "sessoes": list(estado["sessoes"])}
@@ -205,28 +168,25 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
     parada = (f"cadeia parada: {', '.join(estado['falhados'])} não chegou a Done"
               if estado.get("modo") == "sequencial" and estado["falhados"] else None)
     done = {sp.slug for sp, _ in items if sp.status == "Done"}
-    custo = _custo_gasto(estado, so, paralelo, custo_fn)
     lancados, itens, pendentes, motivo = [], [], [], None
     # Único decisor: nunca lançar SP já iniciado (Doing), nem um que a fila já lançou/fechou ou reservou (outro `--seguinte` corre enquanto o spawn tem o lock solto).
     for alvo in (sp for sp in ([] if parada else fila) if sp.status == "TODO" and all(d in done for d in sp.depends_on)):
         if alvo.slug in set(estado["sessoes"]) | set(estado["feitos"]) | set(estado["falhados"]):
             continue
-        motivo = limite_paralelo(estado, agora) if paralelo else limite(estado, agora, custo)
+        motivo = limite_paralelo(estado, agora)
         if motivo or len(estado["sessoes"]) >= teto:
             break
-        if paralelo:
-            backend = backend or _backend_defeito()
-            if backend is None:
-                motivo = falta_backend()
-                break
-            if not estado.get("fila_paineis"):
-                estado["fila_paineis"] = sp_fila_paineis.garantir_fila(estado)
-        doing = alvo.path.parent.parent / "Doing" / alvo.path.name
+        backend = backend or _backend_defeito()
+        if backend is None:
+            motivo = falta_backend()
+            break
+        if not estado.get("fila_paineis"):
+            estado["fila_paineis"] = sp_fila_paineis.garantir_fila(estado)
         inicio = agora.isoformat(timespec="seconds")
         registar_sessao(estado, alvo.slug, inicio, requests=REQ_POR_SP, reserva=True)  # reservar o slug antes de soltar o lock
         guardar(estado_path, estado)
         pilha.close()
-        erro, item = _lancar(alvo, doing, estado, paralelo, backend, run, root)
+        erro, item = _lancar(alvo, estado, backend, run, root)
         pilha.enter_context(bloqueio(estado_path))
         estado = ler(estado_path)  # outros `--seguinte` podem ter alterado o estado durante o spawn
         if item and item["estado"] == "pendente":  # sem vaga global: tira a reserva, não é falha; nada mais abre agora
@@ -241,7 +201,7 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
         guardar(estado_path, estado)
         return {"acao": "espera", "sessoes": list(estado["sessoes"]), "pendentes": pendentes}
     if not lancados and not estado["sessoes"]:
-        motivo = parada or motivo or (limite_paralelo(estado, agora) if paralelo else limite(estado, agora, custo)) or "fila vazia"
+        motivo = parada or motivo or limite_paralelo(estado, agora) or "fila vazia"
         return _fim(estado, estado_path, items, so, fila, excluidos, motivo, rel_dir, run, agora, custo_fn)
     guardar(estado_path, estado)
     if not lancados:

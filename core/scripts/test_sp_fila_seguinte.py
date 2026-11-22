@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from sp_fila_testlib import (
     sp_fila,
+    PainelFalso,
     make_sp,
     _runner,
     _estado,
@@ -12,16 +13,15 @@ from sp_fila_testlib import (
 )
 
 
-def test_seguinte_lanca_primeiro_move_para_doing_e_nao_faz_push(tmp_path):
+def test_seguinte_lanca_primeiro_num_painel_e_nao_faz_push(tmp_path):
     root = tmp_path / "sps"
     make_sp(root, "a")
     calls = []
-    st = _estado(tmp_path)
-    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0))
-    assert out["acao"] == "lancou" and out["slug"] == "a"
+    st = _estado(tmp_path, concorrencia=1)
+    painel = PainelFalso()
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), datetime(2026, 10, 25, 12, 0), backend=painel)
+    assert out["acao"] == "lancou" and out["slug"] == "a" and len(painel.abertos) == 1
     flat = [" ".join(map(str, c)) for c in calls]
-    assert any("sp-move.py" in c and "doing" in c for c in flat)
-    assert any("sp-handoff.py" in c and "--launch" in c and "--auto" in c for c in flat)
     assert not any("push" in c for c in flat)
     assert list(json.loads(st.read_text(encoding="utf-8"))["sessoes"]) == ["a"]
     assert json.loads(st.read_text(encoding="utf-8"))["usados"] == sp_fila.REQ_POR_SP
@@ -71,25 +71,26 @@ def test_seguinte_limite_para_e_reporta(tmp_path):
 
 def test_e2e_para_no_limite_grava_progresso_e_retoma(tmp_path):
     root = tmp_path / "sps"
-    _arvore(root, {"orcamento_requests": 100})
-    st = _estado(tmp_path, max=9, orcamento=100, programa="mae", horas=None, usd=None)
+    _arvore(root, {})
+    st = _estado(tmp_path, max=2, orcamento=None, programa="mae", horas=None, usd=None, concorrencia=1)
+    painel = PainelFalso()
     agora, calls = datetime(2026, 10, 25, 12, 0), []
-    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), agora)
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), agora, backend=painel)
     assert out["slug"] == "f1"
     make_sp(root, "f1", folder="Done", extra={"parent": "mae"})  # sessão f1 fechou
     (root / "p" / "sp" / "TODO" / "f1.md").unlink()
-    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), agora)
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), agora, slug="f1", backend=painel)
     assert out["slug"] == "f2"
     make_sp(root, "f2", folder="Done", extra={"parent": "mae"})
     (root / "p" / "sp" / "TODO" / "f2.md").unlink()
-    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), agora)  # 100 usados: sem espaço para f3
-    assert out["acao"] == "fim" and "orçamento" in out["motivo"] and not st.exists()
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner(calls), agora, slug="f2", backend=painel)  # máximo de 2 SPs: sem espaço para f3
+    assert out["acao"] == "fim" and "máximo" in out["motivo"] and not st.exists()
     mae = (root / "p" / "sp" / "TODO" / "mae.md").read_text(encoding="utf-8")
     assert "## Progresso" in mae and "- f1" in mae and "- f2" in mae and "- f3" in mae
     assert "fora" not in mae
     # retoma: nova corrida, f1/f2 ficam Done, só f3 por correr
-    st2 = _estado(tmp_path, max=9, orcamento=100, programa="mae", horas=None, usd=None)
-    assert sp_fila.seguinte(root, st2, tmp_path / "rel", _runner(calls), agora)["slug"] == "f3"
+    st2 = _estado(tmp_path, max=9, orcamento=None, programa="mae", horas=None, usd=None, concorrencia=1)
+    assert sp_fila.seguinte(root, st2, tmp_path / "rel", _runner(calls), agora, backend=painel)["slug"] == "f3"
 
 
 def test_estado_antigo_com_lancado_migra_para_sessoes(tmp_path):
@@ -121,9 +122,9 @@ def test_seguinte_com_slug_so_fecha_essa_sessao_e_espera_pelas_outras(tmp_path):
 
 def test_limite_falhas_seguidas_para_com_motivo():
     estado = {"max": 9, "ate": None, "orcamento": None, "usados": 0, "feitos": [], "falhados": ["a", "b"], "seguidas": 2, "max_falhas": 2}
-    assert "falhas seguidas" in sp_fila.limite(estado, datetime(2026, 10, 25, 12, 0))
+    assert "falhas seguidas" in sp_fila.limite_paralelo(estado, datetime(2026, 10, 25, 12, 0))
     estado["seguidas"] = 1
-    assert sp_fila.limite(estado, datetime(2026, 10, 25, 12, 0)) is None
+    assert sp_fila.limite_paralelo(estado, datetime(2026, 10, 25, 12, 0)) is None
 
 
 def test_seguidas_conta_falhas_e_um_feito_repoe_a_zero(tmp_path):
@@ -186,8 +187,12 @@ def test_seguinte_sp_ja_integrado_continua_a_avancar(tmp_path):
     make_sp(root, "b")
     wt = tmp_path / "a"
     make_sp(wt, "a", folder="Done")
-    st = _estado(tmp_path, sessoes={"a": {}})
-    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner_worktree([], wt), datetime(2026, 10, 25, 12, 0), slug="a")
+    st = _estado(tmp_path, sessoes={"a": {}}, concorrencia=1)
+    wt_run, ensure_run = _runner_worktree([], wt), _runner([])
+
+    def run(argv, **kw):  # `worktree list` mostra a worktree de `a`; `ensure` devolve o caminho da de `b`
+        return (ensure_run if "ensure" in argv else wt_run)(argv, **kw)
+    out = sp_fila.seguinte(root, st, tmp_path / "rel", run, datetime(2026, 10, 25, 12, 0), slug="a", backend=PainelFalso())
     assert out["acao"] == "lancou" and out["slug"] == "b"
 
 

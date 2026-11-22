@@ -7,22 +7,6 @@ from sp_fila_testlib import _estado, _pid_morto, _runner, make_sp, sp_fila
 import contextlib
 
 
-def test_sequencial_no_repo_move_para_doing_so_na_worktree(tmp_path, monkeypatch):
-    monkeypatch.setattr(sp_fila_execucao, "REPO", tmp_path)
-    monkeypatch.setattr(sp_fila_execucao.sp_fila_paineis, "REPO", tmp_path)
-    root = tmp_path / "sps"
-    make_sp(root, "a")
-    calls = []
-    out = sp_fila.seguinte(root, _estado(tmp_path), tmp_path / "rel", _runner(calls), datetime(2026, 11, 22, 12, 0))
-    assert out["acao"] == "lancou"
-    flat = [" ".join(map(str, c)).replace("\\", "/") for c in calls]  # Windows: caminhos com \\
-    assert any("ensure a" in c for c in flat)
-    move = next(c for c in flat if "sp-move.py" in c)
-    assert move.split()[2].startswith("/wt/sb-a/")  # o sp-move da worktree, nunca o do checkout
-    launch = next(c for c in flat if "sp-handoff.py" in c)
-    assert "/wt/sb-a/" in launch and "Doing" in launch
-
-
 def test_sequencial_ensure_falhado_marca_falha_sem_mexer_no_checkout(tmp_path, monkeypatch):
     monkeypatch.setattr(sp_fila_execucao, "REPO", tmp_path)
     root = tmp_path / "sps"
