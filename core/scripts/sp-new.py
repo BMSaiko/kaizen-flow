@@ -309,10 +309,19 @@ def parse_niveis(text):
     return niveis
 
 
-def create_program(root, project, slug, priority, today, children, modo="manual", auth=None, niveis=None, gates=(), michi="default"):
-    """Mãe + filhos; `gates` e `michi` valem para todos os filhos (`niveis` sobrepõe o nível por filho)."""
-    root = Path(root)
-    auth = check_auth(auth)
+def _sem_ciclos(graph, names):
+    for name in names:
+        seen, stack = set(), [name]
+        while stack:
+            for dep in graph[stack.pop()]:
+                if dep == name:
+                    raise SpNewError(f"dependências cíclicas em '{name}'")
+                if dep not in seen:
+                    seen.add(dep)
+                    stack.append(dep)
+
+
+def _validar_filhos(root, project, slug, priority, children, modo):
     names = [name for name, _ in children]
     if not children:
         raise SpNewError("programa sem filhos (--children)")
@@ -326,16 +335,14 @@ def create_program(root, project, slug, priority, today, children, modo="manual"
         raise SpNewError(f"o programa '{slug}' não pode ser filho de si próprio")
     for name in [slug, *names]:
         check(root, project, name, priority, modo)
-    graph = dict(children)
-    for name in names:
-        seen, stack = set(), [name]
-        while stack:
-            for dep in graph[stack.pop()]:
-                if dep == name:
-                    raise SpNewError(f"dependências cíclicas em '{name}'")
-                if dep not in seen:
-                    seen.add(dep)
-                    stack.append(dep)
+    _sem_ciclos(dict(children), names)
+
+
+def create_program(root, project, slug, priority, today, children, modo="manual", auth=None, niveis=None, gates=(), michi="default"):
+    """Mãe + filhos; `gates` e `michi` valem para todos os filhos (`niveis` sobrepõe o nível por filho)."""
+    root = Path(root)
+    auth = check_auth(auth)
+    _validar_filhos(root, project, slug, priority, children, modo)
     extra = ["kind: program", "children:"]
     for name, deps in children:
         extra += [f"  - slug: {name}", f"    depends_on: [{', '.join(deps)}]", "    state: TODO"]
