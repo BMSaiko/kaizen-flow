@@ -86,7 +86,11 @@ def resumo(root, slug, project=None):
         partes.append(("Esboço", _itens(_seccao_extra(texto, "Esboço"), 10)))
     if mae:
         partes.insert(3, ("Filhos (entrega, dependências)", _filhos(root, sp)[:8]))
+    return _render(slug, partes)
 
+
+def _render(slug, partes):
+    """(rc, texto) a partir de `partes` [(título, linhas)]; rc 1 se falta matéria."""
     saida, faltas = [f"RESUMO · {slug}"], []
     for titulo, linhas in partes:
         if not linhas:
