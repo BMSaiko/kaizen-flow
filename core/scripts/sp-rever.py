@@ -621,6 +621,24 @@ def _hook(argv):
     return 0
 
 
+def _cmd_veredicto(a):
+    """`--veredicto SLUG ESTADO [frase]`: aplica e imprime; rc 0, 64 (uso/frase vazia) ou 1."""
+    if len(a.veredicto) < 2 or len(a.veredicto) > 3 or a.veredicto[1] not in ESTADOS[1:]:
+        print("erro: --veredicto <slug> ok|ajustar|redirecionar [\"frase\"]", file=sys.stderr)
+        return 64
+    slug, est, frase = a.veredicto[0], a.veredicto[1], (a.veredicto[2] if len(a.veredicto) == 3 else "")
+    try:
+        e = aplicar_veredicto(slug, est, frase, a.estado, a.root, arrancar=a.arrancar)
+    except Exception as ex:  # noqa: BLE001
+        vazio = type(ex).__name__ == "VeredictoErro" and "vazia" in str(ex)
+        print(f"erro: {ex}", file=sys.stderr)
+        return 64 if vazio else 1
+    print(f"{slug}: {est} · {e.get('acao', '-')}" + (f" · {e['ajuste']}" if e.get("ajuste") else "") + (f" · {e['motivo']}" if e.get("motivo") else ""))
+    if e.get("acao") == "em-todo":
+        print(f"em TODO; para arrancar: python -I scripts/sp-rever.py --veredicto {slug} ajustar \"<frase>\" --arrancar")
+    return 0
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if "--hook" in argv:
@@ -644,20 +662,7 @@ def main(argv=None):
         print(json.dumps(retomar(a.estado), ensure_ascii=False))
         return 0
     if a.veredicto:
-        if len(a.veredicto) < 2 or len(a.veredicto) > 3 or a.veredicto[1] not in ESTADOS[1:]:
-            print("erro: --veredicto <slug> ok|ajustar|redirecionar [\"frase\"]", file=sys.stderr)
-            return 64
-        slug, est, frase = a.veredicto[0], a.veredicto[1], (a.veredicto[2] if len(a.veredicto) == 3 else "")
-        try:
-            e = aplicar_veredicto(slug, est, frase, a.estado, a.root, arrancar=a.arrancar)
-        except Exception as ex:  # noqa: BLE001
-            vazio = type(ex).__name__ == "VeredictoErro" and "vazia" in str(ex)
-            print(f"erro: {ex}", file=sys.stderr)
-            return 64 if vazio else 1
-        print(f"{slug}: {est} · {e.get('acao', '-')}" + (f" · {e['ajuste']}" if e.get("ajuste") else "") + (f" · {e['motivo']}" if e.get("motivo") else ""))
-        if e.get("acao") == "em-todo":
-            print(f"em TODO; para arrancar: python -I scripts/sp-rever.py --veredicto {slug} ajustar \"<frase>\" --arrancar")
-        return 0
+        return _cmd_veredicto(a)
     if a.listar:
         listar(por_rever(a.root, a.estado), a.json)
         return 0
