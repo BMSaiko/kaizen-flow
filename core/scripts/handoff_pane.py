@@ -7,8 +7,10 @@ rc: n/a
 """
 import json
 import os
+import re
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -19,6 +21,7 @@ SEND_DELAY = 5.0
 SEND_GAP = 2.0
 ENTER_GAP = 0.5
 ENTER_TRIES = 3
+SEND_LOG = Path(tempfile.gettempdir()) / "handoff-send.log"
 ENTER_SETTLE = 6.0  # o Claude Code demora a limpar o prompt (hooks UserPromptSubmit)
 
 
@@ -128,10 +131,16 @@ def pane_exists(pane, run=run_hidden, env=None, retoma=None):
         raise HandoffError(f"painel {pane} não existe no WezTerm (janela fechada?){dica}")
 
 
+PLACEHOLDER = re.compile(r'^Try "[^"]*"$')  # sugestão do prompt vazio (sessão nova, depois de /clear)
+
+
 def prompt_has_text(screen):
-    """True se o prompt do Claude Code (última linha `❯`) já tem texto escrito."""
+    """True se o prompt do Claude Code (última linha `❯`) já tem texto escrito; a sugestão `Try "…"` não conta."""
     lines = [ln for ln in screen.splitlines() if ln.lstrip().startswith("❯")]
-    return bool(lines) and bool(lines[-1].lstrip()[1:].strip())
+    if not lines:
+        return False
+    resto = lines[-1].lstrip()[1:].strip()
+    return bool(resto) and not PLACEHOLDER.match(resto)
 
 
 def text_arrived(screen, text):
@@ -275,6 +284,9 @@ def consume_ficheiro(path, out=print):
 def launch_detached(script, args, env=None):
     """Corre `script args...` num processo separado, sem janela, para o envio só chegar depois de o turno atual acabar."""
     argv = [sys.executable, "-I", str(Path(script).resolve()), *args]
-    popen_sem_janela(argv, "grupo", stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     close_fds=True, **({"env": env} if env is not None else {}))
+    with open(SEND_LOG, "a", encoding="utf-8") as log:  # erros do envio (HandoffError) ficam aqui, não no vazio
+        log.write(f"--- {time.strftime('%Y-%m-%d %H:%M:%S')} {' '.join(argv)}\n")
+        log.flush()
+        popen_sem_janela(argv, "grupo", stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=log,
+                         close_fds=True, **({"env": env} if env is not None else {}))
     return argv
