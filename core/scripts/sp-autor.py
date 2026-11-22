@@ -26,6 +26,8 @@ from handoff_pane import consume_ficheiro  # noqa: E402
 from painel_backend import enviar_prompt  # noqa: E402
 import painel_backend  # noqa: E402
 import sp_painel_estado as pe  # noqa: E402
+import avisos_caixa  # noqa: E402
+from handoff_pane import read_screen  # noqa: E402
 
 MODELOS = modelos.DEFAULT  # os testes trocam-no
 PAPEL = "sp-autor"
@@ -99,7 +101,7 @@ def _linha(texto):
 
 def avisar(slug, backend, sp=None, estado_root=None, rotulo=PAPEL):
     """Envia ao painel de origem (pelo título guardado ao lançar; o pane-id só confirma) uma linha a dizer que o SP está pronto.
-    Devolve `enviado` ou `origem-ausente` (nada enviado, `aviso` no estado). Nunca envia a outro painel nem ao próprio."""
+    Devolve `enviado` (teclas, origem livre), `caixa` (origem ocupada: avisos_caixa, entregue pelo avisos-hook) ou `origem-ausente`. Nunca envia a outro painel nem ao próprio."""
     k = chave(slug, rotulo)
     fila = pe.procurar(k, root=estado_root)
     st = pe.ler(fila, k, root=estado_root)
@@ -110,14 +112,24 @@ def avisar(slug, backend, sp=None, estado_root=None, rotulo=PAPEL):
         cand = sorted(p for p, t in backend.titulos().items() if t == alvo and str(p) != proprio)
         pista = st.get("origem_pane")
         destino = pista if pista in cand else (cand[0] if cand else None)
-    if destino is not None:
-        caminho = _linha(sp) if sp else f"vault, SP {slug}"
-        msg = f"[sp-autor] SP {_linha(slug)} preenchido: {caminho}. Próximo: sp-resumo.py {_linha(slug)} e aprovação (super-prompt §Gerar 3-5)."
-        if backend.enviar(destino, msg):
-            pe.registar(fila, k, root=estado_root, aviso="enviado")
-            return "enviado"
+    caminho = _linha(sp) if sp else f"vault, SP {slug}"
+    msg = f"[sp-autor] SP {_linha(slug)} preenchido: {caminho}. Próximo: sp-resumo.py {_linha(slug)} e aprovação (super-prompt §Gerar 3-5)."
+    if destino is not None and _livre(backend, destino) and backend.enviar(destino, msg):
+        pe.registar(fila, k, root=estado_root, aviso="enviado")
+        return "enviado"
+    if destino is not None:  # origem ocupada (turno ou diálogo: as teclas perdiam-se): o avisos-hook entrega-o
+        avisos_caixa.depositar(destino, msg)
+        pe.registar(fila, k, root=estado_root, aviso="caixa")
+        return "caixa"
     pe.registar(fila, k, root=estado_root, aviso="aviso: origem ausente")
     return "origem-ausente"
+
+
+def _livre(backend, pane):
+    try:
+        return avisos_caixa.livre(read_screen(backend.nome, pane))
+    except Exception:  # noqa: BLE001 — sem ler o ecrã não se arrisca teclas: vai para a caixa
+        return False
 
 
 def fechar(slug, backend, estado_root=None, rotulo=PAPEL, env=None, atual=False):
@@ -126,9 +138,13 @@ def fechar(slug, backend, estado_root=None, rotulo=PAPEL, env=None, atual=False)
     Devolve o id fechado ou None (nada a fechar)."""
     k = chave(slug, rotulo)
     try:
-        pane = pe.ler(pe.procurar(k, root=estado_root), k, root=estado_root).get("pane")
+        st = pe.ler(pe.procurar(k, root=estado_root), k, root=estado_root)
     except pe.ErroEstado:
-        pane = None
+        st = {}
+    pane = st.get("pane")
+    if st and rotulo == PAPEL and not st.get("aviso"):  # o painel esqueceu o --avisar: a origem não fica sem saber
+        with contextlib.suppress(Exception):
+            avisar(slug, backend, estado_root=estado_root, rotulo=rotulo)
     if not pane and atual:
         pane = painel_backend.painel_atual(env)[1]
     if not pane:

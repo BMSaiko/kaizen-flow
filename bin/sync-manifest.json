@@ -6,6 +6,8 @@
     "context-budget.py",
     "handoff.py",
     "handoff_pane.py",
+    "avisos_caixa.py",
+    "test_avisos_caixa.py",
     "handoff_spawn.py",
     "handoff_resume.py",
     "test_handoff_autoconsumo.py",

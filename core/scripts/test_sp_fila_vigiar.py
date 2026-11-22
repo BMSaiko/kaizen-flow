@@ -101,3 +101,18 @@ def test_cli_uma_vez_devolve_estado_e_rc(tmp_path, monkeypatch, capsys):
 def test_cli_fila_desconhecida(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(fv, "_pasta", lambda fila: tmp_path / "nada")
     assert fv.main(["nada", "--uma-vez"]) == 1
+
+
+def test_main_aceita_a_pasta_da_fila(tmp_path, monkeypatch, capsys):
+    (tmp_path / "fila-x").mkdir()
+    monkeypatch.setattr(fv.pe, "raiz", lambda: tmp_path)
+    vistos = []
+    monkeypatch.setattr(fv, "ler_tudo", lambda fila: vistos.append(fila) or
+                        {"sps": {}, "vigia_vivo": True, "log": "", "fila_existe": True})
+    assert fv.main([str(tmp_path / "fila-x"), "--uma-vez"]) == 0
+    assert vistos == ["fila-x"]
+
+
+def test_main_fila_desconhecida_rc_1(tmp_path, monkeypatch):
+    monkeypatch.setattr(fv.pe, "raiz", lambda: tmp_path)
+    assert fv.main([str(tmp_path / "nao-existe"), "--uma-vez"]) == 1
