@@ -88,6 +88,7 @@ def test_paralelo_painel_que_nao_abre_marca_falhado(tmp_path):
 
 def test_paralelo_sem_backend_termina_com_erro_claro(tmp_path, monkeypatch):
     monkeypatch.setattr(sys.modules["sp_fila_execucao"], "_backend_defeito", lambda: None)
+    monkeypatch.setattr(sys.modules["sp_fila_execucao"].kaizen_config, "painel_backend", lambda repo: "auto")
     root = tmp_path / "sps"
     make_sp(root, "a")
     calls = []
@@ -99,6 +100,7 @@ def test_paralelo_sem_backend_termina_com_erro_claro(tmp_path, monkeypatch):
 
 def test_main_paralelo_sem_backend_recusa_antes_de_criar_estado(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(sys.modules["sp_fila_execucao"], "_backend_defeito", lambda: None)
+    monkeypatch.setattr(sys.modules["sp_fila_execucao"].kaizen_config, "painel_backend", lambda repo: "auto")
     make_sp(tmp_path / "sps", "a")
     st = tmp_path / "estado.json"
     rc = sp_fila.main(["--concorrencia", "2", "--estado", str(st), "--root", str(tmp_path / "sps"), "--relatorios", str(tmp_path / "rel")])

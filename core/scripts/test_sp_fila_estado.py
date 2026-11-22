@@ -40,24 +40,80 @@ def _obsoleta(tmp_path, root, **over):
     return _estado(tmp_path, **base)
 
 
-def test_fila_obsoleta_recusa_e_propoe_abandonar(tmp_path, capsys):
+@pytest.fixture
+def sem_lancar(monkeypatch):
+    """Nenhum teste deste ficheiro lança uma sessão real: `seguinte` é trocado por um stub que só regista."""
+    chamadas = []
+    monkeypatch.setattr(sp_fila, "seguinte", lambda *a, **k: chamadas.append(1) or {"acao": "fim", "motivo": "teste", "relatorio": "-"})
+    return chamadas
+
+
+def _arquivadas(tmp_path):
+    return sorted((tmp_path / "obsoletas").glob("*.json"))
+
+
+def test_fila_obsoleta_arquiva_e_arranca(tmp_path, sem_lancar, capsys):
     root = tmp_path / "sps"
-    st = _obsoleta(tmp_path, root)
-    assert _arranca(tmp_path, root) == 1
+    st = _obsoleta(tmp_path, root, inicio=None)  # sem data legível
+    antes = st.read_text(encoding="utf-8")
+    assert _arranca(tmp_path, root) == 0
     err = capsys.readouterr().err
-    assert "fila obsoleta" in err and "--abandonar-obsoleta" in err and "nenhum SP em Doing" in err
-    assert st.exists()
+    assert err.count("fila obsoleta arquivada:") == 1 and "EC-038" not in err
+    arq = _arquivadas(tmp_path)
+    assert len(arq) == 1 and arq[0].read_text(encoding="utf-8") == antes
+    assert st.exists() and sp_fila.ler(st).get("inicio")  # estado novo
 
 
-def test_fila_obsoleta_abandonada_com_flag_e_arranca_nova(tmp_path, capsys):
+def test_fila_antiga_arquiva_e_arranca(tmp_path, sem_lancar, capsys):
+    root = tmp_path / "sps"
+    _obsoleta(tmp_path, root)
+    assert _arranca(tmp_path, root) == 0
+    assert "fila obsoleta arquivada:" in capsys.readouterr().err and len(_arquivadas(tmp_path)) == 1
+
+
+def test_vigia_vivo_protege_a_fila(tmp_path, sem_lancar, monkeypatch, capsys):
+    root = tmp_path / "sps"
+    st = _obsoleta(tmp_path, root, fila_paineis="fila-y")
+    pidfile = tmp_path / "vigia.pid"
+    pidfile.write_text("4242", encoding="utf-8")
+    monkeypatch.setattr(sp_fila.sp_vigia, "caminhos", lambda pasta: (pidfile, None, None))
+    monkeypatch.setattr(sp_fila.sp_fila_paineis.pe, "pid_vivo", lambda pid: True)
+    assert _arranca(tmp_path, root) == 1
+    assert "fila já em curso" in capsys.readouterr().err and st.exists() and not _arquivadas(tmp_path)
+
+
+def test_pidfile_ilegivel_conta_como_viva(tmp_path, monkeypatch):
+    pidfile = tmp_path / "vigia.pid"
+    pidfile.write_text("lixo", encoding="utf-8")
+    monkeypatch.setattr(sp_fila.sp_vigia, "caminhos", lambda pasta: (pidfile, None, None))
+    assert sp_fila.vigia_vivo({"fila_paineis": "f"}) is True
+    pidfile.unlink()
+    assert sp_fila.vigia_vivo({"fila_paineis": "f"}) is False
+    assert sp_fila.vigia_vivo({}) is False
+
+
+def test_dry_run_diz_arquivaria_sem_tocar(tmp_path, capsys):
     root = tmp_path / "sps"
     st = _obsoleta(tmp_path, root)
-    rc = _arranca(tmp_path, root, "--abandonar-obsoleta", "--dry-run")
-    assert rc == 0  # dry-run nem toca no estado
-    assert st.exists()
-    estado = sp_fila.ler(st)
-    assert sp_fila.abandonar_obsoleta(st, estado, "m", type("A", (), {"abandonar_obsoleta": True})(), tty=False)
-    assert not st.exists()
+    antes = st.read_text(encoding="utf-8")
+    assert _arranca(tmp_path, root, "--dry-run") == 0
+    assert "arquivaria" in capsys.readouterr().out
+    assert st.read_text(encoding="utf-8") == antes and not _arquivadas(tmp_path)
+
+
+def test_json_corrompido_da_ec045_e_fica_intacto(tmp_path, capsys):
+    root = tmp_path / "sps"
+    make_sp(root, "novo")
+    st = tmp_path / "estado.json"
+    st.write_text("{truncado", encoding="utf-8")
+    assert _arranca(tmp_path, root) == 1
+    assert st.read_text(encoding="utf-8") == "{truncado" and not _arquivadas(tmp_path)
+
+
+def test_flag_abandonar_obsoleta_continua_aceite(tmp_path, sem_lancar):
+    root = tmp_path / "sps"
+    _obsoleta(tmp_path, root)
+    assert _arranca(tmp_path, root, "--abandonar-obsoleta") == 0
 
 
 def test_fila_viva_nunca_e_tocada(tmp_path, capsys):
@@ -76,35 +132,6 @@ def test_fila_vazia_antiga_e_obsoleta(tmp_path):
     antigo = {"inicio": "2020-01-01T10:00:00", "sessoes": {}}
     assert "nenhum SP em Doing" in sp_fila.fila_obsoleta(antigo, items, datetime(2026, 11, 9))
     assert sp_fila.fila_obsoleta({"inicio": "2026-11-09T11:30:00", "sessoes": {}}, items, datetime(2026, 11, 9, 12)) is None
-
-
-def test_obsoleta_confirmada_no_terminal(tmp_path):
-    st = _estado(tmp_path)
-    args = type("A", (), {"abandonar_obsoleta": False})()
-    assert not sp_fila.abandonar_obsoleta(st, {}, "m", args, entrada=lambda _: "n", tty=True) and st.exists()
-    assert sp_fila.abandonar_obsoleta(st, {}, "m", args, entrada=lambda _: "s", tty=True) and not st.exists()
-
-
-def test_obsoleta_eof_no_terminal_vale_como_nao(tmp_path, capsys):
-    st = _estado(tmp_path)
-    args = type("A", (), {"abandonar_obsoleta": False})()
-
-    def eof(_):
-        raise EOFError
-    assert not sp_fila.abandonar_obsoleta(st, {}, "m", args, entrada=eof, tty=True) and st.exists()
-    assert "--abandonar-obsoleta" in capsys.readouterr().err
-
-
-def test_obsoleta_com_stdin_em_eof_nao_rebenta(tmp_path, capsys):
-    # Windows: stdin em NUL diz isatty() True e o input() dá EOFError
-    st = _estado(tmp_path)
-    args = type("A", (), {"abandonar_obsoleta": False})()
-
-    def eof(_):
-        raise EOFError
-
-    assert not sp_fila.abandonar_obsoleta(st, {}, "m", args, entrada=eof, tty=True) and st.exists()
-    assert "--abandonar-obsoleta" in capsys.readouterr().err
 
 
 def test_dois_escritores_simultaneos_nao_perdem_registos(tmp_path):
@@ -262,3 +289,15 @@ def test_estado_por_mae_nao_se_partilha(tmp_path):
     assert fe.localizar("tb1", tmp_path, tmp_path / "x.json") == b
     assert fe.localizar("nada", tmp_path, tmp_path / "x.json") is None
     assert fe.localizar(None, tmp_path, tmp_path / "x.json") is None  # ambíguo: duas filas
+
+
+def test_fila_de_paineis_nao_e_estado(tmp_path):
+    """`fila-<id>/fila.json` dos painéis vive na mesma pasta: `localizar` cai no legado, não nele."""
+    import sp_fila_estado as fe
+    p = tmp_path / "fila-1" / "fila.json"
+    p.parent.mkdir(parents=True)
+    fe.guardar(p, {"fila": "fila-1", "ordem": ["s1"], "sessoes": {"s1": {}}})
+    legado = tmp_path / "legado.json"
+    fe.guardar(legado, {"max": None, "usados": 0, "sessoes": {"s1": {}}})
+    assert fe.estados_existentes(tmp_path) == []
+    assert fe.localizar("s1", tmp_path, legado) == legado

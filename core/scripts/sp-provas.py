@@ -30,7 +30,7 @@ TIPOS = ("antes", "depois", "diagrama", "terminal")
 MAX_BYTES = 2 * 1024 * 1024
 DATA_MIN = "2026-11-13"
 PROIBIDOS = (".env", ".key", ".pem", ".p12", ".pfx", "id_rsa", ".kdbx", "secrets.", ".secrets")
-SEGREDO = re.compile(r"(ghp_\w{10,}|github_pat_\w+|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{12,}|xox[abprs]-[\w-]+|"
+SEGREDO = re.compile(r"(ghp_\w{10,}|github_pat_\w+|(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{12,}|xox[abprs]-[\w-]+|"
                      r"eyJ[\w-]{15,}\.[\w-]{10,}\.[\w-]+|Bearer\s+[\w.-]{16,}|(password|passwd|secret|token|api[_-]?key)\s*[=:]\s*\S{6,})", re.I)
 PERIGOSO = re.compile(r"git\s+(reset|push\s+.*(--force|-f\b))|--force|--hard", re.I)
 

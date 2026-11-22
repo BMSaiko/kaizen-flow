@@ -213,3 +213,14 @@ def test_fim_guarda_ultima_json_para_o_gastos(tmp_path):
     assert out["acao"] == "fim" and not st.exists()
     assert json.loads(st.with_name("ultima.json").read_text(encoding="utf-8"))["sessoes"] == {"a": {}}
     assert st.with_name("ultima.json").is_file()
+
+
+def test_fim_e_parar_nao_deixam_estado_orfao(tmp_path):
+    root = tmp_path / "sps"
+    make_sp(root, "a", folder="Done")
+    st = _estado(tmp_path, sessoes={"a": {}})
+    sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 10, 25, 12, 0))
+    assert not st.exists() and not st.with_name("fila.json").exists()
+    st = _estado(tmp_path, sessoes={"a": {}})
+    assert sp_fila.main(["--parar", "--estado", str(st)]) == 0
+    assert not st.exists() and not list(tmp_path.glob("**/fila.json"))

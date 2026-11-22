@@ -250,6 +250,22 @@ def test_esperar_estado_timeout_sem_registo(tmp_path):
     assert (rc, e) == (sr.RC_TIMEOUT, None)
 
 
+def test_esperar_sem_registo_falha_cedo_apos_graca(tmp_path):
+    relogio = iter(range(0, 10000, 10))
+    rc, e = sr.esperar_estado("x", timeout=900, estado_root=tmp_path / "vazio", sleep=lambda s: None,
+                              agora=lambda: next(relogio), graca=60)
+    assert (rc, e) == (1, None)
+
+
+def test_esperar_heartbeat_regista_progresso(tmp_path):
+    root = _estado(tmp_path, "a-correr")
+    relogio = iter(range(0, 1000, 10))
+    msgs = []
+    sr.esperar_estado("x", timeout=130, estado_root=root, sleep=lambda s: None, agora=lambda: next(relogio),
+                      heartbeat=50, log=msgs.append)
+    assert len(msgs) >= 2 and "a-correr" in msgs[0]
+
+
 # --- inline -------------------------------------------------------------------
 
 

@@ -68,7 +68,7 @@ def _script(nome):
     return str(Path(__file__).resolve().parent / nome)
 
 
-def _enviar(a, backend, titulo, entrada, saida):
+def _acao_enviar(a, backend, titulo, entrada, saida):
     texto = a.alvo or ""
     if not texto or len(texto) > MAX_TEXTO or CONTROLO.search(texto):
         print(f"erro: texto vazio, com caracteres de controlo ou acima de {MAX_TEXTO}", file=sys.stderr)
@@ -116,7 +116,7 @@ def acao(a, backend, entrada=input, saida=print, correr=run_hidden):
         saida(dados_painel(texto))
         return 0
     if a.acao == "enviar":
-        return _enviar(a, backend, titulo, entrada, saida)
+        return _acao_enviar(a, backend, titulo, entrada, saida)
     return _matar(a, backend, titulo, entrada, saida)
 
 
