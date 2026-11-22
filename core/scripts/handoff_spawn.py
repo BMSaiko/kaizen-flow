@@ -3,6 +3,7 @@
 Uso: módulo importado por sp-handoff.py (`--spawn`); sem execução direta
 rc: n/a
 """
+import os
 import subprocess
 import sys
 import time
@@ -10,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import herdr_ops  # noqa: E402
 import painel_backend  # noqa: E402
 import sp_leitura  # noqa: E402
 from handoff_pane import (ENTER_SETTLE, ENTER_TRIES, HandoffError, _argvs, _copy, detect_backend, read_screen,  # noqa: E402
@@ -86,6 +88,21 @@ def _send_line(backend, pane, text, run, sleep):
                    tries=SPAWN_ENTER_TRIES, settle=SPAWN_SETTLE)
 
 
+def _spawn_herdr(wt, claude, cmd, run, res):
+    """herdr: painel novo (layout do HerdrBackend), `claude` como agente e `agent prompt` com o comando; id em `res`."""
+    backend = painel_backend.por_nome("herdr", run)
+    ops = backend._ops
+    pane = ops.painel_novo(wt, None, backend.max_panes, backend.workspace_por_projeto, os.environ.get("HERDR_PANE_ID"))
+    if not pane:
+        raise painel_backend.BackendError("herdr não devolveu o id do painel novo (o servidor está a correr? `herdr status`)")
+    res["painel"] = pane
+    ops.lancar_agente(pane, wt, claude)
+    try:
+        ops.prompt(pane, cmd)
+    except herdr_ops.HerdrErro as exc:
+        raise HandoffError(f"painel {pane}: {exc}") from exc
+
+
 def _adiado(slug, maximo):
     return {"slug": slug, "ok": False, "painel": None, "worktree": None,
             "erro": f"adiado: máximo de {maximo} painéis em simultâneo"}
@@ -102,6 +119,8 @@ def _spawn_um(slug, backend, run, sleep, res):
         print(f"{slug}: cd {wt} && {' '.join(claude)}  →  {cmd}")
     elif backend == "background":  # sem terminal: não há prompt a esperar, o comando corre direto em `claude -p`
         res["painel"] = _spawn_pane(backend, wt, run, (*claude, "-p", cmd))
+    elif backend == "herdr":  # herdr_ops único: painel, agente e prompt sem ler o ecrã
+        _spawn_herdr(wt, claude, cmd, run, res)
     else:
         res["painel"] = _spawn_pane(backend, wt, run, claude)
         _wait_prompt(backend, res["painel"], run, sleep)

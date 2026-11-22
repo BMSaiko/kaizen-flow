@@ -116,4 +116,6 @@ Layout of the herdr backend (herdr is also picked by `auto`, before WezTerm and 
 
 Invalid values (non-integer or below 1, non-boolean) fall back to the defaults.
 
+The queue (`/sp-fila`) and the handoff (`handoff --spawn`) share one herdr layer, `core/scripts/herdr_ops.py`: new pane, `claude` as agent, prompt by `herdr agent prompt` (no screen scraping).
+
 End-to-end check of the herdr engine (isolated herdr session, 2 projects, 3 panes, cap and resume; never touches the default session): `python -I core/scripts/herdr-e2e-multiprojeto.py --isolado`.

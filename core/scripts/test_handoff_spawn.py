@@ -160,3 +160,22 @@ def test_spawn_dry_run_leva_o_modelo_do_nivel_de_cada_sp(tmp_path, monkeypatch):
     _sp(tmp_path, "Doing", "sp-c", "complexo")
     res = _spawn(["sp-c", "outro"], backend="tmux", run=FakeRun(), dry_run=True)
     assert "claude-opus-5-5" in res[0]["cmd"] and "claude-sonnet-5-5" in res[1]["cmd"]
+
+
+def test_herdr_lanca_agente_e_envia_o_michi_por_herdr_ops(monkeypatch):
+    """No herdr o handoff fala só por `herdr_ops`: painel novo, agente `claude`, prompt `agent prompt` (sem ler o ecrã)."""
+    from herdr_fake import FakeHerdr
+    fake = FakeHerdr()
+
+    def run(argv, **kw):
+        if "ensure" in argv:
+            return _Res("aviso\n/wt/meu-sp\n")
+        return fake(argv, **kw)
+
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    res = _spawn(["meu-sp"], backend="herdr", run=run)
+    assert res[0]["ok"] and res[0]["worktree"] == "/wt/meu-sp"
+    pane = res[0]["painel"]
+    assert ["herdr", "agent", "prompt", pane, "/michi --auto meu-sp"] in fake.chamadas
+    assert not any(c[:3] in (["herdr", "pane", "send-text"], ["herdr", "pane", "read"]) for c in fake.chamadas)
+    assert any(c[:3] == ["herdr", "pane", "run"] and "command claude" in c[4] for c in fake.chamadas)
