@@ -229,6 +229,23 @@ def _perguntar():
         return False
 
 
+def _cmd_lock(a):
+    """`--lock`/`--unlock <slug>`: toma ou liberta o lock sem processo; rc 0, 1 (ocupado) ou 2 (slug inválido)."""
+    if not _slug_valido(a.slug):
+        print(resume(a.raiz, a.slug)[1], file=sys.stderr)
+        return 2
+    if not a.lock:
+        print("lock libertado" if sp_disco.libertar_lock(a.raiz, a.slug, pid=None, painel=a.painel) else "sem lock próprio a libertar")
+        return 0
+    try:
+        sp_disco.tomar_lock(a.raiz, a.slug, a.painel, pid=None)
+    except sp_disco.LockOcupado as e:
+        print(_msg_ocupado(a.slug, e.dono), file=sys.stderr)
+        return 1
+    print(f"lock de {a.slug} tomado")
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Retoma um SP interrompido (kaizen resume)")
     ap.add_argument("slug", nargs="?")
@@ -242,20 +259,8 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if (a.lock or a.unlock) and not a.slug:
         ap.error("--lock/--unlock precisam de <slug>")
-    if (a.lock or a.unlock) and not _slug_valido(a.slug):
-        print(resume(a.raiz, a.slug)[1], file=sys.stderr)
-        return 2
-    if a.lock:
-        try:
-            sp_disco.tomar_lock(a.raiz, a.slug, a.painel, pid=None)
-        except sp_disco.LockOcupado as e:
-            print(_msg_ocupado(a.slug, e.dono), file=sys.stderr)
-            return 1
-        print(f"lock de {a.slug} tomado")
-        return 0
-    if a.unlock:
-        print("lock libertado" if sp_disco.libertar_lock(a.raiz, a.slug, pid=None, painel=a.painel) else "sem lock próprio a libertar")
-        return 0
+    if a.lock or a.unlock:
+        return _cmd_lock(a)
     slug = a.slug
     if not slug:
         cands = candidatos(a.raiz)
