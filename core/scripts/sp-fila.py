@@ -11,6 +11,7 @@ Uso:
   python -I scripts/sp-fila.py --ajuda      # regras do agente principal no modo paralelo
   python -I scripts/sp-fila.py --programa <slug-mãe> [--max N]   # só a árvore da mãe; orçamento lido dela
   python -I scripts/sp-fila.py --seguinte [--slug S]   # no fecho de cada SP da fila: regista e lança o seguinte
+  python -I scripts/sp-fila.py --seguinte --retomar   # retoma a fila pausada por `orcamento` (kaizen.config.json) depois de subir o teto
   python -I scripts/sp-fila.py --gastos     # custo USD por sessão da corrida (só medição)
   python -I scripts/sp-fila.py --parar       # abandona a fila (apaga o estado)
 
@@ -47,6 +48,8 @@ import sp_fila_paineis  # noqa: E402
 import sp_vigia  # noqa: E402
 import sp_fila_nucleo as nucleo  # noqa: E402
 import kf_erros  # noqa: E402
+import kaizen_config  # noqa: E402
+from sp_fila_estado import REPO  # noqa: E402
 import contextlib
 import time
 
@@ -214,6 +217,7 @@ def _parser():
     ap.add_argument("--max", type=int, default=None, help=f"nº máximo de SPs (defeito {MAX_DEFEITO}; em --concorrencia só conta se passado)")
     ap.add_argument("--ate", metavar="HH:MM", help="hora limite")
     ap.add_argument("--concorrencia", type=int, metavar="N", help="modo paralelo (N=1 também): abre até N painéis `claude`, cada um com a sua worktree e o modelo do SP; sem limite de quota")
+    ap.add_argument("--retomar", action="store_true", help="com `--seguinte`: retoma a fila pausada por orçamento (relê `orcamento` do kaizen.config.json)")
     ap.add_argument("--orcamento", type=int, default=ORCAMENTO, help=f"teto opcional de requests totais; cada SP gasta {REQ_POR_SP} (sem ele, sem limite)")
     ap.add_argument("--max-falhas", type=int, default=MAX_FALHAS_DEFEITO, metavar="N", help=f"para a fila após N SPs falhados seguidos (defeito {MAX_FALHAS_DEFEITO}; 0 = sem este limite)")
     ap.add_argument("--projeto")
@@ -290,8 +294,9 @@ def _novo_estado(args, mae, modo, so):
     def num(k):
         return float(fm[k]) if fm.get(k) not in (None, "") else None
     usd = num("orcamento_usd")
+    orcamento_cfg = kaizen_config.orcamento(REPO)  # `orcamento` do kaizen.config.json: pausa em vez de fechar por falhas
     novo = {"max": args.max, "concorrencia": max(1, args.concorrencia or 0) if args.concorrencia else None, "ate": args.ate, "orcamento": int(num("orcamento_requests") or args.orcamento or 0) or None,
-            "max_falhas": max(0, args.max_falhas), "seguidas": 0, "usados": 0, "modo": modo, "feitos": [], "falhados": [], "sessoes": {}, "projeto": args.projeto,
+            "max_falhas": 0 if orcamento_cfg else max(0, args.max_falhas), "orcamento_cfg": orcamento_cfg, "seguidas": 0, "usados": 0, "modo": modo, "feitos": [], "falhados": [], "sessoes": {}, "projeto": args.projeto,
             "programa": args.programa, "horas": num("orcamento_horas"), "usd": usd,
             "inicio": datetime.now().isoformat(timespec="seconds")}
     if usd is not None:
@@ -313,6 +318,8 @@ def _imprimir(out, estado):
             _arrancar_vigia(estado)
         else:
             print(f"lançado · {', '.join(out['slugs'])} · terminar o turno")
+    elif out["acao"] == "pausa":
+        print(f"fila em pausa (orçamento): {out['razao']}\nsubir o teto em kaizen.config.json e `sp-fila.py --seguinte --retomar`")
     else:
         print(f"fila terminada: {out['motivo']}\nrelatório: {out['relatorio']}")
         if out.get("fechar_mae"):
@@ -401,7 +408,7 @@ def _estado_path(args):
 
 def _cmd_seguinte(args, estado):
     try:
-        out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug, **({'run': nucleo.RUN} if nucleo.RUN else {}))
+        out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug, retomar=args.retomar, **({'run': nucleo.RUN} if nucleo.RUN else {}))
     except (IntegracaoPendente, SlugObrigatorio) as e:
         _erro("EC-067", str(e), "o pedido à fila não pode avançar assim", "estado da fila intacto",
               "seguir a indicação acima e repetir `--seguinte`")

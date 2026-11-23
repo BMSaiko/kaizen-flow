@@ -1,6 +1,6 @@
 """Lê `kaizen.config.json` na raiz do repo; sem ficheiro ou chave, devolve o defeito.
 
-Chaves: `spRoot` (raiz dos SPs) e `docsRoot` (raiz dos DR/DP), relativas à raiz do repo; `desenvolvimento` (método do projeto); `herdr` ({maxPanesPorTab, workspacePorProjeto}); `qualidade.coberturaDiff` (limiar % da cobertura do diff, defeito 85); `qualidade.{bloqueantes,consultivos,fases}` (perfil de gates, ver `qualidade`).
+Chaves: `spRoot` (raiz dos SPs) e `docsRoot` (raiz dos DR/DP), relativas à raiz do repo; `desenvolvimento` (método do projeto); `herdr` ({maxPanesPorTab, workspacePorProjeto}); `qualidade.coberturaDiff` (limiar % da cobertura do diff, defeito 85); `qualidade.{bloqueantes,consultivos,fases}` (perfil de gates, ver `qualidade`); `orcamento` ({spUsd, diaUsd, falhasSeguidas}, ver `orcamento`).
 
 Uso: módulo importado pelos scripts sp-* e doc_ops; sem execução direta
 rc: n/a
@@ -91,6 +91,26 @@ def qualidade(repo):
     fases = q.get("fases")
     fases = [f for f in FASES_PERFIL if f in fases] if isinstance(fases, list) else list(FASES_PERFIL)
     return {"bloqueantes": bloq, "consultivos": [c for c in cmds("consultivos") if c not in bloq], "fases": fases}
+
+
+FALHAS_SEGUIDAS_DEFEITO = 3
+
+
+def orcamento(repo):
+    """Orçamento da fila ({spUsd, diaUsd, falhasSeguidas}) ou None sem a chave `orcamento` (comportamento antigo).
+
+    `spUsd`/`diaUsd`: número > 0, senão None (sem esse teto); `falhasSeguidas`: inteiro >= 1, defeito 3."""
+    o = _read(repo).get("orcamento")
+    if not isinstance(o, dict):
+        return None
+
+    def usd(k):
+        v = o.get(k)
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else None
+
+    f = o.get("falhasSeguidas")
+    return {"spUsd": usd("spUsd"), "diaUsd": usd("diaUsd"),
+            "falhasSeguidas": f if isinstance(f, int) and not isinstance(f, bool) and f >= 1 else FALHAS_SEGUIDAS_DEFEITO}
 
 
 HOOKS_NAME = "kaizen-hooks.json"

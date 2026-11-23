@@ -15,3 +15,17 @@ Values are USD per million tokens (optional `cache_read` defaults to `in`, `cach
 Examples: see the usage rows in [use cases](use-cases.md) (`--days`, `--since`, `--source`, `--top`, `--codex-root`, `report --print`, `report --out`).
 
 Known limit: the Codex parser follows the rollout format (`event_msg` / `token_count`, `last_token_usage`) and is tested with synthetic fixtures; if your Codex version logs usage differently, open an issue with an anonymised sample.
+
+## Queue budget (`orcamento`)
+
+```json
+{"orcamento": {"spUsd": 10, "diaUsd": 50, "falhasSeguidas": 3}}
+```
+
+Safety brake of the autonomous queue (`/sp-fila`, `core/scripts/kf_orcamento.py`). Without the key nothing changes. Each ceiling is optional (`spUsd`, `diaUsd` > 0; `falhasSeguidas` integer >= 1, default 3).
+
+- `spUsd`: cost of the SP that just closed (from `sp-metricas`, when available); `diaUsd`: API-equivalent cost of today's Claude Code transcripts (`usage/kaizen_usage.py`); `falhasSeguidas`: consecutive SPs that did not reach Done. With the key set, this replaces `--max-falhas` (the queue pauses instead of ending).
+- The queue checks before launching each SP and after each close: `ok` below 80 % of every ceiling, `aviso` (stderr line) at 80 %, `parar` at 100 %.
+- `parar` pauses between SPs (a running panel is never killed): `estado.pausa = {estado: "orcamento", razao, desde}` in `fila.json`, nothing more is launched and no report is written, so no state is lost.
+- Resume after raising the ceiling in `kaizen.config.json`: `python -I scripts/sp-fila.py --seguinte --retomar` (re-reads the config; still over = stays paused).
+- Metrics only (tokens and USD), never conversation content.

@@ -135,6 +135,10 @@ A profile exists when `bloqueantes` or `consultivos` is a list; without it nothi
 - `pr_fechar.py <PR> --sp <slug> --pentest-relatorio F --review-estado F`: with a profile it re-runs the blocking gates before merging; a red gate, a pentest report that is not `sem achados` or a review state that is not `APROVADO` (per `fases`; remove one only here, in the reviewed config) means rc 11, no merge, and the SP is set to `bloqueado` with the reason.
 - An SP cannot switch the profile off; only this file can.
 
+## Queue budget (`orcamento`)
+
+`{"orcamento": {"spUsd": 10, "diaUsd": 50, "falhasSeguidas": 3}}` pauses `/sp-fila` between SPs when a cost or failure ceiling is hit; resume with `sp-fila.py --seguinte --retomar`. Details in [usage and cost](usage-and-cost.md#queue-budget-orcamento).
+
 ## Design gates (`design`, `ui: sim` SPs only)
 
 ```json
