@@ -5,6 +5,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 
 ## [Unreleased]
 
+### Fixed
+- `handoff --spawn` (herdr) confirma a submissão: se o `agent prompt` deixar o `/michi` no prompt sem Enter, repete o Enter e falha com erro claro se nunca submeter.
+
 ## [0.4.0] - 2026-11-23
 
 ### Added

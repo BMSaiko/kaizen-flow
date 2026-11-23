@@ -14,8 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import herdr_ops  # noqa: E402
 import painel_backend  # noqa: E402
 import sp_leitura  # noqa: E402
-from handoff_pane import (ENTER_SETTLE, ENTER_TRIES, HandoffError, _argvs, _copy, detect_backend, read_screen,  # noqa: E402
-                          run_hidden, send_confirmed)
+from handoff_pane import (ENTER_SETTLE, ENTER_TRIES, HandoffError, _argvs, _copy, detect_backend, herdr_enter_argv,  # noqa: E402
+                          prompt_has_text, read_screen, run_hidden, send_confirmed)
 
 from sp_fila_estado import ESTADO, atualizar, guardar, registar_sessao  # noqa: E402
 import contextlib
@@ -88,6 +88,18 @@ def _send_line(backend, pane, text, run, sleep):
                    tries=SPAWN_ENTER_TRIES, settle=SPAWN_SETTLE)
 
 
+def _confirmar_submissao(pane, cmd, run, sleep):
+    """`agent prompt` pode escrever o texto sem o submeter (Claude Code ainda a arrancar): se o prompt continuar com texto, repete o Enter."""
+    for _ in range(SPAWN_ENTER_TRIES):
+        sleep(SPAWN_SETTLE)
+        if not prompt_has_text(read_screen("herdr", pane, run)):
+            return
+        run(herdr_enter_argv(pane), check=True)
+    sleep(SPAWN_SETTLE)
+    if prompt_has_text(read_screen("herdr", pane, run)):
+        raise HandoffError(f"painel {pane}: o Enter não submeteu {cmd!r}")
+
+
 def _spawn_herdr(wt, claude, cmd, run, res, sleep=time.sleep):
     """herdr: painel novo (layout do HerdrBackend), `claude` como agente e `agent prompt` com o comando; id em `res`."""
     backend = painel_backend.por_nome("herdr", run)
@@ -100,6 +112,7 @@ def _spawn_herdr(wt, claude, cmd, run, res, sleep=time.sleep):
     for i in range(SPAWN_READY_S):  # o herdr só deteta o agente uns segundos depois de o `claude` arrancar
         try:
             ops.prompt(pane, cmd)
+            _confirmar_submissao(pane, cmd, run, sleep)
             return
         except herdr_ops.HerdrErro as exc:
             if exc.code != "agent_not_found" or i == SPAWN_READY_S - 1:
