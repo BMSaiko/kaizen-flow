@@ -107,12 +107,34 @@ def test_duas_filas_nunca_passam_de_3_paineis(ambiente):
     assert len(b.abertos) == 3 and pe.vagas_livres() == 0
 
 
-def test_titulo_do_separador_e_o_slug_com_sufixo_se_duplicado(ambiente):
+def test_titulo_do_separador_e_o_nome_canonico_com_sufixo_se_duplicado(ambiente):
     fila = fp.garantir_fila({"programa": None})
-    b = PainelFalso(titulos={"99": "a"})
+    b = PainelFalso(titulos={"99": "sp-a"})
+    b.abertos_ids.append("99")  # o painel com esse título está vivo
     res = _lancar([_alvo(ambiente.root, "a")], fila, b, _run([]))
-    assert res[0]["titulo"] == "a-2" and list(b.titulos_postos.values()) == ["a-2"]
+    assert res[0]["titulo"] == "sp-a-2" and list(b.titulos_postos.values()) == ["sp-a-2"]
     assert fp.titulo_livre("a", ["a", "a-2"]) == "a-3" and fp.titulo_livre("b", ["a"]) == "b"
+
+
+def test_lancar_regista_o_nome_e_guarda_no_estado(ambiente):
+    import kf_nomes as kn
+    fila = fp.garantir_fila({"programa": None})
+    b = PainelFalso()
+    res = _lancar([_alvo(ambiente.root, "a")], fila, b, _run([]))
+    e = kn.resolver("sp-a", root=ambiente.estado)
+    assert e["pane"] == b.abertos_ids[0] and e["papel"] == "sp" and e["slug"] == "a"
+    assert res[0]["nome"] == "sp-a"
+    assert pe.ler(fila, "a", root=ambiente.estado)["nome"] == "sp-a"
+
+
+def test_reabrir_o_mesmo_slug_recupera_o_nome_se_o_pane_morreu(ambiente):
+    import kf_nomes as kn
+    fila = fp.garantir_fila({"programa": None})
+    b = PainelFalso()
+    _lancar([_alvo(ambiente.root, "a")], fila, b, _run([]))
+    b.fechados.append(b.abertos_ids[0])
+    res = _lancar([_alvo(ambiente.root, "a")], fila, b, _run([]))
+    assert res[0]["nome"] == "sp-a" and kn.resolver("sp-a", root=ambiente.estado)["pane"] == b.abertos_ids[1]
 
 
 def test_prompt_manda_sp_estado_no_fim_e_proibe_atalhos():
