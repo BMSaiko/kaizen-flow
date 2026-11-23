@@ -92,6 +92,8 @@
     "ds-init.py",
     "ds-validate.py",
     "ds-export.py",
-    "test_ds.py"
+    "test_ds.py",
+    "sp-visao.py",
+    "test_sp_visao.py"
   ]
 }

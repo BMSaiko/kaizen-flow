@@ -111,6 +111,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-074 | Two panes are launched for the same slug | the second gets the next free name (`-2`, `-3`), never the first one's | testes-falha-90 | `core/scripts/test_kf_nomes.py::test_nome_colisao_sufixo` |
 | EC-076 | `orq` is asked to close the `kaizen` pane (by name or by id) | it is refused with a clear error (rc 2) and nothing is closed | testes-falha-90 | `core/scripts/test_kf_term_orq.py::test_matar_principal_recusado` |
 | EC-077 | A pane is registered with an invalid name (uppercase, spaces, over 48 characters) | the registration is refused and the registry is left untouched | testes-falha-90 | `core/scripts/test_kf_nomes.py::test_registar_nome_invalido` |
+| EC-079 | A `VISION.md` still holds `TBD`/`TODO`/`(preencher)` placeholders (e.g. straight from `kaizen vision init`) | `kaizen vision validate` exits 1 and lists every unfilled field and section; nothing downstream consumes it | kaizenflow-visao-intake | `core/scripts/test_sp_visao.py::test_ec_079_validate_rejeita_placeholders` |
 
 ## Windows (atomic rename, CRLF, paths, console close)
 
@@ -124,3 +125,4 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-056 | Accented characters in a path or story title | files are read and written as UTF-8 without mangling | testes-falha-90 | `core/scripts/test_sp_progresso.py::test_ec_056_titulo_e_caminho_acentuados_lidos_e_escritos_em_utf8` |
 | EC-057 | Console window closed (CTRL_CLOSE_EVENT) during a phase | the phase journal is flushed before the process ends | checkpoint-journal | `core/scripts/test_sp_journal.py::test_ec_057_handler_de_fecho_de_consola_grava_checkpoint` |
 | EC-058 | Text with control characters sent to a pane | it is refused before anything is sent | testes-falha-90 | `core/scripts/test_sp_handoff.py::test_send_argv_recusa_caracteres_de_controlo` |
+| EC-080 | A `VISION.md` saved on Windows with a UTF-8 BOM, CRLF line endings and accented text | it is read and validated like any other file, without mangling the accents | kaizenflow-visao-intake | `core/scripts/test_sp_visao.py::test_ec_080_validate_utf8_com_acentos_e_bom` |

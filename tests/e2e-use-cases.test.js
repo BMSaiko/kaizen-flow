@@ -433,3 +433,26 @@ test("UC-035 kaizen ds gera e valida o design system do projeto", T, comSandbox(
   const css = fs.readFileSync(path.join(sb.dir, "design", "tokens.css"), "utf8");
   assert.match(css, /:root\s*\{[^}]*--/);
 }));
+
+test("UC-038 kaizen vision gera e valida o VISION.md do projeto", T, comSandbox({}, (sb) => {
+  const vision = (...a) => kaizen(["vision", ...a], { cwd: sb.dir, env: sb.env, encoding: "utf8" });
+  assert.strictEqual(vision("init", "demo").status, 0, "vision init");
+  const f = path.join("demo", "VISION.md");
+  assert.ok(fs.existsSync(path.join(sb.dir, f)), "VISION.md");
+  const falha = vision("validate", f);
+  assert.strictEqual(falha.status, 1, "esqueleto com TBD não valida");
+  assert.match(falha.stderr, /Goal/);
+  const texto = fs.readFileSync(path.join(sb.dir, f), "utf8")
+    .replace("ui: nao", "ui: nao").replace("stack: TBD", "stack: node").replace("orcamento: TBD", "orcamento: 5 USD por SP, 20 USD por dia")
+    .replace("## Goal\nTBD", "## Goal\nPlanear refeições sem desperdício.")
+    .replace("## Users\n- TBD", "## Users\n- Famílias.")
+    .replace(/- \[ \] TBD[^\n]*/, "- [ ] `npm test` passa.")
+    .replace("## Constraints\n- TBD", "## Constraints\n- Sem telemetria.")
+    .replace("## Non-goals\n- TBD", "## Non-goals\n- Sem contas.")
+    .replace("1. TBD", "1. Lista de compras.");
+  fs.writeFileSync(path.join(sb.dir, f), texto, "utf8");
+  assert.strictEqual(vision("validate", f).status, 0, "vision validate");
+  const r = vision("resumo", f);
+  assert.strictEqual(r.status, 0, "vision resumo");
+  assert.match(r.stdout, /demo/);
+}));
