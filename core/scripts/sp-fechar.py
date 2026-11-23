@@ -16,6 +16,7 @@ import re
 import sys as _s
 import pathlib as _p
 _s.path.insert(0, str(_p.Path(__file__).resolve().parent))
+import painel_backend  # noqa: E402
 from painel_backend import run_hidden  # noqa: E402
 import sys
 import time
@@ -215,6 +216,56 @@ def em_fila(slug, estado=None):
         return False
 
 
+def _gravar_estado(slug, estado_root=None, base=None, legado=None):
+    """Grava `done` na fila do SP (mãe: `sessoes` → `feitos`; painéis: `done`, também vindo de `bloqueado`).
+
+    Devolve (linhas, pane a fechar ou None); fora da fila: ([], None)."""
+    import sp_fila_estado as fe
+    import sp_painel_estado as pe
+    caminho = fe.localizar(slug, base=base, legado=legado)
+    if caminho is None:
+        return [], None
+    dados = {}
+
+    def _mover(estado):
+        dados["fila"] = estado.get("fila_paineis")
+        if estado["sessoes"].pop(slug, None) is not None and slug not in estado["feitos"]:
+            estado["feitos"].append(slug)
+
+    fe.atualizar(caminho, _mover)
+    linhas, pane = [f"{slug}: fila — sessão passa a feita"], None
+    fila = dados["fila"]
+    if not fila:
+        return linhas, None
+    try:
+        pane = pe.ler(fila, slug, root=estado_root).get("pane")
+        pe.transitar(slug, "done", fila=fila, root=estado_root, forcar_done=True)
+        linhas[0] = f"{slug}: fila {fila} gravada em done"
+    except pe.ErroEstado as exc:
+        linhas.append(f"aviso: estado da fila não gravado ({exc})")
+    return linhas, pane
+
+
+def _fechar_pane(pane, backend, emitir=None, linhas=()):
+    """Fecha o pane do SP por último (pode ser o do próprio `sp-fechar`): `emitir(linhas)` antes; falha = linha de aviso."""
+    if not pane:
+        return
+    if backend is None:
+        return [f"aviso: sem backend de painéis, pane {pane} fica aberto"]
+    if emitir:
+        emitir(list(linhas))
+    try:
+        backend.fechar(pane)
+    except Exception as exc:  # noqa: BLE001 — fechar o pane nunca muda o rc
+        return [f"aviso: pane {pane} não fechado ({exc})"]
+
+
+def gravar_done_fila(slug, backend=None, estado_root=None, base=None, legado=None, emitir=None):
+    """Estado da fila em `done` e pane fechado (injetável nos testes); devolve as linhas, vazias fora da fila."""
+    linhas, pane = _gravar_estado(slug, estado_root, base, legado)
+    return [*linhas, *(_fechar_pane(pane, backend, emitir, linhas) or [])]
+
+
 def filhos_da_mae(sps, kid):
     """Slugs em `children:` do frontmatter da mãe de `kid` (vazio se a mãe não existe ou não os lista)."""
     mae = next((s for s in sps if s.slug == kid.parent and s.project == kid.project), None)
@@ -305,8 +356,9 @@ def _bloqueado(slug, lines, commit, budget, commit_dir):
     return False
 
 
-def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True, sem_prova=None):
-    """Corre o fecho. Devolve (rc, linhas)."""
+def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True, sem_prova=None,
+           backend=None, emitir=None, estado_root=None):
+    """Corre o fecho. Devolve (rc, linhas). Sessão da fila: grava `done` na fila e, com `backend`, fecha o pane no fim (`emitir` imprime antes)."""
     t_total = time.monotonic()
     sp = find_doing(root, slug, project)
     slug = sp.slug  # o resto (sp_move, seguinte, COMMIT) usa o slug completo, não o `ref` curto
@@ -318,10 +370,13 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
     fila = em_fila(slug)
     if nxt and fila:
         return 1, [*lines, f"{slug}: sessão da fila, --next não se aplica (o driver lança o seguinte)"]
+    pane = None
     if nxt:
         lines.append(sp_move.advance(root, slug, sp.project))
     else:
         lines.append(sp_move.move(root, slug, "done", sp.project))
+        linhas_fila, pane = _gravar_estado(slug, estado_root) if fila else ([], None)
+        lines += linhas_fila
     prox = "" if nxt else seguinte(root, slug, sp.project, fila)
     if prox:
         lines.append(prox)
@@ -331,6 +386,8 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
     if hint:
         lines.append(hint)
     print(f"[sp-fechar] total {time.monotonic() - t_total:.1f}s", file=sys.stderr, flush=True)
+    if not nxt and pane:
+        lines += _fechar_pane(pane, backend, emitir, lines) or []
     return 0, lines
 
 
@@ -356,14 +413,23 @@ def main(argv=None):
         rc = wt_redirect.redirect(__file__, args.slug, sys.argv[1:])
         if rc is not None:
             return rc
+    impresso = []
+
+    def emitir(linhas):  # o pane pode ser o deste processo: as linhas saem antes de ele fechar
+        print("\n".join(linhas), flush=True)
+        impresso.append(1)
     try:
+        backend = painel_backend.escolher_por_config("auto") if em_fila(args.slug) else None
         rc, lines = fechar(args.root, args.slug, args.project, args.next, args.msg,
                            not args.sem_budget, not args.sem_commit, args.commit_dir,
-                           not args.sem_testes, args.sem_prova)
+                           not args.sem_testes, args.sem_prova, backend=backend, emitir=emitir)
     except (FecharError, sp_move.SpMoveError) as exc:
         print(f"erro: {exc}", file=sys.stderr)
         return 2
-    print("\n".join(lines))
+    if impresso:  # o `emitir` já imprimiu tudo menos o que veio depois do fecho do pane
+        lines = lines[-1:] if lines and lines[-1].startswith("aviso: pane") else []
+    if lines:
+        print("\n".join(lines))
     return rc
 
 
