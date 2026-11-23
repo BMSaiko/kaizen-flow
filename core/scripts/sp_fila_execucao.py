@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kf_git  # noqa: E402
 import kaizen_config  # noqa: E402
 import kaizen_engine  # noqa: E402
+import kf_orcamento  # noqa: E402
 import painel_backend  # noqa: E402
 import sp_fila_nucleo as nucleo  # noqa: E402
 import sp_painel_estado as pe  # noqa: E402
@@ -34,15 +35,17 @@ def falta_backend():
     return painel_backend.falta(kaizen_config.painel_backend(REPO))
 
 
-def seguinte(root, estado_path, rel_dir, run=run_hidden, agora=None, custo_fn=None, slug=None, backend=None):
+def seguinte(root, estado_path, rel_dir, run=run_hidden, agora=None, custo_fn=None, slug=None, backend=None,
+             gasto_dia_fn=None, retomar=False):
     """Regista o SP que fechou, respeita os limites e lança o seguinte. Devolve {acao, ...}.
 
     `slug`: só essa sessão fecha (as outras continuam); sem ele fecham todas as registadas (formato antigo).
     Com sessões ainda em curso não lança nada (`acao: espera`) até haver teto de concorrência.
-    `backend`: painéis do modo paralelo (defeito: o da config, resolvido só quando há um SP a lançar)."""
+    `backend`: painéis do modo paralelo (defeito: o da config, resolvido só quando há um SP a lançar).
+    Orçamento (`estado.orcamento_cfg`): ao exceder um teto devolve `acao: pausa` com a razão em `estado.pausa`; `retomar` reavalia."""
     with ExitStack() as pilha:  # o lock é solto durante o spawn (`_seguinte` fecha-o e volta a prendê-lo) e solto no fim
         pilha.enter_context(bloqueio(estado_path))
-        return _seguinte(root, estado_path, rel_dir, run, agora or datetime.now(), custo_fn, slug, pilha, backend)
+        return _seguinte(root, estado_path, rel_dir, run, agora or datetime.now(), custo_fn, slug, pilha, backend, gasto_dia_fn, retomar)
 
 
 def _fechar_painel(estado, slug, feito):
@@ -149,7 +152,27 @@ def _registar_lancamento(estado, alvo, erro, item, agora, lancados, itens):
     return None
 
 
-def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, backend=None):
+def _pausar(estado, estado_path, razao, agora):
+    """Regista a pausa por orçamento (a fila fica intacta, sem relatório) e devolve o resultado `pausa`."""
+    estado["pausa"] = {"estado": "orcamento", "razao": razao, "desde": agora.isoformat(timespec="seconds")}
+    guardar(estado_path, estado)
+    return {"acao": "pausa", "razao": razao, "sessoes": list(estado["sessoes"])}
+
+
+def _verificar_orcamento(estado, fechadas, custo_fn, gasto_dia_fn, agora):
+    """`parar` → razão (str); `aviso` → avisos impressos em stderr; sem `orcamento_cfg`, None (comportamento antigo)."""
+    cfg = estado.get("orcamento_cfg")
+    if not cfg:
+        return None
+    sp_usd = max((_custos_seguros(custo_fn).get(f, 0.0) for f in fechadas), default=0.0) if cfg.get("spUsd") and fechadas else 0.0
+    dia = (gasto_dia_fn or kf_orcamento.gasto_dia)(agora) if cfg.get("diaUsd") else 0.0
+    r = kf_orcamento.decidir(cfg, sp_usd=sp_usd, dia_usd=dia, seguidas=estado.get("seguidas", 0))
+    for a in r["avisos"]:
+        print(f"aviso de orçamento: {a}", file=sys.stderr)
+    return r["razao"] or None
+
+
+def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, backend=None, gasto_dia_fn=None, retomar=False):
     estado = ler(estado_path)
     if not slug and estado.get("concorrencia") and estado["sessoes"]:
         raise SlugObrigatorio("em modo paralelo `--seguinte` exige `--slug <SP que fechou>`; sem ele fecharia sessões ainda vivas")
@@ -157,7 +180,14 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
     if estado.get("concorrencia"):  # worktrees atrasadas: o estado dos SPs é o de master
         aplicar_master(items)
     so = descendentes(items, estado["programa"]) if estado.get("programa") else None
+    antes = set(estado["sessoes"])
     _registar_fechadas(root, estado, items, slug, run)
+    if retomar and estado.get("pausa"):  # o humano subiu o teto (config ou estado): reavaliar já
+        estado.pop("pausa")
+        estado["orcamento_cfg"] = kaizen_config.orcamento(REPO) or estado.get("orcamento_cfg")
+    razao = _verificar_orcamento(estado, antes - set(estado["sessoes"]), custo_fn, gasto_dia_fn, agora)
+    if razao or estado.get("pausa"):  # pausada: nada é lançado até `--retomar`; os SPs em curso acabam (paragem só entre SPs)
+        return _pausar(estado, estado_path, razao or estado["pausa"]["razao"], agora)
     # Paralelo (--concorrencia N): sem orçamento; só `--ate` e `--max` explícito; o único travão é o guard de contexto, que continua a sessão por handoff.
     teto = estado.get("concorrencia") or 1
     if len(estado["sessoes"]) >= teto:
@@ -175,6 +205,11 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
             continue
         motivo = limite_paralelo(estado, agora)
         if motivo or len(estado["sessoes"]) >= teto:
+            break
+        if razao := _verificar_orcamento(estado, [], custo_fn, gasto_dia_fn, agora):  # o custo do dia pode ter subido durante um spawn
+            if not lancados:
+                return _pausar(estado, estado_path, razao, agora)
+            estado["pausa"] = {"estado": "orcamento", "razao": razao, "desde": agora.isoformat(timespec="seconds")}
             break
         backend = backend or _backend_defeito()
         if backend is None:
