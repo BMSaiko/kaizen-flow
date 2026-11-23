@@ -15,6 +15,9 @@ Ficheiros antigos sem `fase`/`pergunta`/`motivo`/`retoma_em` continuam a ler-se.
 
 Pausa por quota/rede/sessão: o vigia lê a cauda do ecrã de cada SP `a-correr`; se ficar parada em dois ticks e `kf_erros.classificar_falha` a reconhecer, o SP passa a `bloqueado` com `motivo` e `retoma_em` (sem escalada de modelo, checkpoint intacto). Passada a hora, com o painel vivo, volta a `a-correr` e recebe «continua»; com o painel morto, `kaizen resume <slug>` retoma (antes da hora recusa com o EC e a hora). `sp-estado.py --listar` mostra `retoma <hora>`.
 
+## Nomes dos painéis
+
+`<SP_FILA_ROOT>/nomes.json` guarda nome→pane (`nome`, `backend`, `pane`, `cwd`, `papel`, `slug`, `criado`), escrita atómica; entradas cujo pane já não está em `backend.listar()` são podadas na leitura e um ficheiro corrompido é recriado com aviso. O campo `nome` do estado de cada SP guarda o nome do seu painel. `kaizen` só se regista para o cwd da raiz do Second Brain (`SB_ROOT`).
 ## Hook `scripts/kf_painel_hook.py`
 
 | Evento | Efeito |

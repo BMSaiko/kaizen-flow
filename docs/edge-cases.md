@@ -42,6 +42,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-013 | Unexpected error while the watcher handles one story | the other stories of the queue are still handled | testes-falha-90 | `core/scripts/test_sp_vigia.py::test_erro_inesperado_num_sp_nao_para_os_outros` |
 | EC-014 | The same gate keeps failing | after `max_tentativas` the run stops and asks instead of looping | testes-falha-90 | `core/scripts/test_sp_gates.py::test_limite_de_tentativas_para` |
 | EC-015 | A script module fails while being imported by another | the half-loaded module is not left registered; the next import retries cleanly | testes-falha-90 | `core/scripts/test_sp_carregar.py::test_erro_no_modulo_nao_deixa_nome_registado` |
+| EC-078 | The name registry file is corrupted | it is recreated empty with a warning; panes keep working by id | testes-falha-90 | `core/scripts/test_kf_nomes.py::test_ficheiro_corrompido_recria_e_avisa` |
 
 ## Quota, network, API and model session
 
@@ -89,6 +90,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-039 | Watcher pid file left behind by a crash | stopping with a dead pid only deletes the file | resume-orfaos | `core/scripts/test_sp_vigia.py::test_parar_pid_morto_so_apaga` |
 | EC-065 | `git` or Python is not on PATH | the preflight reports EC-065 with what is missing and how to install it; rc 1 | preflight-erros-ux | `core/scripts/test_sp_preflight.py::test_git_ausente_ec065` |
 | EC-068 | Kaizen pieces missing from a project (skills, scripts, AGENTS.md block, hooks) | `kaizen doctor` reports them in one EC-068 message with rc 1 and proposes `kaizen doctor --fix`; nothing is overwritten | preflight-erros-ux | `tests/cli-hardening.test.js::doctor com peças em falta lista-as numa mensagem EC-068 e propõe --fix` |
+| EC-075 | A named pane is gone (closed or machine restarted) while its name is still registered | the name is pruned on the next read and no longer resolves; reopening the same slug gets the same name back | testes-falha-90 | `core/scripts/test_kf_nomes.py::test_poda_panes_mortos_na_leitura` |
 
 ## Concurrency and corrupted state
 
@@ -106,6 +108,9 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-049 | A second watcher is started for the same queue | it is refused | testes-falha-90 | `core/scripts/test_sp_vigia.py::test_cli_recusa_segundo_vigia` |
 | EC-050 | Phase journal missing or corrupted at resume | resume falls back to the last valid entry and says which one | checkpoint-journal | `core/scripts/test_sp_journal.py::test_ec_050_linha_do_meio_invalida_vai_para_quarentena` |
 | EC-067 | Invalid request to a kaizen command or to the queue state (unknown slug or folder, invalid transition or phase, wrong option) | refused without writing; the message (EC format) says what is valid and the next command | preflight-erros-ux | `core/scripts/test_sp_estado.py::test_recusas_do_estado_no_formato_ec` |
+| EC-074 | Two panes are launched for the same slug | the second gets the next free name (`-2`, `-3`), never the first one's | testes-falha-90 | `core/scripts/test_kf_nomes.py::test_nome_colisao_sufixo` |
+| EC-076 | `orq` is asked to close the `kaizen` pane (by name or by id) | it is refused with a clear error (rc 2) and nothing is closed | testes-falha-90 | `core/scripts/test_kf_term_orq.py::test_matar_principal_recusado` |
+| EC-077 | A pane is registered with an invalid name (uppercase, spaces, over 48 characters) | the registration is refused and the registry is left untouched | testes-falha-90 | `core/scripts/test_kf_nomes.py::test_registar_nome_invalido` |
 
 ## Windows (atomic rename, CRLF, paths, console close)
 

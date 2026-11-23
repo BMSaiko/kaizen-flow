@@ -37,6 +37,11 @@ class FakeRun:
         return _Res()
 
 
+@pytest.fixture(autouse=True)
+def _estado_nomes(tmp_path, monkeypatch):
+    monkeypatch.setenv("SP_FILA_ROOT", str(tmp_path / "estado"))
+
+
 def _spawn(slugs, **kw):
     kw.setdefault("sleep", lambda s: None)
     kw.setdefault("registar", False)
@@ -54,7 +59,7 @@ def test_dry_run_nao_toca_em_nada_e_adia_o_excedente():
 def test_tmux_cria_painel_e_envia_o_michi_auto():
     run = FakeRun()
     res = _spawn(["meu-sp"], backend="tmux", run=run)
-    assert res == [{"slug": "meu-sp", "ok": True, "painel": "%9", "worktree": "C:/wt/meu-sp"}]
+    assert res == [{"slug": "meu-sp", "ok": True, "painel": "%9", "worktree": "C:/wt/meu-sp", "nome": "handoff-meu-sp"}]
     assert ["tmux", "send-keys", "-t", "%9", "-l", "/michi --auto meu-sp"] in run.calls
     assert ["tmux", "send-keys", "-t", "%9", "Enter"] in run.calls
 
@@ -242,3 +247,26 @@ def test_herdr_falha_se_o_enter_nunca_submete(monkeypatch):
     monkeypatch.delenv("HERDR_PANE_ID", raising=False)
     res = _spawn(["meu-sp"], backend="herdr", run=run, sleep=lambda s: None)
     assert not res[0]["ok"] and "Enter" in res[0]["erro"]
+
+
+def test_spawn_regista_nome():
+    import kf_nomes as kn
+    run = FakeRun()
+    res = _spawn(["meu-sp"], backend="tmux", run=run)
+    e = kn.resolver("handoff-meu-sp")
+    assert res[0]["nome"] == "handoff-meu-sp" and e["pane"] == "%9" and e["backend"] == "tmux" and e["papel"] == "handoff"
+
+
+def test_spawn_dois_do_mesmo_slug_nao_colidem():
+    import kf_nomes as kn
+    run = FakeRun()
+    _spawn(["x"], backend="tmux", run=run)
+    res = _spawn(["x"], backend="tmux", run=run)
+    assert res[0]["nome"] == "handoff-x-2" and kn.resolver("handoff-x")  # o antigo continua registado (sem poda sem vivos)
+
+
+def test_spawn_que_falha_nao_regista_nome():
+    import kf_nomes as kn
+    run = FakeRun(screen="❯ /michi --auto x")
+    _spawn(["x"], backend="tmux", run=run)
+    assert kn.listar() == []

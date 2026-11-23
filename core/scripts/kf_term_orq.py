@@ -20,6 +20,7 @@ from painel_backend import run_hidden  # noqa: E402
 import sys
 from pathlib import Path
 
+import kf_nomes  # noqa: E402
 import painel_backend as pb  # noqa: E402
 
 TITULO = "ORQ"
@@ -88,11 +89,18 @@ def _matar(a, backend, titulo, entrada, saida):
     if titulo == TITULO:
         print("erro: o painel ORQ não se mata por aqui", file=sys.stderr)
         return 2
+    if titulo == kf_nomes.NOME_PRINCIPAL:
+        print(f"erro: o painel {kf_nomes.NOME_PRINCIPAL} não se fecha por aqui", file=sys.stderr)
+        return 2
     saida(f"matar o painel {a.painel} ({titulo})")
     if not confirmar("matar?", entrada):
         saida("cancelado")
         return 0
-    saida("fechado" if backend.fechar(a.painel) else "já não existia")
+    fechado = backend.fechar(a.painel)
+    nome = kf_nomes.nome_de_pane(a.painel)
+    if nome:
+        kf_nomes.remover(nome)
+    saida("fechado" if fechado else "já não existia")
     return 0
 
 
@@ -105,10 +113,14 @@ def acao(a, backend, entrada=input, saida=print, correr=run_hidden):
             return 2
         flag = "--slug" if a.painel == "michi" else "--programa"
         return correr([sys.executable, "-I", _script("kf_term_arranque.py"), a.painel, flag, a.alvo], check=False).returncode
-    if a.painel not in backend.listar():
+    vivos = set(backend.listar())
+    nome = a.painel if kf_nomes.resolver(a.painel, vivos=vivos) else None  # nome canónico primeiro, id opaco continua válido
+    a.painel = kf_nomes.ref_a_pane(a.painel, vivos=vivos)
+    if a.painel not in vivos:
         print(f"erro: painel {a.painel} não existe", file=sys.stderr)
         return 2
-    titulo = backend.titulos().get(a.painel, "sem título")
+    nome = nome or kf_nomes.nome_de_pane(a.painel)
+    titulo = nome or backend.titulos().get(a.painel, "sem título")
     if a.acao == "ler":
         texto = backend.ecra(a.painel)
         if a.linhas:
