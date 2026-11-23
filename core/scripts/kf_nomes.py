@@ -1,4 +1,4 @@
-"""Nomes canónicos de painéis: `heimdall` (principal, no path do Second Brain) e `<papel>-<slug>` para os restantes.
+"""Nomes canónicos de painéis: `kaizen` (principal, no path do Second Brain) e `<papel>-<slug>` para os restantes.
 
 Registo JSON atómico nome→pane em `<estado>/nomes.json` (mesma pasta do estado das filas, `SP_FILA_ROOT`).
 Entradas cujo pane já não está vivo são podadas na leitura quando se passa `vivos`. Sem registo, ids opacos
@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sp_painel_estado as pe  # noqa: E402
 
-NOME_PRINCIPAL = "heimdall"
+NOME_PRINCIPAL = os.environ.get("KF_NOME_PRINCIPAL", "kaizen")
 PAPEIS = ("sp", "autor", "handoff", "fila", "livre")
 MAX_NOME = 48
 FICHEIRO = "nomes.json"
@@ -107,8 +107,8 @@ def _lido(vivos, root):
     return dados
 
 
-def registar(nome, backend, pane, cwd, papel, slug, root=None, raiz_sb=None):
-    """Regista `nome`→`pane`. `heimdall` só para o pane cujo cwd é a raiz do Second Brain, e só um."""
+def registar(nome, backend, pane, cwd, papel, slug, root=None, raiz_sb=None):  # noqa: PLR0913
+    """Regista `nome`→`pane`. `kaizen` só para o pane cujo cwd é a raiz do Second Brain, e só um."""
     if nome == NOME_PRINCIPAL:
         if not _mesmo_caminho(cwd, raiz_sb or globals()["raiz_sb"]()):
             raise ValueError(f"o nome {NOME_PRINCIPAL} é reservado ao painel do Second Brain")
@@ -131,7 +131,7 @@ def resolver(nome, vivos=None, root=None):
 
 
 def remover(nome, root=None):
-    """Tira `nome` do registo; True se existia. `heimdall` não se remove."""
+    """Tira `nome` do registo; True se existia. `kaizen` não se remove."""
     if nome == NOME_PRINCIPAL:
         raise PermissionError(f"o painel {NOME_PRINCIPAL} não se fecha nem se renomeia")
     dados = _ler(root)
@@ -148,14 +148,14 @@ def listar(vivos=None, root=None):
     return [dados[n] for n in sorted(dados)]
 
 
-def detetar_heimdall(backend, vivos_cwd, root=None, raiz_sb=None):
-    """Regista `heimdall` no pane cujo cwd é a raiz do Second Brain (`vivos_cwd` = {id: cwd}); devolve o id ou None."""
+def detetar_kaizen(backend, vivos_cwd, root=None, raiz_sb=None):
+    """Regista `kaizen` no pane cujo cwd é a raiz do Second Brain (`vivos_cwd` = {id: cwd}); devolve o id ou None."""
     sb = raiz_sb or globals()["raiz_sb"]()
     for pane, cwd in vivos_cwd.items():
         if _mesmo_caminho(cwd, sb):
             atual = _ler(root).get(NOME_PRINCIPAL)
             if atual and str(atual.get("pane")) != str(pane) and str(atual.get("pane")) in {str(p) for p in vivos_cwd}:
-                return str(atual["pane"])  # já há um heimdall vivo
+                return str(atual["pane"])  # já há um kaizen vivo
             dados = _ler(root)
             dados.pop(NOME_PRINCIPAL, None)
             _escrever(dados, root)

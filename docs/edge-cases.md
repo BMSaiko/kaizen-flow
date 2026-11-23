@@ -109,7 +109,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-050 | Phase journal missing or corrupted at resume | resume falls back to the last valid entry and says which one | checkpoint-journal | `core/scripts/test_sp_journal.py::test_ec_050_linha_do_meio_invalida_vai_para_quarentena` |
 | EC-067 | Invalid request to a kaizen command or to the queue state (unknown slug or folder, invalid transition or phase, wrong option) | refused without writing; the message (EC format) says what is valid and the next command | preflight-erros-ux | `core/scripts/test_sp_estado.py::test_recusas_do_estado_no_formato_ec` |
 | EC-074 | Two panes are launched for the same slug | the second gets the next free name (`-2`, `-3`), never the first one's | testes-falha-90 | `core/scripts/test_kf_nomes.py::test_nome_colisao_sufixo` |
-| EC-076 | `orq` is asked to close the `heimdall` pane (by name or by id) | it is refused with a clear error (rc 2) and nothing is closed | testes-falha-90 | `core/scripts/test_kf_term_orq.py::test_matar_heimdall_recusado` |
+| EC-076 | `orq` is asked to close the `kaizen` pane (by name or by id) | it is refused with a clear error (rc 2) and nothing is closed | testes-falha-90 | `core/scripts/test_kf_term_orq.py::test_matar_principal_recusado` |
 | EC-077 | A pane is registered with an invalid name (uppercase, spaces, over 48 characters) | the registration is refused and the registry is left untouched | testes-falha-90 | `core/scripts/test_kf_nomes.py::test_registar_nome_invalido` |
 
 ## Windows (atomic rename, CRLF, paths, console close)

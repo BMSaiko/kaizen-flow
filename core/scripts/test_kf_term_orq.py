@@ -175,11 +175,11 @@ def test_id_opaco_continua_a_funcionar(estado):
     assert rc == 0 and b.fechados == ["2"]
 
 
-def test_matar_heimdall_recusado(estado):
+def test_matar_principal_recusado(estado):
     import kf_nomes as kn
-    kn.registar("heimdall", "falso", "2", "/sb", "livre", "heimdall", raiz_sb="/sb")
+    kn.registar("kaizen", "falso", "2", "/sb", "livre", "kaizen", raiz_sb="/sb")
     b = Falso()
-    rc, out = run(["acao", "matar", "heimdall"], b, resp="s")
+    rc, out = run(["acao", "matar", "kaizen"], b, resp="s")
     assert rc == 2 and b.fechados == []
     rc, _ = run(["acao", "matar", "2"], b, resp="s")  # também pelo id
     assert rc == 2 and b.fechados == []

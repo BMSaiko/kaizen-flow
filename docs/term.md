@@ -39,7 +39,7 @@ Each action opens a new tab with `-NoExit`, so the output stays readable. The `F
 
 ## Pane names
 
-`kaizen term ls` shows a NAME column. Queue, handoff and `orq` panes get a canonical name (`sp-<slug>`, `handoff-<slug>`; `-2`, `-3` on collision) kept in `<SP_FILA_ROOT>/nomes.json` and pruned when the pane no longer exists. The pane whose cwd is the Second Brain root is always `heimdall`: `orq acao matar heimdall` is refused. `orq acao enviar|ler|matar` accept the name or the opaque id.
+`kaizen term ls` shows a NAME column. Queue, handoff and `orq` panes get a canonical name (`sp-<slug>`, `handoff-<slug>`; `-2`, `-3` on collision) kept in `<SP_FILA_ROOT>/nomes.json` and pruned when the pane no longer exists. The pane whose cwd is the Second Brain root is always `kaizen`: `orq acao matar kaizen` is refused. `orq acao enviar|ler|matar` accept the name or the opaque id.
 ## Safety
 
 The keys only start `kaizen term <sub>`; the confirmations of `fila`, `michi`, `limpar` and `retomar` still apply (see [commands](commands.md)).

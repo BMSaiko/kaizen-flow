@@ -17,7 +17,7 @@ Pausa por quota/rede/sessão: o vigia lê a cauda do ecrã de cada SP `a-correr`
 
 ## Nomes dos painéis
 
-`<SP_FILA_ROOT>/nomes.json` guarda nome→pane (`nome`, `backend`, `pane`, `cwd`, `papel`, `slug`, `criado`), escrita atómica; entradas cujo pane já não está em `backend.listar()` são podadas na leitura e um ficheiro corrompido é recriado com aviso. O campo `nome` do estado de cada SP guarda o nome do seu painel. `heimdall` só se regista para o cwd da raiz do Second Brain (`SB_ROOT`).
+`<SP_FILA_ROOT>/nomes.json` guarda nome→pane (`nome`, `backend`, `pane`, `cwd`, `papel`, `slug`, `criado`), escrita atómica; entradas cujo pane já não está em `backend.listar()` são podadas na leitura e um ficheiro corrompido é recriado com aviso. O campo `nome` do estado de cada SP guarda o nome do seu painel. `kaizen` só se regista para o cwd da raiz do Second Brain (`SB_ROOT`).
 ## Hook `scripts/kf_painel_hook.py`
 
 | Evento | Efeito |

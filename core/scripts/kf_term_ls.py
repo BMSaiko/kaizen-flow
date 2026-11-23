@@ -74,7 +74,7 @@ def linhas(root=None, backend=None, fila=None, vivos=None):
     entradas = kf_nomes.listar(vivos=vivos, root=root)
     nomes = {str(e["pane"]): e["nome"] for e in entradas}
     rows = [_linha(sp, vivos, nomes) for f in pe.filas(root) if fila in (None, f["fila"]) for sp in f["sps"]]
-    if fila is None and vivos is not None:  # o heimdall não tem SP: aparece à parte, só se vivo
+    if fila is None and vivos is not None:  # o kaizen não tem SP: aparece à parte, só se vivo
         rows += [{"painel": str(e["pane"]), "nome": e["nome"], "slug": None, "fila": None, "fase": None, "estado": None,
                   "pergunta": None, "vivo": "vivo"} for e in entradas if e["nome"] == kf_nomes.NOME_PRINCIPAL]
     return rows

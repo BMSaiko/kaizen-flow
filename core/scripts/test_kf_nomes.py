@@ -1,4 +1,4 @@
-"""Testes de kf_nomes.py: nome canónico de painéis, registo nome→pane, `heimdall` reservado, poda e atomicidade."""
+"""Testes de kf_nomes.py: nome canónico de painéis, registo nome→pane, `kaizen` reservado, poda e atomicidade."""
 import json
 
 import pytest
@@ -34,7 +34,7 @@ def test_nome_max_48_com_sufixo():
     assert len(n) <= 48 and n.endswith("-2") and n != base
 
 
-@pytest.mark.parametrize("papel", ["", "outro", "heimdall", "SP"])
+@pytest.mark.parametrize("papel", ["", "outro", "kaizen", "SP"])
 def test_papel_invalido(papel):
     with pytest.raises(ValueError):
         kn.nome_painel(papel, "a", [])
@@ -100,31 +100,31 @@ def test_remover(raiz):
     assert kn.listar(root=raiz) == []
 
 
-def test_heimdall_so_no_cwd_do_second_brain(raiz):
-    with pytest.raises(ValueError, match="heimdall"):
-        kn.registar("heimdall", "herdr", "1", "/outro", "livre", "x", root=raiz, raiz_sb=SB)
-    kn.registar("heimdall", "herdr", "1", SB, "livre", "heimdall", root=raiz, raiz_sb=SB)
-    assert kn.resolver("heimdall", root=raiz)["pane"] == "1"
+def test_principal_so_no_cwd_do_second_brain(raiz):
+    with pytest.raises(ValueError, match="kaizen"):
+        kn.registar("kaizen", "herdr", "1", "/outro", "livre", "x", root=raiz, raiz_sb=SB)
+    kn.registar("kaizen", "herdr", "1", SB, "livre", "kaizen", root=raiz, raiz_sb=SB)
+    assert kn.resolver("kaizen", root=raiz)["pane"] == "1"
 
 
-def test_heimdall_outro_pane_falha(raiz):
-    kn.registar("heimdall", "herdr", "1", SB, "livre", "heimdall", root=raiz, raiz_sb=SB)
-    with pytest.raises(ValueError, match="heimdall"):
-        kn.registar("heimdall", "herdr", "2", SB, "livre", "heimdall", root=raiz, raiz_sb=SB)
+def test_principal_outro_pane_falha(raiz):
+    kn.registar("kaizen", "herdr", "1", SB, "livre", "kaizen", root=raiz, raiz_sb=SB)
+    with pytest.raises(ValueError, match="kaizen"):
+        kn.registar("kaizen", "herdr", "2", SB, "livre", "kaizen", root=raiz, raiz_sb=SB)
 
 
-def test_remover_heimdall_recusado(raiz):
-    kn.registar("heimdall", "herdr", "1", SB, "livre", "heimdall", root=raiz, raiz_sb=SB)
-    with pytest.raises(PermissionError, match="heimdall"):
-        kn.remover("heimdall", root=raiz)
-    assert kn.resolver("heimdall", root=raiz)
+def test_remover_principal_recusado(raiz):
+    kn.registar("kaizen", "herdr", "1", SB, "livre", "kaizen", root=raiz, raiz_sb=SB)
+    with pytest.raises(PermissionError, match="kaizen"):
+        kn.remover("kaizen", root=raiz)
+    assert kn.resolver("kaizen", root=raiz)
 
 
-def test_detetar_heimdall_pelo_cwd(raiz):
+def test_detetar_kaizen_pelo_cwd(raiz):
     vivos = {"1": "/x", "2": SB}
-    assert kn.detetar_heimdall("herdr", vivos, root=raiz, raiz_sb=SB) == "2"
-    assert kn.resolver("heimdall", root=raiz)["pane"] == "2"
-    assert kn.detetar_heimdall("herdr", {"1": "/x"}, root=raiz, raiz_sb=SB) is None
+    assert kn.detetar_kaizen("herdr", vivos, root=raiz, raiz_sb=SB) == "2"
+    assert kn.resolver("kaizen", root=raiz)["pane"] == "2"
+    assert kn.detetar_kaizen("herdr", {"1": "/x"}, root=raiz, raiz_sb=SB) is None
 
 
 def test_ficheiro_corrompido_recria_e_avisa(raiz, capsys):
