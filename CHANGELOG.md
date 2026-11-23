@@ -5,6 +5,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 
 ## [Unreleased]
 
+### Added
+- Ratchet de tipos e complexidade: `quality-ratchet.py` (ruff C901/PLR + mypy vs `quality-baseline.json`), `mypy.ini`, `max-complexity = 12`, jobs CI `quality` e `typecheck`; `sp-gates.py --sugerir` inclui `ruff`, `mypy` e `tsc --noEmit --strict`
+
 ### Fixed
 - `handoff --spawn` (herdr) confirma a submissão: se o `agent prompt` deixar o `/michi` no prompt sem Enter, repete o Enter e falha com erro claro se nunca submeter.
 

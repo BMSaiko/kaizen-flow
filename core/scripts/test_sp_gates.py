@@ -390,3 +390,22 @@ def test_ec_003_ctrl_c_num_gate_nao_o_deixa_verde_na_cache(tmp_path, monkeypatch
     r = sp_gates.run(g, cache_path=cache)
     assert [x["rc"] for x in r] == [0, 0] and not r[1].get("cached")
     assert chamadas.count(g[1]["cmd"]) == 2
+
+
+def test_detect_gates_python_inclui_ruff_mypy_e_ts_tsc(tmp_path):
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n", encoding="utf-8")
+    (tmp_path / "mypy.ini").write_text("[mypy]\n", encoding="utf-8")
+    (tmp_path / "ruff.toml").write_text("line-length = 100\n", encoding="utf-8")
+    cmds = sp_gates.detect_gates(tmp_path)
+    assert "python -m ruff check ." in cmds and "python -m mypy ." in cmds and cmds[-1] == "python -m pytest -q"
+    (tmp_path / "tsconfig.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "package.json").write_text("{}", encoding="utf-8")
+    assert "npx tsc --noEmit --strict" in sp_gates.detect_gates(tmp_path)
+
+
+def test_detect_gates_ts_sem_script_typecheck(tmp_path):
+    (tmp_path / "package.json").write_text('{"scripts": {"test": "x"}}', encoding="utf-8")
+    (tmp_path / "tsconfig.json").write_text("{}", encoding="utf-8")
+    assert sp_gates.detect_gates(tmp_path) == ["npx tsc --noEmit --strict", "npm test"]
+    (tmp_path / "package.json").write_text('{"scripts": {"typecheck": "tsc", "test": "x"}}', encoding="utf-8")
+    assert "npx tsc --noEmit --strict" not in sp_gates.detect_gates(tmp_path)

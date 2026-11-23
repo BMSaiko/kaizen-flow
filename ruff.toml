@@ -13,6 +13,10 @@ ignore = [
   "E501", "E741", "E731", "PERF203", "B904", "B905", "SIM108",
 ]
 
+# Limites medidos pelo ratchet (core/scripts/quality-ratchet.py), não selecionados aqui: dívida antiga em quality-baseline.json
+[lint.mccabe]
+max-complexity = 12
+
 [lint.per-file-ignores]
 "**/test_*.py" = ["B011", "SIM117", "E501"]
 "core/scripts/conftest.py" = ["E501"]
