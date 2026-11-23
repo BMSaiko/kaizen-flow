@@ -5,7 +5,7 @@ const test = require("node:test");
 const assert = require("node:assert");
 const fs = require("fs");
 const path = require("path");
-const { ROOT, sandbox, caminhoSp, preencherSp, matar, lancarPy, esperarSaida, TIMEOUT } = require("./helpers/sandbox.js");
+const { ROOT, kaizen, sandbox, caminhoSp, preencherSp, matar, lancarPy, esperarSaida, TIMEOUT } = require("./helpers/sandbox.js");
 
 const T = { timeout: TIMEOUT * 2 };
 const comSandbox = (opts, fn) => async () => {
@@ -421,4 +421,15 @@ test("UC-034 sp-fila --programa retoma o filho já em Doing", T, comSandbox({}, 
   ok(r, "fila --programa --dry-run");
   assert.match(r.out, new RegExp(`${api}[^\\n]*já em Doing|já em Doing[^\\n]*${api}`));
   assert.match(r.stdout, new RegExp(ui));
+}));
+
+test("UC-035 kaizen ds gera e valida o design system do projeto", T, comSandbox({}, (sb) => {
+  const ds = (...a) => kaizen(["ds", ...a], { cwd: sb.dir, env: sb.env, encoding: "utf8" });
+  assert.strictEqual(ds("init", "demo").status, 0, "ds init");
+  assert.ok(fs.existsSync(path.join(sb.dir, "DESIGN.md")), "DESIGN.md");
+  assert.ok(fs.existsSync(path.join(sb.dir, "design", "tokens.json")), "tokens.json");
+  assert.strictEqual(ds("validate").status, 0, "ds validate");
+  assert.strictEqual(ds("export").status, 0, "ds export");
+  const css = fs.readFileSync(path.join(sb.dir, "design", "tokens.css"), "utf8");
+  assert.match(css, /:root\s*\{[^}]*--/);
 }));
