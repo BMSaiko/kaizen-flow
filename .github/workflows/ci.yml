@@ -66,3 +66,25 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: ruff (config em ruff.toml)
         run: pipx run ruff==0.17.1 check .
+  quality:
+    # ratchet: complexidade (C901/PLR) e tipos (mypy) só descem face a quality-baseline.json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.13"
+      - name: ferramentas de dev (ruff, mypy; só CI, o pacote não as traz)
+        run: python -m pip install ruff==0.17.1 mypy==2.4.1
+      - name: ratchet (ruff C901/PLR + mypy)
+        run: python core/scripts/quality-ratchet.py
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.13"
+      - run: python -m pip install mypy==2.4.1
+      - name: mypy --strict nos módulos novos
+        run: python -m mypy --strict core/scripts/quality-ratchet.py

@@ -4,7 +4,7 @@ Ordem fixa: **gates → harden → pentest → review**. Cada passo só corre se
 
 ## Gates por tipo de repo
 
-`python -I scripts/sp-gates.py --sugerir <repo>` imprime o bloco `gates:` para colar no frontmatter do SP.
+`python -I scripts/sp-gates.py --sugerir <repo>` imprime o bloco `gates:` para colar no frontmatter do SP (Python: `ruff`, `mypy`; TS: `tsc --noEmit --strict`; ratchet de dívida: `scripts/quality-ratchet.py`).
 
 | Tipo (deteção) | Comandos |
 |---|---|
