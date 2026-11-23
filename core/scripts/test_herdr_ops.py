@@ -78,3 +78,31 @@ def test_workspace_metadata_e_workspace_do_pane():
     ops.workspace_metadata("w1", "sp-fila", "fila 1/3 · 2 vagas")
     assert ["herdr", "workspace", "report-metadata", "--source", "sp-fila", "--token", "fila=fila 1/3 · 2 vagas", "w1"] in fake.chamadas
     assert ops.workspace_do_pane("nao-existe") is None
+
+
+def test_criar_enviar_fechar_por_nome_com_herdr(tmp_path, monkeypatch):
+    """Nome canónico ponta a ponta no herdr: abrir→registar→enviar→fechar por nome; heimdall recusado."""
+    import kf_nomes as kn
+    import kf_term_orq as orq
+    import painel_backend as pb
+    monkeypatch.setenv("SP_FILA_ROOT", str(tmp_path / "estado"))
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    fake = FakeHerdr()
+    b = pb.HerdrBackend(run=fake)
+    enviados = []
+    b.enviar = lambda id, texto: enviados.append((id, texto)) or True  # o ecrã do fake não ecoa texto
+    pane = b.abrir(["claude"], str(tmp_path))
+    kn.registar("sp-x", "herdr", pane, str(tmp_path), "sp", "x")
+    sb = tmp_path / "sb"
+    sb.mkdir()
+    heim = b.abrir(["claude"], str(sb))
+    kn.registar("heimdall", "herdr", heim, str(sb), "livre", "heimdall", raiz_sb=str(sb))
+    saidas = []
+    assert orq.acao(type("A", (), {"acao": "enviar", "painel": "sp-x", "alvo": "olá", "linhas": 0})(), b,
+                    entrada=lambda _: "s", saida=saidas.append) == 0
+    assert enviados == [(pane, "olá")]
+    assert orq.acao(type("A", (), {"acao": "matar", "painel": "heimdall", "alvo": None, "linhas": 0})(), b,
+                    entrada=lambda _: "s", saida=saidas.append) == 2 and heim in b.listar()
+    assert orq.acao(type("A", (), {"acao": "matar", "painel": "sp-x", "alvo": None, "linhas": 0})(), b,
+                    entrada=lambda _: "s", saida=saidas.append) == 0
+    assert pane not in b.listar() and kn.resolver("sp-x") is None and kn.resolver("heimdall")
