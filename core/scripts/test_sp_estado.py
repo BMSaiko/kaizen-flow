@@ -169,3 +169,33 @@ def test_recusas_do_estado_no_formato_ec(tmp_path, capsys):
     assert sp_estado.main(["nao-existe", "done", "--root", str(tmp_path)]) == 1
     lido = kf_erros.ler(capsys.readouterr().err.rstrip("\n"))
     assert lido is not None and lido.ec == "EC-067" and "slug desconhecido" in lido.oque
+
+
+def _painel_bloqueado(tmp_path):
+    import sp_painel_estado as pe
+    r = tmp_path / "paineis"
+    fid = pe.criar_fila("mae", ordem=["a"], root=r)
+    pe.transitar("a", "a-correr", fila=fid, root=r)
+    pe.transitar("a", "bloqueado", fila=fid, root=r)
+    return pe, fid, r
+
+
+def test_bloqueado_para_done_recusado_sem_forcar(tmp_path):
+    import pytest
+    pe, fid, r = _painel_bloqueado(tmp_path)
+    with pytest.raises(pe.ErroEstado):
+        pe.transitar("a", "done", fila=fid, root=r)
+    assert pe.ler(fid, "a", root=r)["estado"] == "bloqueado"
+
+
+def test_forcar_done_aceita_bloqueado(tmp_path):
+    pe, fid, r = _painel_bloqueado(tmp_path)
+    sp = pe.transitar("a", "done", fila=fid, root=r, forcar_done=True)
+    assert sp["estado"] == "done" and sp["fim"]
+
+
+def test_forcar_done_nao_abre_outras_transicoes(tmp_path):
+    import pytest
+    pe, fid, r = _painel_bloqueado(tmp_path)
+    with pytest.raises(pe.ErroEstado):
+        pe.transitar("a", "pergunta", fila=fid, root=r, forcar_done=True)

@@ -344,3 +344,67 @@ def test_fecha_com_slug_sem_data(root):
     rc, out, err = fechar(root, f"{PROJECT}-curto")
     assert rc == 0, out + err
     assert list((root / "vault" / PROJECT / "sp" / "Done").glob(f"{fs('curto')}.md"))
+
+
+class _Backend:
+    def __init__(self, falha=False):
+        self.fechados, self.falha = [], falha
+
+    def fechar(self, id):
+        if self.falha:
+            raise RuntimeError("backend em baixo")
+        self.fechados.append(id)
+
+
+def _fila(tmp_path, slug, estado):
+    """Estado da mãe (`sessoes`) + fila de painéis com o SP no `estado` e o pane `%7`."""
+    import json
+    import sp_painel_estado as pe
+    base, paineis = tmp_path / "maes", tmp_path / "paineis"
+    fid = pe.criar_fila(None, ordem=[slug], root=paineis)
+    pe.registar(fid, slug, root=paineis, pane="%7")
+    pe.transitar(slug, "a-correr", fila=fid, root=paineis)
+    if estado == "bloqueado":
+        pe.transitar(slug, "bloqueado", fila=fid, root=paineis)
+    (base / "mae").mkdir(parents=True)
+    f = base / "mae" / "fila.json"
+    f.write_text(json.dumps({"fila_paineis": fid, "sessoes": {slug: {}}, "feitos": [], "falhados": []}), encoding="utf-8")
+    return pe, fid, f, base, paineis
+
+
+@pytest.mark.parametrize("estado", ["a-correr", "bloqueado"])
+def test_grava_done_na_fila_e_fecha_pane(tmp_path, estado):
+    import json
+    pe, fid, f, base, paineis = _fila(tmp_path, "s", estado)
+    b = _Backend()
+    linhas = _mod().gravar_done_fila("s", backend=b, estado_root=paineis, base=base, legado=tmp_path / "x.json")
+    assert pe.ler(fid, "s", root=paineis)["estado"] == "done"
+    dados = json.loads(f.read_text(encoding="utf-8"))
+    assert "s" not in dados["sessoes"] and dados["feitos"] == ["s"]
+    assert b.fechados == ["%7"] and linhas
+
+
+def test_fora_da_fila_nada_muda(tmp_path):
+    pe, fid, f, base, paineis = _fila(tmp_path, "s", "a-correr")
+    antes = f.read_text(encoding="utf-8")
+    b = _Backend()
+    assert _mod().gravar_done_fila("outro", backend=b, estado_root=paineis, base=base, legado=tmp_path / "x.json") == []
+    assert f.read_text(encoding="utf-8") == antes and b.fechados == []
+    assert pe.ler(fid, "s", root=paineis)["estado"] == "a-correr"
+
+
+def test_backend_em_falha_ou_ausente_nao_rebenta(tmp_path):
+    pe, fid, f, base, paineis = _fila(tmp_path, "s", "bloqueado")
+    linhas = _mod().gravar_done_fila("s", backend=_Backend(falha=True), estado_root=paineis, base=base, legado=tmp_path / "x.json")
+    assert pe.ler(fid, "s", root=paineis)["estado"] == "done"
+    assert any("aviso" in x for x in linhas)
+    pe2, fid2, f2, base2, p2 = _fila(tmp_path / "2", "t", "a-correr")
+    assert _mod().gravar_done_fila("t", backend=None, estado_root=p2, base=base2, legado=tmp_path / "x.json")
+
+
+def test_sem_pane_registado_nao_falha(tmp_path):
+    pe, fid, f, base, paineis = _fila(tmp_path, "s", "a-correr")
+    pe.registar(fid, "s", root=paineis, pane=None)
+    b = _Backend()
+    _mod().gravar_done_fila("s", backend=b, estado_root=paineis, base=base, legado=tmp_path / "x.json")
+    assert b.fechados == [] and pe.ler(fid, "s", root=paineis)["estado"] == "done"
