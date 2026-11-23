@@ -150,7 +150,7 @@ class Portos:
 
     def orcamento(self):
         """Dict `orcamento` do kaizen.config.json ou None."""
-        return None
+        return
 
     def esperar(self, segundos):
         time.sleep(segundos)

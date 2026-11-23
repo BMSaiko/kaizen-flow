@@ -1,7 +1,6 @@
 """Testes de kf_factory: máquina de estados da factory com portos falsos (feliz, orçamento, gate vermelho, retoma, lock, release)."""
 import json
 
-import pytest
 
 import kf_factory as kf
 
