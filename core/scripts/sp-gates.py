@@ -390,6 +390,20 @@ def _main_testes(repo, sp_arg, timeout):
     return rc
 
 
+def _modos_sem_sp(args):
+    """Modos que não leem um SP (`--testes`, `--perfil`, `--sugerir`): devolve o rc, ou None se não é um deles."""
+    if args.testes:
+        return _main_testes(args.testes, args.sp, args.timeout)
+    if args.perfil:
+        print(perfil_sugerido(args.perfil))
+        return 0
+    if args.sugerir:
+        block = suggestion(args.sugerir)
+        print(block or "tipo de repo desconhecido: declarar os gates à mão", file=None if block else sys.stderr)
+        return 0 if block else 1
+    return None
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Corre os gates do frontmatter de um SP")
     ap.add_argument("path", nargs="?")
@@ -401,15 +415,9 @@ def main(argv=None):
     ap.add_argument("--sp", help="com --testes: SP (caminho ou slug) onde registar a tentativa e ler os limites")
     ap.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT, help="com --testes: segundos (defeito 300)")
     args = ap.parse_args(argv)
-    if args.testes:
-        return _main_testes(args.testes, args.sp, args.timeout)
-    if args.perfil:
-        print(perfil_sugerido(args.perfil))
-        return 0
-    if args.sugerir:
-        block = suggestion(args.sugerir)
-        print(block or "tipo de repo desconhecido: declarar os gates à mão", file=None if block else sys.stderr)
-        return 0 if block else 1
+    rc = _modos_sem_sp(args)
+    if rc is not None:
+        return rc
     if not args.path:
         ap.error("falta o caminho do SP (ou --sugerir REPO)")
     sp_path, _ = resolve_sp(args.path)
