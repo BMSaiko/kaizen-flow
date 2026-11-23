@@ -350,3 +350,11 @@ def test_fechar_com_aviso_nao_repete(modelos_json, sp_vazio, tmp_path):
     b.enviados.clear()
     sa.fechar(SLUG, b, estado_root=root)
     assert b.enviados == []
+
+def test_prompt_commita_e_envia_so_o_sp_antes_do_done(sp_vazio, tmp_path):
+    t = sa.prompt(sp_vazio, _semente(tmp_path))
+    assert "sem commit" not in t
+    assert f'git add "{sp_vazio}"' in t and "git commit" in t and "git push" in t
+    assert "git add -A &&" not in t and "git add . &&" not in t
+    assert "sem fazer o trabalho do SP" in t and "sem abrir outros painéis" in t
+    assert t.index("git add") < t.index("--avisar") < t.index("sp-estado.py") < t.index("--fechar")

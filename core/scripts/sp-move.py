@@ -14,6 +14,7 @@ rc: 0 movido, 1 erro
 import contextlib
 import argparse
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -211,6 +212,26 @@ def avisos_fecho(root, slug, project=None):
     return [f"aviso: o sp-fechar vai exigir {x}" for x in falta]
 
 
+def aviso_diff(root, slug, project=None, run=subprocess.run):
+    """Aviso se o SP tem diff por commitar (a worktree do michi nasce do HEAD e herdaria o SP vazio); [] se limpo, sem git ou sem SP."""
+    achados = sp_list.encontrar(sp_list.collect(root, include_done=True), slug, project)
+    if len(achados) != 1:
+        return []
+    caminho = achados[0].path
+    try:
+        dentro = run(["git", "-C", str(caminho.parent), "rev-parse", "--is-inside-work-tree"], capture_output=True)
+        if dentro.returncode != 0:  # fora de um repo o `git diff` cairia em --no-index
+            return []
+        r = run(["git", "-C", str(caminho.parent), "diff", "--quiet", "HEAD", "--", caminho.name], capture_output=True)
+    except OSError:
+        return []
+    if r.returncode != 1:  # 0 limpo; >1 fora de um repo git ou erro
+        return []
+    rel = caminho.relative_to(root).as_posix() if root and caminho.is_relative_to(Path(root)) else caminho.as_posix()
+    return [f"aviso: o SP {rel} tem alterações por commitar; a worktree do michi nasce do HEAD e herda-o vazio: "
+            f"git add \"{rel}\" && git commit -m 'vault: SP {slug}'"]
+
+
 def _mover_doc(ap, args):
     """`--tipo dr|dp`: move um DR/DP."""
     if not args.slug or not args.dest or args.start or args.next or args.project:
@@ -227,7 +248,10 @@ def _executar(args):
     if args.start:
         if args.dest.lower() != "doing" or args.next:
             raise SpMoveError("--start não se combina com outro destino nem com --next")
+        avisos_diff = aviso_diff(args.root, args.slug, args.project)  # antes de mover: o caminho é o de TODO
         print(start(args.root, args.slug, args.project))
+        for linha in avisos_diff:
+            print(linha, file=sys.stderr)
         for linha in avisos_fecho(args.root, args.slug, args.project):
             print(linha, file=sys.stderr)
     elif args.next:
