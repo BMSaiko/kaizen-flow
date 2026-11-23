@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sp_leitura  # noqa: E402
+import sp_vigia_reacao  # noqa: E402
 from painel_backend import popen_sem_janela, run_hidden  # noqa: E402
 from sp_disco import guardar, ler_json  # noqa: E402
 import kf_erros  # noqa: E402
@@ -108,6 +109,17 @@ class Contexto:
     def escalar(self, sp):
         """Relança o SP no nível seguinte se `sp_escalada` o pedir; {de, para, ...} ou None (sem escalada)."""
         return
+
+    def texto_sp(self, sp):
+        """Texto do SP na worktree (restricoes/permitir/## Decisões para a reação); None se não há."""
+        return
+
+    def registar_reacao(self, sp, linha):
+        """Acrescenta a reação do vigia a `## Report modo auto` do SP."""
+
+    def retomar_contexto(self, sp):
+        """Handoff no próprio painel (`sp-handoff.py --launch --auto`); True se lançou."""
+        return False
 
 
 def _seguro(ctx, f, *a):
@@ -279,6 +291,8 @@ def _um(ctx, mem, sp):
     if estado == "a-correr" and sp.get("pane") and _falha_no_ecra(ctx, mem, sp):
         return None
     if estado == "bloqueado" and _retomar_pausa(ctx, mem, sp):
+        return None
+    if estado in ("bloqueado", "pergunta") and sp.get("pane") and not ec_pausa(sp) and sp_vigia_reacao.reagir(ctx, mem, sp):
         return None
     if estado in ("falhou", "bloqueado") and slug not in mem.get("escalados", []) and not ec_pausa(sp):
         esc = _seguro(ctx, ctx.escalar, sp)
@@ -519,6 +533,30 @@ class ContextoReal(Contexto):
         if self.estado_path is not None:
             _seguro(self, sp_escalada.registar_fila, self.estado_path, sp["slug"], de, para)
         return {"de": de, "para": para, "causa": causa, **res}
+
+    def texto_sp(self, sp):
+        path = _sp_na_worktree(sp.get("worktree"), sp["slug"])
+        try:
+            return path.read_text(encoding="utf-8") if path else None
+        except OSError:
+            return None
+
+    def registar_reacao(self, sp, linha):
+        import sp_escalada
+        path = _sp_na_worktree(sp.get("worktree"), sp["slug"])
+        if path is not None and path.parent.name != "Done":
+            sp_escalada.registar_report(path, linha)
+
+    def retomar_contexto(self, sp):
+        """`sp-handoff.py --launch <SP> --auto` no painel do SP (mesmo painel, SP e vaga; repete o prompt da fila)."""
+        path, nome = _sp_na_worktree(sp.get("worktree"), sp["slug"]), getattr(self.backend, "nome", None)
+        if path is None or not nome:
+            return False
+        rc, out = self._py(self.scripts / "sp-handoff.py", "--launch", path, "--auto", "--pane", sp["pane"], "--backend", nome,
+                           cwd=sp["worktree"])
+        if rc:
+            self.log(f"retoma de contexto {sp['slug']}: {out[-300:]}")
+        return rc == 0
 
     def _ops(self):
         """HerdrOps sobre o backend atual, ou None se o painel não é herdr."""
