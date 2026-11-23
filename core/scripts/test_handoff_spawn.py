@@ -179,7 +179,7 @@ def test_herdr_lanca_agente_e_envia_o_michi_por_herdr_ops(monkeypatch):
     assert res[0]["ok"] and res[0]["worktree"] == "/wt/meu-sp"
     pane = res[0]["painel"]
     assert ["herdr", "agent", "prompt", pane, "/michi --auto meu-sp"] in fake.chamadas
-    assert not any(c[:3] in (["herdr", "pane", "send-text"], ["herdr", "pane", "read"]) for c in fake.chamadas)
+    assert not any(c[:3] == ["herdr", "pane", "send-text"] for c in fake.chamadas)
     assert any(c[:3] == ["herdr", "pane", "run"] and "command claude" in c[4] for c in fake.chamadas)
 
 
@@ -202,3 +202,43 @@ def test_herdr_espera_pela_deteccao_do_agente_antes_do_prompt(monkeypatch):
     monkeypatch.delenv("HERDR_PANE_ID", raising=False)
     res = _spawn(["meu-sp"], backend="herdr", run=run, sleep=lambda s: None)
     assert res[0]["ok"] and falhas["n"] == 0
+
+
+def test_herdr_repete_o_enter_se_o_prompt_ficou_com_texto(monkeypatch):
+    """Falha real (2026-11-23): `agent prompt` escreveu o `/michi` mas o Enter perdeu-se; o spawn repete o Enter até o prompt esvaziar."""
+    from herdr_fake import FakeHerdr
+    fake = FakeHerdr()
+    ecras = ["\u276f /michi --auto meu-sp\n", "\u276f /michi --auto meu-sp\n", "\u276f \n"]
+    enters = []
+
+    def run(argv, **kw):
+        if "ensure" in argv:
+            return _Res("/wt/meu-sp\n")
+        if argv[1:3] == ["pane", "read"]:
+            return _Res(ecras.pop(0) if ecras else "\u276f \n")
+        if argv[1:3] == ["pane", "send-keys"]:
+            enters.append(list(argv))
+            return _Res("")
+        return fake(argv, **kw)
+
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    res = _spawn(["meu-sp"], backend="herdr", run=run, sleep=lambda s: None)
+    assert res[0]["ok"] and len(enters) == 2
+
+
+def test_herdr_falha_se_o_enter_nunca_submete(monkeypatch):
+    from herdr_fake import FakeHerdr
+    fake = FakeHerdr()
+
+    def run(argv, **kw):
+        if "ensure" in argv:
+            return _Res("/wt/meu-sp\n")
+        if argv[1:3] == ["pane", "read"]:
+            return _Res("\u276f /michi --auto meu-sp\n")
+        if argv[1:3] == ["pane", "send-keys"]:
+            return _Res("")
+        return fake(argv, **kw)
+
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    res = _spawn(["meu-sp"], backend="herdr", run=run, sleep=lambda s: None)
+    assert not res[0]["ok"] and "Enter" in res[0]["erro"]
