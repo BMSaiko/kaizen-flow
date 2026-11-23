@@ -83,6 +83,11 @@
     "test_michi_metodologias.py",
     "sp-migrar-slug.py",
     "test_sp_migrar_slug.py",
-    "test_kf_erros.py"
+    "test_kf_erros.py",
+    "ds_core.py",
+    "ds-init.py",
+    "ds-validate.py",
+    "ds-export.py",
+    "test_ds.py"
   ]
 }
