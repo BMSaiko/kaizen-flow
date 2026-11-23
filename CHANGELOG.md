@@ -6,6 +6,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 ## [Unreleased]
 
 ### Added
+- Gates de design para SPs `ui: sim`: `ds-lint.py` (literais de cor/espaçamento/tipografia fora dos tokens, `ficheiro:linha`) e `ds-verify.py` (axe WCAG 2.2 AA, screenshots em 3 breakpoints vs `design/baselines/`, orçamento Lighthouse opcional; rc 3 sem browser, nunca verde); `sp-gates --repo` injeta-os só com `ui: sim`; `kaizen ds lint|verify`.
 - Perfil `qualidade` em `kaizen.config.json` (`bloqueantes`, `consultivos`, `fases`): `sp-gates --repo` junta-o aos gates do SP (consultivos só registam), `sp-gates --perfil` sugere-o por tipo de repo e `pr_fechar` não faz merge com gate bloqueante vermelho nem sem pentest/review verdes (SP `bloqueado` com motivo).
 - Ratchet de tipos e complexidade: `quality-ratchet.py` (ruff C901/PLR + mypy vs `quality-baseline.json`), `mypy.ini`, `max-complexity = 12`, jobs CI `quality` e `typecheck`; `sp-gates.py --sugerir` inclui `ruff`, `mypy` e `tsc --noEmit --strict`
 

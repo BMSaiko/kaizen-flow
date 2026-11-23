@@ -104,3 +104,7 @@ Todo o script tem teste dedicado, exceto os da tabela, que têm justificação.
 | `handoff_pane.py` (socket) | `test_handoff_socket.py` (socket do WezTerm morto, painel inexistente; `run` injetado) |
 | `context-guard.py` | hook do vault; o teste (`test_context_guard.py`) fica no vault porque afirma textos em português (ver `SKIP` em `bin/sync.js`) |
 | `wt_redirect.py` | depende de `sb-worktree.py` do vault; o teste (`test_wt_redirect.py`) fica no vault (`SKIP`) |
+
+## Gates de design (`ui: sim`)
+
+`core/scripts/test_ds_gates.py` cobre `ds-lint` (literal detetado, token aceite, ignorados) e `ds-verify` com um browser falso injetado (`runner`): baselines, diff acima do limiar, violações axe, rc 3 sem browser, relatório e registo no SP. Nenhum teste precisa de Playwright nem de rede.

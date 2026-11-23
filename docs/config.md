@@ -134,3 +134,16 @@ A profile exists when `bloqueantes` or `consultivos` is a list; without it nothi
 - `sp-gates.py <SP> --repo R` adds the profile gates to the SP's own `gates:`, without duplicates. Blocking ones stop at the first red (rc 1); advisory ones run last, are reported as `consultivo verde|aviso` and never block.
 - `pr_fechar.py <PR> --sp <slug> --pentest-relatorio F --review-estado F`: with a profile it re-runs the blocking gates before merging; a red gate, a pentest report that is not `sem achados` or a review state that is not `APROVADO` (per `fases`; remove one only here, in the reviewed config) means rc 11, no merge, and the SP is set to `bloqueado` with the reason.
 - An SP cannot switch the profile off; only this file can.
+
+## Design gates (`design`, `ui: sim` SPs only)
+
+```json
+{"design": {"startCmd": "npm run dev", "url": "http://localhost:5173", "rotas": ["/", "/sobre"],
+            "limiarDiff": 0.01, "breakpoints": {"sm": 640, "md": 768, "xl": 1280},
+            "lighthouse": {"cmd": "npx lighthouse {url} --output=json --quiet --chrome-flags=--headless", "minPerformance": 0.8}}}
+```
+
+- `ds-lint.py [--dir D]`: colour, spacing and typography literals outside the tokens (CSS/SCSS/TSX/JSX/HTML/Vue/Svelte), `file:line`; rc 1 on any. `ds-lint-ignore` on a line skips it.
+- `ds-verify.py [--dir D]`: starts the app (`startCmd`), runs axe (WCAG 2.2 AA) and screenshots at 3 breakpoints against `design/baselines/`; rc 1 on serious/critical violations, diff above `limiarDiff`, a missing baseline or a failed performance budget; writes `design/relatorio.json`. rc 3 = no browser/Playwright/axe (never green). Baselines change only with `--atualizar-baselines` (logged in the SP with `--sp`).
+- Playwright and `@axe-core/playwright` are dev tools of the target project, never dependencies of this package.
+- `sp-gates.py <SP> --repo R` injects both only when the SP frontmatter has `ui: sim`: `ds-lint` blocking; `ds-verify` blocking when Playwright is installed in the repo, otherwise advisory with a warning.

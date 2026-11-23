@@ -42,3 +42,7 @@ Se `kaizen.config.json` tem `qualidade: {bloqueantes, consultivos, fases}`, corr
 ## Passos seguintes
 
 `/harden` (só leitura, FAIL bloqueia) → `/pentest` (achados viram SPs) → `/review-ciclo` (painel `revisor` independente via `sp-revisor.py`, `--inline` só se simples/sem painéis; 3 iterações, depois escalada). Detalhe: `michi-fases-detalhe.md` §Fase 5.
+
+## Gates de design (`ui: sim`)
+
+Com `ui: sim` no frontmatter, `sp-gates.py <SP> --repo <repo-alvo>` junta `ds-lint` (bloqueante) e `ds-verify` (bloqueante com Playwright no repo, senão consultivo com aviso, rc 3 nunca verde). Baselines só com `--atualizar-baselines`, registado no SP. Detalhe: `design-system/references/verificacao.md`, `docs/config.md`.
