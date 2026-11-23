@@ -20,6 +20,7 @@ import painel_backend  # noqa: E402
 from painel_backend import run_hidden  # noqa: E402
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -216,13 +217,23 @@ def em_fila(slug, estado=None):
         return False
 
 
-def _gravar_estado(slug, estado_root=None, base=None, legado=None):
+@dataclass(frozen=True)
+class CaminhosFila:
+    """Raízes do estado da fila (injetáveis nos testes); `None` = defeito do módulo dono."""
+    estado_root: object = None
+    base: object = None
+    legado: object = None
+
+
+def _gravar_estado(slug, caminhos=None):
     """Grava `done` na fila do SP (mãe: `sessoes` → `feitos`; painéis: `done`, também vindo de `bloqueado`).
 
     Devolve (linhas, pane a fechar ou None); fora da fila: ([], None)."""
     import sp_fila_estado as fe
     import sp_painel_estado as pe
-    caminho = fe.localizar(slug, base=base, legado=legado)
+    c = caminhos or CaminhosFila()
+    estado_root = c.estado_root
+    caminho = fe.localizar(slug, base=c.base, legado=c.legado)
     if caminho is None:
         return [], None
     dados = {}
@@ -260,9 +271,9 @@ def _fechar_pane(pane, backend, emitir=None, linhas=()):
         return [f"aviso: pane {pane} não fechado ({exc})"]
 
 
-def gravar_done_fila(slug, backend=None, estado_root=None, base=None, legado=None, emitir=None):
+def gravar_done_fila(slug, backend=None, caminhos=None, emitir=None):
     """Estado da fila em `done` e pane fechado (injetável nos testes); devolve as linhas, vazias fora da fila."""
-    linhas, pane = _gravar_estado(slug, estado_root, base, legado)
+    linhas, pane = _gravar_estado(slug, caminhos)
     return [*linhas, *(_fechar_pane(pane, backend, emitir, linhas) or [])]
 
 
@@ -375,7 +386,7 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
         lines.append(sp_move.advance(root, slug, sp.project))
     else:
         lines.append(sp_move.move(root, slug, "done", sp.project))
-        linhas_fila, pane = _gravar_estado(slug, estado_root) if fila else ([], None)
+        linhas_fila, pane = _gravar_estado(slug, CaminhosFila(estado_root)) if fila else ([], None)
         lines += linhas_fila
     prox = "" if nxt else seguinte(root, slug, sp.project, fila)
     if prox:
