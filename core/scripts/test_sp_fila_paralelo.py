@@ -32,7 +32,7 @@ def test_concorrencia_so_lanca_ate_ao_teto(tmp_path):
     assert estado["sessoes"]["a"]["painel"] is True and "subagent" not in estado["sessoes"]["a"]
     assert estado["sessoes"]["b"]["worktree"] == "/wt/sb-b"
     assert [cwd for _, cwd in painel.abertos] == ["/wt/sb-a", "/wt/sb-b"] and painel.abertos[0][0][0] == "claude"
-    assert sorted(painel.titulos_postos.values()) == ["a", "b"]
+    assert sorted(painel.titulos_postos.values()) == ["sp-a", "sp-b"]
     assert estado["fila_paineis"] and pe.ler(estado["fila_paineis"], "a")["estado"] == "a-correr"
 
 
