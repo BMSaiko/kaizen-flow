@@ -409,3 +409,49 @@ def test_detect_gates_ts_sem_script_typecheck(tmp_path):
     assert sp_gates.detect_gates(tmp_path) == ["npx tsc --noEmit --strict", "npm test"]
     (tmp_path / "package.json").write_text('{"scripts": {"typecheck": "tsc", "test": "x"}}', encoding="utf-8")
     assert "npx tsc --noEmit --strict" not in sp_gates.detect_gates(tmp_path)
+
+
+def _g(cmd, **kw):
+    return {"cmd": cmd, "cwd": ".", "timeout": 30, "inputs": [], **kw}
+
+
+def test_perfil_junta_sem_duplicar_e_ordena():
+    perfil = {"bloqueantes": ["b", "a"], "consultivos": ["c", "a"], "fases": []}
+    out = sp_gates.juntar_perfil([_g("a")], perfil, "/r")
+    assert [(g["cmd"], g["modo"]) for g in out] == [("a", "bloqueante"), ("b", "bloqueante"), ("c", "consultivo")]
+
+
+def test_sem_perfil_gates_intactos_como_bloqueantes():
+    out = sp_gates.juntar_perfil([_g("a")], None, "/r")
+    assert [(g["cmd"], g["modo"]) for g in out] == [("a", "bloqueante")]
+
+
+def test_consultivo_vermelho_nao_trava_nem_falha():
+    gates = sp_gates.juntar_perfil([], {"bloqueantes": [f"{PY} -c pass"], "consultivos": [f"{PY} -c \"raise SystemExit(1)\"", f"{PY} -c \"print(1)\""], "fases": []}, ".")
+    res = sp_gates.run(gates)
+    assert len(res) == 3 and res[1]["rc"] == 1 and sp_gates.sucesso(res, gates)
+    tab = sp_gates.table(res, 3)
+    assert "consultivo aviso" in tab and "consultivo verde" in tab and "[consultivo]" in sp_gates.summary(res)
+
+
+def test_bloqueante_vermelho_do_perfil_trava_e_consultivo_nao_corre():
+    gates = sp_gates.juntar_perfil([], {"bloqueantes": [f"{PY} -c \"raise SystemExit(1)\""], "consultivos": [f"{PY} -c pass"], "fases": []}, ".")
+    res = sp_gates.run(gates)
+    assert len(res) == 1 and not sp_gates.sucesso(res, gates)
+    assert "não correu" in sp_gates.table(res, 2)
+
+
+def test_main_repo_aplica_perfil_e_sem_repo_comportamento_antigo(tmp_path, capsys):
+    import json
+    (tmp_path / "kaizen.config.json").write_text(json.dumps({"qualidade": {"bloqueantes": [f"{PY} -c \"raise SystemExit(1)\""]}}))
+    sp = tmp_path / "sp.md"
+    sp.write_text(sp_text((f"{PY} -c pass", {})), encoding="utf-8")
+    assert sp_gates.main([str(sp), "--full"]) == 0
+    assert sp_gates.main([str(sp), "--full", "--repo", str(tmp_path)]) == 1
+
+
+def test_perfil_sugerido_json_por_tipo(tmp_path):
+    import json
+    (tmp_path / "package.json").write_text(json.dumps({"scripts": {"test": "x"}}))
+    q = json.loads(sp_gates.perfil_sugerido(tmp_path))["qualidade"]
+    assert q["bloqueantes"] == ["npm test"] and q["consultivos"] == []

@@ -1,6 +1,6 @@
 """Lê `kaizen.config.json` na raiz do repo; sem ficheiro ou chave, devolve o defeito.
 
-Chaves: `spRoot` (raiz dos SPs) e `docsRoot` (raiz dos DR/DP), relativas à raiz do repo; `desenvolvimento` (método do projeto); `herdr` ({maxPanesPorTab, workspacePorProjeto}); `qualidade.coberturaDiff` (limiar % da cobertura do diff, defeito 85).
+Chaves: `spRoot` (raiz dos SPs) e `docsRoot` (raiz dos DR/DP), relativas à raiz do repo; `desenvolvimento` (método do projeto); `herdr` ({maxPanesPorTab, workspacePorProjeto}); `qualidade.coberturaDiff` (limiar % da cobertura do diff, defeito 85); `qualidade.{bloqueantes,consultivos,fases}` (perfil de gates, ver `qualidade`).
 
 Uso: módulo importado pelos scripts sp-* e doc_ops; sem execução direta
 rc: n/a
@@ -65,6 +65,32 @@ def cobertura_diff(repo):
     q = _read(repo).get("qualidade")
     v = q.get("coberturaDiff") if isinstance(q, dict) else None
     return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 100 else COBERTURA_DIFF_DEFEITO
+
+
+FASES_PERFIL = ("pentest", "review")
+
+
+def qualidade(repo):
+    """Perfil `qualidade` ({bloqueantes, consultivos, fases}) ou None sem perfil (repo sem a chave: comportamento antigo).
+
+    Há perfil se `qualidade.bloqueantes` ou `qualidade.consultivos` for uma lista. Entradas não-string/vazias e
+    duplicados caem; `fases` (pentest|review exigidas pelo `pr_fechar`) tem defeito as duas.
+    """
+    q = _read(repo).get("qualidade")
+    if not isinstance(q, dict) or not any(isinstance(q.get(k), list) for k in ("bloqueantes", "consultivos")):
+        return None
+
+    def cmds(k):
+        vistos = []
+        for c in q.get(k) if isinstance(q.get(k), list) else []:
+            if isinstance(c, str) and c.strip() and c.strip() not in vistos:
+                vistos.append(c.strip())
+        return vistos
+
+    bloq = cmds("bloqueantes")
+    fases = q.get("fases")
+    fases = [f for f in FASES_PERFIL if f in fases] if isinstance(fases, list) else list(FASES_PERFIL)
+    return {"bloqueantes": bloq, "consultivos": [c for c in cmds("consultivos") if c not in bloq], "fases": fases}
 
 
 HOOKS_NAME = "kaizen-hooks.json"

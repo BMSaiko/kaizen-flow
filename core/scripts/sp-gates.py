@@ -12,12 +12,15 @@ RC 0 = todos verdes (ou SP sem gates); 1 = gate vermelho/timeout; 2 = gate invá
 Uso:
   python -I scripts/sp-gates.py <caminho.md>          # incremental: salta gates verdes com inputs iguais
   python -I scripts/sp-gates.py <caminho.md> --full   # corre todos (o fecho, sp-fechar.py, usa sempre isto)
+  python -I scripts/sp-gates.py <caminho.md> --repo R  # junta o perfil `qualidade` de R/kaizen.config.json (bloqueantes e consultivos)
+  python -I scripts/sp-gates.py --perfil <repo>       # bloco `qualidade` sugerido para o tipo de repo (colar em kaizen.config.json)
   python -I scripts/sp-gates.py --sugerir <repo>      # gates por tipo de repo (Node, Python, Tauri, vault), bloco `gates:` pronto
   python -I scripts/sp-gates.py --testes <repo> --sp <SP>  # fase de testes: corre `test.cmd` de <repo>/kaizen.config.json,
                                                        # regista `## Testes` no SP; rc 0 verde, 1 vermelho, 2 proibido,
                                                        # 3 sem test.cmd (perguntar ao user), 4 limite de tentativas
 Ordem da fase 5: gates -> harden -> pentest -> review (michi/references/michi-gates.md).
-rc: 0 gates verdes, 1 gate falhou, 2 erro de uso ou gates inválidos
+Perfil `qualidade`: gates `bloqueantes` juntam-se aos do SP (sem duplicar) e travam; `consultivos` correm no fim, só registam.
+rc: 0 gates verdes (consultivos à parte), 1 gate bloqueante falhou, 2 erro de uso ou gates inválidos
 """
 import argparse
 import hashlib
@@ -32,6 +35,7 @@ import sys
 import time
 from pathlib import Path
 
+import kaizen_config  # noqa: E402
 import kaizen_engine  # noqa: E402
 import contextlib
 
@@ -111,6 +115,33 @@ def suggestion(repo):
     if not cmds:
         return ""
     return "gates:\n" + "\n".join(f"  - cmd: {c}\n    timeout: 300" for c in cmds)
+
+
+def perfil_sugerido(repo):
+    """Bloco JSON `qualidade` com os gates do tipo de repo como bloqueantes e o ratchet/cobertura de diff se existirem."""
+    r = Path(repo)
+    bloq = detect_gates(repo)
+    if (r / "quality-baseline.json").exists() and (r / "core" / "scripts" / "quality-ratchet.py").exists():
+        bloq.append("python core/scripts/quality-ratchet.py --repo .")
+    return json.dumps({"qualidade": {"bloqueantes": bloq, "consultivos": []}}, indent=2, ensure_ascii=False)
+
+
+def juntar_perfil(gates, perfil, repo):
+    """Gates do SP (bloqueantes) + `perfil` do repo, sem duplicar: um comando já no SP fica como está.
+
+    Bloqueantes do perfil vêm antes dos consultivos; cada gate ganha `modo`. Sem perfil devolve `gates` intactos.
+    """
+    out = [{**g, "modo": "bloqueante"} for g in gates]
+    if not perfil:
+        return out
+    vistos = {g["cmd"].strip() for g in gates}
+    for modo, chave in (("bloqueante", "bloqueantes"), ("consultivo", "consultivos")):
+        for cmd in perfil[chave]:
+            if cmd not in vistos:
+                vistos.add(cmd)
+                out.append({"cmd": cmd, "cwd": str(repo), "timeout": DEFAULT_TIMEOUT, "inputs": [],
+                            "timeout_declarado": False, "modo": modo})
+    return out
 
 
 def forbidden(cmd):
@@ -206,7 +237,8 @@ def run(gates, cache_path=None):
         digest = input_hash(g) if cache_path else None
         key = f"{Path(g['cwd']).resolve()}::{g['cmd']}"
         if digest and cache.get(key) == digest:
-            results.append({"cmd": g["cmd"], "rc": 0, "timeout": False, "secs": 0, "tail": "", "cached": True})
+            results.append({"cmd": g["cmd"], "rc": 0, "timeout": False, "secs": 0, "tail": "", "cached": True,
+                            "modo": g.get("modo", "bloqueante")})
             continue
         start = time.monotonic()
         timed_out = False
@@ -225,7 +257,8 @@ def run(gates, cache_path=None):
                 cache[key] = digest
             else:
                 cache.pop(key, None)
-        if rc != 0:
+        results[-1]["modo"] = g.get("modo", "bloqueante")
+        if rc != 0 and results[-1]["modo"] == "bloqueante":
             break
     if cache_path:
         with contextlib.suppress(OSError):
@@ -238,7 +271,8 @@ def summary(results):
     for r in results:
         flag = " TIMEOUT" if r["timeout"] else ""
         when = "cache" if r.get("cached") else f"{r['secs']} s"
-        lines.append(f"- `{r['cmd']}` rc={r['rc']}{flag} ({when})")
+        modo = " [consultivo]" if r.get("modo") == "consultivo" else ""
+        lines.append(f"- `{r['cmd']}`{modo} rc={r['rc']}{flag} ({when})")
         if r["tail"]:
             lines += [f"    {t}" for t in r["tail"].splitlines()]
     return "\n".join(lines)
@@ -249,6 +283,8 @@ def table(results, total):
     rows = ["| # | comando | RC | estado |", "|---|---|---|---|"]
     for i, r in enumerate(results, 1):
         state = "TIMEOUT" if r["timeout"] else ("cache" if r.get("cached") else ("verde" if r["rc"] == 0 else "VERMELHO"))
+        if r.get("modo") == "consultivo":
+            state = "consultivo " + ("verde" if state in ("verde", "cache") else "aviso")
         rows.append(f"| {i} | `{r['cmd']}` | {r['rc']} | {state} |")
     rows += [f"| {i} | — | — | não correu |" for i in range(len(results) + 1, total + 1)]
     return "\n".join(rows)
@@ -358,6 +394,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Corre os gates do frontmatter de um SP")
     ap.add_argument("path", nargs="?")
     ap.add_argument("--sugerir", metavar="REPO", help="imprime o bloco gates: sugerido para o tipo de repo")
+    ap.add_argument("--repo", help="repo cujo perfil `qualidade` se junta aos gates do SP (defeito: sem perfil)")
+    ap.add_argument("--perfil", metavar="REPO", help="imprime o bloco `qualidade` sugerido para o tipo de repo")
     ap.add_argument("--full", action="store_true", help="ignora a cache: corre todos os gates")
     ap.add_argument("--testes", metavar="REPO", help="fase de testes: corre o test.cmd da config do REPO")
     ap.add_argument("--sp", help="com --testes: SP (caminho ou slug) onde registar a tentativa e ler os limites")
@@ -365,6 +403,9 @@ def main(argv=None):
     args = ap.parse_args(argv)
     if args.testes:
         return _main_testes(args.testes, args.sp, args.timeout)
+    if args.perfil:
+        print(perfil_sugerido(args.perfil))
+        return 0
     if args.sugerir:
         block = suggestion(args.sugerir)
         print(block or "tipo de repo desconhecido: declarar os gates à mão", file=None if block else sys.stderr)
@@ -380,9 +421,11 @@ def main(argv=None):
         print(f"{args.path}: erro de leitura ({exc.__class__.__name__})", file=sys.stderr)
         return 2
     gates = parse_gates(text)
-    if not gates:
+    perfil = kaizen_config.qualidade(args.repo) if args.repo else None
+    if not gates and not perfil:
         print("sem gates declarados no SP")
         return 0
+    gates = juntar_perfil(gates, perfil, args.repo)
     bad = problems(gates)
     if bad:
         print("\n".join(bad), file=sys.stderr)
@@ -392,7 +435,12 @@ def main(argv=None):
     results = run(gates, cache_path=None if args.full else CACHE_PATH)
     print(summary(results))
     print(table(results, len(gates)))
-    return 0 if all(r["rc"] == 0 for r in results) and len(results) == len(gates) else 1
+    return 0 if sucesso(results, gates) else 1
+
+
+def sucesso(results, gates):
+    """Verde = todos os gates bloqueantes correram e passaram (consultivos vermelhos só avisam)."""
+    return len(results) == len(gates) and all(r["rc"] == 0 or r.get("modo") == "consultivo" for r in results)
 
 
 if __name__ == "__main__":

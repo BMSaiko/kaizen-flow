@@ -112,6 +112,8 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-076 | `orq` is asked to close the `kaizen` pane (by name or by id) | it is refused with a clear error (rc 2) and nothing is closed | testes-falha-90 | `core/scripts/test_kf_term_orq.py::test_matar_principal_recusado` |
 | EC-077 | A pane is registered with an invalid name (uppercase, spaces, over 48 characters) | the registration is refused and the registry is left untouched | testes-falha-90 | `core/scripts/test_kf_nomes.py::test_registar_nome_invalido` |
 | EC-079 | A `VISION.md` still holds `TBD`/`TODO`/`(preencher)` placeholders (e.g. straight from `kaizen vision init`) | `kaizen vision validate` exits 1 and lists every unfilled field and section; nothing downstream consumes it | kaizenflow-visao-intake | `core/scripts/test_sp_visao.py::test_ec_079_validate_rejeita_placeholders` |
+| EC-081 | An advisory (`consultivos`) quality gate fails | it is reported as `consultivo aviso`, the run goes on and `sp-gates` still exits 0 | kaizenflow-gates-perfil-qualidade | `core/scripts/test_sp_gates.py::test_consultivo_vermelho_nao_trava_nem_falha` |
+| EC-082 | A repo has no `qualidade` profile (or only `coberturaDiff`), or an SP lists a profile command already in its own `gates:` | old behaviour is kept; the duplicate runs once, as the SP's blocking gate | kaizenflow-gates-perfil-qualidade | `core/scripts/test_sp_gates.py::test_main_repo_aplica_perfil_e_sem_repo_comportamento_antigo` |
 
 ## Windows (atomic rename, CRLF, paths, console close)
 

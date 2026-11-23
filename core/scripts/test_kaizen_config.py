@@ -83,3 +83,17 @@ def test_herdr_defeitos_e_valores(tmp_path):
     assert kc.herdr(tmp_path) == {"maxPanesPorTab": 3, "workspacePorProjeto": False}
     (tmp_path / "kaizen.config.json").write_text('{"herdr": {"maxPanesPorTab": 0, "workspacePorProjeto": "x"}}', encoding="utf-8")
     assert kc.herdr(tmp_path) == {"maxPanesPorTab": 2, "workspacePorProjeto": True}
+
+
+def test_qualidade_perfil_ausente_ou_so_cobertura_e_none(tmp_path):
+    assert cfg.qualidade(tmp_path) is None
+    (tmp_path / "kaizen.config.json").write_text(json.dumps({"qualidade": {"coberturaDiff": 90}}))
+    assert cfg.qualidade(tmp_path) is None
+
+
+def test_qualidade_perfil_limpa_e_defeitos(tmp_path):
+    conf = {"qualidade": {"bloqueantes": ["a", " a ", "", 3, "b"], "consultivos": ["b", "c"], "fases": ["review", "x"]}}
+    (tmp_path / "kaizen.config.json").write_text(json.dumps(conf))
+    assert cfg.qualidade(tmp_path) == {"bloqueantes": ["a", "b"], "consultivos": ["c"], "fases": ["review"]}
+    (tmp_path / "kaizen.config.json").write_text(json.dumps({"qualidade": {"consultivos": ["c"]}}))
+    assert cfg.qualidade(tmp_path) == {"bloqueantes": [], "consultivos": ["c"], "fases": ["pentest", "review"]}
