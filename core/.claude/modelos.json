@@ -2,14 +2,14 @@
   "papeis": {
     "sp-autor": {
       "model": "claude-opus-5-5",
-      "effort": "medium",
+      "effort": "low",
       "fallback": [
         "claude-fable-5-2"
       ]
     },
     "michi-exec": {
       "model": "claude-sonnet-5-5",
-      "effort": "medium"
+      "effort": "low"
     },
     "michi-leve": {
       "model": "claude-haiku-5-5",
@@ -21,7 +21,7 @@
     },
     "michi-complexo": {
       "model": "claude-opus-5-5",
-      "effort": "medium"
+      "effort": "low"
     },
     "michi-critico": {
       "model": "claude-fable-5-2",

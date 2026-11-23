@@ -288,7 +288,7 @@ def test_json_real_do_repo():
     assert d["papeis"]["michi-critico"]["model"] == "claude-fable-5-2"
     assert d["michi_modelo"]["critico"] == "michi-critico"
     assert d["papeis"]["michi-complexo"]["model"] == "claude-opus-5-5"
-    assert d["papeis"]["sp-autor"]["effort"] == "medium"
+    assert d["papeis"]["sp-autor"]["effort"] == "low"
 
 
 def test_proximo_nivel_ordem_da_config():
