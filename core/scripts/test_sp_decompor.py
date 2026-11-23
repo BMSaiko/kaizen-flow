@@ -16,8 +16,8 @@ listar = carregar(AQUI / "sp-list.py")
 
 def vision(ui="nao", marcos=None):
     marcos = marcos or [
-        "1. Modelo de dados [ficheiros 3, horas 1] `python -m pytest tests/test_modelo.py`",
-        "2. API de refeições (depende: 1) `python -m pytest tests/test_api.py`",
+        "1. Modelo de dados [ficheiros 3, horas 1] `python -m pytest -k modelo`",
+        "2. API de refeições (depende: 1) `python -m pytest -k api`",
         "3. Ecrã de planeamento (depende: 1, 2) [ficheiros 5, horas 3]",
     ]
     ds = "DESIGN.md" if ui == "sim" else "nenhum"
@@ -133,4 +133,4 @@ def test_dry_run_nao_escreve(ambiente, capsys):
 def test_gate_extra_em_cada_filho(ambiente):
     assert correr(ambiente, vision(), "--gate", "python -m ruff check .") == 0
     m2 = (ambiente / "sp-root/demo/sp/TODO/demo-visao-m2-2026-11-23.md").read_text(encoding="utf-8")
-    assert "  - cmd: python -m ruff check ." in m2 and "  - cmd: python -m pytest tests/test_api.py" in m2
+    assert "  - cmd: python -m ruff check ." in m2 and "  - cmd: python -m pytest -k api" in m2

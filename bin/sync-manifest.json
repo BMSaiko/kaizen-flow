@@ -94,6 +94,8 @@
     "ds-export.py",
     "test_ds.py",
     "sp-visao.py",
-    "test_sp_visao.py"
+    "test_sp_visao.py",
+    "sp-decompor.py",
+    "test_sp_decompor.py"
   ]
 }
