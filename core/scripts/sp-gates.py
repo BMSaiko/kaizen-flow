@@ -19,6 +19,7 @@ Uso:
                                                        # regista `## Testes` no SP; rc 0 verde, 1 vermelho, 2 proibido,
                                                        # 3 sem test.cmd (perguntar ao user), 4 limite de tentativas
 Ordem da fase 5: gates -> harden -> pentest -> review (michi/references/michi-gates.md).
+SP `ui: sim` com `--repo`: junta `ds-lint` (bloqueante) e `ds-verify` (bloqueante com Playwright no repo, senão consultivo).
 Perfil `qualidade`: gates `bloqueantes` juntam-se aos do SP (sem duplicar) e travam; `consultivos` correm no fim, só registam.
 rc: 0 gates verdes (consultivos à parte), 1 gate bloqueante falhou, 2 erro de uso ou gates inválidos
 """
@@ -26,6 +27,7 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 from pathlib import Path as _P
 import sys as _s
@@ -126,21 +128,42 @@ def perfil_sugerido(repo):
     return json.dumps({"qualidade": {"bloqueantes": bloq, "consultivos": []}}, indent=2, ensure_ascii=False)
 
 
-def juntar_perfil(gates, perfil, repo):
+def sp_ui(text):
+    """True se o frontmatter do SP tem `ui: sim` (o corpo nunca conta)."""
+    return any(re.match(r"^ui:\s*sim\s*$", ln, re.I) for ln in kaizen_engine.frontmatter_lines(text))
+
+
+def _browser_disponivel(repo):
+    return bool(shutil.which("node")) and (Path(repo) / "node_modules" / "playwright").is_dir()
+
+
+def gates_ui(repo):
+    """Gates de design de um SP `ui: sim`: `ds-lint` bloqueante; `ds-verify` bloqueante com Playwright no repo, senão consultivo."""
+    aqui = Path(__file__).resolve().parent
+    py = f'"{sys.executable}"'
+    verify = f'{py} -I "{aqui / "ds-verify.py"}" --dir .'
+    return [(f'{py} -I "{aqui / "ds-lint.py"}" --dir .', "bloqueante"),
+            (verify, "bloqueante" if _browser_disponivel(repo) else "consultivo")]
+
+
+def juntar_perfil(gates, perfil, repo, ui=False):
     """Gates do SP (bloqueantes) + `perfil` do repo, sem duplicar: um comando já no SP fica como está.
 
-    Bloqueantes do perfil vêm antes dos consultivos; cada gate ganha `modo`. Sem perfil devolve `gates` intactos.
+    Bloqueantes do perfil vêm antes dos consultivos; cada gate ganha `modo`. Com `ui` (SP `ui: sim`) juntam-se os gates
+    de design (`gates_ui`). Sem perfil nem ui devolve `gates` intactos.
     """
     out = [{**g, "modo": "bloqueante"} for g in gates]
-    if not perfil:
+    if not perfil and not ui:
         return out
     vistos = {g["cmd"].strip() for g in gates}
-    for modo, chave in (("bloqueante", "bloqueantes"), ("consultivo", "consultivos")):
-        for cmd in perfil[chave]:
-            if cmd not in vistos:
-                vistos.add(cmd)
-                out.append({"cmd": cmd, "cwd": str(repo), "timeout": DEFAULT_TIMEOUT, "inputs": [],
-                            "timeout_declarado": False, "modo": modo})
+    extra = [(c, "bloqueante") for c in (perfil or {}).get("bloqueantes", [])]
+    extra += gates_ui(repo) if ui else []
+    extra += [(c, "consultivo") for c in (perfil or {}).get("consultivos", [])]
+    for cmd, modo in sorted(extra, key=lambda t: t[1] != "bloqueante"):
+        if cmd not in vistos:
+            vistos.add(cmd)
+            out.append({"cmd": cmd, "cwd": str(repo), "timeout": DEFAULT_TIMEOUT, "inputs": [],
+                        "timeout_declarado": False, "modo": modo})
     return out
 
 
@@ -430,10 +453,11 @@ def main(argv=None):
         return 2
     gates = parse_gates(text)
     perfil = kaizen_config.qualidade(args.repo) if args.repo else None
-    if not gates and not perfil:
+    ui = bool(args.repo) and sp_ui(text)
+    if not gates and not perfil and not ui:
         print("sem gates declarados no SP")
         return 0
-    gates = juntar_perfil(gates, perfil, args.repo)
+    gates = juntar_perfil(gates, perfil, args.repo, ui=ui)
     bad = problems(gates)
     if bad:
         print("\n".join(bad), file=sys.stderr)

@@ -116,6 +116,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-082 | `decompor` is run twice on the same `VISION.md` | the second run creates nothing (stable slug per milestone) and says so | kaizenflow-decompor | `core/scripts/test_sp_decompor.py::test_idempotente` |
 | EC-083 | An advisory (`consultivos`) quality gate fails | it is reported as `consultivo aviso`, the run goes on and `sp-gates` still exits 0 | kaizenflow-gates-perfil-qualidade | `core/scripts/test_sp_gates.py::test_consultivo_vermelho_nao_trava_nem_falha` |
 | EC-084 | A repo has no `qualidade` profile (or only `coberturaDiff`), or an SP lists a profile command already in its own `gates:` | old behaviour is kept; the duplicate runs once, as the SP's blocking gate | kaizenflow-gates-perfil-qualidade | `core/scripts/test_sp_gates.py::test_main_repo_aplica_perfil_e_sem_repo_comportamento_antigo` |
+| EC-085 | A UI gate runs where there is no browser, Playwright or axe (or a baseline is missing) | `ds-verify` exits 3 with a warning and never reports green; a missing baseline fails and is only created by an explicit `--atualizar-baselines`, logged in the SP | kaizenflow-design-gates-ui | `core/scripts/test_ds_gates.py::test_verify_sem_browser_rc3_nunca_verde` |
 
 ## Windows (atomic rename, CRLF, paths, console close)
 

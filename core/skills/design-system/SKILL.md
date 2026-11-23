@@ -14,8 +14,12 @@ O design system é do projeto-alvo: `DESIGN.md` (porquê e como) e `design/token
 | Criar | `python -I scripts/ds-init.py <projeto> [--primaria #hex] [--neutra #hex]` (nunca sobrescreve sem `--force`) |
 | Validar | `python -I scripts/ds-validate.py [--dir D]`: schema DTCG, `{alias}` resolúveis, contraste, escalas; rc 1 lista as falhas |
 | Exportar | `python -I scripts/ds-export.py [--dir D] [--out D]`: `tokens.css` (claro/escuro) e `tailwind.preset.js`; recusa tokens inválidos |
+| Lint | `python -I scripts/ds-lint.py [--dir D]`: literais de cor/espaçamento/tipografia fora dos tokens; rc 1 |
+| Verificar UI | `python -I scripts/ds-verify.py [--dir D] [--atualizar-baselines]`: axe, screenshots vs baselines; rc 3 sem browser |
+| Linting | `python -I scripts/ds-lint.py [--dir D]`: literais fora dos tokens; rc 1 |
+| Verificar UI | `python -I scripts/ds-verify.py [--dir D] [--atualizar-baselines]`: axe, screenshots vs baselines; rc 3 sem browser |
 
-CLI equivalente: `kaizen ds init|validate|export`.
+CLI equivalente: `kaizen ds init|validate|export|lint|verify`.
 
 ## Regras
 
@@ -30,3 +34,4 @@ CLI equivalente: `kaizen ds init|validate|export`.
 - `references/principios.md`: princípios, escalas, formato dos tokens.
 - `references/componentes.md`: checklist de componente e estados.
 - `references/a11y.md`: WCAG 2.2 AA aplicado, o que o validador não apanha.
+- `references/verificacao.md`: gates `ds-lint` e `ds-verify` (SPs `ui: sim`).
