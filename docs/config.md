@@ -23,7 +23,7 @@ Optional, in the project root. Without it the defaults below apply. `init` only 
 | `prices` | bundled `usage/prices.json` | cost calculation |
 | `test.cmd` | detected by `init` | command that runs the target project's tests (see below) |
 | `painelBackend` | `auto` | `sp-handoff --spawn`: where the new session runs (see below) |
-| `qualidade` | `{"coberturaDiff": 85}` | `sp-cobertura-diff.py`: minimum % coverage of the lines a diff adds (0-100; invalid falls back to 85) |
+| `qualidade` | `{"coberturaDiff": 85}` | `sp-cobertura-diff.py`: minimum % coverage of the lines a diff adds (0-100; invalid falls back to 85). Also the quality profile (see below) |
 | `herdr` | `{"maxPanesPorTab": 2, "workspacePorProjeto": true}` | herdr backend layout (see below) |
 | `desenvolvimento` | none | development method: default authorisations and PR closing (see below) |
 | `userName` | `user` | name the scripts' warnings use for you; empty or non-string falls back to `user` |
@@ -120,3 +120,17 @@ Invalid values (non-integer or below 1, non-boolean) fall back to the defaults.
 The queue (`/sp-fila`) and the handoff (`handoff --spawn`) share one herdr layer, `core/scripts/herdr_ops.py`: new pane, `claude` as agent, prompt by `herdr agent prompt` (no screen scraping).
 
 End-to-end check of the herdr engine (isolated herdr session, 2 projects, 3 panes, cap and resume; never touches the default session): `python -I core/scripts/herdr-e2e-multiprojeto.py --isolado`.
+
+## Quality profile (`qualidade`)
+
+```json
+{"qualidade": {"bloqueantes": ["npm test", "python core/scripts/quality-ratchet.py --repo ."],
+               "consultivos": ["npm run lint"],
+               "fases": ["pentest", "review"]}}
+```
+
+A profile exists when `bloqueantes` or `consultivos` is a list; without it nothing changes (repos with only `coberturaDiff` keep the old behaviour). `python -I scripts/sp-gates.py --perfil <repo>` prints a block with sensible defaults for the repo type.
+
+- `sp-gates.py <SP> --repo R` adds the profile gates to the SP's own `gates:`, without duplicates. Blocking ones stop at the first red (rc 1); advisory ones run last, are reported as `consultivo verde|aviso` and never block.
+- `pr_fechar.py <PR> --sp <slug> --pentest-relatorio F --review-estado F`: with a profile it re-runs the blocking gates before merging; a red gate, a pentest report that is not `sem achados` or a review state that is not `APROVADO` (per `fases`; remove one only here, in the reviewed config) means rc 11, no merge, and the SP is set to `bloqueado` with the reason.
+- An SP cannot switch the profile off; only this file can.
