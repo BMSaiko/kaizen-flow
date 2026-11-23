@@ -112,6 +112,8 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-076 | `orq` is asked to close the `kaizen` pane (by name or by id) | it is refused with a clear error (rc 2) and nothing is closed | testes-falha-90 | `core/scripts/test_kf_term_orq.py::test_matar_principal_recusado` |
 | EC-077 | A pane is registered with an invalid name (uppercase, spaces, over 48 characters) | the registration is refused and the registry is left untouched | testes-falha-90 | `core/scripts/test_kf_nomes.py::test_registar_nome_invalido` |
 | EC-079 | A `VISION.md` still holds `TBD`/`TODO`/`(preencher)` placeholders (e.g. straight from `kaizen vision init`) | `kaizen vision validate` exits 1 and lists every unfilled field and section; nothing downstream consumes it | kaizenflow-visao-intake | `core/scripts/test_sp_visao.py::test_ec_079_validate_rejeita_placeholders` |
+| EC-081 | The milestones of a `VISION.md` depend on each other in a cycle | `decompor` exits 1 naming the cycle and creates no SP | kaizenflow-decompor | `core/scripts/test_sp_decompor.py::test_ciclo_rejeitado` |
+| EC-082 | `decompor` is run twice on the same `VISION.md` | the second run creates nothing (stable slug per milestone) and says so | kaizenflow-decompor | `core/scripts/test_sp_decompor.py::test_idempotente` |
 
 ## Windows (atomic rename, CRLF, paths, console close)
 
