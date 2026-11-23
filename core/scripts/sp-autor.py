@@ -2,7 +2,7 @@
 
 O painel abre `claude --model <M> --effort <E>` (papel `sp-autor` de `.claude/modelos.json`) no cwd dado, recebe o
 título `sp-autor <slug>` e um prompt numa linha: ler a semente com `--consume` (imprime e só depois apaga, como o
-`/handoff`), preencher o SP pela skill `super-prompt` §Gerar, gravar `done` com `sp-estado.py sp-autor-<slug>` e
+`/handoff`), preencher o SP pela skill `super-prompt` §Gerar, commitar+enviar só o SP, gravar `done` com `sp-estado.py sp-autor-<slug>` e
 fechar. Conta para o teto global de painéis (`sp_painel_estado.MAX_PARALELO`); sem vaga fica `pendente` e nada abre.
 A sessão que pediu fica livre: segue com `sp-estado.py --listar` ou o vigia. Ao lançar guarda-se o título da tab de
 origem (`origem_titulo`, mais `origem_pane` como pista); o painel corre `--avisar <slug>` antes do `done` e a origem
@@ -62,7 +62,9 @@ def prompt(sp, semente):
     slug = slug_de(sp)
     return (f"És o painel sp-autor de {slug}. Primeiro corre `python -I scripts/sp-autor.py --consume \"{semente}\"` "
             f"(semente: decisões e contexto; lida e apagada). Preenche as 8 secções de {sp} pela skill super-prompt §Gerar, "
-            "sem fazer o trabalho do SP, sem commit, sem abrir outros painéis. No fim corre "
+            "sem fazer o trabalho do SP, sem abrir outros painéis. Depois commita e envia só o SP, em master e sem worktree: "
+            f"`git add \"{sp}\" && git commit -m 'vault: SP {slug}' && git push` (nunca `git add -A`; se o push falhar segue e "
+            "regista-o no `--msg`). No fim corre "
             f"`python -I scripts/sp-autor.py --avisar {slug} --sp \"{sp}\"` (avisa o painel que te lançou; se falhar segue) e depois "
             f"`python -I scripts/sp-estado.py {chave(slug)} done --msg '<resumo numa linha>'` "
             f"(ou bloqueado/falhou com o motivo) e fecha este painel com "

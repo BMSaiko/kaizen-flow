@@ -3,7 +3,7 @@ name: super-prompt
 description: Constrói um Super Prompt de 8 secções (brainstorm, SWOT, grill-me e DR mini) e guarda-o como SP. Usar para transformar uma ideia num SP pronto para o michi.
 version: 2.0.0
 model: claude-opus-5-5
-effort: medium
+effort: low
 ---
 # Super Prompt
 
@@ -42,4 +42,4 @@ Super Prompt saved: <abs path>
 Sections: 1.Role 2.Context 3.Objective 4.Success 5.Constraints 6.Seams 7.Steps 8.Done-when
 Reuse:    /michi <paste body of this file> in a new session
 ```
-Sem commit, push nem DA; depois, a pergunta de §Gerar 4.
+O painel `sp-autor` commita e envia só o SP preenchido (em `master`); sem DA; depois, a pergunta de §Gerar 4.
