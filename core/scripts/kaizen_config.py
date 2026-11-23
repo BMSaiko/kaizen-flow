@@ -1,6 +1,6 @@
 """Lê `kaizen.config.json` na raiz do repo; sem ficheiro ou chave, devolve o defeito.
 
-Chaves: `spRoot` (raiz dos SPs) e `docsRoot` (raiz dos DR/DP), relativas à raiz do repo; `desenvolvimento` (método do projeto); `herdr` ({maxPanesPorTab, workspacePorProjeto}).
+Chaves: `spRoot` (raiz dos SPs) e `docsRoot` (raiz dos DR/DP), relativas à raiz do repo; `desenvolvimento` (método do projeto); `herdr` ({maxPanesPorTab, workspacePorProjeto}); `qualidade.coberturaDiff` (limiar % da cobertura do diff, defeito 85).
 
 Uso: módulo importado pelos scripts sp-* e doc_ops; sem execução direta
 rc: n/a
@@ -55,6 +55,16 @@ def herdr(repo):
     n, w = raw.get("maxPanesPorTab"), raw.get("workspacePorProjeto")
     return {"maxPanesPorTab": n if isinstance(n, int) and not isinstance(n, bool) and n >= 1 else HERDR_DEFEITO["maxPanesPorTab"],
             "workspacePorProjeto": w if isinstance(w, bool) else HERDR_DEFEITO["workspacePorProjeto"]}
+
+
+COBERTURA_DIFF_DEFEITO = 85
+
+
+def cobertura_diff(repo):
+    """Limiar (%) da cobertura das linhas do diff (`qualidade.coberturaDiff`, número 0-100); inválido ou ausente = 85."""
+    q = _read(repo).get("qualidade")
+    v = q.get("coberturaDiff") if isinstance(q, dict) else None
+    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 100 else COBERTURA_DIFF_DEFEITO
 
 
 HOOKS_NAME = "kaizen-hooks.json"

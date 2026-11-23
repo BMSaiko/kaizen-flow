@@ -44,6 +44,8 @@
     "test_kf_erros_formato.py",
     "pentest.py",
     "test_pentest.py",
+    "sp-cobertura-diff.py",
+    "test_sp_cobertura_diff.py",
     "review_ciclo.py",
     "test_review_ciclo.py",
     "pr_corpo.py",

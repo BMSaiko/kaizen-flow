@@ -60,6 +60,10 @@ Além da cobertura de linhas, o workflow mede a cobertura de casos: `docs/catalo
 
 Correr só estes: `node --test tests/e2e-use-cases.test.js` (cerca de 15 s); um caso: `node --test --test-name-pattern "UC-015" tests/e2e-use-cases.test.js`.
 
+## Cobertura do diff
+
+O limiar global não diz se as linhas **alteradas** estão testadas. `python core/scripts/sp-cobertura-diff.py --repo . --base main` calcula a cobertura só das linhas adicionadas (mesmo parser de diff do `pentest.py`) a partir de relatórios já gerados (`coverage/lcov.info`, JSON do coverage.py ou `coverage/python.xml` do CI) e sai com rc 1 abaixo de `qualidade.coberturaDiff` (defeito 85, ver `docs/config.md`). Ignora testes, docs, config e linhas não executáveis; ficheiros de código sem dados no relatório são avisados e não contam. Não altera os limiares globais.
+
 ## Testes de falha e propriedades
 
 - Fixtures de injeção em `core/scripts/conftest.py`: `relogio` e `tempo_falso` (relógio controlado), `falha_replace` (`os.replace` falha N vezes e depois passa); cada uma tem teste-sentinela.
