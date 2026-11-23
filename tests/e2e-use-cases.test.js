@@ -456,3 +456,24 @@ test("UC-038 kaizen vision gera e valida o VISION.md do projeto", T, comSandbox(
   assert.strictEqual(r.status, 0, "vision resumo");
   assert.match(r.stdout, /demo/);
 }));
+
+test("UC-039 kaizen vision decompor cria o programa de SPs", T, comSandbox({}, (sb) => {
+  const vision = (...a) => kaizen(["vision", ...a], { cwd: sb.dir, env: sb.env, encoding: "utf8" });
+  const f = path.join(sb.dir, "VISION.md");
+  fs.writeFileSync(f, [
+    "---", "projeto: demo", "ui: nao", "stack: node", "design_system: nenhum", "orcamento: 5 USD por SP, 20 USD por dia", "---",
+    "# demo", "", "## Goal", "Planear refeições.", "", "## Users", "- Famílias.", "", "## Success criteria", "- [ ] `npm test` passa", "",
+    "## Constraints", "- Só stdlib.", "", "## Non-goals", "- Sem contas.", "", "## Milestones",
+    "1. Modelo [ficheiros 2, horas 1] `node --version`", "2. API (depende: 1) `node --version`", "",
+  ].join("\n"), "utf8");
+  const root = path.join(sb.dir, "sp-root");
+  fs.mkdirSync(path.join(root, "demo"), { recursive: true });
+  const args = ["decompor", f, "--root", root, "--data", "2026-11-23"];
+  assert.strictEqual(vision(...args).status, 0, "decompor");
+  const todo = path.join(root, "demo", "sp", "TODO");
+  assert.strictEqual(fs.readdirSync(todo).length, 3, "mãe + 2 filhos");
+  const outra = vision(...args);
+  assert.strictEqual(outra.status, 0, "segunda execução");
+  assert.match(outra.stdout, /nada a criar/);
+  assert.strictEqual(fs.readdirSync(todo).length, 3, "idempotente");
+}));
