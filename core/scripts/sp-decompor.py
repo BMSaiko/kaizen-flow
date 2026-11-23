@@ -105,7 +105,8 @@ def _decisoes(campos, seccoes):
     return dec
 
 
-def _corpo_filho(projeto, campos, seccoes, mc, total, slug_de, gates):
+def _corpo_filho(ctx, mc):
+    projeto, campos, seccoes, total, slug_de = ctx["projeto"], ctx["campos"], ctx["seccoes"], ctx["total"], ctx["slug_de"]
     util = sp_visao._util
     deps = ", ".join(f"`{slug_de(d)}`" for d in mc["deps"]) or "nenhuma"
     ficheiros = f"{mc['ficheiros']} ficheiros, {mc['horas']:g} h" + (" (Assuncao: estimativa por omissão)" if mc["assumido"] else "")
@@ -179,53 +180,74 @@ def _auth(projeto, root):
         return None
 
 
-def decompor(args):
-    campos, seccoes, marcos = _planear(args)
-    projeto, root, hoje = campos["projeto"].strip(), Path(args.root), date.fromisoformat(args.data)
-    total = len(marcos)
-    nome_mae = sp_new.full_slug(projeto, "visao", hoje)
-    existentes = {sp.slug for sp in sp_list.collect(root, include_done=True) if sp.project == projeto}
-
+def _slugs(projeto, marcos, existentes, hoje):
     def achado(prefixo):
         rx = re.compile(rf"^{re.escape(prefixo)}-\d{{4}}-\d{{2}}-\d{{2}}$")
         return next((s for s in sorted(existentes) if rx.match(s)), None)
 
     mae_existente = achado(f"{projeto}-visao")
     slugs = {mc["n"]: achado(f"{projeto}-visao-m{mc['n']}") or sp_new.full_slug(projeto, f"visao-m{mc['n']}", hoje) for mc in marcos}
-    slug_de = lambda n: slugs[n]  # noqa: E731
+    return mae_existente, slugs
+
+
+def _criar_mae(ctx, marcos, mae, args):
+    slugs = ctx["slugs"]
+    extra = ["kind: program", "children:"]
+    for mc in marcos:
+        extra += [f"  - slug: {slugs[mc['n']]}", f"    depends_on: [{', '.join(slugs[d] for d in mc['deps'])}]", "    state: TODO"]
+    p = sp_new.create(ctx["root"], ctx["projeto"], mae, args.priority, ctx["hoje"], extra=extra, modo="auto", auth=ctx["auth"], programa=True)
+    _com_corpo(p, _corpo_mae(ctx["projeto"], ctx["seccoes"], marcos, ctx["slug_de"]))
+    return p
+
+
+def _criar_filho(ctx, mc, mae, gates_base, args):
+    slugs, deps = ctx["slugs"], [ctx["slugs"][d] for d in mc["deps"]]
+    gates = list(dict.fromkeys([*gates_base, mc["cmd"]]))
+    p = sp_new.create(ctx["root"], ctx["projeto"], slugs[mc["n"]], args.priority, ctx["hoje"], parent=mae, depends_on=deps,
+                      modo="auto", auth=ctx["auth"], gates=gates, prova=mc["cmd"], decisoes=_decisoes(ctx["campos"], ctx["seccoes"]), ui=ctx["ui"])
+    _com_corpo(p, _corpo_filho(ctx, mc))
+    return p
+
+
+def _criar(ctx, criados, args):
+    """Cria mãe e filhos em falta, acrescentando a `criados` (o chamador limpa em caso de erro)."""
+    mae, gates_base = ctx["mae"], _gates(args)
+    if not ctx["mae_existente"]:
+        criados.append(_criar_mae(ctx, ctx["marcos"], mae, args))
+    for mc in ctx["faltam"]:
+        criados.append(_criar_filho(ctx, mc, mae, gates_base, args))
+        if ctx["mae_existente"]:
+            sp_new.link_parent(ctx["root"], ctx["projeto"], mae, ctx["slugs"][mc["n"]], [ctx["slugs"][d] for d in mc["deps"]])
+
+
+def _validar(criados):
+    erros = []
+    for p in criados:
+        erros += [f"{p.name}: {e}" for e in sp_validate.validate(p.read_text(encoding="utf-8"), p.parent.name)]
+    if erros:
+        raise DecomporErro("SP gerado inválido: " + "; ".join(erros))
+
+
+def decompor(args):
+    campos, seccoes, marcos = _planear(args)
+    projeto, root, hoje = campos["projeto"].strip(), Path(args.root), date.fromisoformat(args.data)
+    existentes = {sp.slug for sp in sp_list.collect(root, include_done=True) if sp.project == projeto}
+    mae_existente, slugs = _slugs(projeto, marcos, existentes, hoje)
     faltam = [mc for mc in marcos if slugs[mc["n"]] not in existentes]
     if not faltam:
-        print(f"nada a criar: os {total} marcos de {projeto} já têm SP")
+        print(f"nada a criar: os {len(marcos)} marcos de {projeto} já têm SP")
         return 0
     if args.dry_run:
         for mc in faltam:
             print(f"criaria {slugs[mc['n']]} (depende: {', '.join(slugs[d] for d in mc['deps']) or '-'})")
         return 0
-    mae = mae_existente or nome_mae
-    gates_base, auth, criados, ligados = _gates(args), _auth(projeto, root), [], []
-    ui = campos["ui"].strip().lower() == "sim"
+    mae = mae_existente or sp_new.full_slug(projeto, "visao", hoje)
+    ctx = {"projeto": projeto, "campos": campos, "seccoes": seccoes, "total": len(marcos), "slugs": slugs, "slug_de": slugs.__getitem__,
+           "root": root, "hoje": hoje, "mae": mae, "mae_existente": mae_existente, "marcos": marcos, "faltam": faltam, "auth": _auth(projeto, root), "ui": campos["ui"].strip().lower() == "sim"}
+    criados = []
     try:
-        if not mae_existente:
-            extra = ["kind: program", "children:"]
-            for mc in marcos:
-                extra += [f"  - slug: {slugs[mc['n']]}", f"    depends_on: [{', '.join(slugs[d] for d in mc['deps'])}]", "    state: TODO"]
-            p = sp_new.create(root, projeto, mae, args.priority, hoje, extra=extra, modo="auto", auth=auth, programa=True)
-            _com_corpo(p, _corpo_mae(projeto, seccoes, marcos, slug_de))
-            criados.append(p)
-        for mc in faltam:
-            gates = list(dict.fromkeys([*gates_base, mc["cmd"]]))
-            p = sp_new.create(root, projeto, slugs[mc["n"]], args.priority, hoje, parent=mae, depends_on=[slugs[d] for d in mc["deps"]],
-                              modo="auto", auth=auth, gates=gates, prova=mc["cmd"], decisoes=_decisoes(campos, seccoes), ui=ui)
-            _com_corpo(p, _corpo_filho(projeto, campos, seccoes, mc, total, slug_de, gates))
-            criados.append(p)
-            if mae_existente:
-                sp_new.link_parent(root, projeto, mae, slugs[mc["n"]], [slugs[d] for d in mc["deps"]])
-                ligados.append(slugs[mc["n"]])
-        erros = []
-        for p in criados:
-            erros += [f"{p.name}: {e}" for e in sp_validate.validate(p.read_text(encoding="utf-8"), p.parent.name)]
-        if erros:
-            raise DecomporErro("SP gerado inválido: " + "; ".join(erros))
+        _criar(ctx, criados, args)
+        _validar(criados)
     except (DecomporErro, sp_new.SpNewError) as exc:
         for p in criados:
             p.unlink(missing_ok=True)
