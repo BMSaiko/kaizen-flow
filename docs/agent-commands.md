@@ -13,6 +13,7 @@ Typed inside Claude Code / Codex, not in the shell. These are skills and prompt 
 | `/pentest [repo]` | optional repo | Defensive, local pen test of the lines added in the diff (`pentest.py`); each finding becomes a fix story. |
 | `/review-ciclo` | | Review phase that loops fix and review until approved, with an iteration limit and escalation to you (`review_ciclo.py`). |
 | `/pr-fase` | | Final phase: opens the PR from the story, the pen test and the review (`pr_corpo.py`), following the story's `pr:` authorization. |
+| `design-system` (skill, by reference) | | Principles, component checklist and a11y rules for a project's `DESIGN.md` and DTCG tokens; pairs with `kaizen ds`. |
 | `/grill-me`, `/dr`, `/dp`, `/da`, `/brainstorm`, `/swot` | topic | The building blocks michi chains; usable alone. |
 
 ## The michi cycle
