@@ -23,6 +23,7 @@ Optional, in the project root. Without it the defaults below apply. `init` only 
 | `prices` | bundled `usage/prices.json` | cost calculation |
 | `test.cmd` | detected by `init` | command that runs the target project's tests (see below) |
 | `painelBackend` | `auto` | `sp-handoff --spawn`: where the new session runs (see below) |
+| `qualidade` | `{"coberturaDiff": 85}` | `sp-cobertura-diff.py`: minimum % coverage of the lines a diff adds (0-100; invalid falls back to 85) |
 | `herdr` | `{"maxPanesPorTab": 2, "workspacePorProjeto": true}` | herdr backend layout (see below) |
 | `desenvolvimento` | none | development method: default authorisations and PR closing (see below) |
 | `userName` | `user` | name the scripts' warnings use for you; empty or non-string falls back to `user` |
