@@ -92,9 +92,15 @@ def detect_gates(repo):
         except (OSError, ValueError):
             scripts = {}
         cmds += [f"npm run {n}" for n in ("lint", "typecheck", "build") if n in scripts]
+        if (r / "tsconfig.json").exists() and "typecheck" not in scripts:
+            cmds.append("npx tsc --noEmit --strict")
         if "test" in scripts:
             cmds.append("npm test")
     if (r / "pyproject.toml").exists() or (r / "pytest.ini").exists() or (r / "setup.cfg").exists():
+        if (r / "ruff.toml").exists() or (r / ".ruff.toml").exists():
+            cmds.append("python -m ruff check .")
+        if (r / "mypy.ini").exists():
+            cmds.append("python -m mypy .")
         cmds.append("python -m pytest -q")
     return cmds
 

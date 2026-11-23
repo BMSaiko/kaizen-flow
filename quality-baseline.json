@@ -1,0 +1,195 @@
+{
+ "catalog/kf_catalogo.py": {
+  "PLR0913": 2
+ },
+ "core/scripts/conftest.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/context-guard.py": {
+  "PLR0911": 1
+ },
+ "core/scripts/da-stop.py": {
+  "mypy": 1
+ },
+ "core/scripts/ds_core.py": {
+  "PLR0911": 1
+ },
+ "core/scripts/handoff.py": {
+  "PLR0913": 2
+ },
+ "core/scripts/handoff_pane.py": {
+  "PLR0913": 3
+ },
+ "core/scripts/handoff_spawn.py": {
+  "PLR0913": 2,
+  "mypy": 1
+ },
+ "core/scripts/herdr_fake.py": {
+  "C901": 1,
+  "PLR0911": 1,
+  "PLR0912": 1
+ },
+ "core/scripts/kf_errlog.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/kf_git.py": {
+  "mypy": 1
+ },
+ "core/scripts/kf_term_arranque.py": {
+  "PLR0913": 1,
+  "mypy": 1
+ },
+ "core/scripts/kf_term_limpar.py": {
+  "PLR0911": 2,
+  "PLR0913": 3,
+  "mypy": 1
+ },
+ "core/scripts/kf_term_orq.py": {
+  "PLR0911": 1,
+  "PLR0913": 1,
+  "mypy": 1
+ },
+ "core/scripts/loop_estado.py": {
+  "C901": 1,
+  "PLR0912": 1,
+  "PLR0915": 1
+ },
+ "core/scripts/michi-checkpoint.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/michi_handoff_auto.py": {
+  "PLR0911": 1,
+  "PLR0913": 1,
+  "mypy": 1
+ },
+ "core/scripts/painel_backend.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/pr_corpo.py": {
+  "PLR0911": 1
+ },
+ "core/scripts/pr_fechar.py": {
+  "PLR0911": 1,
+  "PLR0913": 1
+ },
+ "core/scripts/pr_watch.py": {
+  "PLR0911": 1,
+  "PLR0913": 1
+ },
+ "core/scripts/sp-autor.py": {
+  "PLR0911": 1,
+  "PLR0913": 2,
+  "mypy": 1
+ },
+ "core/scripts/sp-fechar.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/sp-fila.py": {
+  "C901": 1,
+  "PLR0911": 1
+ },
+ "core/scripts/sp-handoff.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/sp-new.py": {
+  "PLR0913": 3
+ },
+ "core/scripts/sp-organize.py": {
+  "PLR0911": 1,
+  "PLR0913": 1
+ },
+ "core/scripts/sp-preflight.py": {
+  "PLR0913": 1,
+  "mypy": 1
+ },
+ "core/scripts/sp-provas.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/sp-report.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/sp-resume.py": {
+  "PLR0911": 1,
+  "PLR0913": 1
+ },
+ "core/scripts/sp-revisor.py": {
+  "PLR0913": 4,
+  "mypy": 1
+ },
+ "core/scripts/sp_escalada.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/sp_fila_execucao.py": {
+  "C901": 1,
+  "PLR0913": 4
+ },
+ "core/scripts/sp_fila_paineis.py": {
+  "PLR0913": 2,
+  "mypy": 1
+ },
+ "core/scripts/sp_fila_relatorio.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/sp_fila_testlib.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/sp_indice.py": {
+  "mypy": 2
+ },
+ "core/scripts/sp_journal.py": {
+  "PLR0913": 1,
+  "mypy": 5
+ },
+ "core/scripts/sp_painel_estado.py": {
+  "PLR0913": 2
+ },
+ "core/scripts/sp_vigia.py": {
+  "PLR0911": 1,
+  "PLR0913": 1
+ },
+ "core/scripts/sp_vigia_reacao.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/test_herdr_spike_agent.py": {
+  "mypy": 3
+ },
+ "core/scripts/test_kf_erros_formato.py": {
+  "mypy": 1
+ },
+ "core/scripts/test_kf_term_limpar.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/test_michi_tree_close.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/test_quality_ratchet.py": {
+  "mypy": 3
+ },
+ "core/scripts/test_sp_cobertura_diff.py": {
+  "mypy": 3
+ },
+ "core/scripts/test_sp_envelhecer.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/test_sp_organize.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/test_sp_painel_estado.py": {
+  "mypy": 1
+ },
+ "core/scripts/test_sp_resumo.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/test_sp_validate.py": {
+  "PLR0913": 1
+ },
+ "core/scripts/test_sp_vigia.py": {
+  "PLR0913": 1
+ },
+ "tests/test_usage.py": {
+  "PLR0913": 1
+ },
+ "usage/kaizen_usage.py": {
+  "PLR0913": 1
+ }
+}

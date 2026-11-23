@@ -46,6 +46,8 @@
     "test_pentest.py",
     "sp-cobertura-diff.py",
     "test_sp_cobertura_diff.py",
+    "quality-ratchet.py",
+    "test_quality_ratchet.py",
     "review_ciclo.py",
     "test_review_ciclo.py",
     "pr_corpo.py",
