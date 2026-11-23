@@ -91,12 +91,21 @@ def _criterio_verificavel(texto):
     return bool(re.search(r"`[^`]+`", texto)) or bool(re.match(r"^observa[cç][aã]o\s*:\s*\S", texto, re.I))
 
 
-def analisar(texto):
-    """Devolve (campos, seccoes, problemas)."""
+def _problemas_criterios(seccoes):
     problemas = []
-    if not texto.startswith("---"):
-        return {}, {}, ["frontmatter em falta (o ficheiro tem de abrir com `---`)"]
-    campos = kaizen_engine.parse_frontmatter(texto)
+    if "Success criteria" not in seccoes:
+        return problemas
+    criterios = [m.group(1).strip() for ln in seccoes["Success criteria"] if (m := CRITERIO.match(ln))]
+    if _util(seccoes["Success criteria"]) and not criterios:
+        problemas.append("Success criteria: usar a lista `- [ ] critério`")
+    for c in criterios:
+        if c and not PLACEHOLDER.match(c) and not _criterio_verificavel(c):
+            problemas.append(f"critério sem comando nem «Observação:»: {c}")
+    return problemas
+
+
+def _problemas_campos(campos):
+    problemas = []
     for c in CAMPOS:
         v = str(campos.get(c, "")).strip()
         if not v or PLACEHOLDER.match(v):
@@ -109,19 +118,22 @@ def analisar(texto):
     orc = str(campos.get("orcamento", "")).strip()
     if orc and not PLACEHOLDER.match(orc) and not re.search(r"\d", orc):
         problemas.append("frontmatter: `orcamento` sem número (teto por SP e por dia)")
+    return problemas
+
+
+def analisar(texto):
+    """Devolve (campos, seccoes, problemas)."""
+    if not texto.startswith("---"):
+        return {}, {}, ["frontmatter em falta (o ficheiro tem de abrir com `---`)"]
+    campos = kaizen_engine.parse_frontmatter(texto)
+    problemas = _problemas_campos(campos)
     seccoes = _seccoes(texto)
     for sec in SECCOES:
         if sec not in seccoes:
             problemas.append(f"secção em falta: {sec}")
         elif not _util(seccoes[sec]):
             problemas.append(f"secção por preencher: {sec}")
-    if "Success criteria" in seccoes:
-        criterios = [m.group(1).strip() for ln in seccoes["Success criteria"] if (m := CRITERIO.match(ln))]
-        if _util(seccoes["Success criteria"]) and not criterios:
-            problemas.append("Success criteria: usar a lista `- [ ] critério`")
-        for c in criterios:
-            if c and not PLACEHOLDER.match(c) and not _criterio_verificavel(c):
-                problemas.append(f"critério sem comando nem «Observação:»: {c}")
+    problemas += _problemas_criterios(seccoes)
     return campos, seccoes, problemas
 
 
