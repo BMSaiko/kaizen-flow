@@ -121,7 +121,7 @@ def test_backend_timeout_avisa_e_lista(root, capsys):
 def test_texto_uma_linha_por_painel_com_cabecalho(root, capsys):
     assert ls.main([], root=root, backend=Falso({"7": "x", "9": "z"})) == 0
     linhas = capsys.readouterr().out.splitlines()
-    assert linhas[0].split()[:5] == ["PAINEL", "SP", "FASE", "ESTADO", "FILA"]
+    assert linhas[0].split()[:5] == ["PAINEL", "NOME", "SP", "FASE", "ESTADO"]
     assert len(linhas) == 1 + 4
     a2 = next(l for l in linhas if " a2 " in l)
     assert "morto" in a2 and "pergunta" in a2 and "prog-a" in a2
@@ -134,7 +134,7 @@ def test_json_contrato_estavel(root, capsys):
     dados = json.loads(capsys.readouterr().out)
     assert isinstance(dados, list) and len(dados) == 4
     for r in dados:
-        assert list(r) == ["painel", "slug", "fila", "fase", "estado", "pergunta", "vivo"]
+        assert list(r) == ["painel", "nome", "slug", "fila", "fase", "estado", "pergunta", "vivo"]
 
 
 def test_main_fila_x(root, capsys):

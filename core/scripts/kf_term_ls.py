@@ -14,12 +14,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kf_nomes  # noqa: E402
 import painel_backend as pb  # noqa: E402
 import sp_painel_estado as pe  # noqa: E402
 
 TIMEOUT_S = 5
-CAMPOS = ("painel", "slug", "fila", "fase", "estado", "pergunta", "vivo")
-COLUNAS = (("PAINEL", "painel"), ("SP", "slug"), ("FASE", "fase"), ("ESTADO", "estado"), ("FILA", "fila"))
+CAMPOS = ("painel", "nome", "slug", "fila", "fase", "estado", "pergunta", "vivo")
+COLUNAS = (("PAINEL", "painel"), ("NOME", "nome"), ("SP", "slug"), ("FASE", "fase"), ("ESTADO", "estado"), ("FILA", "fila"))
 
 
 def _com_timeout(run):
@@ -52,7 +53,7 @@ def _vivos(backend):
         return None, f"backend {backend.nome}: {e}"
 
 
-def _linha(sp, vivos):
+def _linha(sp, vivos, nomes=None):
     pane = sp.get("pane")
     pane = None if pane in (None, "") else str(pane)
     ativo = sp.get("estado") in pe.ATIVOS
@@ -62,7 +63,7 @@ def _linha(sp, vivos):
         vivo = "vivo"
     else:
         vivo = "morto" if ativo else None  # SP acabado sem painel é o normal, só os ativos denunciam painel morto
-    return {"painel": pane, "slug": sp.get("slug"), "fila": sp.get("fila"), "fase": sp.get("fase"),
+    return {"painel": pane, "nome": (nomes or {}).get(pane), "slug": sp.get("slug"), "fila": sp.get("fila"), "fase": sp.get("fase"),
             "estado": sp.get("estado"), "pergunta": sp.get("pergunta"), "vivo": vivo}
 
 
@@ -70,7 +71,13 @@ def linhas(root=None, backend=None, fila=None, vivos=None):
     """Uma linha por SP de todas as filas (ou só de `fila`); `vivos` (ids) dispensa chamar o backend."""
     if vivos is None:
         vivos, _ = _vivos(backend)
-    return [_linha(sp, vivos) for f in pe.filas(root) if fila in (None, f["fila"]) for sp in f["sps"]]
+    entradas = kf_nomes.listar(vivos=vivos, root=root)
+    nomes = {str(e["pane"]): e["nome"] for e in entradas}
+    rows = [_linha(sp, vivos, nomes) for f in pe.filas(root) if fila in (None, f["fila"]) for sp in f["sps"]]
+    if fila is None and vivos is not None:  # o heimdall não tem SP: aparece à parte, só se vivo
+        rows += [{"painel": str(e["pane"]), "nome": e["nome"], "slug": None, "fila": None, "fase": None, "estado": None,
+                  "pergunta": None, "vivo": "vivo"} for e in entradas if e["nome"] == kf_nomes.NOME_PRINCIPAL]
+    return rows
 
 
 def _texto(rows):

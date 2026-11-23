@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import herdr_ops  # noqa: E402
+import kf_nomes  # noqa: E402
 import painel_backend  # noqa: E402
 import sp_leitura  # noqa: E402
 from handoff_pane import (ENTER_SETTLE, ENTER_TRIES, HandoffError, _argvs, _copy, detect_backend, herdr_enter_argv,  # noqa: E402
@@ -120,6 +121,23 @@ def _spawn_herdr(wt, claude, cmd, run, res, sleep=time.sleep):
         sleep(1)
 
 
+def _nomear(slug, backend, res, run):
+    """Nome canónico `handoff-<slug>` (sufixo se já usado) registado para o painel; título best effort. Nunca falha o spawn."""
+    if not res.get("painel") or backend == "clipboard":
+        return
+    try:
+        vivos = None
+        with contextlib.suppress(Exception):
+            vivos = set(painel_backend.por_nome(backend, run).listar()) or None  # lista vazia = não fiável
+        nome = kf_nomes.nome_painel("handoff", slug, [e["nome"] for e in kf_nomes.listar(vivos=vivos)])
+        kf_nomes.registar(nome, backend, res["painel"], res.get("worktree") or "", "handoff", slug)
+        res["nome"] = nome
+        with contextlib.suppress(Exception):
+            painel_backend.por_nome(backend, run).titulo(res["painel"], nome)
+    except (OSError, ValueError) as exc:
+        print(f"aviso: painel {res['painel']} sem nome canónico ({exc})", file=sys.stderr)
+
+
 def _adiado(slug, maximo):
     return {"slug": slug, "ok": False, "painel": None, "worktree": None,
             "erro": f"adiado: máximo de {maximo} painéis em simultâneo"}
@@ -170,6 +188,7 @@ def spawn(slugs, backend=None, maximo=MAX_SPAWN, run=run_hidden, sleep=time.slee
         except (subprocess.CalledProcessError, OSError, HandoffError, IndexError, painel_backend.BackendError) as exc:
             res["erro"] = (getattr(exc, "stderr", None) or str(exc)).strip() or type(exc).__name__
             continue
+        _nomear(slug, backend, res, run)
         if not registar:
             continue
         inicio = datetime.now(timezone.utc).isoformat(timespec="seconds")
