@@ -377,7 +377,7 @@ def test_grava_done_na_fila_e_fecha_pane(tmp_path, estado):
     import json
     pe, fid, f, base, paineis = _fila(tmp_path, "s", estado)
     b = _Backend()
-    linhas = _mod().gravar_done_fila("s", backend=b, estado_root=paineis, base=base, legado=tmp_path / "x.json")
+    linhas = _mod().gravar_done_fila("s", backend=b, caminhos=_mod().CaminhosFila(paineis, base, tmp_path / "x.json"))
     assert pe.ler(fid, "s", root=paineis)["estado"] == "done"
     dados = json.loads(f.read_text(encoding="utf-8"))
     assert "s" not in dados["sessoes"] and dados["feitos"] == ["s"]
@@ -388,23 +388,23 @@ def test_fora_da_fila_nada_muda(tmp_path):
     pe, fid, f, base, paineis = _fila(tmp_path, "s", "a-correr")
     antes = f.read_text(encoding="utf-8")
     b = _Backend()
-    assert _mod().gravar_done_fila("outro", backend=b, estado_root=paineis, base=base, legado=tmp_path / "x.json") == []
+    assert _mod().gravar_done_fila("outro", backend=b, caminhos=_mod().CaminhosFila(paineis, base, tmp_path / "x.json")) == []
     assert f.read_text(encoding="utf-8") == antes and b.fechados == []
     assert pe.ler(fid, "s", root=paineis)["estado"] == "a-correr"
 
 
 def test_backend_em_falha_ou_ausente_nao_rebenta(tmp_path):
     pe, fid, f, base, paineis = _fila(tmp_path, "s", "bloqueado")
-    linhas = _mod().gravar_done_fila("s", backend=_Backend(falha=True), estado_root=paineis, base=base, legado=tmp_path / "x.json")
+    linhas = _mod().gravar_done_fila("s", backend=_Backend(falha=True), caminhos=_mod().CaminhosFila(paineis, base, tmp_path / "x.json"))
     assert pe.ler(fid, "s", root=paineis)["estado"] == "done"
     assert any("aviso" in x for x in linhas)
     pe2, fid2, f2, base2, p2 = _fila(tmp_path / "2", "t", "a-correr")
-    assert _mod().gravar_done_fila("t", backend=None, estado_root=p2, base=base2, legado=tmp_path / "x.json")
+    assert _mod().gravar_done_fila("t", backend=None, caminhos=_mod().CaminhosFila(p2, base2, tmp_path / "x.json"))
 
 
 def test_sem_pane_registado_nao_falha(tmp_path):
     pe, fid, f, base, paineis = _fila(tmp_path, "s", "a-correr")
     pe.registar(fid, "s", root=paineis, pane=None)
     b = _Backend()
-    _mod().gravar_done_fila("s", backend=b, estado_root=paineis, base=base, legado=tmp_path / "x.json")
+    _mod().gravar_done_fila("s", backend=b, caminhos=_mod().CaminhosFila(paineis, base, tmp_path / "x.json"))
     assert b.fechados == [] and pe.ler(fid, "s", root=paineis)["estado"] == "done"
