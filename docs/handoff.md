@@ -36,6 +36,10 @@ Codex context guard: wire `python -I scripts/context-guard.py` as a hook in your
 
 Extra options: `--harness claude|codex`, `--backend wezterm|tmux|herdr|clipboard`, `--pane ID`, `--dry-run` (print the commands, execute nothing), `--auto` (no questions; needs a story in Doing).
 
+## Inside a queue pane
+
+`[context-guard]` in a pane started by `/sp-fila` does not block the story: the pane runs `/sp-handoff --launch <story> --auto` itself (reflect, `## Progresso`, `/clear`, then `/michi --auto <story>` with the queue prompt). The story stays `a-correr`; the pane, the slot and the lock are kept and no new pane opens. If the handoff fails and the pane ends up `bloqueado` for context, the watcher re-launches it in the same pane (at most 2 automatic reactions per story, then it escalates to you).
+
 ## Backends
 
 The handoff reuses the terminal where the agent already runs and opens no new window.

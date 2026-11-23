@@ -62,7 +62,7 @@ Se aparecer `[context-guard] Contexto … >= limite`: acabar o passo em curso (n
 |---|---|---|
 | Fim de fase com verificação verde, SP em Doing | `/sp-handoff` manual: regista `## Progresso`, pergunta sim/não | um por fase, não por passo; nunca a meio de edição/teste; não repetir se o guard já o fez nessa fase |
 | `[context-guard]` ≥ limite | `--launch --auto`, sem perguntar | acabar o passo em curso primeiro |
-| `[context-guard]` dentro de um painel de fila | grava `## Progresso` e `sp-estado.py <slug> bloqueado --msg contexto` | nunca abre outro painel |
+| `[context-guard]` dentro de um painel de fila | `/sp-handoff --launch <SP> --auto` no próprio painel (reflect, `## Progresso`, `/clear`, retoma): estado `a-correr`, painel, vaga e lock mantidos | nunca `bloqueado` por contexto nem painel novo; se o handoff falhar, o vigia retoma-o (máx. 2 por SP) |
 | Modo auto (`--auto`) | `--launch --auto` por fase | sem `AskUserQuestion` |
 | Sem SP em Doing | nada (`/handoff` só em conversa livre) | |
 | `/michi` com contexto ≥ 40K (`CLAUDE_MICHI_START_LIMIT`) | `[context-guard]` no arranque: `/sp-handoff --launch --auto`, sem perguntar | uma vez por sessão; não começar o ciclo na sessão cheia |
