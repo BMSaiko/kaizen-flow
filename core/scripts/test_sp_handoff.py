@@ -625,6 +625,18 @@ def test_ec_059_retoma_num_painel_da_fila_repete_o_prompt_da_fila(tmp_path, monk
     assert "sp-estado.py sp-x" in cmds[-1] and "\n" not in cmds[-1]
 
 
+def test_handoff_no_painel_da_fila_mantem_a_correr_e_a_vaga(tmp_path, monkeypatch):
+    import sp_painel_estado as pe
+    monkeypatch.setenv("SP_FILA_ROOT", str(tmp_path))
+    _fila(tmp_path)
+    antes = pe.ler("mae", "sp-x", root=tmp_path)
+    cmds = sp_handoff.resume_commands("claude", "knowledge/p/sp/Doing/sp-x.md", pane="w3:p17")
+    depois = pe.ler("mae", "sp-x", root=tmp_path)
+    assert cmds[-1].startswith("/michi --auto sp-x")
+    assert depois["estado"] == "a-correr" and depois.get("pane") == antes.get("pane")
+    assert pe.vagas_livres(tmp_path) == 2 and (pe.ler("mae", root=tmp_path) is not None)
+
+
 @pytest.mark.parametrize("pane,estado", [("w3:p99", "a-correr"), (None, "a-correr"), ("w3:p17", "done")])
 def test_fora_do_painel_da_fila_retoma_normal(tmp_path, monkeypatch, pane, estado):
     monkeypatch.setenv("SP_FILA_ROOT", str(tmp_path))
