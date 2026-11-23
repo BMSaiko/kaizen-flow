@@ -5,13 +5,30 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-23
+
+### Added
+- Motor herdr do `sp-fila`: núcleo sobre herdr (`--motor herdr`, subcomandos, retoma), vigia por eventos com metadata «fila n/N · vagas» (sem toasts nem prefixos) e e2e real em sessão isolada (2 projetos, 3 painéis, retoma).
+- `herdr_ops` como único sítio da CLI herdr (`HerdrBackend` delega); spike `agent start/prompt/wait`.
+- O motor herdr passa a defeito no `sp-fila`; o antigo fica como fallback (`--motor antigo`). `sp-fila` corre só em painel (sem ramo sequencial nem limite por orçamento).
+- `sp-handoff --spawn` usa `herdr_ops` (agente + prompt); docs do `/sp-fila` herdr-first.
+- `sync`: pastas em `dirs` no manifesto e `fakeVault` gerado dele; `avisos_caixa`, aviso do `sp-autor` e vigia por pasta da fila trazidos do vault.
+
 ### Changed
 - Simplificação: `a + [b]` passa a `[*a, b]` (RUF005) e variáveis desempacotadas por usar levam `_` (RUF059); sem mudança de comportamento.
 - Refactor sem mudança de comportamento: `main`/funções longas divididas em passos nomeados em `sp-handoff`, `sp-fila`, `sp-new`, `sp-move`, `sp-fechar`, `sp-resume`, `sp-preflight`, `sp-provas`, `sp-validate`, `sp-organize`, `sp_fila_execucao`, `kf_catalogo` e `wez` (menos avisos ruff PLR0912/PLR0915).
 - Simplificações do `ruff` (`removeprefix`, variáveis por usar, espaços e linhas em branco).
+- Removidos `sp-rever` e `sp_veredicto`; `sp-autor` e `sp-revisor` sincronizados com o vault; 5 exports sem uso tirados.
+- Testes: `BIN` e `kaizen()` partilhados em `helpers/sandbox.js`, corrida de lock sem sleep, timeouts de 0,3 s nos gates.
+- CI: `push` só em `main`, PRs correm uma vez, cancela corrida anterior, `audit` antes do PR; job `lint` com `ruff.toml`.
 - CI: a combinação ubuntu/node 22/python 3.13 deixa a matriz `test` (já corre no job `coverage`).
 
 ### Fixed
+- `handoff --spawn` repete o prompt até o agente ser detetado; o handoff espera que o painel fique livre antes de escrever `/clear`, ignora a sugestão «Try» do prompt vazio e regista erros do envio.
+- Vigia usa o estado da fila-mãe, não o `fila.json` dos painéis; `sp-fila` sequencial com worktree e vigia; `--parar` limpa filas órfãs.
+- Loops só afetam a sessão dona (`session_id` + `CLAUDE_PID`).
+- `sync`: limites de palavra nas regras do `agentSlug`; testes de JSON inválido; portar peças do vault e ponto único de processos.
+- Testes: temporários por execução em pasta própria (`/tmp` esgotava os inodes), `loadCore` ignora caches, EC-043 tolera leitura corrompida transitória no Windows.
 - `SECURITY.md` e `.github/workflows/ci.yml` estavam em ISO-8859-1; passam a UTF-8.
 
 ## [0.3.0] - 2026-11-19
@@ -76,7 +93,8 @@ Primeira release do kaizen-flow (histórico desde 2026-10-22).
 - Testes e caminhos POSIX independentes do ambiente e do WezTerm no CI.
 - `sync` copia as fixtures do `sp-fila`; fixture sem literais de caminho Windows.
 
-[Unreleased]: https://github.com/BMSaiko/kaizen-flow/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/BMSaiko/kaizen-flow/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/BMSaiko/kaizen-flow/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/BMSaiko/kaizen-flow/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/BMSaiko/kaizen-flow/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/BMSaiko/kaizen-flow/compare/v0.1.0...v0.1.1
