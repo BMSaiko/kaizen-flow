@@ -6,6 +6,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 ## [Unreleased]
 
 ### Added
+- Skills `vision` (`/vision`: `kaizen vision init|validate|resumo|decompor` com aprovação do resumo antes de decompor) e `release` (`/release`: `kf_release.py plan|prepare`, merge por `kf-ship`, `publish --confirmo` só com o «sim» humano), instaladas por todos os harnesses e sincronizadas para o vault; a pausa `release` da factory aponta para a skill.
 - Release assistida: `kf_release.py plan|prepare|publish` (bump semver pelos commits convencionais, CHANGELOG `[Unreleased]` -> `[x.y.z]`, branch `agent/release-x-y-z`, gates e PR sem merge); `publish` só com `--confirmo` e só empurra a tag (nunca reescreve tags, o npm publish fica no workflow); a factory pausa no marco com release e aponta para ele.
 - Skill `kf-ship` (`/kf-ship`): leva o ramo ao merge com guarda «testes como contrato» (`core/scripts/kf_ship_testes_guard.py`: teste apagado ou com menos asserts = rc 1, sem testes = rc 3), review-ciclo, PR reutilizado ou aberto por `pr-fase` e merge por `pr_fechar` só com verde e método `worktree-pr`.
 - `kaizen factory run|status|stop <projeto>` (`core/scripts/kf_factory.py`, `/factory`): loop autónomo VISION -> backlog -> fila -> gates -> merge (só CI verde) -> reflect, com orçamento, pausas limpas, retoma e lock por projeto.

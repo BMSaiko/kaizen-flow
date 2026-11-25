@@ -476,7 +476,7 @@ class Fabrica:
         fila = [f"{s}:{r['fase']}" for s, r in sps.items()]
         proxima = {"aguarda-aprovacao": "`kaizen factory approve <projeto> [--so a,b]` e depois `run` ou `step`", "manual": "o humano acaba o SP (ou `resume`/`skip <sp>`) e `run`",
                    "passo": "`step` para o seguinte ou `run` para continuar", "orcamento": "subir `orcamento` no kaizen.config.json e `factory run`", "gate-bloqueado": "corrigir o gate e `factory run`",
-                   "release": "`kf_release.py prepare`, merge do PR, `publish --confirmo` e `factory run --release-feito`", "visao-invalida": "`kaizen vision validate` e corrigir", "parado": "`factory run`"}
+                   "release": "skill `release`: `kf_release.py prepare`, merge do PR, `publish --confirmo` e `factory run --release-feito`", "visao-invalida": "`kaizen vision validate` e corrigir", "parado": "`factory run`"}
         prox = proxima.get(e.get("paragem"), "-") if e["estado"] == "pausada" else ("a correr" if e["estado"] == "a-correr" else "-")
         modo = f" · manual ({len(e.get('aprovados', []))} aprovados)" if e.get("manual") else ""
         return (f"factory {self.projeto}: {e['estado']}{modo} · marco {e['marco']} · gasto dia {e['gasto']:.2f} USD · falhas seguidas {e['seguidas']}\n"
