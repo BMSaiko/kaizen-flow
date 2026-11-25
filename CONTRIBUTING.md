@@ -51,6 +51,12 @@ Larger changes follow the kaizen flow this project ships: write the story as an 
 3. `KAIZEN_SOURCE=<vault> kaizen sync --to-vault --check`, then `kaizen sync --to-vault`.
 4. Write a `COMMIT_*.md` and wait for the maintainer's confirmation before committing. Nothing here commits or pushes on its own; push only on explicit request.
 
+### Releasing
+
+1. `python core/scripts/kf_release.py plan` shows the version and the CHANGELOG entry (read-only).
+2. `kf_release.py prepare` opens the release PR with the gate proof; merge it only with CI green (`pr_fechar.py`).
+3. `kf_release.py publish --confirmo` (the maintainer, never an agent) tags and pushes `vX.Y.Z`; the `publish.yml` workflow publishes with provenance.
+
 What counts as a piece is defined once, in `bin/sync.js`. Project SPs stay in the vault and are never mirrored.
 
 ## Code layout
