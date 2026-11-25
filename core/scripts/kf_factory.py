@@ -347,6 +347,14 @@ class Fabrica:
             return self._pausar(e, "visao-invalida", msg or "decompor falhou")
         return self.p.backlog(self.projeto) or self._pausar(e, "visao-invalida", "VISION sem marcos")
 
+    def _concluir(self, e, pend_av):
+        if pend_av:
+            return self._sem_alvo(e, pend_av, "SPs avulsos")
+        e["estado"] = "concluida"
+        self.guardar(e)
+        self.log("fim")
+        return RC_OK
+
     def _ciclo(self, e):
         for _ in range(self.max_voltas):
             if self.stop_f.exists():
@@ -369,12 +377,7 @@ class Fabrica:
             if alvo:
                 rc = self._sp(e, alvo)
             elif e["marco"] > marcos[-1]:
-                if pend_av:
-                    return self._sem_alvo(e, pend_av, "SPs avulsos")
-                e["estado"] = "concluida"
-                self.guardar(e)
-                self.log("fim")
-                return RC_OK
+                return self._concluir(e, pend_av)
             elif not pendentes:
                 rc = self._fechar_marco(e, atuais)
             else:
