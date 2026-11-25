@@ -30,6 +30,8 @@ Os testes são o contrato: o {{userName}} escreve os testes, o agente faz o cód
 | 12 | conflito | rebase sobre a base e repetir do passo 1 |
 | 3, 4 | vigia parou | relançar o passo 5 |
 
+Merge negado pelo harness (classificador do modo auto ou permissão recusada), mesmo com `merge: auto` e rc 0 esperado: tratar como rc 10, pedir o «sim» do {{userName}} e só então repetir o passo 5; nunca contornar a negação.
+
 ## Proibições
 
 - Nunca alterar branch protection, nunca `--admin`, nunca force push.
