@@ -148,7 +148,7 @@ def test_pane_exists_e_check_prompt_com_run_falso():
     with pytest.raises(hp.HandoffError, match="não existe"):
         hp.pane_exists(9, run=run)
     with pytest.raises(hp.HandoffError, match="texto por enviar"):
-        hp.check_prompt(4, run=lambda *a, **k: _Res("❯ rascunho"))
+        hp.check_prompt(4, run=lambda *a, **k: _Res("❯ rascunho"), espera=0)
     hp.check_prompt(4, run=lambda *a, **k: _Res("❯ "))
 
 
@@ -214,5 +214,19 @@ def test_check_prompt_le_o_ecra_pelo_backend_herdr():
         vistos.append(argv)
         return _Res("❯ rascunho")
     with pytest.raises(hp.HandoffError):
-        hp.check_prompt("w3:p17", run=run, backend="herdr")
+        hp.check_prompt("w3:p17", run=run, backend="herdr", espera=0)
     assert vistos == [["herdr", "pane", "read", "w3:p17", "--source", "visible"]]
+
+
+def test_check_prompt_espera_que_o_rascunho_limpe():
+    ecras = iter(["❯ /sp-handoff", "❯ /sp-handoff", "❯ "])
+    dormiu = []
+    hp.check_prompt(4, run=lambda *a, **k: _Res(next(ecras)), sleep=dormiu.append)
+    assert len(dormiu) == 2
+
+
+def test_check_prompt_aborta_se_o_texto_persiste():
+    dormiu = []
+    with pytest.raises(hp.HandoffError, match="texto por enviar"):
+        hp.check_prompt(4, run=lambda *a, **k: _Res("❯ rascunho"), espera=4, sleep=dormiu.append)
+    assert len(dormiu) == 2
