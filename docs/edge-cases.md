@@ -43,6 +43,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-014 | The same gate keeps failing | after `max_tentativas` the run stops and asks instead of looping | testes-falha-90 | `core/scripts/test_sp_gates.py::test_limite_de_tentativas_para` |
 | EC-015 | A script module fails while being imported by another | the half-loaded module is not left registered; the next import retries cleanly | testes-falha-90 | `core/scripts/test_sp_carregar.py::test_erro_no_modulo_nao_deixa_nome_registado` |
 | EC-078 | The name registry file is corrupted | it is recreated empty with a warning; panes keep working by id | testes-falha-90 | `core/scripts/test_kf_nomes.py::test_ficheiro_corrompido_recria_e_avisa` |
+| EC-091 | The factory process dies while a story is launched | the next `run` resumes from the persisted state without relaunching or re-merging | kaizenflow-loop-autonomo | `core/scripts/test_kf_factory.py::test_ec_091_retoma_apos_crash_nao_relanca_nem_remerge` |
 
 ## Quota, network, API and model session
 
@@ -117,6 +118,13 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-083 | An advisory (`consultivos`) quality gate fails | it is reported as `consultivo aviso`, the run goes on and `sp-gates` still exits 0 | kaizenflow-gates-perfil-qualidade | `core/scripts/test_sp_gates.py::test_consultivo_vermelho_nao_trava_nem_falha` |
 | EC-084 | A repo has no `qualidade` profile (or only `coberturaDiff`), or an SP lists a profile command already in its own `gates:` | old behaviour is kept; the duplicate runs once, as the SP's blocking gate | kaizenflow-gates-perfil-qualidade | `core/scripts/test_sp_gates.py::test_main_repo_aplica_perfil_e_sem_repo_comportamento_antigo` |
 | EC-085 | A UI gate runs where there is no browser, Playwright or axe (or a baseline is missing) | `ds-verify` exits 3 with a warning and never reports green; a missing baseline fails and is only created by an explicit `--atualizar-baselines`, logged in the SP | kaizenflow-design-gates-ui | `core/scripts/test_ds_gates.py::test_verify_sem_browser_rc3_nunca_verde` |
+| EC-086 | `kaizen factory run` on a project with no backlog and a valid `VISION.md` | it decomposes first, then runs each milestone through launch, green gates, merge and reflect, and ends `concluida` | kaizenflow-loop-autonomo | `core/scripts/test_kf_factory.py::test_ec_086_feliz_decompoe_corre_marcos_ate_ao_merge_e_conclui` |
+| EC-087 | `kaizen factory run` with an invalid `VISION.md` (decompose fails) | it pauses with `visao-invalida` and launches nothing | kaizenflow-loop-autonomo | `core/scripts/test_kf_factory.py::test_ec_087_visao_invalida_pausa_sem_lancar` |
+| EC-088 | The daily or per-story cost cap is already reached when the next story is due | the factory pauses with `orcamento` before launching anything | kaizenflow-loop-autonomo | `core/scripts/test_kf_factory.py::test_ec_088_orcamento_excedido_pausa_antes_de_lancar` |
+| EC-089 | A story ends with a red blocking gate | one correction story is created and the factory goes on; a second red gate on the same story pauses with `gate-bloqueado | kaizenflow-loop-autonomo | `core/scripts/test_kf_factory.py::test_ec_089_gate_vermelho_cria_correcao_e_continua` |
+| EC-090 | A milestone that needs a release is finished | the factory reflects, pauses with `release` (never tags or publishes) and resumes with `run --release-feito | kaizenflow-loop-autonomo | `core/scripts/test_kf_factory.py::test_ec_090_release_pausa_no_marco_e_retoma_com_release_feito` |
+| EC-092 | A second `factory run` starts for the same project | it is refused with rc 4 while the first lives; a lock whose pid is dead is taken over | kaizenflow-loop-autonomo | `core/scripts/test_kf_factory.py::test_ec_092_lock_recusa_segunda_factory_viva_e_toma_o_de_pid_morto` |
+| EC-093 | The factory log receives a non-scalar field | only slugs, phases and numbers are written, never objects that could hold secrets | kaizenflow-loop-autonomo | `core/scripts/test_kf_factory.py::test_ec_093_log_so_tem_campos_simples_sem_segredos` |
 
 ## Windows (atomic rename, CRLF, paths, console close)
 
