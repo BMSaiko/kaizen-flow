@@ -9,6 +9,7 @@ simulados (o projeto de exemplo não tem código tipado). O e2e real (herdr + gh
 rc: 0 todos os cenários como esperado · 1 algum cenário falhou · 2 uso
 """
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -54,7 +55,8 @@ def say(fase, msg):
 
 
 def py(dirp, script, *args):
-    return subprocess.run([sys.executable, "-I", "-B", str(dirp / "scripts" / script), *args], cwd=str(dirp), capture_output=True, text=True)
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}  # Windows: sem isto a consola cp1252 estraga os acentos
+    return subprocess.run([sys.executable, "-I", "-B", str(dirp / "scripts" / script), *args], cwd=str(dirp), capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
 
 
 def mostrar(r):
@@ -242,6 +244,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dir", required=True)
     dirp = Path(ap.parse_args(argv).dir).resolve()
+    for fluxo in (sys.stdout, sys.stderr):
+        fluxo.reconfigure(encoding="utf-8")
     sys.path.insert(0, str(dirp / "scripts"))
     import kf_factory as kf  # noqa: E402 — a cópia instalada no projeto de exemplo
 
