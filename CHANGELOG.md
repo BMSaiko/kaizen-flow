@@ -6,6 +6,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 ## [Unreleased]
 
 ### Added
+- Skill `kf-ship` (`/kf-ship`): leva o ramo ao merge com guarda «testes como contrato» (`core/scripts/kf_ship_testes_guard.py`: teste apagado ou com menos asserts = rc 1, sem testes = rc 3), review-ciclo, PR reutilizado ou aberto por `pr-fase` e merge por `pr_fechar` só com verde e método `worktree-pr`.
 - `kaizen factory run|status|stop <projeto>` (`core/scripts/kf_factory.py`, `/factory`): loop autónomo VISION -> backlog -> fila -> gates -> merge (só CI verde) -> reflect, com orçamento, pausas limpas, retoma e lock por projeto.
 - Gates de design para SPs `ui: sim`: `ds-lint.py` (literais de cor/espaçamento/tipografia fora dos tokens, `ficheiro:linha`) e `ds-verify.py` (axe WCAG 2.2 AA, screenshots em 3 breakpoints vs `design/baselines/`, orçamento Lighthouse opcional; rc 3 sem browser, nunca verde); `sp-gates --repo` injeta-os só com `ui: sim`; `kaizen ds lint|verify`.
 - Perfil `qualidade` em `kaizen.config.json` (`bloqueantes`, `consultivos`, `fases`): `sp-gates --repo` junta-o aos gates do SP (consultivos só registam), `sp-gates --perfil` sugere-o por tipo de repo e `pr_fechar` não faz merge com gate bloqueante vermelho nem sem pentest/review verdes (SP `bloqueado` com motivo).
