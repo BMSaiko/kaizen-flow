@@ -6,6 +6,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import kf_release as r
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _identidade(monkeypatch):
+    for k in ("AUTHOR", "COMMITTER"):
+        monkeypatch.setenv(f"GIT_{k}_NAME", "T")
+        monkeypatch.setenv(f"GIT_{k}_EMAIL", "t@t")
+
+
 CL = "# Changelog\n\n## [Unreleased]\n\n### Added\n- Coisa nova\n\n## [0.4.0] - 2026-11-23\n\n### Fixed\n- Velho\n"
 
 
@@ -80,7 +90,7 @@ def test_prepare_cria_branch_pr_sem_merge(tmp_path, monkeypatch):
     commit(repo, "fix: corrige", "b.txt")
     chamadas = []
     monkeypatch.setattr(r, "gh", lambda repo, *a: chamadas.append(a) or subprocess.CompletedProcess(a, 0, "https://x/pr/9\n", ""))
-    rc = r.main(["prepare", "--repo", str(repo), "--gate", f"{sys.executable} -c pass", "--data", "2026-12-01"])
+    rc = r.main(["prepare", "--repo", str(repo), "--gate", "git --version", "--data", "2026-12-01"])
     assert rc == 0
     assert git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "agent/release-0-4-1"
     assert json.loads((repo / "package.json").read_text())["version"] == "0.4.1"
@@ -96,7 +106,7 @@ def test_prepare_gate_vermelho_sem_pr(tmp_path, monkeypatch):
     commit(repo, "feat: nova", "b.txt")
     chamadas = []
     monkeypatch.setattr(r, "gh", lambda repo, *a: chamadas.append(a) or subprocess.CompletedProcess(a, 0, "", ""))
-    rc = r.main(["prepare", "--repo", str(repo), "--gate", f"{sys.executable} -c 1/0"])
+    rc = r.main(["prepare", "--repo", str(repo), "--gate", "git nao-existe-xyz"])
     assert rc == 1 and chamadas == []
 
 
@@ -104,7 +114,7 @@ def test_prepare_recusa_arvore_suja(tmp_path):
     repo = fixture(tmp_path)
     commit(repo, "feat: nova", "b.txt")
     (repo / "sujo.txt").write_text("x")
-    assert r.main(["prepare", "--repo", str(repo), "--gate", f"{sys.executable} -c pass"]) == 4
+    assert r.main(["prepare", "--repo", str(repo), "--gate", "git --version"]) == 4
 
 
 def _release_feito(tmp_path):

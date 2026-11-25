@@ -16,6 +16,7 @@ rc: 0 ok, 1 gate vermelho, 2 nada a lançar, 3 sem `--confirmo`, 4 recusado (ár
 import argparse
 import datetime
 import json
+import os
 import re
 import shlex
 import sys
@@ -135,7 +136,7 @@ def cmd_plan(a):
 def _correr_gates(repo, gates):
     linhas, ok = [], True
     for g in gates:
-        p = run_hidden(shlex.split(g), cwd=str(repo), capture_output=True, text=True, encoding="utf-8")
+        p = run_hidden(shlex.split(g, posix=os.name != "nt"), cwd=str(repo), capture_output=True, text=True, encoding="utf-8")
         ok &= p.returncode == 0
         linhas.append(f"- `{g}` -> rc {p.returncode}")
     return ok, "\n".join(linhas)
