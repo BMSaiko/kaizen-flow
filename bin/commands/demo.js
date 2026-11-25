@@ -17,11 +17,12 @@ function run(cmd, args, cwd, label, okRcs = [0]) {
   return r.stdout || "";
 }
 
-// `kaizen demo [--keep]`: cria um repo temporário, instala o kaizen-flow e percorre um SP pelo ciclo (sem rede nem agente)
+// `kaizen demo [--factory] [--keep]`: cria um repo temporário, instala o kaizen-flow e percorre um SP (ou, com --factory, a factory inteira) sem rede nem agente
 function demo(args) {
-  const unknown = args.filter((a) => a !== "--keep");
-  if (unknown.length) throw new Error(`argumentos desconhecidos: ${unknown.join(" ")} (uso: kaizen demo [--keep])`);
+  const unknown = args.filter((a) => a !== "--keep" && a !== "--factory");
+  if (unknown.length) throw new Error(`argumentos desconhecidos: ${unknown.join(" ")} (uso: kaizen demo [--factory] [--keep])`);
   const keep = args.includes("--keep");
+  const factory = args.includes("--factory");
   const python = pythonCmd();
   if (!python) throw new Error("falta: Python 3 no PATH (ou KAIZEN_PYTHON)");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-demo-"));
@@ -31,6 +32,11 @@ function demo(args) {
     console.log("[init] repo git novo e peças do kaizen-flow (skills, comandos, scripts)");
     run("git", ["init", "-q"], dir, "git init");
     init(dir, "claude");
+    if (factory) {
+      run(python, [...PY_FLAGS, path.join(__dirname, "..", "..", "core", "scripts", "kf_demo_factory.py"), "--dir", dir], dir, "demo --factory");
+      console.log(`demo --factory concluída em ${dir}${keep ? "" : " (apagado no fim; usa --keep para o guardar)"}`);
+      return;
+    }
     const sps = path.join(dir, "knowledge", "projects", "kaizen", PROJECT, "sp");
     for (const s of ["TODO", "Doing", "Done"]) fs.mkdirSync(path.join(sps, s), { recursive: true });
 
