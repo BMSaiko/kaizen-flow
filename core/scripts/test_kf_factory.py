@@ -1,6 +1,8 @@
 """Testes de kf_factory: máquina de estados da factory com portos falsos (feliz, orçamento, gate vermelho, retoma, lock, release)."""
 import json
 
+import pytest
+
 
 import kf_factory as kf
 
@@ -276,6 +278,27 @@ def test_portos_reais_done_sem_pr_nao_segue_para_merge(tmp_path):
     r = kf.PortosReais(P, tmp_path / "VISION.md", tmp_path, run=run)
     res = r.resultado("demo-visao-m1-x")
     assert res["estado"] == "done" and res["pr"] is None and not res["gates_ok"]
+
+
+def test_portos_reais_corrigir_usa_flags_do_sp_new(tmp_path):
+    chamadas = []
+
+    class R:
+        returncode, stderr, stdout = 0, "", ""
+    r = kf.PortosReais(P, tmp_path / "VISION.md", tmp_path, run=lambda argv, **kw: chamadas.append(argv) or R())
+    assert r.corrigir("demo-m1-2026-11-23", "gate vermelho") == "demo-m1-2026-11-23-correcao"
+    a = chamadas[0]
+    assert "sp-new.py" in a[2] and a[a.index("--slug") + 1] == "demo-m1-2026-11-23-correcao"
+    assert a[a.index("--depends-on") + 1] == "demo-m1-2026-11-23" and "--priority" in a and "--project" in a
+    assert "gate vermelho" in a[a.index("--restricoes") + 1]
+
+
+def test_portos_reais_corrigir_falha_do_sp_new_levanta(tmp_path):
+    class R:
+        returncode, stderr, stdout = 1, "slug existente", ""
+    r = kf.PortosReais(P, tmp_path / "VISION.md", tmp_path, run=lambda argv, **kw: R())
+    with pytest.raises(RuntimeError, match="slug existente"):
+        r.corrigir("demo-x", "m")
 
 
 # modo manual -------------------------------------------------------------------
