@@ -211,19 +211,10 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
                 return _pausar(estado, estado_path, razao, agora)
             estado["pausa"] = {"estado": "orcamento", "razao": razao, "desde": agora.isoformat(timespec="seconds")}
             break
-        backend = backend or _backend_defeito()
+        estado, backend, erro, item = _spawn(alvo, estado, estado_path, (run, root, agora, backend), pilha)
         if backend is None:
             motivo = falta_backend()
             break
-        if not estado.get("fila_paineis"):
-            estado["fila_paineis"] = sp_fila_paineis.garantir_fila(estado)
-        inicio = agora.isoformat(timespec="seconds")
-        registar_sessao(estado, alvo.slug, inicio, requests=REQ_POR_SP, reserva=True)  # reservar o slug antes de soltar o lock
-        guardar(estado_path, estado)
-        pilha.close()
-        erro, item = _lancar(alvo, estado, backend, run, root)
-        pilha.enter_context(bloqueio(estado_path))
-        estado = ler(estado_path)  # outros `--seguinte` podem ter alterado o estado durante o spawn
         if item and item["estado"] == "pendente":  # sem vaga global: tira a reserva, não é falha; nada mais abre agora
             estado["sessoes"].pop(alvo.slug, None)
             pendentes.append(alvo.slug)
@@ -232,6 +223,30 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
             break
         motivo = _registar_lancamento(estado, alvo, erro, item, agora, lancados, itens)
         guardar(estado_path, estado)
+    return _desfecho(estado, estado_path, (lancados, itens, pendentes, motivo, parada),
+                     (items, so, fila, excluidos, rel_dir, run, agora, custo_fn))
+
+
+def _spawn(alvo, estado, estado_path, ctx, pilha):
+    """Reserva o slug, lança o painel com o lock solto e relê o estado. (estado, backend|None, erro, item)."""
+    run, root, agora, backend = ctx
+    backend = backend or _backend_defeito()
+    if backend is None:
+        return estado, None, None, None
+    if not estado.get("fila_paineis"):
+        estado["fila_paineis"] = sp_fila_paineis.garantir_fila(estado)
+    registar_sessao(estado, alvo.slug, agora.isoformat(timespec="seconds"), requests=REQ_POR_SP, reserva=True)  # reservar o slug antes de soltar o lock
+    guardar(estado_path, estado)
+    pilha.close()
+    erro, item = _lancar(alvo, estado, backend, run, root)
+    pilha.enter_context(bloqueio(estado_path))
+    return ler(estado_path), backend, erro, item  # outros `--seguinte` podem ter alterado o estado durante o spawn
+
+
+def _desfecho(estado, estado_path, res, ctx):
+    """Resultado de `--seguinte` depois do ciclo de lançamentos: espera, fim da fila ou `lancou`."""
+    lancados, itens, pendentes, motivo, parada = res
+    items, so, fila, excluidos, rel_dir, run, agora, custo_fn = ctx
     if pendentes and not lancados:
         guardar(estado_path, estado)
         return {"acao": "espera", "sessoes": list(estado["sessoes"]), "pendentes": pendentes}
