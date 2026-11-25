@@ -6,7 +6,7 @@ Recusa slug já existente no projeto (em qualquer pasta) e projeto inexistente.
 Nunca faz commit.
 
 Uso:
-  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--michi simples|default|complexo|critico] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--ui] [--origem <veredicto:id|pentest:slug>] [--parent <slug>] [--depends-on <slug> ...]
+  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--michi simples|default|complexo|critico] [--commit|--push|--pr auto|pergunta|nunca] [--permissoes all|nenhuma|commit,push,pr,merge] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--ui] [--origem <veredicto:id|pentest:slug>] [--parent <slug>] [--depends-on <slug> ...]
   python -I scripts/sp-new.py --project <nome> --program <slug> --children a,b@complexo:a,c:a+b --priority P1|P2|P3
 
 `--parent <mãe>` exige que a mãe seja `kind: program` e acrescenta o filho a `children:` dela (depends_on, `state: TODO`, sem duplicar).
@@ -78,6 +78,25 @@ class SpNewError(Exception):
 def autorizacoes_por_destino(project):
     """Autorizações por defeito (commit/push/pr/merge) do destino do `project`, da tabela de kaizen_config."""
     return kaizen_config.autorizacoes(CONFIG_REPO, project)
+
+
+PERMISSOES = ("commit", "push", "pr", "merge")
+
+
+def permissoes_para_auth(selecao):
+    """Seleção do AskUserQuestion multiSelect (`all` ou `commit,push,...`; `nenhuma`) → commit/push/pr/merge auto|nunca."""
+    itens = {s.strip().lower() for s in (selecao or "").split(",") if s.strip()}
+    if not itens:
+        raise SpNewError("--permissoes vazio (all|nenhuma|commit,push,pr,merge)")
+    invalidos = itens - set(PERMISSOES) - {"all", "nenhuma"}
+    if invalidos:
+        raise SpNewError(f"--permissoes inválido: {', '.join(sorted(invalidos))} (all|nenhuma|{','.join(PERMISSOES)})")
+    marcadas = set(PERMISSOES) if "all" in itens else itens - {"nenhuma"}
+    auth = {k: ("auto" if k in marcadas else "nunca") for k in PERMISSOES}
+    for k, antes in zip(PERMISSOES[1:], PERMISSOES):
+        if auth[k] == "auto" and auth[antes] != "auto":
+            raise SpNewError(f"--permissoes: {k} exige {antes} (merge ⇒ pr ⇒ push ⇒ commit)")
+    return auth
 
 
 def resolver_auth(project, auth):
@@ -372,6 +391,7 @@ def _parser():
     ap.add_argument("--push", help="push: auto|pergunta|nunca")
     ap.add_argument("--pr", help="pr: auto|pergunta|nunca")
     ap.add_argument("--merge", help="merge do PR: auto|nunca (defeito do destino)")
+    ap.add_argument("--permissoes", help="seleção multiSelect: all|nenhuma|commit,push,pr,merge (marcado=auto, resto=nunca; ganha a --commit/--push/--pr/--merge)")
     ap.add_argument("--restricoes", help="restrições extra do SP (uma linha)")
     ap.add_argument("--gate", action="append", default=[], help="gate executável (repetível), corrido por sp-gates.py")
     ap.add_argument("--prova", help="comando ou critério verificável da prova")
@@ -435,6 +455,12 @@ def main(argv=None):
                   f"{sp_escalao.comando(escalao, args.project, args.slug or 'slug', args.priority or 'P2')}", file=sys.stderr)
     args.priority = args.priority or "P2"
     auth = {"commit": args.commit, "push": args.push, "pr": args.pr, "merge": args.merge, "restricoes": args.restricoes}
+    if args.permissoes is not None:
+        try:
+            auth.update(permissoes_para_auth(args.permissoes))
+        except SpNewError as e:
+            print(f"erro: {e}", file=sys.stderr)
+            return 2
     perfil = {"perfil": args.perfil, "max_tentativas": args.max_tentativas, "max_requests": args.max_requests, "escalar": args.escalar,
               "parar_se": split(args.parar_se) or None}
     today = date.today()
