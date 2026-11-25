@@ -372,9 +372,18 @@ class PortosReais(Portos):
         r = self._py("sp-estado.py", slug)
         txt = r.stdout or ""
         if "Done" in txt.split("\n", 1)[0]:
-            return {"estado": "done", "pr": None, "gates_ok": True, "motivo": ""}
+            pr = self._pr(slug)
+            return {"estado": "done", "pr": pr, "gates_ok": pr is not None, "motivo": "" if pr else "SP em Done sem PR aberto"}
         estado = "falhou" if "falhou" in txt else "bloqueado" if "bloqueado" in txt else "a-correr"
         return {"estado": estado, "pr": None, "gates_ok": False, "motivo": txt.strip()[-200:]}
+
+    def _pr(self, slug):
+        """Número do PR aberto do ramo `agent/<nome>` do SP (nome como sb-worktree: minúsculas, `-`, 31 caracteres) ou None."""
+        nome = re.sub(r"[^a-z0-9-]+", "-", slug.lower()).strip("-")[:31].rstrip("-")
+        r = self.run(["gh", "pr", "list", "--head", f"agent/{nome}", "--state", "open", "--json", "number", "--jq", ".[0].number"],
+                     capture_output=True, text=True, cwd=str(self.repo))
+        out = (r.stdout or "").strip()
+        return out if r.returncode == 0 and out.isdigit() else None
 
     def merge(self, pr, slug):
         r = self._py("pr_fechar.py", str(pr), "--repo", str(self.repo), "--sp", slug)

@@ -79,7 +79,7 @@ def log(tmp_path):
     return [json.loads(x) for x in f.read_text().splitlines()]
 
 
-def test_ec_080_feliz_decompoe_corre_marcos_ate_ao_merge_e_conclui(tmp_path):
+def test_ec_086_feliz_decompoe_corre_marcos_ate_ao_merge_e_conclui(tmp_path):
     f = Falso()
     assert fab(tmp_path, f).run() == kf.RC_OK
     assert f.chamadas == ["decompor", f"lancar:{P}-visao-m1-x", f"merge:{P}-visao-m1-x", "reflect:1",
@@ -95,7 +95,7 @@ def test_backlog_existente_nao_volta_a_decompor(tmp_path):
     assert "decompor" not in f.chamadas
 
 
-def test_ec_081_visao_invalida_pausa_sem_lancar(tmp_path):
+def test_ec_087_visao_invalida_pausa_sem_lancar(tmp_path):
     f = Falso()
     f.decompor_rc = 1
     assert fab(tmp_path, f).run() == kf.RC_PAUSA
@@ -103,7 +103,7 @@ def test_ec_081_visao_invalida_pausa_sem_lancar(tmp_path):
     assert e["paragem"] == "visao-invalida" and not any(c.startswith("lancar") for c in f.chamadas)
 
 
-def test_ec_082_orcamento_excedido_pausa_antes_de_lancar(tmp_path):
+def test_ec_088_orcamento_excedido_pausa_antes_de_lancar(tmp_path):
     f = Falso(cfg={"spUsd": 5.0, "diaUsd": 10.0, "falhasSeguidas": 3}, dia=10.0)
     assert fab(tmp_path, f).run() == kf.RC_PAUSA
     e = json.loads((tmp_path / "f" / f"{P}.json").read_text())
@@ -111,7 +111,7 @@ def test_ec_082_orcamento_excedido_pausa_antes_de_lancar(tmp_path):
     assert not any(c.startswith("lancar") for c in f.chamadas)
 
 
-def test_ec_083_gate_vermelho_cria_correcao_e_continua(tmp_path):
+def test_ec_089_gate_vermelho_cria_correcao_e_continua(tmp_path):
     m1 = f"{P}-visao-m1-x"
     f = Falso(marcos=1, resultados={m1: [{"estado": "falhou", "pr": None, "gates_ok": False, "motivo": "ruff vermelho"}]})
     assert fab(tmp_path, f).run() == kf.RC_OK
@@ -120,7 +120,7 @@ def test_ec_083_gate_vermelho_cria_correcao_e_continua(tmp_path):
     assert [x["evento"] for x in log(tmp_path)].count("correcao") == 1
 
 
-def test_ec_083_segundo_gate_vermelho_do_mesmo_sp_pausa(tmp_path):
+def test_ec_089_segundo_gate_vermelho_do_mesmo_sp_pausa(tmp_path):
     m1 = f"{P}-visao-m1-x"
     verm = {"estado": "falhou", "pr": None, "gates_ok": False, "motivo": "tipos vermelhos"}
     f = Falso(marcos=1, resultados={m1: [dict(verm)], f"{m1}-correcao": [dict(verm)]})
@@ -144,7 +144,7 @@ def test_merge_recusado_por_ci_nao_marca_done(tmp_path):
     assert f.sps[m1]["estado"] == "todo" and f.sps[f"{m1}-correcao"]["estado"] == "done"
 
 
-def test_ec_084_release_pausa_no_marco_e_retoma_com_release_feito(tmp_path):
+def test_ec_090_release_pausa_no_marco_e_retoma_com_release_feito(tmp_path):
     f = Falso(release=(1,))
     assert fab(tmp_path, f).run() == kf.RC_PAUSA
     e = json.loads((tmp_path / "f" / f"{P}.json").read_text())
@@ -153,7 +153,7 @@ def test_ec_084_release_pausa_no_marco_e_retoma_com_release_feito(tmp_path):
     assert f.chamadas.count("reflect:1") == 1  # o reflect do marco 1 não se repete
 
 
-def test_ec_085_retoma_apos_crash_nao_relanca_nem_remerge(tmp_path):
+def test_ec_091_retoma_apos_crash_nao_relanca_nem_remerge(tmp_path):
     f = Falso(marcos=1)
     m1 = f"{P}-visao-m1-x"
     fa = fab(tmp_path, f)
@@ -165,7 +165,7 @@ def test_ec_085_retoma_apos_crash_nao_relanca_nem_remerge(tmp_path):
     assert [x["evento"] for x in log(tmp_path)][0] == "retoma"
 
 
-def test_ec_086_lock_recusa_segunda_factory_viva_e_toma_o_de_pid_morto(tmp_path):
+def test_ec_092_lock_recusa_segunda_factory_viva_e_toma_o_de_pid_morto(tmp_path):
     pasta = tmp_path / "f"
     pasta.mkdir()
     (pasta / f"{P}.lock").write_text("999999")
@@ -197,7 +197,7 @@ def test_stop_durante_a_corrida_para_na_volta_seguinte(tmp_path):
     assert json.loads((tmp_path / "f" / f"{P}.json").read_text())["paragem"] == "parado"
 
 
-def test_ec_087_log_so_tem_campos_simples_sem_segredos(tmp_path):
+def test_ec_093_log_so_tem_campos_simples_sem_segredos(tmp_path):
     f = Falso()
     fab(tmp_path, f).run()
     campos = {k for x in log(tmp_path) for k in x}
@@ -243,3 +243,30 @@ def test_portos_reais_decompor_chama_o_script_com_o_vision(tmp_path):
     r = kf.PortosReais(P, tmp_path / "VISION.md", tmp_path, run=lambda argv, **kw: chamadas.append(argv) or R())
     assert r.decompor(P) == (1, "VISION inválido")
     assert chamadas[0][-3:] == [str(tmp_path / "VISION.md"), "--repo", str(tmp_path)]
+
+
+def test_portos_reais_resultado_done_procura_o_pr_do_ramo_do_sp(tmp_path):
+    chamadas = []
+
+    def run(argv, **kw):
+        chamadas.append(argv)
+
+        class R:
+            returncode = 0
+            stderr = ""
+            stdout = "Done · P1\n" if "sp-estado.py" in argv[2] else "42\n"
+        return R()
+
+    r = kf.PortosReais(P, tmp_path / "VISION.md", tmp_path, run=run)
+    assert r.resultado("demo-visao-m1-2026-11-23") == {"estado": "done", "pr": "42", "gates_ok": True, "motivo": ""}
+    assert "agent/demo-visao-m1-2026-11-23" in chamadas[-1]
+
+
+def test_portos_reais_done_sem_pr_nao_segue_para_merge(tmp_path):
+    class R:
+        returncode, stderr = 0, ""
+        stdout = ""
+    run = lambda argv, **kw: type("X", (), {"returncode": 0, "stderr": "", "stdout": "Done\n" if "sp-estado.py" in argv[2] else ""})()  # noqa: E731
+    r = kf.PortosReais(P, tmp_path / "VISION.md", tmp_path, run=run)
+    res = r.resultado("demo-visao-m1-x")
+    assert res["estado"] == "done" and res["pr"] is None and not res["gates_ok"]
