@@ -151,11 +151,18 @@ def text_arrived(screen, text):
     return bool(cauda) and cauda in "".join(screen.split())
 
 
-def check_prompt(pane, run=run_hidden, backend="wezterm"):
-    """Aborta se o prompt do painel já tem texto (não o corromper); lê o ecrã pelo backend (wezterm, tmux, herdr)."""
-    screen = read_screen(backend, pane, run)
-    if prompt_has_text(screen):
-        raise HandoffError(f"o prompt do painel {pane} tem texto por enviar: handoff abortado para não o corromper")
+PROMPT_ESPERA = 30.0  # rascunho ou mensagem em fila costuma limpar quando o turno acaba
+
+
+def check_prompt(pane, run=run_hidden, backend="wezterm", espera=PROMPT_ESPERA, sleep=time.sleep, step=2.0):
+    """Aborta se o prompt do painel continua com texto depois de `espera` s (não o corromper); lê o ecrã pelo backend."""
+    waited = 0.0
+    while prompt_has_text(read_screen(backend, pane, run)):
+        if waited >= espera:
+            raise HandoffError(f"o prompt do painel {pane} tem texto por enviar: handoff abortado para não o corromper")
+        sleep(step)
+        waited += step
+
 
 def detect_backend(env=None):
     """(backend, painel): herdr, wezterm ou tmux se o agente corre num painel; senão clipboard (apps desktop)."""

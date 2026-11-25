@@ -7,12 +7,13 @@ Uso:
   python -I scripts/context-guard.py --transcript <caminho> [--limit N]   # imprime "<tokens> <ok|aviso|limite>"
   python -I scripts/context-guard.py                                      # modo hook: JSON no stdin
 
-Modo hook (eventos UserPromptSubmit e PostToolUse): recebe `session_id`, `transcript_path` e
+Modo hook (eventos UserPromptSubmit, PostToolUse e Stop): recebe `session_id`, `transcript_path` e
 `hook_event_name`. Limiar em `CLAUDE_CONTEXT_LIMIT` (omissão 100000); aviso a 85%.
 - `aviso`: uma `systemMessage` ao utilizador, uma vez por sessão.
 - `limite`: `additionalContext` curto a mandar correr, em modo automático e uma vez por sessão,
   `/sp-handoff` se a sessão trabalha num SP (correu `/michi <SP>` nela e o SP está em Doing) ou
   `/handoff` (ficheiro efémero em `handoffs/`) se é conversa livre. Um SP em Doing noutra sessão não conta.
+- `Stop`: com contexto >= limite e sem handoff lançado, bloqueia o fim do turno (`decision: block`) a repetir a instrução; uma vez por turno.
 Arranque do michi: `/michi ...` (exceto help) num `UserPromptSubmit` com contexto >= 40K
 (`CLAUDE_MICHI_START_LIMIT`, omissão 40000) manda correr `/sp-handoff --launch --auto` sem perguntar, uma vez por sessão.
 Chamadas de subagentes (payload com `agent_id`) são ignoradas: partilham o `session_id` do principal.
@@ -202,6 +203,8 @@ def hook(payload, env=None, marker_dir=None):
         return started
     limit = limit_from_env(env)
     loops = []
+    if payload.get("hook_event_name") == "Stop":
+        return _stop(payload, marker_dir, env, session_id, tokens, limit, transcript)
     if tokens >= min(limit, LOOP_LIMIT) * WARN_RATIO:  # loop ativo: o teto é sempre o dos loops (100K), o contexto longo gasta a cache
         loops = _loops_ativos(marker_dir, env, session_id)
         if loops:
@@ -218,6 +221,42 @@ def hook(payload, env=None, marker_dir=None):
     event = payload.get("hook_event_name") or "UserPromptSubmit"
     text = _limite_loop(tokens, limit, loops) if loops else _limite_texto(tokens, limit, _bound_sp_doing(marker_dir, session_id))
     return {"hookSpecificOutput": {"hookEventName": event, "additionalContext": text}}
+
+
+HANDOFF_FEITO = ("handoff.py", "--launch")
+
+
+def _handoff_feito(transcript):
+    """True se o fim do transcript já tem o lançamento do handoff (`handoff.py`/`sp-handoff.py ... --launch`)."""
+    try:
+        lines, _ = _tail_lines(transcript, TAIL_SIZES[1])
+    except OSError:
+        return False
+    for raw in lines:
+        if b"handoff.py" not in raw or b"--launch" not in raw or b'"tool_use"' not in raw:
+            continue  # o texto injetado pelo guard também cita o comando: só conta uma chamada de ferramenta
+        try:
+            content = json.loads(raw).get("message", {}).get("content")
+        except (ValueError, AttributeError):
+            continue
+        for block in content if isinstance(content, list) else []:
+            cmd = (block.get("input") or {}).get("command") if isinstance(block, dict) and block.get("type") == "tool_use" else None
+            if isinstance(cmd, str) and "handoff.py" in cmd and "--launch" in cmd:
+                return True
+    return False
+
+
+def _stop(payload, marker_dir, env, session_id, tokens, limit, transcript):
+    """Fim de turno com contexto >= limite e sem handoff lançado: bloqueia uma vez por turno (`stop_hook_active` evita ciclos)."""
+    if payload.get("stop_hook_active"):
+        return None
+    loops = _loops_ativos(marker_dir, env, session_id) if tokens >= min(limit, LOOP_LIMIT) * WARN_RATIO else []
+    if loops:
+        limit = min(limit, LOOP_LIMIT)
+    if tokens < limit or _handoff_feito(transcript):
+        return None
+    text = _limite_loop(tokens, limit, loops) if loops else _limite_texto(tokens, limit, _bound_sp_doing(marker_dir, session_id))
+    return {"decision": "block", "reason": text.replace(" Não repitas este aviso.", "")}
 
 
 LOOP_LIMIT = 100_000  # teto de contexto dos loops (ronda, manutencao, derivadas); a partir daqui o loop passa à sessão nova
