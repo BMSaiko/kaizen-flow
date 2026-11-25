@@ -443,7 +443,7 @@ test("UC-038 kaizen vision gera e valida o VISION.md do projeto", T, comSandbox(
   assert.strictEqual(falha.status, 1, "esqueleto com TBD não valida");
   assert.match(falha.stderr, /Goal/);
   const texto = fs.readFileSync(path.join(sb.dir, f), "utf8")
-    .replace("ui: nao", "ui: nao").replace("stack: TBD", "stack: node").replace("orcamento: TBD", "orcamento: 5 USD por SP, 20 USD por dia")
+    .replace("stack: TBD", "stack: node").replace("orcamento: TBD", "orcamento: 5 USD por SP, 20 USD por dia")
     .replace("## Goal\nTBD", "## Goal\nPlanear refeições sem desperdício.")
     .replace("## Users\n- TBD", "## Users\n- Famílias.")
     .replace(/- \[ \] TBD[^\n]*/, "- [ ] `npm test` passa.")
