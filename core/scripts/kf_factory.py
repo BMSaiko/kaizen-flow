@@ -444,7 +444,11 @@ class Fabrica:
             return self._pausar(e, "gate-bloqueado", f"{slug}: {motivo} (correção automática já tentada)")
         reg["correcoes"] += 1
         reg["fase"] = "corrigido"
-        novo = self.p.corrigir(slug, motivo)
+        try:
+            novo = self.p.corrigir(slug, motivo)
+        except RuntimeError as exc:
+            reg["fase"] = "falhou"
+            return self._pausar(e, "gate-bloqueado", f"{slug}: {motivo} ({exc})")
         self.log("correcao", slug=slug, novo=novo)
         e["sps"][novo] = {"fase": "novo", "correcoes": MAX_CORRECOES, "pr": None, "corrige": slug}
         if e.get("manual"):
@@ -544,7 +548,10 @@ class PortosReais(Portos):
 
     def corrigir(self, slug, motivo):
         novo = f"{slug}-correcao"[:60]
-        self._py("sp-new.py", novo, "--project", self.projeto, "--depends-on", slug)
+        r = self._py("sp-new.py", "--project", self.projeto, "--slug", novo, "--priority", "P1",
+                     "--depends-on", slug, "--restricoes", f"corrige: {motivo}"[:300])
+        if r.returncode:
+            raise RuntimeError(f"sp-new falhou: {(r.stderr or r.stdout or '').strip()[-200:]}")
         return novo
 
     def custo(self, slug):
