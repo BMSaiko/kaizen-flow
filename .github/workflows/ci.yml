@@ -60,6 +60,11 @@ jobs:
           mkdir proj && cd proj && git init -q
           ../node_modules/.bin/kaizen init
           ../node_modules/.bin/kaizen audit .
+      - name: Smoke da factory (demo --factory, fakes, sem rede)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node bin/kaizen.js demo --factory
   lint:
     runs-on: ubuntu-latest
     steps:
