@@ -204,7 +204,7 @@ def hook(payload, env=None, marker_dir=None):
     limit = limit_from_env(env)
     loops = []
     if payload.get("hook_event_name") == "Stop":
-        return _stop(payload, marker_dir, env, session_id, tokens, limit, transcript)
+        return _stop(payload, marker_dir, env, session_id, (tokens, limit, transcript))
     if tokens >= min(limit, LOOP_LIMIT) * WARN_RATIO:  # loop ativo: o teto é sempre o dos loops (100K), o contexto longo gasta a cache
         loops = _loops_ativos(marker_dir, env, session_id)
         if loops:
@@ -246,10 +246,11 @@ def _handoff_feito(transcript):
     return False
 
 
-def _stop(payload, marker_dir, env, session_id, tokens, limit, transcript):
+def _stop(payload, marker_dir, env, session_id, medida):
     """Fim de turno com contexto >= limite e sem handoff lançado: bloqueia uma vez por turno (`stop_hook_active` evita ciclos)."""
     if payload.get("stop_hook_active"):
         return None
+    tokens, limit, transcript = medida
     loops = _loops_ativos(marker_dir, env, session_id) if tokens >= min(limit, LOOP_LIMIT) * WARN_RATIO else []
     if loops:
         limit = min(limit, LOOP_LIMIT)
