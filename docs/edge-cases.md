@@ -44,6 +44,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-015 | A script module fails while being imported by another | the half-loaded module is not left registered; the next import retries cleanly | testes-falha-90 | `core/scripts/test_sp_carregar.py::test_erro_no_modulo_nao_deixa_nome_registado` |
 | EC-078 | The name registry file is corrupted | it is recreated empty with a warning; panes keep working by id | testes-falha-90 | `core/scripts/test_kf_nomes.py::test_ficheiro_corrompido_recria_e_avisa` |
 | EC-091 | The factory process dies while a story is launched | the next `run` resumes from the persisted state without relaunching or re-merging | kaizenflow-loop-autonomo | `core/scripts/test_kf_factory.py::test_ec_091_retoma_apos_crash_nao_relanca_nem_remerge` |
+| EC-100 | The factory dies in manual mode with approvals recorded | the next `run` keeps the manual mode and the approvals and does not relaunch or re-merge | kaizenflow-modo-manual | `core/scripts/test_kf_factory.py::test_ec_100_retoma_apos_crash_em_modo_manual_mantem_aprovacoes` |
 
 ## Quota, network, API and model session
 
@@ -125,6 +126,13 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 | EC-090 | A milestone that needs a release is finished | the factory reflects, pauses with `release` (never tags or publishes) and resumes with `run --release-feito | kaizenflow-loop-autonomo | `core/scripts/test_kf_factory.py::test_ec_090_release_pausa_no_marco_e_retoma_com_release_feito` |
 | EC-092 | A second `factory run` starts for the same project | it is refused with rc 4 while the first lives; a lock whose pid is dead is taken over | kaizenflow-loop-autonomo | `core/scripts/test_kf_factory.py::test_ec_092_lock_recusa_segunda_factory_viva_e_toma_o_de_pid_morto` |
 | EC-093 | The factory log receives a non-scalar field | only slugs, phases and numbers are written, never objects that could hold secrets | kaizenflow-loop-autonomo | `core/scripts/test_kf_factory.py::test_ec_093_log_so_tem_campos_simples_sem_segredos` |
+| EC-094 | `kaizen factory run --manual <project>` on a project with a valid `VISION.md` | it decomposes, launches nothing and pauses with `aguarda-aprovacao` until `approve` | kaizenflow-modo-manual | `core/scripts/test_kf_factory.py::test_ec_094_manual_decompoe_e_para_em_aguarda_aprovacao` |
+| EC-095 | `kaizen factory approve --so a` while other stories are pending | only `a` is launched; the rest keep waiting for approval | kaizenflow-modo-manual | `core/scripts/test_kf_factory.py::test_ec_095_approve_so_liberta_os_sps_escolhidos` |
+| EC-096 | `kaizen factory step` with approved stories | the next eligible story runs to merge and the factory pauses with `passo` | kaizenflow-modo-manual | `core/scripts/test_kf_factory.py::test_ec_096_step_executa_um_sp_e_para` |
+| EC-097 | `kaizen factory pause <sp>` then `resume <sp>` | the factory skips the paused story (pausing with `manual` if nothing else runs) and launches it again after `resume` | kaizenflow-modo-manual | `core/scripts/test_kf_factory.py::test_ec_097_pause_e_resume_de_um_sp` |
+| EC-098 | `kaizen factory skip <sp>` on a story other stories depend on | the dependency counts as met and the story is never launched | kaizenflow-modo-manual | `core/scripts/test_kf_factory.py::test_ec_098_skip_cumpre_a_dependencia_sem_lancar` |
+| EC-099 | `kaizen factory takeover <sp>` and the human finishes it | the factory never launches or corrects it; once the PR has green gates it is merged by `pr_fechar` like any other | kaizenflow-modo-manual | `core/scripts/test_kf_factory.py::test_ec_099_takeover_a_factory_nao_toca_e_fecha_com_os_mesmos_gates` |
+| EC-101 | A story created by hand (`sp-new.py`, no `-visao-mN-` in the slug) in a manual-mode project | it enters the same state, budget and gates as the generated ones, after `approve` | kaizenflow-modo-manual | `core/scripts/test_kf_factory.py::test_ec_101_sp_feito_a_mao_entra_no_mesmo_estado_e_exige_aprovacao` |
 
 ## Windows (atomic rename, CRLF, paths, console close)
 

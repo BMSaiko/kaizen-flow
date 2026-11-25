@@ -5,6 +5,13 @@ Uso:
   python -I scripts/kf_factory.py run <projeto> [--visao VISION.md] [--repo DIR] [--dir DIR] [--release-feito]   # corre até uma pausa ou ao fim
   python -I scripts/kf_factory.py status <projeto> [--dir DIR]                                  # marco, fila, gasto, próxima paragem
   python -I scripts/kf_factory.py stop <projeto> [--dir DIR]                                    # pede paragem limpa (a volta em curso acaba)
+Modo manual (a autonomia desliga-se, os gates e o orçamento não):
+  run <projeto> --manual         decompõe e pára em `aguarda-aprovacao`; SPs à mão (sem `-visao-mN-`) entram também; `run --auto` sai do modo
+  approve <projeto> [--so a,b]   liberta SPs (sem --so: todos os pendentes); só estes são lançados
+  step <projeto>                 corre o próximo SP elegível até ao merge e pára em `passo`
+  pause|resume|skip|takeover <projeto> <sp>   pausa um SP · devolve-o à factory · dá-o por cumprido · assume-o (a factory não lhe toca;
+                                 quando o humano o acaba, o PR fecha com os mesmos gates e CI verde)
+Com a factory viva o comando fica em `<projeto>.cmd.jsonl` e a volta seguinte aplica-o; sem factory aplica-se logo.
 Estado em `<dir>/<projeto>.json` (defeito `.kaizen/factory/`), registo em `<dir>/factory.log.jsonl`, lock `<dir>/<projeto>.lock`.
 A máquina (`Fabrica`) só fala com `Portos` (decompor, backlog, lançar, resultado, merge, reflect, correção, custo): os testes
 trocam-nos por fakes; `PortosReais` liga-os a sp-decompor, sp-fila, pr_fechar e sp-metricas.
@@ -26,7 +33,9 @@ import kf_orcamento  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 RC_OK, RC_ERRO, RC_USO, RC_PAUSA, RC_LOCK = 0, 1, 2, 3, 4
-PARAGENS = ("orcamento", "gate-bloqueado", "release", "visao-invalida", "parado")
+PARAGENS = ("orcamento", "gate-bloqueado", "release", "visao-invalida", "parado", "aguarda-aprovacao", "manual", "passo")
+COMANDOS = ("approve", "pause", "resume", "skip", "takeover")
+FORA = ("corrigido", "falhou", "pausado", "saltado", "humano")  # fases que a factory não lança
 MAX_VOLTAS = 10000
 MAX_CORRECOES = 1  # um SP de correção por SP; o segundo gate vermelho no mesmo marco pausa
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -118,6 +127,10 @@ class Portos:
         """[{slug, marco, estado: todo|doing|done, depende: [slug], release: bool}]; vazio = ainda por decompor."""
         raise NotImplementedError
 
+    def avulsos(self, projeto):
+        """SPs do projeto feitos à mão (slug sem `-visao-mN-`, não-mães), com `marco` 0; só contam no modo manual."""
+        return []
+
     def decompor(self, projeto):
         """Gera o backlog a partir do VISION; (rc, msg), rc 0 = ok."""
         raise NotImplementedError
@@ -191,7 +204,7 @@ class Fabrica:
         return RC_PAUSA
 
     # orquestração -----------------------------------------------------------
-    def run(self, release_feito=False):
+    def run(self, release_feito=False, manual=None, passo=False):
         if not self.lock.adquirir():
             self.log("recusa", razao="outra factory ativa")
             print(f"factory {self.projeto}: já corre (lock {self.lock.caminho}); `kaizen factory stop {self.projeto}` ou espera", file=sys.stderr)
@@ -201,6 +214,11 @@ class Fabrica:
             e = self.ler()
             retomada = e["estado"] in ("a-correr", "pausada")
             e.update(estado="a-correr", paragem="", razao="")
+            if manual is not None:
+                e["manual"] = manual
+            self._passo = passo
+            self._ini = self._merged(e)
+            self._drenar(e)
             if release_feito and e["marco"] not in e.get("release_ok", []):
                 e.setdefault("release_ok", []).append(e["marco"])
             self.guardar(e)
@@ -208,6 +226,115 @@ class Fabrica:
             return self._ciclo(e)
         finally:
             self.lock.libertar()
+
+    # modo manual --------------------------------------------------------------
+    @staticmethod
+    def _merged(e):
+        return {s for s, r in e["sps"].items() if r["fase"] in ("merged", "substituido")}
+
+    def comando(self, nome, sp=None, so=None):
+        """Aplica já (sem factory viva) ou deixa em fila para a volta seguinte (factory viva); rc 0, 2 = pedido inválido."""
+        cmd = {"cmd": nome, "sp": sp, "so": so}
+        if self.lock.adquirir():
+            try:
+                e = self.ler()
+                rc = self._aplicar(e, cmd)
+                if rc == RC_OK:
+                    self.guardar(e)
+                return rc
+            finally:
+                self.lock.libertar()
+        self.pasta.mkdir(parents=True, exist_ok=True)
+        with (self.pasta / f"{self.projeto}.cmd.jsonl").open("a", encoding="utf-8") as f:
+            f.write(json.dumps(cmd, ensure_ascii=False) + "\n")
+        self.log("comando-em-fila", razao=nome, slug=sp)
+        return RC_OK
+
+    def _drenar(self, e):
+        fila = self.pasta / f"{self.projeto}.cmd.jsonl"
+        tmp = fila.with_suffix(".drenar")
+        try:
+            os.replace(fila, tmp)
+        except OSError:
+            return
+        for linha in tmp.read_text(encoding="utf-8").splitlines():
+            try:
+                self._aplicar(e, json.loads(linha))
+            except ValueError:
+                continue
+        tmp.unlink(missing_ok=True)
+        self.guardar(e)
+
+    def _conhecidos(self):
+        return list(self.p.backlog(self.projeto)) + list(self.p.avulsos(self.projeto))
+
+    def _aplicar(self, e, c):
+        nome, sp = c.get("cmd"), c.get("sp")
+        if nome not in COMANDOS:
+            return RC_USO
+        if nome == "approve":
+            pend = [b["slug"] for b in self._conhecidos() if b["estado"] != "done"]
+            alvo = c.get("so") or pend
+            if any(x not in {b["slug"] for b in self._conhecidos()} for x in alvo):
+                print(f"factory {self.projeto}: SP desconhecido em {alvo}", file=sys.stderr)
+                self.log("recusa", razao="approve: SP desconhecido")
+                return RC_USO
+            e["aprovados"] = sorted(set(e.get("aprovados", [])) | set(alvo))
+            self.log("aprovar", razao=",".join(alvo))
+            return RC_OK
+        if not sp or not SLUG_RE.match(sp):
+            print(f"factory {self.projeto}: {nome} precisa de um <sp> válido", file=sys.stderr)
+            return RC_USO
+        reg = e["sps"].setdefault(sp, {"fase": "novo", "correcoes": 0, "pr": None})
+        if nome == "resume":
+            if reg["fase"] in ("pausado", "saltado", "humano"):
+                reg["fase"] = reg.pop("antes", "novo")
+                reg.pop("humano", None)
+        elif reg["fase"] not in ("pausado", "saltado", "humano", "merged", "substituido"):
+            reg["antes"] = reg["fase"]
+            reg["fase"] = {"pause": "pausado", "skip": "saltado", "takeover": "humano"}[nome]
+            reg["humano"] = nome == "takeover"
+        self.log(nome, slug=sp)
+        return RC_OK
+
+    def _humanos(self, e, itens):
+        """SPs assumidos pelo humano: se acabou (Done, ou PR aberto com gates verdes) segue para o merge normal, sem lançar nem corrigir."""
+        estados = {b["slug"]: b["estado"] for b in itens}
+        for slug, reg in e["sps"].items():
+            if reg["fase"] != "humano" or slug not in estados:
+                continue
+            if estados[slug] == "done":
+                reg["fase"] = "merged"
+                self.guardar(e)
+                continue
+            r = self.p.resultado(slug)
+            if r["estado"] == "done" and r.get("gates_ok", False) and r.get("pr"):
+                reg.update(fase="pr", pr=r["pr"])
+                self.guardar(e)
+                self.log("gates-verdes", slug=slug, pr=r["pr"])
+
+    def _alvo(self, e, pendentes, feitos):
+        aprov = set(e.get("aprovados", []))
+        for b in pendentes:
+            fase = e["sps"].get(b["slug"], {}).get("fase")
+            if fase in FORA or not all(d in feitos for d in b.get("depende", [])):
+                continue
+            if e.get("manual") and b["slug"] not in aprov and fase in (None, "novo"):
+                continue
+            return b
+        return None
+
+    def _sem_alvo(self, e, pendentes, rotulo):
+        """Razão da pausa quando nada é lançável."""
+        if e.get("manual"):
+            aprov = set(e.get("aprovados", []))
+            por = [b["slug"] for b in pendentes if b["slug"] not in aprov and e["sps"].get(b["slug"], {}).get("fase", "novo") == "novo"]
+            if por:
+                return self._pausar(e, "aguarda-aprovacao", f"{len(por)} SP(s) por aprovar: {', '.join(por[:5])}")
+            mao = [b["slug"] for b in pendentes if e["sps"].get(b["slug"], {}).get("fase") in ("pausado", "humano")]
+            if mao:
+                return self._pausar(e, "manual", f"a aguardar o humano: {', '.join(mao[:5])}")
+        return self._pausar(e, "gate-bloqueado", f"{rotulo}: dependências por cumprir")
 
     def _backlog(self, e):
         """Backlog do projeto (decompõe se faltar) ou o rc da pausa se o VISION não decompõe."""
@@ -224,29 +351,39 @@ class Fabrica:
         for _ in range(self.max_voltas):
             if self.stop_f.exists():
                 return self._pausar(e, "parado", "stop pedido")
+            self._drenar(e)
             backlog = self._backlog(e)
             if isinstance(backlog, int):
                 return backlog
+            avulsos = [b for b in self.p.avulsos(self.projeto) if b["slug"] not in {x["slug"] for x in backlog}] if e.get("manual") else []
+            self._humanos(e, backlog + avulsos)
+            subst = {s for s, r in e["sps"].items() if r["fase"] in ("substituido", "saltado")}  # corrigido por merge, ou dado por cumprido
+            feitos = {b["slug"] for b in backlog + avulsos if b["estado"] == "done"} | subst
+            pend_av = [b for b in avulsos if b["estado"] != "done" and b["slug"] not in subst]
             marcos = sorted({b["marco"] for b in backlog})
             fechados = e.setdefault("fechados", [])
             e["marco"] = next((m for m in marcos if m not in fechados), marcos[-1] + 1)
-            if e["marco"] > marcos[-1]:
+            atuais = [b for b in backlog if b["marco"] == e["marco"]]
+            pendentes = [b for b in atuais if b["estado"] != "done" and b["slug"] not in subst]
+            alvo = self._alvo(e, pend_av, feitos) if pend_av else None
+            if alvo:
+                rc = self._sp(e, alvo)
+            elif e["marco"] > marcos[-1]:
+                if pend_av:
+                    return self._sem_alvo(e, pend_av, "SPs avulsos")
                 e["estado"] = "concluida"
                 self.guardar(e)
                 self.log("fim")
                 return RC_OK
-            subst = {s for s, r in e["sps"].items() if r["fase"] == "substituido"}  # SP original cuja correção já fez merge
-            atuais = [b for b in backlog if b["marco"] == e["marco"]]
-            pendentes = [b for b in atuais if b["estado"] != "done" and b["slug"] not in subst]
-            feitos = {b["slug"] for b in backlog if b["estado"] == "done"} | subst
-            if not pendentes:
+            elif not pendentes:
                 rc = self._fechar_marco(e, atuais)
             else:
-                alvo = next((b for b in pendentes if all(d in feitos for d in b.get("depende", []))
-                             and e["sps"].get(b["slug"], {}).get("fase") not in ("corrigido", "falhou")), None)
-                rc = self._sp(e, alvo) if alvo else self._pausar(e, "gate-bloqueado", f"marco {e['marco']}: dependências por cumprir")
+                alvo = self._alvo(e, pendentes, feitos)
+                rc = self._sp(e, alvo) if alvo else self._sem_alvo(e, pendentes + pend_av, f"marco {e['marco']}")
             if rc is not None:
                 return rc
+            if self._passo and self._merged(e) - self._ini:
+                return self._pausar(e, "passo", "1 SP concluído (`step` para o seguinte, `run` para continuar)")
         return self._pausar(e, "parado", "limite de voltas")
 
     def _sp(self, e, alvo):
@@ -299,7 +436,7 @@ class Fabrica:
         if dec["estado"] == "parar":
             reg["fase"] = "falhou"
             return self._pausar(e, "orcamento", dec["razao"])
-        if reg["correcoes"] >= MAX_CORRECOES:
+        if reg["correcoes"] >= MAX_CORRECOES or reg.get("humano"):
             reg["fase"] = "falhou"
             return self._pausar(e, "gate-bloqueado", f"{slug}: {motivo} (correção automática já tentada)")
         reg["correcoes"] += 1
@@ -307,6 +444,8 @@ class Fabrica:
         novo = self.p.corrigir(slug, motivo)
         self.log("correcao", slug=slug, novo=novo)
         e["sps"][novo] = {"fase": "novo", "correcoes": MAX_CORRECOES, "pr": None, "corrige": slug}
+        if e.get("manual"):
+            e["aprovados"] = sorted(set(e.get("aprovados", [])) | {novo})  # a correção é da factory, não pede nova aprovação
         self.guardar(e)
         return None
 
@@ -328,10 +467,12 @@ class Fabrica:
         e = self.ler()
         sps = e["sps"]
         fila = [f"{s}:{r['fase']}" for s, r in sps.items()]
-        proxima = {"orcamento": "subir `orcamento` no kaizen.config.json e `factory run`", "gate-bloqueado": "corrigir o gate e `factory run`",
+        proxima = {"aguarda-aprovacao": "`kaizen factory approve <projeto> [--so a,b]` e depois `run` ou `step`", "manual": "o humano acaba o SP (ou `resume`/`skip <sp>`) e `run`",
+                   "passo": "`step` para o seguinte ou `run` para continuar", "orcamento": "subir `orcamento` no kaizen.config.json e `factory run`", "gate-bloqueado": "corrigir o gate e `factory run`",
                    "release": "fazer o release e `factory run --release-feito`", "visao-invalida": "`kaizen vision validate` e corrigir", "parado": "`factory run`"}
         prox = proxima.get(e.get("paragem"), "-") if e["estado"] == "pausada" else ("a correr" if e["estado"] == "a-correr" else "-")
-        return (f"factory {self.projeto}: {e['estado']} · marco {e['marco']} · gasto dia {e['gasto']:.2f} USD · falhas seguidas {e['seguidas']}\n"
+        modo = f" · manual ({len(e.get('aprovados', []))} aprovados)" if e.get("manual") else ""
+        return (f"factory {self.projeto}: {e['estado']}{modo} · marco {e['marco']} · gasto dia {e['gasto']:.2f} USD · falhas seguidas {e['seguidas']}\n"
                 f"fila: {', '.join(fila) or '-'}\nparagem: {e.get('paragem') or '-'} {e.get('razao') or ''}\npróxima paragem/ação: {prox}")
 
 
@@ -347,21 +488,25 @@ class PortosReais(Portos):
     def _py(self, script, *args):
         return self.run([sys.executable, "-I", str(HERE / script), *args], capture_output=True, text=True, cwd=str(self.repo))
 
-    def backlog(self, projeto):
+    def _itens(self, projeto):
         import sp_fila_plano
         from sp_list_mod import DEFAULT_ROOT
-        itens = sp_fila_plano.load(self.root or DEFAULT_ROOT, projeto)
         out = []
-        for sp, fm in itens:
-            m = marco_de(sp.slug)
-            if not m:
-                continue
+        for sp, fm in sp_fila_plano.load(self.root or DEFAULT_ROOT, projeto):
             dep = fm.get("depends_on") or []
             dep = re.findall(r"[a-z0-9][a-z0-9-]*", dep) if isinstance(dep, str) else list(dep)
             titulo = str(fm.get("title", "")) + str(fm.get("release", ""))
-            out.append({"slug": sp.slug, "marco": m, "estado": {"Done": "done", "Doing": "doing"}.get(sp.status, "todo"),
-                        "depende": dep, "release": "release" in titulo.lower()})
+            out.append((sp.slug, {"slug": sp.slug, "marco": marco_de(sp.slug), "estado": {"Done": "done", "Doing": "doing"}.get(sp.status, "todo"),
+                                  "depende": dep, "release": "release" in titulo.lower()}, str(fm.get("parent") or "")))
         return out
+
+    def backlog(self, projeto):
+        return [b for _, b, _ in self._itens(projeto) if b["marco"]]
+
+    def avulsos(self, projeto):
+        itens = self._itens(projeto)
+        maes = {p for _, _, p in itens if p}
+        return [b for slug, b, _ in itens if not b["marco"] and slug not in maes]
 
     def decompor(self, projeto):
         r = self._py("sp-decompor.py", str(self.visao), "--repo", str(self.repo))
@@ -416,8 +561,12 @@ class PortosReais(Portos):
 
 def main(argv=None, portos=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("sub", choices=("run", "status", "stop"))
+    ap.add_argument("sub", choices=("run", "status", "stop", "step") + COMANDOS)
     ap.add_argument("projeto")
+    ap.add_argument("sp", nargs="?", help="SP alvo de pause|resume|skip|takeover")
+    ap.add_argument("--manual", action="store_true", help="com `run`: decompõe e pára a pedir aprovação (approve) antes de lançar")
+    ap.add_argument("--auto", action="store_true", help="com `run`: sai do modo manual")
+    ap.add_argument("--so", help="com `approve`: slugs separados por vírgula")
     ap.add_argument("--visao", help="VISION.md (defeito <repo>/VISION.md)")
     ap.add_argument("--repo", default=".")
     ap.add_argument("--dir", help="pasta de estado (defeito <repo>/.kaizen/factory)")
@@ -442,7 +591,10 @@ def main(argv=None, portos=None):
         f.log("stop-pedido")
         print(f"factory {a.projeto}: paragem pedida (acaba a volta em curso)")
         return RC_OK
-    return f.run(release_feito=a.release_feito)
+    if a.sub in COMANDOS:
+        return f.comando(a.sub, sp=a.sp, so=[x for x in a.so.split(",") if x] if a.so else None)
+    manual = True if a.manual else False if a.auto else None
+    return f.run(release_feito=a.release_feito, manual=manual, passo=a.sub == "step")
 
 
 if __name__ == "__main__":

@@ -26,6 +26,9 @@ class Falso(kf.Portos):
     def backlog(self, projeto):
         return [] if self.por_decompor else [dict(v) for v in self.sps.values()]
 
+    def avulsos(self, projeto):
+        return [dict(x) for x in getattr(self, "avulsos_l", [])]
+
     def decompor(self, projeto):
         self.chamadas.append("decompor")
         if self.decompor_rc == 0:
@@ -45,7 +48,7 @@ class Falso(kf.Portos):
         self.chamadas.append(f"merge:{slug}")
         rc = self.merge_rc.get(slug, 0)
         if rc == 0:
-            self.sps[slug]["estado"] = "done"
+            (self.sps.get(slug) or next(x for x in getattr(self, "avulsos_l", []) if x["slug"] == slug))["estado"] = "done"
         return rc, "ci vermelho" if rc else "merged"
 
     def reflect(self, projeto, marco):
@@ -273,3 +276,186 @@ def test_portos_reais_done_sem_pr_nao_segue_para_merge(tmp_path):
     r = kf.PortosReais(P, tmp_path / "VISION.md", tmp_path, run=run)
     res = r.resultado("demo-visao-m1-x")
     assert res["estado"] == "done" and res["pr"] is None and not res["gates_ok"]
+
+
+# modo manual -------------------------------------------------------------------
+M1, M2 = f"{P}-visao-m1-x", f"{P}-visao-m2-x"
+
+
+def estado(tmp_path):
+    return json.loads((tmp_path / "f" / f"{P}.json").read_text())
+
+
+def test_ec_094_manual_decompoe_e_para_em_aguarda_aprovacao(tmp_path):
+    f = Falso()
+    assert fab(tmp_path, f).run(manual=True) == kf.RC_PAUSA
+    e = estado(tmp_path)
+    assert e["paragem"] == "aguarda-aprovacao" and e["manual"] is True
+    assert f.chamadas == ["decompor"]
+
+
+def test_ec_095_approve_so_liberta_os_sps_escolhidos(tmp_path):
+    f = Falso(marcos=1)
+    f.sps[f"{P}-b"] = {"slug": f"{P}-b", "marco": 1, "estado": "todo", "depende": [], "release": False}
+    fab(tmp_path, f).run(manual=True)
+    assert fab(tmp_path, f).comando("approve", so=[M1]) == kf.RC_OK
+    assert fab(tmp_path, f).run() == kf.RC_PAUSA
+    assert f"lancar:{M1}" in f.chamadas and f"lancar:{P}-b" not in f.chamadas
+    assert estado(tmp_path)["paragem"] == "aguarda-aprovacao"
+
+
+def test_approve_sem_so_liberta_tudo_e_run_conclui(tmp_path):
+    f = Falso()
+    fab(tmp_path, f).run(manual=True)
+    assert fab(tmp_path, f).comando("approve") == kf.RC_OK
+    assert fab(tmp_path, f).run() == kf.RC_OK
+    assert f.chamadas.count("reflect:1") == 1 and estado(tmp_path)["estado"] == "concluida"
+
+
+def test_approve_slug_desconhecido_e_rc_2_e_nao_grava(tmp_path):
+    f = Falso()
+    fab(tmp_path, f).run(manual=True)
+    assert fab(tmp_path, f).comando("approve", so=["nao-existe"]) == kf.RC_USO
+    assert estado(tmp_path).get("aprovados", []) == []
+
+
+def test_ec_096_step_executa_um_sp_e_para(tmp_path):
+    f = Falso()
+    fab(tmp_path, f).run(manual=True)
+    fab(tmp_path, f).comando("approve")
+    assert fab(tmp_path, f).run(passo=True) == kf.RC_PAUSA
+    assert estado(tmp_path)["paragem"] == "passo"
+    assert f"merge:{M1}" in f.chamadas and f"lancar:{M2}" not in f.chamadas
+    assert fab(tmp_path, f).run(passo=True) == kf.RC_PAUSA
+    assert f"merge:{M2}" in f.chamadas
+
+
+def test_step_sem_aprovacao_em_manual_nao_lanca(tmp_path):
+    f = Falso()
+    fab(tmp_path, f).run(manual=True)
+    assert fab(tmp_path, f).run(passo=True) == kf.RC_PAUSA
+    assert estado(tmp_path)["paragem"] == "aguarda-aprovacao" and not any(c.startswith("lancar") for c in f.chamadas)
+
+
+def test_ec_097_pause_e_resume_de_um_sp(tmp_path):
+    f = Falso(marcos=1)
+    f.sps[f"{P}-b"] = {"slug": f"{P}-b", "marco": 1, "estado": "todo", "depende": [], "release": False}
+    fab(tmp_path, f).run(manual=True)
+    fab(tmp_path, f).comando("approve")
+    assert fab(tmp_path, f).comando("pause", sp=M1) == kf.RC_OK
+    assert fab(tmp_path, f).run() == kf.RC_PAUSA
+    assert f"lancar:{P}-b" in f.chamadas and f"lancar:{M1}" not in f.chamadas
+    assert estado(tmp_path)["paragem"] == "manual"
+    assert fab(tmp_path, f).comando("resume", sp=M1) == kf.RC_OK
+    assert fab(tmp_path, f).run() == kf.RC_OK and f"merge:{M1}" in f.chamadas
+
+
+def test_ec_098_skip_cumpre_a_dependencia_sem_lancar(tmp_path):
+    f = Falso()
+    fab(tmp_path, f).run(manual=True)
+    fab(tmp_path, f).comando("approve")
+    assert fab(tmp_path, f).comando("skip", sp=M1) == kf.RC_OK
+    assert fab(tmp_path, f).run() == kf.RC_OK
+    assert f"lancar:{M1}" not in f.chamadas and f"lancar:{M2}" in f.chamadas
+    assert f.chamadas.count("reflect:1") == 1
+
+
+def test_ec_099_takeover_a_factory_nao_toca_e_fecha_com_os_mesmos_gates(tmp_path):
+    f = Falso(marcos=1, resultados={M1: [{"estado": "a-correr", "pr": None, "gates_ok": False, "motivo": ""}]})
+    fab(tmp_path, f).run(manual=True)
+    fab(tmp_path, f).comando("approve")
+    assert fab(tmp_path, f).comando("takeover", sp=M1) == kf.RC_OK
+    assert fab(tmp_path, f).run() == kf.RC_PAUSA
+    assert estado(tmp_path)["paragem"] == "manual" and not any(c in (f"lancar:{M1}", f"merge:{M1}") for c in f.chamadas)
+    assert fab(tmp_path, f).run() == kf.RC_OK  # o humano acabou: resultado done com PR e gates verdes
+    assert f"merge:{M1}" in f.chamadas and f"lancar:{M1}" not in f.chamadas
+
+
+def test_takeover_gate_vermelho_nao_cria_correcao_automatica(tmp_path):
+    verm = {"estado": "falhou", "pr": None, "gates_ok": False, "motivo": "ruff"}
+    f = Falso(marcos=1, resultados={M1: [dict(verm), dict(verm)]})
+    fab(tmp_path, f).run(manual=True)
+    fab(tmp_path, f).comando("approve")
+    fab(tmp_path, f).comando("takeover", sp=M1)
+    assert fab(tmp_path, f).run() == kf.RC_PAUSA
+    assert not any(c.startswith("corrigir") for c in f.chamadas) and f"merge:{M1}" not in f.chamadas
+
+
+def test_comando_com_factory_viva_fica_em_fila_e_a_volta_aplica(tmp_path):
+    f = Falso()
+    fab(tmp_path, f).run(manual=True)
+    pasta = tmp_path / "f"
+    (pasta / f"{P}.lock").write_text("999999")
+    assert fab(tmp_path, f, vivo=lambda pid: True).comando("approve") == kf.RC_OK
+    assert estado(tmp_path).get("aprovados", []) == [] and (pasta / f"{P}.cmd.jsonl").exists()
+    (pasta / f"{P}.lock").unlink()
+    assert fab(tmp_path, f).run() == kf.RC_OK
+    assert not (pasta / f"{P}.cmd.jsonl").exists()
+
+
+def test_ec_100_retoma_apos_crash_em_modo_manual_mantem_aprovacoes(tmp_path):
+    f = Falso(marcos=1)
+    fa = fab(tmp_path, f)
+    fa.guardar({"projeto": P, "estado": "a-correr", "marco": 1, "manual": True, "aprovados": [M1], "sps": {M1: {"fase": "lancado", "correcoes": 0, "pr": None}},
+                "seguidas": 0, "gasto": 0.0, "paragem": "", "razao": "", "reflect": []})
+    f.por_decompor = False
+    assert fa.run() == kf.RC_OK
+    assert not any(c.startswith("lancar") for c in f.chamadas) and f.chamadas.count(f"merge:{M1}") == 1
+
+
+def test_ec_101_sp_feito_a_mao_entra_no_mesmo_estado_e_exige_aprovacao(tmp_path):
+    f = Falso(marcos=1)
+    f.avulsos_l = [{"slug": "meu-sp", "marco": 0, "estado": "todo", "depende": [], "release": False}]
+    fab(tmp_path, f).run(manual=True)
+    assert fab(tmp_path, f).comando("approve", so=["meu-sp"]) == kf.RC_OK
+    assert fab(tmp_path, f).run() == kf.RC_PAUSA
+    assert "lancar:meu-sp" in f.chamadas and "merge:meu-sp" in f.chamadas and f"lancar:{M1}" not in f.chamadas
+    assert estado(tmp_path)["sps"]["meu-sp"]["fase"] == "merged"
+
+
+def test_sem_manual_os_sps_avulsos_nao_entram(tmp_path):
+    f = Falso(marcos=1)
+    f.avulsos_l = [{"slug": "meu-sp", "marco": 0, "estado": "todo", "depende": [], "release": False}]
+    assert fab(tmp_path, f).run() == kf.RC_OK
+    assert "lancar:meu-sp" not in f.chamadas
+
+
+def test_run_auto_sai_do_modo_manual(tmp_path):
+    f = Falso(marcos=1)
+    fab(tmp_path, f).run(manual=True)
+    assert fab(tmp_path, f).run(manual=False) == kf.RC_OK
+    assert estado(tmp_path)["manual"] is False
+
+
+def test_main_encaminha_approve_step_e_comandos_por_sp(tmp_path, capsys):
+    f = Falso()
+    d = str(tmp_path / "f")
+    assert kf.main(["run", P, "--manual", "--dir", d, "--intervalo", "0"], portos=f) == kf.RC_PAUSA
+    assert kf.main(["approve", P, "--so", M1, "--dir", d], portos=f) == kf.RC_OK
+    assert kf.main(["step", P, "--dir", d, "--intervalo", "0"], portos=f) == kf.RC_PAUSA
+    assert kf.main(["pause", P, M2, "--dir", d], portos=f) == kf.RC_OK
+    assert kf.main(["pause", P, "--dir", d], portos=f) == kf.RC_USO  # falta o SP
+    assert kf.main(["resume", P, M2, "--dir", d], portos=f) == kf.RC_OK
+    assert kf.main(["skip", P, M2, "--dir", d], portos=f) == kf.RC_OK
+    assert kf.main(["takeover", P, "../x", "--dir", d], portos=f) == kf.RC_USO
+
+
+def test_status_manual_mostra_aprovacao_e_proxima_acao(tmp_path, capsys):
+    f = Falso()
+    fab(tmp_path, f).run(manual=True)
+    assert kf.main(["status", P, "--dir", str(tmp_path / "f")], portos=f) == kf.RC_OK
+    out = capsys.readouterr().out
+    assert "manual" in out and "aguarda-aprovacao" in out and "factory approve" in out
+
+
+def test_portos_reais_avulsos_so_sps_sem_marco_e_que_nao_sao_maes(tmp_path):
+    from sp_fila_testlib import make_sp
+    make_sp(tmp_path, f"{P}-visao-m1-d", folder="TODO", project=P)
+    make_sp(tmp_path, "meu-sp", folder="TODO", project=P)
+    make_sp(tmp_path, "feito", folder="Done", project=P)
+    make_sp(tmp_path, "mae", folder="TODO", project=P)
+    make_sp(tmp_path, "filho", folder="TODO", project=P, extra={"parent": "mae"})
+    r = kf.PortosReais(P, tmp_path / "VISION.md", tmp_path, root=tmp_path)
+    av = {x["slug"]: x for x in r.avulsos(P)}
+    assert {s for s, x in av.items() if x["estado"] != "done"} == {"meu-sp", "filho"} and av["feito"]["estado"] == "done"
+    assert all(x["marco"] == 0 for x in av.values()) and f"{P}-visao-m1-d" not in av and "mae" not in av
