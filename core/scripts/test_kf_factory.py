@@ -10,7 +10,8 @@ P = "demo"
 class Falso(kf.Portos):
     """Backlog em memória: cada SP termina com `resultados[slug]` (lista consumida); `esperar` não dorme."""
 
-    def __init__(self, marcos=2, release=(), resultados=None, cfg=None, custos=None, dia=0.0, merge_rc=None):
+    def __init__(self, marcos=2, release=(), resultados=None, cfg=None, **kw):
+        custos, dia, merge_rc = kw.get("custos"), kw.get("dia", 0.0), kw.get("merge_rc")
         self.sps = {f"{P}-visao-m{n}-x": {"slug": f"{P}-visao-m{n}-x", "marco": n, "estado": "todo",
                                          "depende": [f"{P}-visao-m{n - 1}-x"] if n > 1 else [], "release": n in release}
                     for n in range(1, marcos + 1)}
@@ -71,7 +72,9 @@ class Falso(kf.Portos):
 
 
 def fab(tmp_path, falso, **kw):
-    return kf.Fabrica(P, falso, tmp_path / "f", intervalo=0, max_voltas=200, **kw)
+    fa = kf.Fabrica(P, falso, tmp_path / "f", intervalo=0, **kw)
+    fa.max_voltas = 200
+    return fa
 
 
 def log(tmp_path):

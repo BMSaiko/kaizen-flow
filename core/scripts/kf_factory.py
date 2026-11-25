@@ -27,6 +27,7 @@ import kf_orcamento  # noqa: E402
 HERE = Path(__file__).resolve().parent
 RC_OK, RC_ERRO, RC_USO, RC_PAUSA, RC_LOCK = 0, 1, 2, 3, 4
 PARAGENS = ("orcamento", "gate-bloqueado", "release", "visao-invalida", "parado")
+MAX_VOLTAS = 10000
 MAX_CORRECOES = 1  # um SP de correção por SP; o segundo gate vermelho no mesmo marco pausa
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 MARCO_RE = re.compile(r"-visao-m(\d+)-")
@@ -157,7 +158,7 @@ class Portos:
 
 
 class Fabrica:
-    def __init__(self, projeto, portos, pasta, intervalo=30, max_voltas=10000, vivo=None):
+    def __init__(self, projeto, portos, pasta, intervalo=30, vivo=None):
         self.projeto = _slug_ok(projeto)
         self.p = portos
         self.pasta = Path(pasta)
@@ -166,7 +167,7 @@ class Fabrica:
         self.log = Registo(self.pasta / "factory.log.jsonl")
         self.lock = Lock(self.pasta / f"{projeto}.lock", vivo=vivo)
         self.intervalo = intervalo
-        self.max_voltas = max_voltas
+        self.max_voltas = MAX_VOLTAS
 
     # estado -----------------------------------------------------------------
     def ler(self):
@@ -208,19 +209,24 @@ class Fabrica:
         finally:
             self.lock.libertar()
 
+    def _backlog(self, e):
+        """Backlog do projeto (decompõe se faltar) ou o rc da pausa se o VISION não decompõe."""
+        backlog = self.p.backlog(self.projeto)
+        if backlog:
+            return backlog
+        rc, msg = self.p.decompor(self.projeto)
+        self.log("decompor", rc=rc)
+        if rc != 0:
+            return self._pausar(e, "visao-invalida", msg or "decompor falhou")
+        return self.p.backlog(self.projeto) or self._pausar(e, "visao-invalida", "VISION sem marcos")
+
     def _ciclo(self, e):
         for _ in range(self.max_voltas):
             if self.stop_f.exists():
                 return self._pausar(e, "parado", "stop pedido")
-            backlog = self.p.backlog(self.projeto)
-            if not backlog:
-                rc, msg = self.p.decompor(self.projeto)
-                self.log("decompor", rc=rc)
-                if rc != 0:
-                    return self._pausar(e, "visao-invalida", msg or "decompor falhou")
-                backlog = self.p.backlog(self.projeto)
-                if not backlog:
-                    return self._pausar(e, "visao-invalida", "VISION sem marcos")
+            backlog = self._backlog(e)
+            if isinstance(backlog, int):
+                return backlog
             marcos = sorted({b["marco"] for b in backlog})
             fechados = e.setdefault("fechados", [])
             e["marco"] = next((m for m in marcos if m not in fechados), marcos[-1] + 1)
@@ -235,14 +241,10 @@ class Fabrica:
             feitos = {b["slug"] for b in backlog if b["estado"] == "done"} | subst
             if not pendentes:
                 rc = self._fechar_marco(e, atuais)
-                if rc is not None:
-                    return rc
-                continue
-            alvo = next((b for b in pendentes if all(d in feitos for d in b.get("depende", []))
-                         and e["sps"].get(b["slug"], {}).get("fase") not in ("corrigido", "falhou")), None)
-            if alvo is None:
-                return self._pausar(e, "gate-bloqueado", f"marco {e['marco']}: dependências por cumprir")
-            rc = self._sp(e, alvo)
+            else:
+                alvo = next((b for b in pendentes if all(d in feitos for d in b.get("depende", []))
+                             and e["sps"].get(b["slug"], {}).get("fase") not in ("corrigido", "falhou")), None)
+                rc = self._sp(e, alvo) if alvo else self._pausar(e, "gate-bloqueado", f"marco {e['marco']}: dependências por cumprir")
             if rc is not None:
                 return rc
         return self._pausar(e, "parado", "limite de voltas")
