@@ -35,6 +35,8 @@ _autor = carregar(Path(__file__).resolve().parent / "sp-autor.py", "sp_autor")  
 MODELOS = modelos.DEFAULT  # os testes trocam-no
 PAPEL = "revisor"
 RC_TIMEOUT = 3
+SEM_REGISTO_GRACA = 60  # s: sem `revisor-<slug>` registado após isto, nenhum painel o vai gravar (ex.: review --inline)
+HEARTBEAT = 60  # s entre linhas de progresso do --esperar
 FORMATO = "[bloqueante|menor] ficheiro:linha descrição | verificar: como confirmar a correção"
 LEITURA = ["Read", "Grep", "Glob", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)", "Bash(git status:*)"]
 SCRIPTS = Path(__file__).resolve().parent
@@ -171,9 +173,14 @@ def lancar(sp, base, achados, backend, cwd, estado_root=None, run=None, sleep=ti
     return {**res, "aviso": aviso}
 
 
-def esperar_estado(slug, timeout=900, intervalo=5, estado_root=None, sleep=time.sleep, agora=time.monotonic):
-    """Como `esperar`, mas devolve `(rc, ultimo_estado)`; estado `None` = painel sem registo."""
-    k, limite = _autor.chave(slug, PAPEL), agora() + timeout
+def esperar_estado(slug, timeout=900, intervalo=5, estado_root=None, sleep=time.sleep, agora=time.monotonic,
+                   graca=SEM_REGISTO_GRACA, heartbeat=HEARTBEAT, log=None):
+    """Como `esperar`, mas devolve `(rc, ultimo_estado)`; estado `None` = painel sem registo.
+    Sem registo durante `graca` s falha cedo (rc 1): um review `--inline` nunca grava estado. `log(msg)` recebe o
+    progresso a cada `heartbeat` s."""
+    k = _autor.chave(slug, PAPEL)
+    inicio = agora()
+    limite, proximo = inicio + timeout, inicio + heartbeat
     while True:
         try:
             e = pe.ler(pe.procurar(k, root=estado_root), k, root=estado_root)["estado"]
@@ -183,8 +190,14 @@ def esperar_estado(slug, timeout=900, intervalo=5, estado_root=None, sleep=time.
             return 0, e
         if e in ("bloqueado", "falhou"):
             return 1, e
-        if agora() >= limite:
+        t = agora()
+        if e is None and t - inicio >= graca and graca < timeout:
+            return 1, None
+        if t >= limite:
             return RC_TIMEOUT, e
+        if log and t >= proximo:
+            log(f"a esperar {k}: estado {e or 'sem registo'}, {int(t - inicio)}/{timeout}s")
+            proximo = t + heartbeat
         sleep(intervalo)
 
 
@@ -213,14 +226,18 @@ def main(argv=None, diff=None):
         MODELOS = Path(args.modelos)
     try:
         if args.esperar:
-            rc, estado = esperar_estado(slug_de(args.sp), args.timeout)
-            print({0: "revisor done", 1: "revisor bloqueado ou falhou",
+            rc, estado = esperar_estado(slug_de(args.sp), args.timeout,
+                                        log=lambda m: print(m, file=sys.stderr, flush=True))
+            if rc == 1 and estado is None:
+                print(f"revisor sem registo após {SEM_REGISTO_GRACA}s: nenhum painel revisor foi lançado "
+                      "(review --inline não grava estado; --esperar só serve ao painel)", file=sys.stderr)
+            print({0: "revisor done", 1: f"revisor {estado or 'sem registo'}",
                    RC_TIMEOUT: f"timeout ({args.timeout}s, ultimo estado: {estado or 'desconhecido'})"}[rc])
             return rc
         if not args.achados:
             ap.error("indicar --achados (ou --esperar)")
         if args.inline or deve_inline(args.sp):
-            print("review não independente (inline): registar no Report\n")
+            print("review não independente (inline): registar no Report; não usar --esperar (inline não grava estado)\n")
             print(semente(args.sp, args.base, args.cwd, diff, args.checklist, args.rever_so))
             return 0
         data = modelos.load(MODELOS)
