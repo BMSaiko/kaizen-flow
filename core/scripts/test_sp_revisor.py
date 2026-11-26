@@ -336,3 +336,7 @@ def test_lancar_segunda_iteracao_reabre_depois_de_terminar(sp, tmp_path, modelos
     res = sr.lancar(sp, "master", tmp_path / "ach.md", b, cwd=tmp_path, estado_root=root, diff=diff_stub, sleep=lambda s: None)
     assert res["estado"] == "a-correr" and len(b.abertos) == 1
     assert pe.ler(pe.procurar(k, root=root), k, root=root)["estado"] == "a-correr"
+
+
+def test_prompt_revisor_fecha_com_atual():
+    assert "--papel revisor --atual" in sr.prompt("sp/x.md", "s.md", "a.md")

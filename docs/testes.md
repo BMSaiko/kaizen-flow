@@ -60,6 +60,24 @@ Além da cobertura de linhas, o workflow mede a cobertura de casos: `docs/catalo
 
 Correr só estes: `node --test tests/e2e-use-cases.test.js` (cerca de 15 s); um caso: `node --test --test-name-pattern "UC-015" tests/e2e-use-cases.test.js`.
 
+## `kaizen quality` e branch protection
+
+`kaizen quality` (`core/scripts/kf_quality.py`) é o único gate de qualidade: o job `quality` do CI chama só este comando (em PR com `--base origin/<base>`), e localmente corre-se o mesmo antes de abrir o PR. Etapas: lint, ratchet, strict, strict-diff, testes (com cobertura e limiares de `package.json`), protegidos e cobertura-diff; falha (rc 1) em qualquer violação e lista todas as etapas vermelhas. A matriz `test` (Windows/Linux/macOS, Node 18/22, Python 3.10/3.13) continua a correr só os testes.
+
+Branch protection do `main` (GitHub: Settings → Branches → regra para `main`), sem `--admin`:
+- «Require status checks to pass before merging» + «Require branches to be up to date», com os checks `quality` e a matriz `test / test (...)`;
+- «Require a pull request before merging»; «Do not allow bypassing the above settings» (inclui administradores);
+- sem force-push nem apagar o `main`.
+Com a regra ativa, o merge só é possível com `quality` verde: `pr_fechar.py` já não faz merge com CI vermelho.
+
+## Cobertura do diff
+
+O limiar global não diz se as linhas **alteradas** estão testadas. `python core/scripts/sp-cobertura-diff.py --repo . --base main` calcula a cobertura só das linhas adicionadas (mesmo parser de diff do `pentest.py`) a partir de relatórios já gerados (`coverage/lcov.info`, JSON do coverage.py ou `coverage/python.xml` do CI) e sai com rc 1 abaixo de `qualidade.coberturaDiff` (defeito 85, ver `docs/config.md`). Ignora testes, docs, config e linhas não executáveis; ficheiros de código sem dados no relatório são avisados e não contam. Não altera os limiares globais.
+
+## Tipos e complexidade (ratchet)
+
+`python core/scripts/quality-ratchet.py` mede `ruff` (C901 com `max-complexity = 12` em `ruff.toml`, PLR0911/0912/0913/0915) e `mypy` (`mypy.ini`) e compara com `quality-baseline.json` (`{ficheiro: {regra: n}}`). Dívida antiga passa; subir num ficheiro/regra falha (rc 1). `--atualizar` só grava quando desce (ou cria a baseline). Módulos novos: `mypy --strict` (etapas `strict` e `strict-diff` do `kaizen quality`); a etapa `ratchet` corre o ratchet. `ruff`/`mypy` são ferramentas de dev, sem dependência de runtime. `sp-gates.py --sugerir` passa a incluir `ruff`, `mypy` (Python) e `npx tsc --noEmit --strict` (repo TS com `tsconfig.json` sem script `typecheck`).
+
 ## Testes de falha e propriedades
 
 - Fixtures de injeção em `core/scripts/conftest.py`: `relogio` e `tempo_falso` (relógio controlado), `falha_replace` (`os.replace` falha N vezes e depois passa); cada uma tem teste-sentinela.
@@ -96,3 +114,7 @@ Todo o script tem teste dedicado, exceto os da tabela, que têm justificação.
 | `handoff_pane.py` (socket) | `test_handoff_socket.py` (socket do WezTerm morto, painel inexistente; `run` injetado) |
 | `context-guard.py` | hook do vault; o teste (`test_context_guard.py`) fica no vault porque afirma textos em português (ver `SKIP` em `bin/sync.js`) |
 | `wt_redirect.py` | depende de `sb-worktree.py` do vault; o teste (`test_wt_redirect.py`) fica no vault (`SKIP`) |
+
+## Gates de design (`ui: sim`)
+
+`core/scripts/test_ds_gates.py` cobre `ds-lint` (literal detetado, token aceite, ignorados) e `ds-verify` com um browser falso injetado (`runner`): baselines, diff acima do limiar, violações axe, rc 3 sem browser, relatório e registo no SP. Nenhum teste precisa de Playwright nem de rede.

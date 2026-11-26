@@ -14,6 +14,7 @@ rc: 0 movido, 1 erro
 import contextlib
 import argparse
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -93,15 +94,30 @@ def _resolver(root, slug, target, project):
     return matches[0], dups
 
 
+def _remover_dups(sp, dups):
+    """A cópia desatualizada sai sempre, mesmo que o SP já esteja no destino."""
+    for d in dups:
+        if d.path != sp.path and d.path.exists():
+            kaizen_engine.relocate(d.path, d.path.with_suffix(".md.dup"))
+            d.path.with_suffix(".md.dup").unlink()
+
+
+def _registar_metricas(root, dst, project):
+    """Sufixo do resumo; métricas nunca bloqueiam o fecho."""
+    if not sp_metricas:
+        return ""
+    try:
+        return " (+métricas)" if sp_metricas.registar(root, dst, project) else ""
+    except Exception as exc:
+        return f" (métricas falharam: {exc})"
+
+
 def move(root, slug, dest, project=None):
     if dest.lower() not in DESTS:
         raise SpMoveError(f"destino inválido '{dest}' (todo|doing|done)")
     target = DESTS[dest.lower()]
     sp, dups = _resolver(root, slug, target, project)
-    for d in dups:  # a cópia desatualizada sai sempre, mesmo que o SP já esteja no destino
-        if d.path != sp.path and d.path.exists():
-            kaizen_engine.relocate(d.path, d.path.with_suffix(".md.dup"))
-            d.path.with_suffix(".md.dup").unlink()
+    _remover_dups(sp, dups)
     if sp.status == target:
         return f"{slug}: já está em {target} ({sp.path})"
     if target == "Doing":
@@ -125,12 +141,8 @@ def move(root, slug, dest, project=None):
     if target == "Done":
         _agent_claim(slug, target)
     extra = f" (+{n} provas)" if n else ""
-    if target == "Done" and sp_metricas:
-        try:
-            if sp_metricas.registar(root, dst, sp.project):
-                extra += " (+métricas)"
-        except Exception as exc:  # métricas nunca bloqueiam o fecho
-            extra += f" (métricas falharam: {exc})"
+    if target == "Done":
+        extra += _registar_metricas(root, dst, sp.project)
     ctx["path"] = str(dst)
     avisos = "".join(f"\naviso: {w}" for w in kaizen_hooks.fire("sp.moved", ctx, phase="post"))
     return f"{slug}: {sp.status} → {target} ({dst}){extra}{avisos}"
@@ -200,6 +212,56 @@ def avisos_fecho(root, slug, project=None):
     return [f"aviso: o sp-fechar vai exigir {x}" for x in falta]
 
 
+def aviso_diff(root, slug, project=None, run=subprocess.run):
+    """Aviso se o SP tem diff por commitar (a worktree do michi nasce do HEAD e herdaria o SP vazio); [] se limpo, sem git ou sem SP."""
+    achados = sp_list.encontrar(sp_list.collect(root, include_done=True), slug, project)
+    if len(achados) != 1:
+        return []
+    caminho = achados[0].path
+    try:
+        dentro = run(["git", "-C", str(caminho.parent), "rev-parse", "--is-inside-work-tree"], capture_output=True)
+        if dentro.returncode != 0:  # fora de um repo o `git diff` cairia em --no-index
+            return []
+        r = run(["git", "-C", str(caminho.parent), "diff", "--quiet", "HEAD", "--", caminho.name], capture_output=True)
+    except OSError:
+        return []
+    if r.returncode != 1:  # 0 limpo; >1 fora de um repo git ou erro
+        return []
+    rel = caminho.relative_to(root).as_posix() if root and caminho.is_relative_to(Path(root)) else caminho.as_posix()
+    return [f"aviso: o SP {rel} tem alterações por commitar; a worktree do michi nasce do HEAD e herda-o vazio: "
+            f"git add \"{rel}\" && git commit -m 'vault: SP {slug}'"]
+
+
+def _mover_doc(ap, args):
+    """`--tipo dr|dp`: move um DR/DP."""
+    if not args.slug or not args.dest or args.start or args.next or args.project:
+        ap.error("--tipo dr|dp exige <slug> <todo|doing|done> e não aceita --start, --next nem --project")
+    try:
+        print(doc_ops.move(args.root or doc_ops.DEFAULT_ROOT, args.tipo, args.slug, args.dest))
+    except doc_ops.DocMoveError as exc:
+        print(f"erro: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _executar(args):
+    if args.start:
+        if args.dest.lower() != "doing" or args.next:
+            raise SpMoveError("--start não se combina com outro destino nem com --next")
+        avisos_diff = aviso_diff(args.root, args.slug, args.project)  # antes de mover: o caminho é o de TODO
+        print(start(args.root, args.slug, args.project))
+        for linha in avisos_diff:
+            print(linha, file=sys.stderr)
+        for linha in avisos_fecho(args.root, args.slug, args.project):
+            print(linha, file=sys.stderr)
+    elif args.next:
+        if args.dest.lower() != "done":
+            raise SpMoveError(f"--next só se usa com 'done'; corre sp-move.py {args.slug} done --next")
+        print(advance(args.root, args.slug, args.project))
+    else:
+        print(move(args.root, args.slug, args.dest, args.project))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Move um SP entre TODO, Doing e Done")
     ap.add_argument("slug", nargs="?")
@@ -208,18 +270,11 @@ def main(argv=None):
     ap.add_argument("--project")
     ap.add_argument("--next", action="store_true", help="com done: abre o próximo filho elegível do programa")
     ap.add_argument("--start", action="store_true", help="arranque: move o SP e as mães em TODO para Doing")
-    ap.add_argument("--tipo", choices=("sp",) + doc_ops.TYPES, default="sp", help="sp (predefinido) | dr | dp: move um DR/DP")
+    ap.add_argument("--tipo", choices=("sp", *doc_ops.TYPES), default="sp", help="sp (predefinido) | dr | dp: move um DR/DP")
     ap.add_argument("--root", default=None, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     if args.tipo != "sp":
-        if not args.slug or not args.dest or args.start or args.next or args.project:
-            ap.error("--tipo dr|dp exige <slug> <todo|doing|done> e não aceita --start, --next nem --project")
-        try:
-            print(doc_ops.move(args.root or doc_ops.DEFAULT_ROOT, args.tipo, args.slug, args.dest))
-        except doc_ops.DocMoveError as exc:
-            print(f"erro: {exc}", file=sys.stderr)
-            return 1
-        return 0
+        return _mover_doc(ap, args)
     args.root = args.root or str(sp_list.DEFAULT_ROOT)
     if args.slug_opt:
         args.slug, args.dest = args.slug_opt, args.dest or args.slug
@@ -233,18 +288,7 @@ def main(argv=None):
         if rc is not None:
             return rc
     try:
-        if args.start:
-            if args.dest.lower() != "doing" or args.next:
-                raise SpMoveError("--start não se combina com outro destino nem com --next")
-            print(start(args.root, args.slug, args.project))
-            for linha in avisos_fecho(args.root, args.slug, args.project):
-                print(linha, file=sys.stderr)
-        elif args.next:
-            if args.dest.lower() != "done":
-                raise SpMoveError(f"--next só se usa com 'done'; corre sp-move.py {args.slug} done --next")
-            print(advance(args.root, args.slug, args.project))
-        else:
-            print(move(args.root, args.slug, args.dest, args.project))
+        _executar(args)
     except SpMoveError as exc:
         print(f"erro: {exc}", file=sys.stderr)
         return 1
@@ -252,9 +296,6 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")
     sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
     import kf_errlog
     sys.exit(kf_errlog.executar("sp-move", main))

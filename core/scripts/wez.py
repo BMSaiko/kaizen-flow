@@ -11,7 +11,8 @@ import os
 import re
 import shutil
 import subprocess
-import sys as _s, pathlib as _p
+import sys as _s
+import pathlib as _p
 _s.path.insert(0, str(_p.Path(__file__).resolve().parent))
 from painel_backend import run_hidden  # noqa: E402
 import sys
@@ -106,7 +107,7 @@ def resolve_pane(nome, panes=None):
 
 def _cwd(p):
     c = p.get("cwd", "") or ""
-    c = c[len("file://"):] if c.startswith("file://") else c
+    c = c.removeprefix("file://")
     return c[1:] if re.match(r"^/[A-Za-z]:/", c) else c
 
 
@@ -261,8 +262,7 @@ def _ficheiros(raiz):
     out = set()
     for d, dirs, files in os.walk(raiz):
         dirs[:] = [x for x in dirs if x not in CFG_IGNORAR]
-        for f in files:
-            out.add(os.path.relpath(os.path.join(d, f), raiz).replace(os.sep, "/"))
+        out.update(os.path.relpath(os.path.join(d, f), raiz).replace(os.sep, "/") for f in files)
     return out
 
 
@@ -416,6 +416,25 @@ def layouts_dir():
                            or os.path.join(os.path.dirname(os.path.abspath(__file__)), "wez-layouts"))
 
 
+def _validar_split(split, vistos, onde):
+    """Normaliza o `split` de um painel (o primeiro não leva; os outros partem de um painel anterior)."""
+    if not vistos:
+        if split:
+            raise WezError(f"{onde}: o primeiro painel não leva 'split'")
+        return split
+    split = dict(split or {})
+    de = split.get("de", vistos[-1])
+    if de not in vistos:
+        raise WezError(f"{onde}: 'de' = '{de}' não é um painel anterior")
+    d = split.get("dir", "right")
+    if d not in LAYOUT_DIRS:
+        raise WezError(f"{onde}: 'dir' tem de ser um de {', '.join(LAYOUT_DIRS)}")
+    pc = split.get("percent", 50)
+    if not isinstance(pc, int) or isinstance(pc, bool) or not 1 <= pc <= 99:
+        raise WezError(f"{onde}: 'percent' tem de ser inteiro entre 1 e 99")
+    return {"de": de, "dir": d, "percent": pc}
+
+
 def validate_layout(data, nome="layout"):
     """Valida e normaliza um layout; devolve o dict com 'paineis' completos."""
     if not isinstance(data, dict):
@@ -439,22 +458,7 @@ def validate_layout(data, nome="layout"):
         cwd = p.get("cwd")
         if cwd is not None and not isinstance(cwd, str):
             raise WezError(f"{onde}: 'cwd' tem de ser texto")
-        split = p.get("split")
-        if i == 0:
-            if split:
-                raise WezError(f"{onde}: o primeiro painel não leva 'split'")
-        else:
-            split = dict(split or {})
-            de = split.get("de", vistos[-1])
-            if de not in vistos:
-                raise WezError(f"{onde}: 'de' = '{de}' não é um painel anterior")
-            d = split.get("dir", "right")
-            if d not in LAYOUT_DIRS:
-                raise WezError(f"{onde}: 'dir' tem de ser um de {', '.join(LAYOUT_DIRS)}")
-            pc = split.get("percent", 50)
-            if not isinstance(pc, int) or isinstance(pc, bool) or not 1 <= pc <= 99:
-                raise WezError(f"{onde}: 'percent' tem de ser inteiro entre 1 e 99")
-            split = {"de": de, "dir": d, "percent": pc}
+        split = _validar_split(p.get("split"), vistos, onde)
         vistos.append(pn)
         out.append({"nome": pn, "cwd": cwd, "cmd": cmd, "split": split})
     return {"titulo": data.get("titulo") or nome, "descricao": data.get("descricao", ""),
@@ -505,8 +509,7 @@ def open_layout(lay):
             run_cli(["set-tab-title", "--pane-id", ids[p["nome"]], lay["titulo"]])
         else:
             s = p["split"]
-            cmd = ["split-pane", "--pane-id", ids[s["de"]], f"--{s['dir']}",
-                   "--percent", str(s["percent"])] + extra
+            cmd = ["split-pane", "--pane-id", ids[s["de"]], f"--{s['dir']}", "--percent", str(s["percent"]), *extra]
             ids[p["nome"]] = _pid(run_cli(cmd), "split-pane")
     return ids
 

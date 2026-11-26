@@ -5,6 +5,50 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 
 ## [Unreleased]
 
+### Fixed
+- `kaizen sync --from-vault` já não apaga peças de `core/` que o vault não tem nem deixa dados pessoais em `core/`: atualiza só peças existentes nos dois lados (novas com `--only <caminho>`), recusa dados pessoais, árvore suja e o checkout principal, e `--dry-run` lista o que mudaria e as remoções evitadas.
+
+### Added
+- Guarda de casos indesejados `core/scripts/kf_guard.py` (hook PreToolUse do adapter claude e `kf_guard.py diff` como gate): bloqueia, com a razão, alterar ficheiros de `protectedFiles` (`kaizen.config.json`; override só com `KAIZEN_ALLOW_PROTECTED=<razão>`, registado em `~/.claude/kaizen-guard.log`), ler segredos, force-push, `--admin`, merge com CI não verde, tag/publish locais e escrita fora do repo; `test_kf_guard.py` tem um teste por caso.
+- `kaizen quality` (`core/scripts/kf_quality.py`): gate único local e CI (lint, ratchet, mypy strict, testes com cobertura, guarda de testes protegidos, cobertura do diff); o CI passa a ter um só job `quality` (substitui `lint`, `typecheck`, `quality` e `coverage`) e a branch protection do `main` está documentada em `docs/testes.md`.
+- Skills `resume` (`/resume`: `kaizen resume [slug] [--from FASE]`, `--restart` só com confirmação) e `preflight` (`/preflight`: ler primeiro, `--fix` um comando seguro de cada vez), instaladas por todos os adapters (UC-046, UC-047).
+- Skills `vision` (`/vision`: `kaizen vision init|validate|resumo|decompor` com aprovação do resumo antes de decompor) e `release` (`/release`: `kf_release.py plan|prepare`, merge por `kf-ship`, `publish --confirmo` só com o «sim» humano), instaladas por todos os harnesses e sincronizadas para o vault; a pausa `release` da factory aponta para a skill.
+- Release assistida: `kf_release.py plan|prepare|publish` (bump semver pelos commits convencionais, CHANGELOG `[Unreleased]` -> `[x.y.z]`, branch `agent/release-x-y-z`, gates e PR sem merge); `publish` só com `--confirmo` e só empurra a tag (nunca reescreve tags, o npm publish fica no workflow); a factory pausa no marco com release e aponta para ele.
+- Skill `kf-ship` (`/kf-ship`): leva o ramo ao merge com guarda «testes como contrato» (`core/scripts/kf_ship_testes_guard.py`: teste apagado ou com menos asserts = rc 1, sem testes = rc 3), review-ciclo, PR reutilizado ou aberto por `pr-fase` e merge por `pr_fechar` só com verde e método `worktree-pr`.
+- `kaizen factory run|status|stop <projeto>` (`core/scripts/kf_factory.py`, `/factory`): loop autónomo VISION -> backlog -> fila -> gates -> merge (só CI verde) -> reflect, com orçamento, pausas limpas, retoma e lock por projeto.
+- Gates de design para SPs `ui: sim`: `ds-lint.py` (literais de cor/espaçamento/tipografia fora dos tokens, `ficheiro:linha`) e `ds-verify.py` (axe WCAG 2.2 AA, screenshots em 3 breakpoints vs `design/baselines/`, orçamento Lighthouse opcional; rc 3 sem browser, nunca verde); `sp-gates --repo` injeta-os só com `ui: sim`; `kaizen ds lint|verify`.
+- Perfil `qualidade` em `kaizen.config.json` (`bloqueantes`, `consultivos`, `fases`): `sp-gates --repo` junta-o aos gates do SP (consultivos só registam), `sp-gates --perfil` sugere-o por tipo de repo e `pr_fechar` não faz merge com gate bloqueante vermelho nem sem pentest/review verdes (SP `bloqueado` com motivo).
+- Ratchet de tipos e complexidade: `quality-ratchet.py` (ruff C901/PLR + mypy vs `quality-baseline.json`), `mypy.ini`, `max-complexity = 12`, jobs CI `quality` e `typecheck`; `sp-gates.py --sugerir` inclui `ruff`, `mypy` e `tsc --noEmit --strict`
+
+### Fixed
+- `handoff --spawn` (herdr) confirma a submissão: se o `agent prompt` deixar o `/michi` no prompt sem Enter, repete o Enter e falha com erro claro se nunca submeter.
+
+## [0.4.0] - 2026-11-23
+
+### Added
+- Motor herdr do `sp-fila`: núcleo sobre herdr (`--motor herdr`, subcomandos, retoma), vigia por eventos com metadata «fila n/N · vagas» (sem toasts nem prefixos) e e2e real em sessão isolada (2 projetos, 3 painéis, retoma).
+- `herdr_ops` como único sítio da CLI herdr (`HerdrBackend` delega); spike `agent start/prompt/wait`.
+- O motor herdr passa a defeito no `sp-fila`; o antigo fica como fallback (`--motor antigo`). `sp-fila` corre só em painel (sem ramo sequencial nem limite por orçamento).
+- `sp-handoff --spawn` usa `herdr_ops` (agente + prompt); docs do `/sp-fila` herdr-first.
+- `sync`: pastas em `dirs` no manifesto e `fakeVault` gerado dele; `avisos_caixa`, aviso do `sp-autor` e vigia por pasta da fila trazidos do vault.
+
+### Changed
+- Simplificação: `a + [b]` passa a `[*a, b]` (RUF005) e variáveis desempacotadas por usar levam `_` (RUF059); sem mudança de comportamento.
+- Refactor sem mudança de comportamento: `main`/funções longas divididas em passos nomeados em `sp-handoff`, `sp-fila`, `sp-new`, `sp-move`, `sp-fechar`, `sp-resume`, `sp-preflight`, `sp-provas`, `sp-validate`, `sp-organize`, `sp_fila_execucao`, `kf_catalogo` e `wez` (menos avisos ruff PLR0912/PLR0915).
+- Simplificações do `ruff` (`removeprefix`, variáveis por usar, espaços e linhas em branco).
+- Removidos `sp-rever` e `sp_veredicto`; `sp-autor` e `sp-revisor` sincronizados com o vault; 5 exports sem uso tirados.
+- Testes: `BIN` e `kaizen()` partilhados em `helpers/sandbox.js`, corrida de lock sem sleep, timeouts de 0,3 s nos gates.
+- CI: `push` só em `main`, PRs correm uma vez, cancela corrida anterior, `audit` antes do PR; job `lint` com `ruff.toml`.
+- CI: a combinação ubuntu/node 22/python 3.13 deixa a matriz `test` (já corre no job `coverage`).
+
+### Fixed
+- `handoff --spawn` repete o prompt até o agente ser detetado; o handoff espera que o painel fique livre antes de escrever `/clear`, ignora a sugestão «Try» do prompt vazio e regista erros do envio.
+- Vigia usa o estado da fila-mãe, não o `fila.json` dos painéis; `sp-fila` sequencial com worktree e vigia; `--parar` limpa filas órfãs.
+- Loops só afetam a sessão dona (`session_id` + `CLAUDE_PID`).
+- `sync`: limites de palavra nas regras do `agentSlug`; testes de JSON inválido; portar peças do vault e ponto único de processos.
+- Testes: temporários por execução em pasta própria (`/tmp` esgotava os inodes), `loadCore` ignora caches, EC-043 tolera leitura corrompida transitória no Windows.
+- `SECURITY.md` e `.github/workflows/ci.yml` estavam em ISO-8859-1; passam a UTF-8.
+
 ## [0.3.0] - 2026-11-19
 
 ### Added
@@ -67,7 +111,8 @@ Primeira release do kaizen-flow (histórico desde 2026-10-22).
 - Testes e caminhos POSIX independentes do ambiente e do WezTerm no CI.
 - `sync` copia as fixtures do `sp-fila`; fixture sem literais de caminho Windows.
 
-[Unreleased]: https://github.com/BMSaiko/kaizen-flow/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/BMSaiko/kaizen-flow/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/BMSaiko/kaizen-flow/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/BMSaiko/kaizen-flow/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/BMSaiko/kaizen-flow/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/BMSaiko/kaizen-flow/compare/v0.1.0...v0.1.1

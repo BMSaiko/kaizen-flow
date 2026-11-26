@@ -11,16 +11,17 @@ rc: n/a
 import abc
 import json
 import os
-import shlex
 import shutil
 import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sp_disco import ler_json  # noqa: E402
+import herdr_ops  # noqa: E402
 import contextlib
 
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -48,13 +49,13 @@ _FLAGS = {
 }
 
 
-def run_hidden(*args, **kwargs):
+def run_hidden(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[Any]:
     """Único sítio que corre `subprocess.run` sem abrir janela de consola no Windows."""
     kwargs.setdefault("creationflags", NO_WINDOW)
     return subprocess.run(*args, **kwargs)
 
 
-def run_visivel(*args, **kwargs):
+def run_visivel(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[Any]:
     """Único sítio que corre `subprocess.run` herdando a consola (CLI interativa: o filho escreve no terminal do utilizador)."""
     return subprocess.run(*args, **kwargs)
 
@@ -252,75 +253,34 @@ class HerdrBackend(_Multiplexer):
         self.max_panes = max_panes
         self.workspace_por_projeto = workspace_por_projeto
 
+    @property
+    def _ops(self):
+        """HerdrOps sobre o `run` atual (o único sítio que fala com a CLI herdr)."""
+        return herdr_ops.HerdrOps(run=self.run)
+
     def _json(self, argv):
-        try:
-            d = json.loads(self.run(["herdr", *argv], capture_output=True, text=True, encoding="utf-8").stdout or "{}")
-        except (OSError, ValueError, subprocess.SubprocessError):
-            return {}
-        return d.get("result") or {}
+        return self._ops.json(argv)
 
     def _paineis(self):
-        return self._json(["pane", "list"]).get("panes") or []
+        return self._ops.paineis()
 
     def _panes_da_tab(self, origem):
         """(nº de panes na tab do pane `origem`, workspace) ou (None, None) se a origem não aparece em `pane list`."""
-        paineis = self._paineis()
-        o = next((p for p in paineis if p.get("pane_id") == origem), None)
-        if not o or not o.get("tab_id"):
-            return None, None
-        return sum(1 for p in paineis if p.get("tab_id") == o["tab_id"]), o.get("workspace_id")
+        return self._ops.panes_da_tab(origem)
 
-    @staticmethod
-    def _repo_do_projeto(projeto):
-        """Repo de código do `projeto` (campo `project:` do SP): `<SB_CODE_ROOT, defeito ~/Documents/code>/<projeto>` se for um diretório; senão None (workspace do repo de `cwd`, o vault)."""
-        if not projeto or "/" in projeto or projeto.startswith("."):
-            return None
-        raiz = Path(os.environ.get("SB_CODE_ROOT", "").strip() or "~/Documents/code").expanduser() / projeto
-        return str(raiz) if raiz.is_dir() else None
-
-    @staticmethod
-    def _raiz_repo(cwd):
-        """Raiz do repo principal de `cwd` (uma worktree resolve para o checkout principal via --git-common-dir); None fora de um repo."""
-        try:
-            r = subprocess.run(["git", "-C", str(cwd), "rev-parse", "--path-format=absolute", "--git-common-dir"],
-                               capture_output=True, text=True, encoding="utf-8", timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            return None
-        comum = (r.stdout or "").strip()
-        if r.returncode != 0 or not comum:
-            return None
-        return os.path.dirname(comum.rstrip("/")) if os.path.basename(comum.rstrip("/")) == ".git" else comum
+    _repo_do_projeto = staticmethod(herdr_ops.HerdrOps.repo_do_projeto)
+    _raiz_repo = staticmethod(herdr_ops.HerdrOps.raiz_repo)
 
     def _workspace_para(self, cwd, projeto=None):
-        """(workspace_id, root_pane ou None) do projeto de `cwd`: reutiliza o workspace com label = nome do repo
-        (`workspace list`) ou cria-o (`workspace create --cwd <raiz> --label <nome>`, devolvendo o root pane novo).
-        (None, None) se o herdr não responde: `abrir` cai no comportamento anterior."""
-        raiz = self._repo_do_projeto(projeto) or self._raiz_repo(cwd) or str(cwd)
-        nome = os.path.basename(raiz.rstrip("/")) or raiz
-        ws = next((w.get("workspace_id") for w in self._json(["workspace", "list"]).get("workspaces") or []
-                   if w.get("label") == nome and w.get("workspace_id")), None)
-        if ws:
-            return ws, None
-        res = self._json(["workspace", "create", "--cwd", raiz, "--label", nome, "--no-focus"])
-        return (res.get("workspace") or {}).get("workspace_id"), (res.get("root_pane") or {}).get("pane_id")
+        """(workspace_id, root_pane ou None) do projeto de `cwd`; ver `HerdrOps.workspace_para`."""
+        return self._ops.workspace_para(cwd, projeto)
 
     def abrir(self, cmd, cwd, projeto=None):
-        origem = os.environ.get("HERDR_PANE_ID")
-        n, ws_origem = self._panes_da_tab(origem) if origem else (None, None)
-        ws, pane = self._workspace_para(cwd, projeto) if self.workspace_por_projeto else (None, None)
-        if pane:  # workspace acabado de criar: o seu root pane é o painel novo
-            pass
-        elif n is not None and n < self.max_panes and (ws is None or ws == ws_origem):  # só divide dentro do workspace do projeto
-            res = self._json(["pane", "split", origem, "--direction", "right", "--cwd", str(cwd), "--no-focus"])
-            pane = (res.get("pane") or {}).get("pane_id")
-        else:  # tab cheia, origem noutro workspace, desconhecida ou fora do herdr: tab nova no workspace do projeto
-            ws = ws or ws_origem
-            res = self._json(["tab", "create", *(["--workspace", ws] if ws else []), "--cwd", str(cwd), "--no-focus"])
-            pane = (res.get("root_pane") or {}).get("pane_id")
+        ops = self._ops
+        pane = ops.painel_novo(cwd, projeto, self.max_panes, self.workspace_por_projeto, os.environ.get("HERDR_PANE_ID"))
         if not pane:
             raise BackendError("herdr não devolveu o id do painel novo (o servidor está a correr? `herdr status`)")
-        # `exec`: o painel fecha quando o comando acaba, como no tmux split-window
-        self._out(["herdr", "pane", "run", pane, "exec " + shlex.join(str(c) for c in cmd)])
+        ops.correr(pane, cmd)
         return pane
 
     def listar(self):

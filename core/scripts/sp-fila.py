@@ -11,12 +11,15 @@ Uso:
   python -I scripts/sp-fila.py --ajuda      # regras do agente principal no modo paralelo
   python -I scripts/sp-fila.py --programa <slug-mãe> [--max N]   # só a árvore da mãe; orçamento lido dela
   python -I scripts/sp-fila.py --seguinte [--slug S]   # no fecho de cada SP da fila: regista e lança o seguinte
+  python -I scripts/sp-fila.py --seguinte --retomar   # retoma a fila pausada por `orcamento` (kaizen.config.json) depois de subir o teto
   python -I scripts/sp-fila.py --gastos     # custo USD por sessão da corrida (só medição)
   python -I scripts/sp-fila.py --parar       # abandona a fila (apaga o estado)
 
 O estado vive em `~/.claude/sp-fila-estado.json` (uma entrada por sessão em `sessoes`, escrita atómica e
 bloqueio `.lock`; o formato antigo com `lancado` migra sozinho); no fim (fila vazia, limite ou erro) escreve o
-relatório em `knowledge/infra/reports/sp-fila/` e apaga o estado. Um SP lançado que não chegou a Done
+relatório em `knowledge/infra/reports/sp-fila/` e apaga o estado. Ao arrancar, um estado obsoleto (sem data
+legível ou com mais de 60 min, sem SP em Doing nem vigia vivo) é arquivado em `obsoletas/` ao lado do estado,
+com um aviso; fila viva ou JSON ilegível (EC-045) nunca são tocados. Um SP lançado que não chegou a Done
 conta como falhado: os dependentes ficam de fora e só continuam os independentes.
 
 Orçamento por programa: o SP-mãe pode ter `orcamento_horas`, `orcamento_usd`, `orcamento_requests` no
@@ -34,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # Módulos irmãos (a CLI e os testes continuam a ver tudo aqui): estado, plano, relatório, execução, painéis.
 from sp_fila_estado import (MAX_DEFEITO, MAX_FALHAS_DEFEITO, ORCAMENTO, REQ_POR_SP, RELATORIOS, ESTADO, USER,  # noqa: E402,F401
                             atualizar, bloqueio, guardar, ler, migrar, run_hidden)
-from sp_fila_plano import descendentes, limite, load, plan, render_plan, sem_commit, sp_list  # noqa: E402,F401
+from sp_fila_plano import descendentes, limite_paralelo, load, plan, render_plan, sem_commit, sp_list  # noqa: E402,F401
 from sp_fila_relatorio import gastos, relatorio, render_gastos  # noqa: E402,F401
 from sp_fila_execucao import (_custos, _ler_sp,  # noqa: E402,F401
                               seguinte, IntegracaoPendente, SlugObrigatorio)
@@ -43,8 +46,14 @@ from sp_fila_estado import estado_de  # noqa: E402
 import sp_fila_execucao  # noqa: E402
 import sp_fila_paineis  # noqa: E402
 import sp_vigia  # noqa: E402
+import sp_fila_nucleo as nucleo  # noqa: E402
 import kf_erros  # noqa: E402
+import kaizen_config  # noqa: E402
+from sp_fila_estado import REPO  # noqa: E402
 import contextlib
+import time
+
+ORFA_MIN = 10  # fila sem vigia.pid mais nova do que isto: arranque a meio, não é órfã
 
 
 def _erro(ec, oque, porque, estado, proximo):
@@ -121,24 +130,58 @@ def _limpar_paineis(fid):
         print(f"aviso: fila de painéis {fid} não removida: {e}", file=sys.stderr)
 
 
-def abandonar_obsoleta(estado, atual, motivo, args, entrada=input, tty=None):
-    """Propõe abandonar a fila obsoleta e, confirmado, apaga o estado. True = abandonada."""
-    print(f"fila obsoleta ({estado}): {motivo}", file=sys.stderr)
-    tty = sys.stdin.isatty() if tty is None else tty
-    ok = args.abandonar_obsoleta
-    if not ok and tty:
-        try:  # no Windows, stdin em NUL diz isatty() True e o input() dá EOF: vale como «não»
-            ok = entrada("abandonar e arrancar uma nova? [s/N] ").strip().lower() in ("s", "sim", "y", "yes")
-        except EOFError:
-            ok = False
-    if not ok:
-        _erro("EC-038", "fila obsoleta por abandonar", motivo, "fila intacta",
-              "repetir com `--abandonar-obsoleta` (ou `--parar`)")
+def filas_orfas(root=None):
+    """Filas de painéis sem programa (`fila-*`) com o vigia morto: ninguém as fecha e o arranque seguinte reata-as.
+
+    Ficam intactas: filas de outros donos (mães, `sp-autor`), com vigia vivo ou ilegível, com SP ativo
+    (`a-correr`/`pergunta`) e filas sem `vigia.pid` criadas há menos de `ORFA_MIN` min (arranque a meio)."""
+    pe = sp_fila_paineis.pe
+    r = pe.raiz(root)
+    out = []
+    for d in sorted(r.glob("fila-*/fila.json")) if r.is_dir() else []:
+        fid = d.parent.name
+        if vigia_vivo({"fila_paineis": fid}, root=root):
+            continue
+        try:
+            if any(sp.get("estado") in pe.ATIVOS for sp in pe.ler(fid, root=root)["sps"].values()):
+                continue
+            if not sp_vigia.caminhos(d.parent)[0].exists() and time.time() - d.stat().st_mtime < ORFA_MIN * 60:
+                continue
+        except Exception:  # noqa: BLE001  # fila ilegível: dúvida = viva
+            continue
+        out.append(fid)
+    return out
+
+
+def vigia_vivo(atual, root=None):
+    """True se o vigia da fila de painéis do estado vive ou se não dá para saber (dúvida = fila viva)."""
+    fid = (atual or {}).get("fila_paineis")
+    if not fid:
         return False
+    try:
+        pidfile = sp_vigia.caminhos(sp_fila_paineis.pe.raiz(root) / fid)[0]
+        if not Path(pidfile).exists():
+            return False
+        return bool(sp_fila_paineis.pe.pid_vivo(int(Path(pidfile).read_text(encoding="utf-8").strip())))
+    except Exception:  # noqa: BLE001  # pidfile ilegível ou pid_vivo a falhar: tratar como viva
+        return True
+
+
+def arquivar_obsoleta(estado, atual, motivo, agora=None):
+    """Arquiva o estado obsoleto em `<pasta>/obsoletas/<AAAAMMDD-HHMMSS>.json` (nada se perde) e devolve o arquivo.
+
+    Antes pára o vigia e remove a fila de painéis; se isso falhar só avisa. Sem pergunta: arranque sem TTY."""
     _limpar_paineis((atual or {}).get("fila_paineis"))  # sem isto o vigia velho fecha a fila nova com o mesmo id
-    estado.unlink(missing_ok=True)
-    print("fila obsoleta abandonada")
-    return True
+    pasta = Path(estado).parent / "obsoletas"
+    pasta.mkdir(parents=True, exist_ok=True)
+    destino = pasta / f"{(agora or datetime.now()).strftime('%Y%m%d-%H%M%S')}.json"
+    n = 1
+    while destino.exists():
+        destino = destino.with_name(f"{destino.stem.split('_')[0]}_{n}.json")
+        n += 1
+    Path(estado).replace(destino)
+    print(f"fila obsoleta arquivada: {motivo} → {destino}", file=sys.stderr)
+    return destino
 
 
 def _arrancar_vigia(estado):
@@ -164,7 +207,7 @@ def _arrancar_vigia(estado):
 
 def _parser():
     ap = argparse.ArgumentParser(description="Fila autónoma de SPs")
-    ap.add_argument("--abandonar-obsoleta", action="store_true", help="ao arrancar: abandona sem perguntar uma fila obsoleta (arrancada há mais de 60 min e nenhum SP em Doing); fila viva nunca é tocada")
+    ap.add_argument("--abandonar-obsoleta", action="store_true", help="compatibilidade (no-op): a fila obsoleta (sem data legível ou arrancada há mais de 60 min, sem SP em Doing nem vigia vivo) é arquivada sempre em `obsoletas/`; fila viva nunca é tocada")
     ap.add_argument("--dry-run", action="store_true", help="mostra a ordem e as exclusões, sem lançar")
     ap.add_argument("--seguinte", action="store_true", help="no fecho de um SP da fila: regista e lança o seguinte")
     ap.add_argument("--slug", help="com --seguinte: o SP que fechou (só essa sessão; sem ele fecham todas)")
@@ -174,9 +217,11 @@ def _parser():
     ap.add_argument("--max", type=int, default=None, help=f"nº máximo de SPs (defeito {MAX_DEFEITO}; em --concorrencia só conta se passado)")
     ap.add_argument("--ate", metavar="HH:MM", help="hora limite")
     ap.add_argument("--concorrencia", type=int, metavar="N", help="modo paralelo (N=1 também): abre até N painéis `claude`, cada um com a sua worktree e o modelo do SP; sem limite de quota")
+    ap.add_argument("--retomar", action="store_true", help="com `--seguinte`: retoma a fila pausada por orçamento (relê `orcamento` do kaizen.config.json)")
     ap.add_argument("--orcamento", type=int, default=ORCAMENTO, help=f"teto opcional de requests totais; cada SP gasta {REQ_POR_SP} (sem ele, sem limite)")
     ap.add_argument("--max-falhas", type=int, default=MAX_FALHAS_DEFEITO, metavar="N", help=f"para a fila após N SPs falhados seguidos (defeito {MAX_FALHAS_DEFEITO}; 0 = sem este limite)")
     ap.add_argument("--projeto")
+    ap.add_argument("--motor", choices=nucleo.MOTORES, default=nucleo.motor_defeito(), help="motor de painéis: `herdr` (defeito se o CLI existir) ou `antigo` (fallback: WezTerm/tmux/background da config)")
     ap.add_argument("--programa", metavar="SLUG", help="só a árvore deste SP-mãe; orçamento lido do frontmatter dela")
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
     ap.add_argument("--estado", default=str(ESTADO), help=argparse.SUPPRESS)
@@ -197,6 +242,19 @@ def _concorrencia_invalida(args):
     return False
 
 
+def _dry_obsoleta(estado, items):
+    """`--dry-run`: diz se o arranque arquivaria um estado obsoleto, sem lhe tocar."""
+    if not estado.exists():
+        return
+    try:
+        atual = ler(estado)
+        motivo = fila_obsoleta(atual, items, datetime.now())
+    except ValueError:
+        return
+    if motivo and not vigia_vivo(atual):
+        print(f"arquivaria a fila obsoleta ({estado}): {motivo}")
+
+
 def _cmd_parar(args, estado):
     """`--parar`: abandona a fila."""
     fid = None
@@ -207,6 +265,9 @@ def _cmd_parar(args, estado):
     except ValueError:  # corrompido: abandonar na mesma
         pass
     _limpar_paineis(fid)
+    for orfa in filas_orfas():
+        print(f"fila de painéis órfã removida: {orfa}")
+        _limpar_paineis(orfa)
     estado.unlink(missing_ok=True)
     print("fila abandonada")
     return 0
@@ -233,8 +294,9 @@ def _novo_estado(args, mae, modo, so):
     def num(k):
         return float(fm[k]) if fm.get(k) not in (None, "") else None
     usd = num("orcamento_usd")
+    orcamento_cfg = kaizen_config.orcamento(REPO)  # `orcamento` do kaizen.config.json: pausa em vez de fechar por falhas
     novo = {"max": args.max, "concorrencia": max(1, args.concorrencia or 0) if args.concorrencia else None, "ate": args.ate, "orcamento": int(num("orcamento_requests") or args.orcamento or 0) or None,
-            "max_falhas": max(0, args.max_falhas), "seguidas": 0, "usados": 0, "modo": modo, "feitos": [], "falhados": [], "sessoes": {}, "projeto": args.projeto,
+            "max_falhas": 0 if orcamento_cfg else max(0, args.max_falhas), "orcamento_cfg": orcamento_cfg, "seguidas": 0, "usados": 0, "modo": modo, "feitos": [], "falhados": [], "sessoes": {}, "projeto": args.projeto,
             "programa": args.programa, "horas": num("orcamento_horas"), "usd": usd,
             "inicio": datetime.now().isoformat(timespec="seconds")}
     if usd is not None:
@@ -256,6 +318,8 @@ def _imprimir(out, estado):
             _arrancar_vigia(estado)
         else:
             print(f"lançado · {', '.join(out['slugs'])} · terminar o turno")
+    elif out["acao"] == "pausa":
+        print(f"fila em pausa (orçamento): {out['razao']}\nsubir o teto em kaizen.config.json e `sp-fila.py --seguinte --retomar`")
     else:
         print(f"fila terminada: {out['motivo']}\nrelatório: {out['relatorio']}")
         if out.get("fechar_mae"):
@@ -263,57 +327,21 @@ def _imprimir(out, estado):
             print(f"fechar-mae: {m} · `sb-worktree.py ensure {m}` → `sp-move.py {m} done` → commit → `sb-worktree.py merge {m}`")
 
 
-def main(argv=None):
-    args = _parser().parse_args(argv)
-    max_dado = args.max
-    if args.max is None and not args.concorrencia:
-        args.max = MAX_DEFEITO  # em paralelo None = sem máximo
-    estado = Path(args.estado)
-    if args.estado == str(ESTADO):  # defeito: o estado é da mãe (`--programa`) ou onde está o SP (`--seguinte --slug`)
-        if args.programa:
-            estado = estado_de(args.programa)
-        elif args.seguinte or args.gastos or args.parar:
-            estado = sp_fila_estado.localizar(args.slug) or estado
-    if _concorrencia_invalida(args):
-        return 1
+def _cmd_dry_run(args, items, so, estado):
+    """`--dry-run`: mostra o plano, os painéis previstos e os limites, sem criar estado."""
+    _dry_obsoleta(estado, items)
+    fila, excluidos = plan(items, args.max, so, sem_commit(items))
+    print(render_plan(fila, excluidos))
+    if args.concorrencia:  # o que o lançador de painéis abriria (slug · modelo · worktree), sem abrir nada
+        print("Painéis previstos:")
+        print(sp_fila_paineis.render_dry_run(sp_fila_paineis.plano_dry_run(fila, maximo=args.concorrencia)))
+    print(f"Limites: máx {args.max or 'sem'} SPs · {args.max_falhas or 'sem'} falhas seguidas · "
+          f"{'até ' + args.ate if args.ate else 'sem hora limite'} · {args.orcamento or 'sem'} requests")
+    return 0
 
-    if args.ajuda:
-        print(AJUDA)
-        return 0
-    if args.parar:
-        return _cmd_parar(args, estado)
-    if args.gastos:
-        return _cmd_gastos(args, estado)
-    items = load(args.root, args.projeto)
-    mae = None
-    if args.programa:
-        mae = next(((sp, fm) for sp, fm in items if sp.slug == args.programa), None)
-        if mae is None:
-            _erro("EC-067", f"SP-mãe desconhecido: {args.programa}", "nenhum SP em TODO/Doing tem esse slug", "nada alterado",
-                  "`sp-list.py` para ver os slugs")
-            return 1
-        args.projeto = mae[0].project
-        items = load(args.root, args.projeto)
-    modo = None
-    if mae and not args.dry_run and not args.seguinte:  # o modo é da mãe (`execucao:`), nunca escolhido pela fila
-        modo = str(mae[1].get("execucao") or "").strip()
-        if modo not in MODOS:
-            _erro("EC-067", f"modo por escolher: sp-execucao.py {args.programa} sequencial|paralelo",
-                  "o modo da fila é da mãe (`execucao:`), nunca escolhido pela fila", "nada alterado",
-                  f"`python -I scripts/sp-execucao.py {args.programa} sequencial|paralelo`")
-            return 1
-        args.concorrencia = 1 if modo == "sequencial" else min(args.concorrencia or MAX_PARALELO, MAX_PARALELO)
-        args.max = max_dado
-    so = descendentes(items, args.programa) if args.programa else None
-    if args.dry_run:
-        fila, excluidos = plan(items, args.max, so, sem_commit(items))
-        print(render_plan(fila, excluidos))
-        if args.concorrencia:  # o que o lançador de painéis abriria (slug · modelo · worktree), sem abrir nada
-            print("Painéis previstos:")
-            print(sp_fila_paineis.render_dry_run(sp_fila_paineis.plano_dry_run(fila, maximo=args.concorrencia)))
-        print(f"Limites: máx {args.max or 'sem'} SPs · {args.max_falhas or 'sem'} falhas seguidas · "
-              f"{'até ' + args.ate if args.ate else 'sem hora limite'} · {args.orcamento or 'sem'} requests")
-        return 0
+
+def _preparar_estado(args, estado, mae, modo, so):
+    """`--seguinte` exige fila em curso; senão cria o estado novo. Devolve o rc se não pode avançar, ou None."""
     if args.seguinte:
         if not estado.exists():
             _erro("EC-067", "sem fila em curso", "`--seguinte` só continua uma fila arrancada", "nada alterado",
@@ -322,14 +350,12 @@ def main(argv=None):
     else:
         if estado.exists():
             try:
-                atual, motivo = ler(estado), None
+                atual = ler(estado)
                 motivo = fila_obsoleta(atual, load(args.root, None), datetime.now())
             except ValueError:  # ilegível: o user decide com `--parar`
                 atual = motivo = None
-            if motivo and abandonar_obsoleta(estado, atual, motivo, args):
-                pass
-            elif motivo:
-                return 1
+            if motivo and not vigia_vivo(atual):
+                arquivar_obsoleta(estado, atual, motivo)
         if estado.exists():
             with contextlib.suppress(ValueError):
                 print(_resumo_antigo(estado, args), file=sys.stderr)
@@ -343,8 +369,46 @@ def main(argv=None):
         estado.parent.mkdir(parents=True, exist_ok=True)
         novo = _novo_estado(args, mae, modo, so)
         guardar(estado, novo)
+    return None
+
+
+def _resolver_programa(args, max_dado):
+    """Carrega os SPs e, com `--programa`, a mãe e o modo da fila (`execucao:`). Devolve (items, mae, modo, rc); rc != None = erro."""
+    items = load(args.root, args.projeto)
+    mae = modo = None
+    if args.programa:
+        mae = next(((sp, fm) for sp, fm in items if sp.slug == args.programa), None)
+        if mae is None:
+            _erro("EC-067", f"SP-mãe desconhecido: {args.programa}", "nenhum SP em TODO/Doing tem esse slug", "nada alterado",
+                  "`sp-list.py` para ver os slugs")
+            return items, mae, modo, 1
+        args.projeto = mae[0].project
+        items = load(args.root, args.projeto)
+    if mae and not args.dry_run and not args.seguinte:  # o modo é da mãe (`execucao:`), nunca escolhido pela fila
+        modo = str(mae[1].get("execucao") or "").strip()
+        if modo not in MODOS:
+            _erro("EC-067", f"modo por escolher: sp-execucao.py {args.programa} sequencial|paralelo",
+                  "o modo da fila é da mãe (`execucao:`), nunca escolhido pela fila", "nada alterado",
+                  f"`python -I scripts/sp-execucao.py {args.programa} sequencial|paralelo`")
+            return items, mae, modo, 1
+        args.concorrencia = 1 if modo == "sequencial" else min(args.concorrencia or MAX_PARALELO, MAX_PARALELO)
+        args.max = max_dado
+    return items, mae, modo, None
+
+
+def _estado_path(args):
+    estado = Path(args.estado)
+    if args.estado == str(ESTADO):  # defeito: o estado é da mãe (`--programa`) ou onde está o SP (`--seguinte --slug`)
+        if args.programa:
+            estado = estado_de(args.programa)
+        elif args.seguinte or args.gastos or args.parar:
+            estado = sp_fila_estado.localizar(args.slug) or estado
+    return estado
+
+
+def _cmd_seguinte(args, estado):
     try:
-        out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug)
+        out = seguinte(args.root, estado, Path(args.relatorios), slug=args.slug, retomar=args.retomar, **({'run': nucleo.RUN} if nucleo.RUN else {}))
     except (IntegracaoPendente, SlugObrigatorio) as e:
         _erro("EC-067", str(e), "o pedido à fila não pode avançar assim", "estado da fila intacto",
               "seguir a indicação acima e repetir `--seguinte`")
@@ -360,10 +424,87 @@ def main(argv=None):
     return 0
 
 
+def _cmd_resume(argv):
+    """`resume`: reconcilia a fila com os painéis vivos do herdr e relança o vigia (idempotente)."""
+    ap = argparse.ArgumentParser(prog="sp-fila resume")
+    ap.add_argument("--estado", default=str(ESTADO))
+    ap.add_argument("--programa", metavar="SLUG")
+    ap.add_argument("--slug")
+    a = ap.parse_args(argv)
+    estado = Path(a.estado)
+    if a.estado == str(ESTADO):
+        estado = estado_de(a.programa) if a.programa else (sp_fila_estado.localizar(a.slug) or estado)
+    if not estado.exists():
+        _erro("EC-067", "sem fila em curso", "`resume` só retoma uma fila arrancada", "nada alterado", "arrancar com `sp-fila.py run`")
+        return 1
+    try:
+        with bloqueio(estado):
+            atual = ler(estado)
+            out = nucleo.retomar(atual)
+            guardar(estado, atual)
+    except ValueError as e:
+        _erro("EC-045", f"estado da fila ilegível ({estado}): {e}", "o JSON da fila está truncado", "ficheiro intacto", "`sp-fila.py stop` abandona")
+        return 1
+    except TimeoutError as e:
+        _erro("EC-042", str(e), "outro processo tem o lock da fila", "estado intacto", "repetir `resume`")
+        return 1
+    print(f"retoma · adotados: {', '.join(out['adotados']) or '-'} · mortos: {', '.join(out['mortos']) or '-'}")
+    _arrancar_vigia(estado)
+    return 0
+
+
+def _cmd_status():
+    """`status`: filas de painéis e o estado de cada SP (só leitura)."""
+    filas = sp_fila_paineis.pe.filas()
+    if not filas:
+        print("sem filas de painéis")
+    for f in filas:
+        print(f"fila {f['fila']} · {f.get('programa') or '-'}")
+        for sp in f["sps"]:
+            print(f"  {sp.get('slug', '?')} · {sp.get('estado', '?')}")
+    return 0
+
+
+def main(argv=None):
+    sub, resto = nucleo.traduzir(sys.argv[1:] if argv is None else argv)
+    if sub == "resume":
+        return _cmd_resume(resto)
+    if sub == "status":
+        return _cmd_status()
+    if sub == "watch":
+        import sp_fila_vigiar
+        return sp_fila_vigiar.main(resto)
+    args = _parser().parse_args(resto)
+    nucleo.MOTOR_ATUAL = args.motor
+    max_dado = args.max
+    if args.max is None and not args.concorrencia:
+        args.max = MAX_DEFEITO  # em paralelo None = sem máximo
+    estado = _estado_path(args)
+    if _concorrencia_invalida(args):
+        return 1
+
+    if args.ajuda:
+        print(AJUDA)
+        return 0
+    if args.parar:
+        return _cmd_parar(args, estado)
+    if args.gastos:
+        return _cmd_gastos(args, estado)
+    items, mae, modo, rc = _resolver_programa(args, max_dado)
+    if rc is not None:
+        return rc
+    so = descendentes(items, args.programa) if args.programa else None
+    if not (args.programa or args.concorrencia or args.seguinte or args.dry_run):
+        args.concorrencia = 1  # sempre em painel: worktree, Doing só lá e vigia (nunca no checkout)
+    if args.dry_run:
+        return _cmd_dry_run(args, items, so, estado)
+    rc = _preparar_estado(args, estado, mae, modo, so)
+    if rc is not None:
+        return rc
+    return _cmd_seguinte(args, estado)
+
+
 if __name__ == "__main__":
-    for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")
     sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
     import kf_errlog
     sys.exit(kf_errlog.executar("sp-fila", main))

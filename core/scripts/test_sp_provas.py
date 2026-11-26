@@ -121,7 +121,7 @@ def test_gravar_preserva_imagens_manuais(tmp_path):
 
 
 def test_anexar_recusa_proibidos(tmp_path):
-    repo, vault = preparar(tmp_path)
+    _repo, vault = preparar(tmp_path)
     segredo = tmp_path / "id_rsa.png"
     segredo.write_bytes(b"x")
     with pytest.raises(provas.ProvasError):
@@ -183,3 +183,9 @@ def test_corpo_pr_com_validar_reverter_e_imagens(tmp_path):
     assert "## Como validar" in extra and "## Como reverter" in extra
     assert "![l](https://github.com/o/r/blob/abc123/d.svg?raw=true)" in extra
     assert "git reset" not in extra
+
+
+def test_limpar_nao_confunde_slug_com_chave_sk():
+    slug = "sp/Doing/agent-core-ask-guard-inteligente-2026-11-20.md | 4 +-"
+    assert provas.limpar(slug) == slug
+    assert "[linha cortada" in provas.limpar("k = " + "s" + "k-" + "a" * 20)

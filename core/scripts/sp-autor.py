@@ -2,7 +2,7 @@
 
 O painel abre `claude --model <M> --effort <E>` (papel `sp-autor` de `.claude/modelos.json`) no cwd dado, recebe o
 título `sp-autor <slug>` e um prompt numa linha: ler a semente com `--consume` (imprime e só depois apaga, como o
-`/handoff`), preencher o SP pela skill `super-prompt` §Gerar, gravar `done` com `sp-estado.py sp-autor-<slug>` e
+`/handoff`), preencher o SP pela skill `super-prompt` §Gerar, commitar+enviar só o SP, gravar `done` com `sp-estado.py sp-autor-<slug>` e
 fechar. Conta para o teto global de painéis (`sp_painel_estado.MAX_PARALELO`); sem vaga fica `pendente` e nada abre.
 A sessão que pediu fica livre: segue com `sp-estado.py --listar` ou o vigia. Ao lançar guarda-se o título da tab de
 origem (`origem_titulo`, mais `origem_pane` como pista); o painel corre `--avisar <slug>` antes do `done` e a origem
@@ -15,6 +15,7 @@ Uso:
 rc: 0 painel aberto (ou dry-run / consume ok) · 1 erro · 2 sem vaga (pendente)
 """
 import argparse
+import contextlib
 import sys
 import time
 from pathlib import Path
@@ -25,6 +26,8 @@ from handoff_pane import consume_ficheiro  # noqa: E402
 from painel_backend import enviar_prompt  # noqa: E402
 import painel_backend  # noqa: E402
 import sp_painel_estado as pe  # noqa: E402
+import avisos_caixa  # noqa: E402
+from handoff_pane import read_screen  # noqa: E402
 
 MODELOS = modelos.DEFAULT  # os testes trocam-no
 PAPEL = "sp-autor"
@@ -59,11 +62,13 @@ def prompt(sp, semente):
     slug = slug_de(sp)
     return (f"És o painel sp-autor de {slug}. Primeiro corre `python -I scripts/sp-autor.py --consume \"{semente}\"` "
             f"(semente: decisões e contexto; lida e apagada). Preenche as 8 secções de {sp} pela skill super-prompt §Gerar, "
-            "sem fazer o trabalho do SP, sem commit, sem abrir outros painéis. No fim corre "
+            "sem fazer o trabalho do SP, sem abrir outros painéis. Depois commita e envia só o SP, em master e sem worktree: "
+            f"`git add \"{sp}\" && git commit -m 'vault: SP {slug}' && git push` (nunca `git add -A`; se o push falhar segue e "
+            "regista-o no `--msg`). No fim corre "
             f"`python -I scripts/sp-autor.py --avisar {slug} --sp \"{sp}\"` (avisa o painel que te lançou; se falhar segue) e depois "
             f"`python -I scripts/sp-estado.py {chave(slug)} done --msg '<resumo numa linha>'` "
             f"(ou bloqueado/falhou com o motivo) e fecha este painel com "
-            f"`python -I scripts/sp-autor.py --fechar {slug}` (backend ativo: herdr, wezterm ou tmux; não uses /quit).")
+            f"`python -I scripts/sp-autor.py --fechar {slug} --atual` (backend ativo: herdr, wezterm ou tmux; não uses /quit).")
 
 
 def consume(path, out=print):
@@ -98,7 +103,7 @@ def _linha(texto):
 
 def avisar(slug, backend, sp=None, estado_root=None, rotulo=PAPEL):
     """Envia ao painel de origem (pelo título guardado ao lançar; o pane-id só confirma) uma linha a dizer que o SP está pronto.
-    Devolve `enviado` ou `origem-ausente` (nada enviado, `aviso` no estado). Nunca envia a outro painel nem ao próprio."""
+    Devolve `enviado` (teclas, origem livre), `caixa` (origem ocupada: avisos_caixa, entregue pelo avisos-hook) ou `origem-ausente`. Nunca envia a outro painel nem ao próprio."""
     k = chave(slug, rotulo)
     fila = pe.procurar(k, root=estado_root)
     st = pe.ler(fila, k, root=estado_root)
@@ -109,25 +114,40 @@ def avisar(slug, backend, sp=None, estado_root=None, rotulo=PAPEL):
         cand = sorted(p for p, t in backend.titulos().items() if t == alvo and str(p) != proprio)
         pista = st.get("origem_pane")
         destino = pista if pista in cand else (cand[0] if cand else None)
-    if destino is not None:
-        caminho = _linha(sp) if sp else f"vault, SP {slug}"
-        msg = f"[sp-autor] SP {_linha(slug)} preenchido: {caminho}. Próximo: sp-resumo.py {_linha(slug)} e aprovação (super-prompt §Gerar 3-5)."
-        if backend.enviar(destino, msg):
-            pe.registar(fila, k, root=estado_root, aviso="enviado")
-            return "enviado"
+    caminho = _linha(sp) if sp else f"vault, SP {slug}"
+    msg = f"[sp-autor] SP {_linha(slug)} preenchido: {caminho}. Próximo: sp-resumo.py {_linha(slug)} e aprovação (super-prompt §Gerar 3-5)."
+    if destino is not None and _livre(backend, destino) and backend.enviar(destino, msg):
+        pe.registar(fila, k, root=estado_root, aviso="enviado")
+        return "enviado"
+    if destino is not None:  # origem ocupada (turno ou diálogo: as teclas perdiam-se): o avisos-hook entrega-o
+        avisos_caixa.depositar(destino, msg)
+        pe.registar(fila, k, root=estado_root, aviso="caixa")
+        return "caixa"
     pe.registar(fila, k, root=estado_root, aviso="aviso: origem ausente")
     return "origem-ausente"
 
 
-def fechar(slug, backend, estado_root=None, rotulo=PAPEL, env=None):
-    """Fecha o painel do papel pelo backend ativo (herdr/wezterm/tmux): pane guardado no estado ao lançar, senão o atual.
+def _livre(backend, pane):
+    try:
+        return avisos_caixa.livre(read_screen(backend.nome, pane))
+    except Exception:  # noqa: BLE001 — sem ler o ecrã não se arrisca teclas: vai para a caixa
+        return False
+
+
+def fechar(slug, backend, estado_root=None, rotulo=PAPEL, env=None, atual=False):
+    """Fecha o painel do papel pelo backend ativo (herdr/wezterm/tmux): pane guardado no estado ao lançar; o atual só com
+    `atual` (sem ele, nunca fecha quem corre o comando, p. ex. uma prova com slug inexistente).
     Devolve o id fechado ou None (nada a fechar)."""
     k = chave(slug, rotulo)
     try:
-        pane = pe.ler(pe.procurar(k, root=estado_root), k, root=estado_root).get("pane")
+        st = pe.ler(pe.procurar(k, root=estado_root), k, root=estado_root)
     except pe.ErroEstado:
-        pane = None
-    if not pane:
+        st = {}
+    pane = st.get("pane")
+    if st and rotulo == PAPEL and not st.get("aviso"):  # o painel esqueceu o --avisar: a origem não fica sem saber
+        with contextlib.suppress(Exception):
+            avisar(slug, backend, estado_root=estado_root, rotulo=rotulo)
+    if not pane and atual:
         pane = painel_backend.painel_atual(env)[1]
     if not pane:
         return None
@@ -166,10 +186,8 @@ def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sle
         msg = f"erro a lançar {k}: {e}"
         pe.transitar(k, "falhou", msg=msg, fila=fila, root=estado_root)
         if pane is not None:
-            try:
+            with contextlib.suppress(Exception):  # noqa: BLE001
                 backend.fechar(pane)
-            except Exception:  # noqa: BLE001
-                pass
         return {**res, "estado": "falhou", "pane": pane, "msg": msg}
     return {**res, "estado": "a-correr", "pane": str(pane)}
 
@@ -181,6 +199,7 @@ def main(argv=None):
     ap.add_argument("--consume", metavar="SEMENTE", help="imprime a semente e apaga-a (usado pelo painel)")
     ap.add_argument("--avisar", metavar="SLUG", help="avisa o painel que lançou o sp-autor (usado pelo painel; rc 0 mesmo sem origem)")
     ap.add_argument("--fechar", metavar="SLUG", help="fecha o painel do papel pelo backend ativo (usado pelo painel no fim)")
+    ap.add_argument("--atual", action="store_true", help="com --fechar: sem pane no estado, fecha o painel atual")
     ap.add_argument("--papel", default=PAPEL, help="papel do painel a fechar (sp-autor|revisor)")
     ap.add_argument("--cwd", default=str(Path(__file__).resolve().parent.parent), help="pasta do painel (defeito: o repo)")
     ap.add_argument("--backend", default="auto", help="auto (usa painelBackend)|herdr|wezterm|tmux|background")
@@ -192,14 +211,13 @@ def main(argv=None):
         MODELOS = Path(args.modelos)
     if args.fechar:
         try:
-            print(f"{chave(args.fechar, args.papel)} · fechar · {fechar(args.fechar, painel_backend.escolher_por_config(args.backend), rotulo=args.papel) or 'nada'}")
+            print(f"{chave(args.fechar, args.papel)} · fechar · {fechar(args.fechar, painel_backend.escolher_por_config(args.backend), rotulo=args.papel, atual=args.atual) or 'nada'}")
         except Exception as e:  # noqa: BLE001
             print(f"erro a fechar: {e}", file=sys.stderr)
             return 1
         return 0
     if args.avisar:
         try:
-            import painel_backend
             print(f"{chave(args.avisar)} · aviso · {avisar(args.avisar, painel_backend.escolher_por_config(args.backend), sp=args.sp)}")
         except Exception as e:  # noqa: BLE001 — falhar a avisar nunca muda o resultado do sp-autor
             print(f"aviso falhou (ignorado): {e}", file=sys.stderr)
@@ -213,7 +231,6 @@ def main(argv=None):
         if args.dry_run:
             print(f"{titulo(slug_de(args.sp))} · {' '.join(comando())} · {args.cwd}\n{prompt(args.sp, args.semente)}")
             return 0
-        import painel_backend
         backend = painel_backend.escolher_por_config(args.backend)
         res = lancar(args.sp, args.semente, backend, args.cwd, run=painel_backend.run_hidden)
     except (SpAutorErro, modelos.ModelosError, pe.ErroEstado) as e:

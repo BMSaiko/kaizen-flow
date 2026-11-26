@@ -157,6 +157,12 @@ SLUG = "proj-algo-2026-11-11"
 K = f"sp-autor-{SLUG}"
 
 
+@pytest.fixture(autouse=True)
+def _origem_livre(monkeypatch, tmp_path):
+    monkeypatch.setattr(sa, "_livre", lambda b, p: True)
+    monkeypatch.setenv("AVISOS_DIR", str(tmp_path / "avisos"))
+
+
 def _estado(root):
     return pe.ler(pe.procurar(K, root=root), K, root=root)
 
@@ -266,11 +272,33 @@ def test_fechar_usa_o_pane_do_estado(modelos_json, sp_vazio, tmp_path):
     assert b.fechados == ["p1"]
 
 
-def test_fechar_sem_estado_usa_o_painel_atual(tmp_path, monkeypatch):
+def test_fechar_sem_estado_nao_fecha_nada(tmp_path, monkeypatch):
     b = FakeBackend()
     monkeypatch.setattr(sa.painel_backend, "painel_atual", lambda env=None: ("herdr", "w3:pX"))
-    assert sa.fechar("nao-existe", b, estado_root=tmp_path / "e") == "w3:pX"
+    assert sa.fechar("nao-existe", b, estado_root=tmp_path / "e") is None
+    assert b.fechados == []
+
+
+def test_fechar_sem_estado_com_atual_fecha_o_atual(tmp_path, monkeypatch):
+    b = FakeBackend()
+    monkeypatch.setattr(sa.painel_backend, "painel_atual", lambda env=None: ("herdr", "w3:pX"))
+    assert sa.fechar("nao-existe", b, estado_root=tmp_path / "e", atual=True) == "w3:pX"
     assert b.fechados == ["w3:pX"]
+
+
+def test_main_fechar_passa_atual(monkeypatch, capsys):
+    visto = {}
+    monkeypatch.setattr(sa.painel_backend, "escolher_por_config", lambda b: FakeBackend())
+    monkeypatch.setattr(sa, "fechar", lambda *a, **k: visto.update(k) or "ok")
+    sa.main(["--fechar", "x", "--atual"])
+    assert visto.get("atual") is True
+    sa.main(["--fechar", "x"])
+    assert visto.get("atual") is False
+
+
+def test_prompts_fecham_com_atual():
+    p = sa.prompt("sp/x.md", None)
+    assert "--fechar x --atual" in p
 
 
 def test_ec_022_prompt_nao_submetido_mantem_a_semente_e_permite_relancar(modelos_json, sp_vazio, tmp_path):
@@ -284,3 +312,49 @@ def test_ec_022_prompt_nao_submetido_mantem_a_semente_e_permite_relancar(modelos
     res = sa.lancar(sp_vazio, s, ok, cwd=tmp_path, estado_root=root, sleep=lambda x: None)
     assert res["estado"] == "a-correr" and len(ok.abertos) == 1
     assert any(str(s) in texto for _, texto in ok.enviados)
+
+
+def test_main_fechar_nao_rebenta_com_import_local(monkeypatch, capsys):
+    """Regressão: `import painel_backend` dentro de main tornava o nome local e o --fechar dava UnboundLocalError."""
+    monkeypatch.setattr(sa.painel_backend, "escolher_por_config", lambda b: FakeBackend())
+    monkeypatch.setattr(sa, "fechar", lambda *a, **k: "ok")
+    assert sa.main(["--fechar", "x-2026-11-22", "--papel", "revisor"]) in (0, None)
+    assert "fechar · ok" in capsys.readouterr().out
+
+
+def test_avisar_origem_ocupada_vai_para_a_caixa(modelos_json, sp_vazio, tmp_path, monkeypatch):
+    b, root = _lancado(modelos_json, sp_vazio, tmp_path)
+    monkeypatch.setattr(sa, "_livre", lambda b, p: False)
+    assert sa.avisar(SLUG, b, sp=sp_vazio, estado_root=root) == "caixa"
+    assert b.enviados == [] and _estado(root)["aviso"] == "caixa"
+    (m,) = sa.avisos_caixa.recolher("7")
+    assert SLUG in m and sa.avisos_caixa.recolher("7") == []
+
+
+def test_livre_le_o_ecra():
+    assert sa.avisos_caixa.livre("❯ \n  Opus · ctx")
+    assert not sa.avisos_caixa.livre("✽ Spelunking… esc to interrupt")
+    assert not sa.avisos_caixa.livre("Enter to select · Esc to cancel")
+    assert not sa.avisos_caixa.livre("")
+
+
+def test_fechar_sem_aviso_avisa_a_origem(modelos_json, sp_vazio, tmp_path):
+    b, root = _lancado(modelos_json, sp_vazio, tmp_path)
+    sa.fechar(SLUG, b, estado_root=root)
+    assert _estado(root)["aviso"] == "enviado" and b.enviados[0][0] == "7"
+
+
+def test_fechar_com_aviso_nao_repete(modelos_json, sp_vazio, tmp_path):
+    b, root = _lancado(modelos_json, sp_vazio, tmp_path)
+    sa.avisar(SLUG, b, sp=sp_vazio, estado_root=root)
+    b.enviados.clear()
+    sa.fechar(SLUG, b, estado_root=root)
+    assert b.enviados == []
+
+def test_prompt_commita_e_envia_so_o_sp_antes_do_done(sp_vazio, tmp_path):
+    t = sa.prompt(sp_vazio, _semente(tmp_path))
+    assert "sem commit" not in t
+    assert f'git add "{sp_vazio}"' in t and "git commit" in t and "git push" in t
+    assert "git add -A &&" not in t and "git add . &&" not in t
+    assert "sem fazer o trabalho do SP" in t and "sem abrir outros painéis" in t
+    assert t.index("git add") < t.index("--avisar") < t.index("sp-estado.py") < t.index("--fechar")

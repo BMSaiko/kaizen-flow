@@ -6,7 +6,8 @@
 |---|---|---|
 | `--project`, `--slug`, `--priority P1\|P2\|P3` | frontmatter | prioridade (default P3) |
 | `--modo auto\|manual` | `modo:` (michi não repete a pergunta de arranque) | não perguntar: defeito `auto`; `--modo manual` só se o {{userName}} pedir |
-| `--commit`, `--push`, `--pr auto\|pergunta\|nunca` | `commit:`/`push:`/`pr:` | não perguntar: defeito por destino (`michi-modo-auto.md` §Autorizações do SP); flag só para desviar |
+| `--permissoes all\|nenhuma\|commit,push,pr,merge` | `commit:`/`push:`/`pr:`/`merge:` | `AskUserQuestion` `multiSelect: true`, opções `all (commit+push+pr+merge)`, `commit`, `push`, `pr`, `merge`; recomendado = herdado (`michi-modo-auto.md` §Autorizações do SP); marcado = `auto`, resto = `nunca`; incoerente (merge sem pr, pr sem push, push sem commit) = erro; vault: pr/merge não se aplicam (SB sem PR) |
+| `--commit`, `--push`, `--pr auto\|pergunta\|nunca` | `commit:`/`push:`/`pr:` | sem `--permissoes`: defeito por destino (`michi-modo-auto.md` §Autorizações do SP); flag para `pergunta` |
 | `--restricoes "<texto>"` | `restricoes:` | pastas intocáveis, repos, ações externas |
 | `--perfil cauteloso\|normal\|autonomo` + `--max-tentativas/--max-requests/--parar-se` | perfil e limites | recomendado `normal`; `autonomo` só com gates (`michi/references/michi-perfis.md`) |
 | `--escopo a/**,b.py`, `--fora-de-escopo x/**` | `escopo:`/`fora_de_escopo:` | derivar de «Relevant files»; sem `escopo` o hook não guarda nada |

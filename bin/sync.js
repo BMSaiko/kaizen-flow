@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-const SKILLS = ["michi", "super-prompt", "grill-me", "dr", "dp", "da", "brainstorm", "swot", "pentest", "review-ciclo", "pr-fase", "orq"];
+const SKILLS = ["michi", "super-prompt", "grill-me", "dr", "dp", "da", "brainstorm", "swot", "pentest", "review-ciclo", "pr-fase", "orq", "design-system", "kf-ship", "vision", "release", "resume", "preflight"];
 const COMMAND_RE = /^(sp(-[a-z]+)*|handoff)\.md$/;
 const SCRIPT_RE = /^(sp|doc)[-_][a-z_-]+\.py$/;
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(__dirname, "sync-manifest.json"), "utf8"));
@@ -13,10 +13,8 @@ const SKIP = new Set(MANIFEST.skip);
 // ficheiros do vault com nomes de kaizen que ainda assim não entram no pacote vão para SKIP; o resto avisa
 const RELATED_RE = /^(test_)?(sp|doc|handoff|kaizen|michi)[-_.]/;
 
-// fixtures dos testes do sp-fila (test_sp_fila.py)
-const FIXTURES = "scripts/fixtures/par-watch";
-// layouts guardados do wez.py
-const LAYOUTS = "scripts/wez-layouts";
+// pastas copiadas inteiras (fixtures do sp-fila, layouts do wez.py): vêm do manifesto
+const DIRS = MANIFEST.dirs || [];
 // config lida pelos scripts em ../.claude/ (modelos.py): fica em core/.claude/
 const CONFIGS = [".claude/modelos.json"];
 
@@ -52,8 +50,7 @@ function plan(vault) {
   for (const n of SCRIPT_NAMES) if (!scripts.includes(n)) missing.push(`scripts/${n}`);
   const chosen = new Set(scripts.filter(isScriptPiece));
   for (const n of [...chosen].sort()) parts.push([`scripts/${n}`, `scripts/${n}`]);
-  if (fs.existsSync(path.join(vault, FIXTURES))) parts.push([FIXTURES, FIXTURES]);
-  if (fs.existsSync(path.join(vault, LAYOUTS))) parts.push([LAYOUTS, LAYOUTS]);
+  for (const d of DIRS) if (fs.existsSync(path.join(vault, d))) parts.push([d, d]);
 
   const unlisted = scripts.filter((n) => n.endsWith(".py") && !chosen.has(n) && !SKIP.has(n) && RELATED_RE.test(n)).map((n) => `scripts/${n}`);
   return { parts, missing, unlisted };
@@ -65,7 +62,7 @@ function owns(rel) {
   if (m) return SKILLS.includes(m[1]);
   const c = rel.match(/^\.claude\/commands\/([^/]+)$/);
   if (c) return COMMAND_RE.test(c[1]);
-  if (rel.startsWith(`${FIXTURES}/`) || rel.startsWith(`${LAYOUTS}/`)) return true;
+  if (DIRS.some((d) => rel.startsWith(`${d}/`))) return true;
   const sc = rel.match(/^scripts\/([^/]+\.py)$/);
   return sc ? isScriptPiece(sc[1]) : false;
 }
@@ -105,4 +102,4 @@ function overlay(core, tdir, stamp) {
   return { stale, orphans };
 }
 
-module.exports = { plan, overlay, owns, files, sha, SKILLS };
+module.exports = { plan, overlay, owns, files, sha, SKILLS, MANIFEST };

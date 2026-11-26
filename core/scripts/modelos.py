@@ -56,14 +56,13 @@ def avisos_ids(data):
     validos = set((data.get("aliases") or {}).values()) | set(data.get("conhecidos") or [])
     if not validos:
         return []
-    out = []
-    for nome, p in data["papeis"].items():
-        if not isinstance(p, dict):
-            continue
-        for m in [p.get("model"), *(p.get("fallback") or [])]:
-            if m and m not in validos:
-                out.append(f"aviso: papel '{nome}' usa o modelo desconhecido '{m}' (não está em aliases nem em conhecidos)")
-    return out
+    return [
+        f"aviso: papel '{nome}' usa o modelo desconhecido '{m}' (não está em aliases nem em conhecidos)"
+        for nome, p in data["papeis"].items()
+        if isinstance(p, dict)
+        for m in [p.get("model"), *(p.get("fallback") or [])]
+        if m and m not in validos
+    ]
 
 
 def michi(data, nivel):
@@ -130,7 +129,7 @@ def _set_key(fm, key, value, eol):
         if l.startswith(key.encode() + b":"):
             linhas[i] = linha
             return eol.join(linhas)
-    return eol.join(linhas + [linha])
+    return eol.join([*linhas, linha])
 
 
 def render(raw, p):

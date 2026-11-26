@@ -37,9 +37,31 @@ def estado_de(programa, base=None):
 
 
 def estados_existentes(base=None):
-    """Estados por mãe que existem em disco, por ordem de nome."""
+    """Estados por mãe que existem em disco, por ordem de nome.
+
+    A mesma pasta guarda as filas de painéis (`sp_painel_estado`, chave `fila`, sem `max`/`usados`): ficam de fora,
+    senão `localizar` devolvia-as e o `--seguinte` lia/escrevia o ficheiro errado (KeyError no vigia)."""
     d = Path(base or ESTADOS_DIR)
-    return sorted(d.glob("*/fila.json")) if d.is_dir() else []
+    return [c for c in sorted(d.glob("*/fila.json")) if not _fila_de_paineis(c)] if d.is_dir() else []
+
+
+def _fila_de_paineis(path):
+    try:
+        return "fila" in json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+
+
+def da_fila_paineis(fila, base=None, legado=None):
+    """Estado da fila-mãe (`sp-fila`) cuja `fila_paineis` é `fila`; None se a fila de painéis não tem mãe."""
+    legado = Path(legado or ESTADO)
+    for c in estados_existentes(base) + ([legado] if legado.exists() else []):
+        try:
+            if ler(c).get("fila_paineis") == fila:
+                return c
+        except (OSError, ValueError):
+            continue
+    return None
 
 
 def localizar(slug=None, base=None, legado=None):
@@ -91,5 +113,3 @@ def atualizar(path, fn):
         fn(estado)
         guardar(path, estado)
         return estado
-
-

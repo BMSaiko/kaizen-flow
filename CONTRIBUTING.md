@@ -51,6 +51,12 @@ Larger changes follow the kaizen flow this project ships: write the story as an 
 3. `KAIZEN_SOURCE=<vault> kaizen sync --to-vault --check`, then `kaizen sync --to-vault`.
 4. Write a `COMMIT_*.md` and wait for the maintainer's confirmation before committing. Nothing here commits or pushes on its own; push only on explicit request.
 
+### Releasing
+
+1. `python core/scripts/kf_release.py plan` shows the version and the CHANGELOG entry (read-only).
+2. `kf_release.py prepare` opens the release PR with the gate proof; merge it only with CI green (`pr_fechar.py`).
+3. `kf_release.py publish --confirmo` (the maintainer, never an agent) tags and pushes `vX.Y.Z`; the `publish.yml` workflow publishes with provenance.
+
 What counts as a piece is defined once, in `bin/sync.js`. Project SPs stay in the vault and are never mirrored.
 
 ## Code layout
@@ -59,7 +65,7 @@ What counts as a piece is defined once, in `bin/sync.js`. Project SPs stay in th
 - `adapters/` renders the core per harness (`claude`, `codex`, `agents-md`); the last two share `agentsAdapter()` in `adapters/util.js`.
 - `core/scripts/` shares helpers through `kaizen_engine.py` (`load`, `relocate`, frontmatter). `sp-fila.py` and `sp-handoff.py` are thin entry points over `sp_fila_*.py`, `handoff_pane.py`, `handoff_spawn.py` and `sp_progresso.py`; no module is above 300 lines.
 - Dead imports and exports were removed; public behaviour (CLI, commands, skills) is unchanged.
-- Architecture diagram: `docs/assets/architecture.svg`, regenerated with `python -I docs/assets/build-diagrams.py` run from `docs/assets/`.
+- Diagrams (`architecture.svg`, `michi-cycle.svg`, `sp-workflow.svg`, `sp-fila-parallel.svg` in `docs/assets/`): regenerate from the repo root with `python -I docs/assets/build-diagrams.py docs/assets`.
 
 ### Before / after the cleanup (non-test `.py`/`.js`)
 

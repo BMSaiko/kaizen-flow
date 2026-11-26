@@ -254,7 +254,7 @@ def test_caminho_com_espacos_e_acentos(tmp_path):
 def test_ec_055_journal_caminho_maior_que_260(tmp_path):
     raiz = tmp_path
     for _ in range(12):
-        raiz = raiz / ("d" * 30)
+        raiz /= "d" * 30
     caminho_estado = sp_journal.caminhos(raiz, SLUG)[0]
     assert len(str(raiz / ".kaizen" / "estado" / f"{SLUG}.json")) > 260
     assert str(caminho_estado).startswith("\\\\?\\")

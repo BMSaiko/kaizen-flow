@@ -1,5 +1,5 @@
 ---
-description: Registar o progresso no SP atual (Doing), imprimir o /michi pronto a copiar e, se o {{userName}} quiser, fazer /clear e continuar o michi neste painel do WezTerm
+description: Registar o progresso no SP atual (Doing), imprimir o /michi pronto a copiar e fazer sempre, sem perguntar, /clear e continuar o michi neste painel do WezTerm
 version: 1.1.0
 ---
 Para um SP (sem SP: `/handoff`; ver `handoff-launch.md` §Qual usar). Passos, por esta ordem (português europeu). Núcleo comum (corpo, `--launch`, modo automático): `handoff-launch.md` do vault, se existir.

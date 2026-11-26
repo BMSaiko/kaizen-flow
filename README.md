@@ -48,6 +48,7 @@ More detail in [Install](#install) and the [documentation](#documentation).
 
 - [Quickstart](#quickstart)
 - [How it works](#how-it-works)
+- [Software factory](#software-factory)
 - [Why it uses fewer tokens and ships more](#why-it-uses-fewer-tokens-and-ships-more)
 - [Install](#install)
 - [Using it with Codex](#using-it-with-codex-codex-sets-up-the-codex-specific-parts)
@@ -74,6 +75,10 @@ More detail in [Install](#install) and the [documentation](#documentation).
 </p>
 
 In parallel mode each story runs in its own terminal pane (up to 3 in total) with its own worktree and a status file; a watcher merges, brings questions and permission requests to you, and launches the next. No `Agent` subagents are used.
+
+## Software factory
+
+From a `VISION.md` to merged, quality-gated stories: `kaizen vision` checks the goal, `kaizen factory run <project>` decomposes it into SPs, runs them (parallel panes), applies the `qualidade` and design gates, merges only with green CI, and pauses for the human at release and publish. Budget caps (`orcamento`) stop it before any story starts. Try it offline in under 2 minutes, with deterministic fakes and no network: `kaizen demo --factory [--keep]`. See [docs/factory.md](docs/factory.md).
 
 ## Why it uses fewer tokens and ships more
 
@@ -142,9 +147,11 @@ If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the blo
 | [Edge cases](docs/edge-cases.md) | numbered `EC-NNN` catalog of interruptions, crashes and broken state, each linked to its test; coverage with `kaizen catalog` |
 | [Term keys](docs/term.md) | Optional WezTerm shortcuts for `kaizen term` (menu and F2 table) |
 | [Commands](docs/commands.md) | every `kaizen` command, option and workflow script |
-| [Agent commands](docs/agent-commands.md) | `/sp`, `/michi`, `/sp-handoff`, `/sp-fila`, `/pentest`, `/review-ciclo`, `/pr-fase` and the michi cycle |
+| [Agent commands](docs/agent-commands.md) | `/sp`, `/michi`, `/sp-handoff`, `/sp-fila`, `/pentest`, `/review-ciclo`, `/pr-fase`, `/kf-ship` and the michi cycle |
 | [Tests](docs/testes.md) | `npm test`, test-command detection in `init`, the michi test phase (`sp-gates --testes`), CI and coverage |
 | [Usage and cost](docs/usage-and-cost.md) | transcripts read, prices file, reports |
+| [Software factory](docs/factory.md) | architecture, configuration, autonomy limits, troubleshooting, the `demo --factory` proof |
+| [Factory by hand](docs/factory-manual.md) | manual mode: approve, step, pause, skip, take over |
 | [Config](docs/config.md) | `kaizen.config.json`, `kaizen-hooks.json` and project folders |
 | [Handoff](docs/handoff.md) | fresh-context handoff, parallel panes, backends, CLI vs desktop app |
 | [Privacy audit](docs/privacy-audit.md) | what `kaizen audit` scans for |

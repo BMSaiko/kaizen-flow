@@ -102,20 +102,18 @@ def test_max_corta_a_lista(tmp_path):
 
 
 def test_limite_razoes():
-    estado = {"max": 2, "ate": "18:00", "orcamento": 100, "usados": 0, "feitos": ["a", "b"], "falhados": []}
+    estado = {"max": 2, "ate": "18:00", "feitos": ["a", "b"], "falhados": []}
     noon = datetime(2026, 10, 25, 12, 0)
-    assert "máximo" in sp_fila.limite(estado, noon)
-    estado = {"max": 5, "ate": "18:00", "orcamento": 100, "usados": 0, "feitos": [], "falhados": []}
-    assert sp_fila.limite(estado, datetime(2026, 10, 25, 18, 0)) and "hora" in sp_fila.limite(estado, datetime(2026, 10, 25, 18, 0))
-    assert sp_fila.limite(estado, noon) is None
-    estado["usados"] = 60
-    estado["orcamento"] = 100
-    assert "orçamento" in sp_fila.limite(estado, noon)
+    assert "máximo" in sp_fila.limite_paralelo(estado, noon)
+    estado = {"max": 5, "ate": "18:00", "feitos": [], "falhados": []}
+    assert "hora" in sp_fila.limite_paralelo(estado, datetime(2026, 10, 25, 18, 0))
+    assert sp_fila.limite_paralelo(estado, noon) is None
 
 
-def test_sem_orcamento_de_requests_nao_ha_limite():
-    estado = {"max": 5, "ate": None, "orcamento": None, "usados": 9999, "feitos": [], "falhados": []}
-    assert sp_fila.limite(estado, datetime(2026, 10, 25, 12, 0)) is None
+def test_concorrencia_sem_max_nao_ha_teto():
+    noon = datetime(2026, 10, 25, 12, 0)
+    for estado in ({"max": None, "feitos": ["a"] * 9, "falhados": []}, {"feitos": ["a"] * 9, "falhados": []}):
+        assert sp_fila.limite_paralelo(estado, noon) is None
 
 
 def test_cli_dry_run_mostra_ordem_e_exclusoes(tmp_path, capsys):
@@ -130,14 +128,6 @@ def test_programa_restringe_a_arvore(tmp_path):
     _arvore(tmp_path, {})
     items = sp_fila.load(tmp_path)
     assert slugs(sp_fila.plan(items, so=sp_fila.descendentes(items, "mae"))) == ["f1", "f2", "f3"]
-
-
-def test_orcamento_tempo_e_custo_em_limite():
-    base = {"max": 9, "ate": None, "orcamento": 999, "usados": 0, "feitos": [], "falhados": [],
-            "inicio": "2026-10-25T10:00:00", "horas": 2.0, "usd": 5.0}
-    assert "tempo" in sp_fila.limite(base, datetime(2026, 10, 25, 12, 0))
-    assert sp_fila.limite(base, datetime(2026, 10, 25, 11, 0)) is None
-    assert "custo" in sp_fila.limite(base, datetime(2026, 10, 25, 11, 0), custo=5.0)
 
 
 def test_nunca_lanca_sp_sem_auto_nem_gates(tmp_path):
@@ -170,7 +160,8 @@ def test_aplicar_master_usa_a_pasta_de_master_e_nao_a_do_disco(tmp_path):
     git("init", "-b", "master")
     make_sp(tmp_path, "um", folder="Done")
     make_sp(tmp_path, "dois")
-    git("add", "."); git("commit", "-m", "x")
+    git("add", ".")
+    git("commit", "-m", "x")
     git("checkout", "-b", "atrasada")
     um = tmp_path / "p" / "sp"
     (um / "Done" / "um.md").rename(um / "TODO" / "um.md")  # disco da worktree atrasada: um ainda em TODO

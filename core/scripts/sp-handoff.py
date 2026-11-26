@@ -38,7 +38,6 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 import painel_backend  # noqa: E402
 from handoff_pane import (ENTER_GAP, SEND_DELAY, SEND_GAP, HandoffError, _argvs, _copy, check_prompt,  # noqa: E402,F401
@@ -108,10 +107,10 @@ def resume_commands(harness, sp_path, nivel=None, pane=None):
     return [clear, *([f"/model {modelo_nivel(nivel)}"] if nivel else []), fila or resume.format(sp=sp_path)]
 
 
-def _inspect(backend):
-    """Confere o prompt vazio antes de escrever, em qualquer backend com ecrã legível."""
+def _inspect(backend, limpar=False):
+    """Confere o prompt vazio antes de escrever, em qualquer backend com ecrã legível (`limpar`: painel de fila, Ctrl+U se sobra texto)."""
     if backend in ("wezterm", "tmux", "herdr"):
-        return lambda p: check_prompt(p, backend=backend)
+        return lambda p: check_prompt(p, backend=backend, limpar=limpar)
     return None
 
 
@@ -149,7 +148,7 @@ def launch(sp_path, pane=None, backend=None, harness="claude", nivel=None):
                                       *(["--nivel", nivel] if nivel else [])])
 
 
-def main(argv=None):
+def _parser():
     ap = argparse.ArgumentParser(description="Apoio ao /sp-handoff")
     group = ap.add_mutually_exclusive_group(required=True)
     group.add_argument("--resolve", nargs="?", const="", metavar="SLUG")
@@ -170,76 +169,103 @@ def main(argv=None):
     ap.add_argument("--fase", help="com --write/--launch: fase michi corrente (default: última linha `Fase:` do progresso)")
     ap.add_argument("--sem-reflect", action="store_true", help="só o user: avança sem `Reflect <fase>` e regista a exceção em ## Progresso")
     ap.add_argument("--root", help=argparse.SUPPRESS)
-    args = ap.parse_args(argv)
+    return ap
+
+
+def _cmd_write(args, excecao):
+    if not args.file:
+        raise HandoffError("--write exige --file")
+    write(args.write, Path(args.file).read_text(encoding="utf-8"))
+    if excecao:
+        registar_excecao_reflect(args.write)
+    print(f"progresso registado em {args.write}")
+    nxt = sync_program(args.root, args.write)
+    if nxt:
+        print(nxt)
+
+
+def _cmd_spawn(args):
+    nome = args.backend
+    if nome is None:  # sem --backend: `painelBackend` da config manda; sem backend utilizável, a deteção antiga
+        kc = kaizen_engine.load("kaizen_config")
+        esc = painel_backend.escolher(kc.painel_backend(Path.cwd()), herdr=kc.herdr(Path.cwd()))
+        nome = esc.nome if esc else None
+    resultados = spawn(args.spawn, nome, args.max, registar=not args.sem_registo, dry_run=args.dry_run)
+    if args.json:
+        print(json.dumps(resultados, ensure_ascii=False))
+        return 1 if any(not r["ok"] for r in resultados) else 0
+    falhou = False
+    for r in resultados:
+        if r.get("dry_run"):
+            print(f"{r['slug']}: dry-run (sem worktree nem painel) · {r['cmd']}  →  /michi --auto {r['slug']}")
+            continue
+        print(f"{r['slug']}: " + (f"painel {r['painel'] or '-'} em {r['worktree']}" if r["ok"] else f"FALHOU ({r['erro']})"))
+        falhou = falhou or not r["ok"]
+    return 1 if falhou else 0
+
+
+def _cmd_dry_run(args):
+    backend, found = (args.backend, None) if args.backend else detect_backend()
+    pane = args.pane or found
+    if backend == "clipboard":
+        print(f"clipboard: {resume_commands(args.harness, args.launch, args.nivel)[-1]}")
+        return
+    pane = pane or pane_id(backend=backend)
+    text_argv, key_argv = _argvs(backend, pane)
+    for text in resume_commands(args.harness, args.launch, args.nivel, pane):
+        print(subprocess.list2cmdline(text_argv(pane, text)))
+        print(subprocess.list2cmdline(key_argv(pane)))
+
+
+def _cmd_launch(args):
+    argv_send = launch(args.launch, args.pane, args.backend, args.harness, args.nivel)
+    if argv_send:
+        pane = argv_send[argv_send.index("--pane") + 1]
+        print(f"a continuar neste painel em {SEND_DELAY:.0f}s: {' e '.join(resume_commands(args.harness, args.launch, args.nivel, pane))}")
+
+
+def _verificar_reflect(args):
+    """Exige o Reflect da fase; com --sem-reflect regista a exceção. Devolve True se houve exceção."""
+    alvo = args.write or args.launch
+    if not alvo:
+        return False
+    extra = Path(args.file).read_text(encoding="utf-8") if args.write and args.file else ""
+    try:
+        exigir_reflect(alvo, args.fase, extra)
+    except HandoffError:
+        if not args.sem_reflect:
+            raise
+        excecao = not args.dry_run
+        if excecao and args.launch:
+            registar_excecao_reflect(alvo)
+        return excecao
+    return False
+
+
+def main(argv=None):
+    args = _parser().parse_args(argv)
     try:
         args.root = args.root or str(sp_root_for(worktree_agent()))
         if args.auto:
             if not args.launch:
                 raise HandoffError("--auto só com --launch")
             require_doing(args.launch)
-        alvo = args.write or args.launch
-        excecao = False
-        if alvo:
-            extra = Path(args.file).read_text(encoding="utf-8") if args.write and args.file else ""
-            try:
-                exigir_reflect(alvo, args.fase, extra)
-            except HandoffError:
-                if not args.sem_reflect:
-                    raise
-                excecao = not args.dry_run
-            if excecao and args.launch:
-                registar_excecao_reflect(alvo)
+        excecao = _verificar_reflect(args)
         if args.resolve is not None:
             agent = worktree_agent()
             print(resolve(args.root, args.resolve or None, _agent_claims(agent), agent))
         elif args.write:
-            if not args.file:
-                raise HandoffError("--write exige --file")
-            write(args.write, Path(args.file).read_text(encoding="utf-8"))
-            if excecao:
-                registar_excecao_reflect(args.write)
-            print(f"progresso registado em {args.write}")
-            nxt = sync_program(args.root, args.write)
-            if nxt:
-                print(nxt)
+            _cmd_write(args, excecao)
         elif args.spawn:
-            falhou = False
-            nome = args.backend
-            if nome is None:  # sem --backend: `painelBackend` da config manda; sem backend utilizável, a deteção antiga
-                kc = kaizen_engine.load("kaizen_config")
-                esc = painel_backend.escolher(kc.painel_backend(Path.cwd()), herdr=kc.herdr(Path.cwd()))
-                nome = esc.nome if esc else None
-            resultados = spawn(args.spawn, nome, args.max, registar=not args.sem_registo, dry_run=args.dry_run)
-            if args.json:
-                print(json.dumps(resultados, ensure_ascii=False))
-                return 1 if any(not r["ok"] for r in resultados) else 0
-            for r in resultados:
-                if r.get("dry_run"):
-                    print(f"{r['slug']}: dry-run (sem worktree nem painel) · {r['cmd']}  →  /michi --auto {r['slug']}")
-                    continue
-                print(f"{r['slug']}: " + (f"painel {r['painel'] or '-'} em {r['worktree']}" if r["ok"] else f"FALHOU ({r['erro']})"))
-                falhou = falhou or not r["ok"]
-            return 1 if falhou else 0
+            return _cmd_spawn(args)
         elif args.send:
             backend = args.backend or "wezterm"
             send(args.send, args.pane or pane_id(backend=backend), backend=backend, harness=args.harness,
-                 inspect=_inspect(backend), confirm=True, nivel=args.nivel)
+                 inspect=_inspect(backend, limpar=prompt_da_fila(args.send, args.pane) is not None), confirm=True, nivel=args.nivel)
         elif args.dry_run:
-            backend, found = (args.backend, None) if args.backend else detect_backend()
-            pane = args.pane or found
-            if backend == "clipboard":
-                print(f"clipboard: {resume_commands(args.harness, args.launch, args.nivel)[-1]}")
-            else:
-                pane = pane or pane_id(backend=backend)
-                text_argv, key_argv = _argvs(backend, pane)
-                for text in resume_commands(args.harness, args.launch, args.nivel, pane):
-                    print(subprocess.list2cmdline(text_argv(pane, text)))
-                    print(subprocess.list2cmdline(key_argv(pane)))
+            _cmd_dry_run(args)
         else:
-            argv_send = launch(args.launch, args.pane, args.backend, args.harness, args.nivel)
-            if argv_send:
-                pane = argv_send[argv_send.index("--pane") + 1]
-                print(f"a continuar neste painel em {SEND_DELAY:.0f}s: {' e '.join(resume_commands(args.harness, args.launch, args.nivel, pane))}")
+            _cmd_launch(args)
     except (HandoffError, OSError) as exc:
         print(f"erro: {exc}", file=sys.stderr)
         return 1
@@ -247,9 +273,6 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")
     sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
     import kf_errlog
     sys.exit(kf_errlog.executar("sp-handoff", main))

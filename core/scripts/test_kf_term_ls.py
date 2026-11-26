@@ -53,7 +53,7 @@ def _por_slug(rows):
 
 def test_linhas_cruza_estado_e_backend(root):
     rows = _por_slug(ls.linhas(root, Falso({"7": "x", "8": "y", "9": "z"})))
-    assert rows["a1"] == {"painel": "7", "slug": "a1", "fila": "prog-a", "fase": "DA", "estado": "a-correr",
+    assert rows["a1"] == {"painel": "7", "nome": None, "slug": "a1", "fila": "prog-a", "fase": "DA", "estado": "a-correr",
                           "pergunta": None, "vivo": "vivo"}
     assert rows["a2"]["estado"] == "pergunta" and rows["a2"]["vivo"] == "vivo"
 
@@ -121,7 +121,7 @@ def test_backend_timeout_avisa_e_lista(root, capsys):
 def test_texto_uma_linha_por_painel_com_cabecalho(root, capsys):
     assert ls.main([], root=root, backend=Falso({"7": "x", "9": "z"})) == 0
     linhas = capsys.readouterr().out.splitlines()
-    assert linhas[0].split()[:5] == ["PAINEL", "SP", "FASE", "ESTADO", "FILA"]
+    assert linhas[0].split()[:5] == ["PAINEL", "NOME", "SP", "FASE", "ESTADO"]
     assert len(linhas) == 1 + 4
     a2 = next(l for l in linhas if " a2 " in l)
     assert "morto" in a2 and "pergunta" in a2 and "prog-a" in a2
@@ -134,7 +134,7 @@ def test_json_contrato_estavel(root, capsys):
     dados = json.loads(capsys.readouterr().out)
     assert isinstance(dados, list) and len(dados) == 4
     for r in dados:
-        assert list(r) == ["painel", "slug", "fila", "fase", "estado", "pergunta", "vivo"]
+        assert list(r) == ["painel", "nome", "slug", "fila", "fase", "estado", "pergunta", "vivo"]
 
 
 def test_main_fila_x(root, capsys):
@@ -167,3 +167,28 @@ def test_argumento_invalido_rc2(root, capsys):
     with pytest.raises(SystemExit) as e:
         ls.main(["--nao-existe"], root=root, backend=Falso())
     assert e.value.code == 2
+
+
+def test_coluna_nome_e_principal_sem_sp(root):
+    import kf_nomes as kn
+    kn.registar("sp-a1", "falso", "7", "/wt", "sp", "a1", root=root)
+    kn.registar("kaizen", "falso", "5", "/sb", "livre", "kaizen", root=root, raiz_sb="/sb")
+    rows = ls.linhas(root, Falso({"5": "/sb", "7": "x", "8": "y", "9": "z"}))
+    por = _por_slug(rows)
+    assert por["a1"]["nome"] == "sp-a1" and por["a2"]["nome"] is None
+    h = [r for r in rows if r["nome"] == "kaizen"]
+    assert len(h) == 1 and h[0]["painel"] == "5" and h[0]["slug"] is None and h[0]["vivo"] == "vivo"
+
+
+def test_texto_tem_coluna_nome(root):
+    import kf_nomes as kn
+    kn.registar("sp-a1", "falso", "7", "/wt", "sp", "a1", root=root)
+    txt = ls._texto(ls.linhas(root, Falso({"7": "x", "8": "y", "9": "z"})))
+    assert txt.splitlines()[0].split()[:2] == ["PAINEL", "NOME"] and "sp-a1" in txt
+
+
+def test_principal_morto_nao_aparece(root):
+    import kf_nomes as kn
+    kn.registar("kaizen", "falso", "5", "/sb", "livre", "kaizen", root=root, raiz_sb="/sb")
+    rows = ls.linhas(root, Falso({"7": "x", "8": "y", "9": "z"}))
+    assert not [r for r in rows if r["nome"] == "kaizen"]

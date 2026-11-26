@@ -1,6 +1,6 @@
 """Lê `kaizen.config.json` na raiz do repo; sem ficheiro ou chave, devolve o defeito.
 
-Chaves: `spRoot` (raiz dos SPs) e `docsRoot` (raiz dos DR/DP), relativas à raiz do repo; `desenvolvimento` (método do projeto); `herdr` ({maxPanesPorTab, workspacePorProjeto}).
+Chaves: `spRoot` (raiz dos SPs) e `docsRoot` (raiz dos DR/DP), relativas à raiz do repo; `desenvolvimento` (método do projeto); `herdr` ({maxPanesPorTab, workspacePorProjeto}); `qualidade.coberturaDiff` (limiar % da cobertura do diff, defeito 85); `qualidade.{bloqueantes,consultivos,fases}` (perfil de gates, ver `qualidade`); `orcamento` ({spUsd, diaUsd, falhasSeguidas}, ver `orcamento`).
 
 Uso: módulo importado pelos scripts sp-* e doc_ops; sem execução direta
 rc: n/a
@@ -55,6 +55,75 @@ def herdr(repo):
     n, w = raw.get("maxPanesPorTab"), raw.get("workspacePorProjeto")
     return {"maxPanesPorTab": n if isinstance(n, int) and not isinstance(n, bool) and n >= 1 else HERDR_DEFEITO["maxPanesPorTab"],
             "workspacePorProjeto": w if isinstance(w, bool) else HERDR_DEFEITO["workspacePorProjeto"]}
+
+
+COBERTURA_DIFF_DEFEITO = 85
+
+
+def cobertura_diff(repo):
+    """Limiar (%) da cobertura das linhas do diff (`qualidade.coberturaDiff`, número 0-100); inválido ou ausente = 85."""
+    q = _read(repo).get("qualidade")
+    v = q.get("coberturaDiff") if isinstance(q, dict) else None
+    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 100 else COBERTURA_DIFF_DEFEITO
+
+
+FASES_PERFIL = ("pentest", "review")
+
+
+def qualidade(repo):
+    """Perfil `qualidade` ({bloqueantes, consultivos, fases}) ou None sem perfil (repo sem a chave: comportamento antigo).
+
+    Há perfil se `qualidade.bloqueantes` ou `qualidade.consultivos` for uma lista. Entradas não-string/vazias e
+    duplicados caem; `fases` (pentest|review exigidas pelo `pr_fechar`) tem defeito as duas.
+    """
+    q = _read(repo).get("qualidade")
+    if not isinstance(q, dict) or not any(isinstance(q.get(k), list) for k in ("bloqueantes", "consultivos")):
+        return None
+
+    def cmds(k):
+        vistos = []
+        for c in q.get(k) if isinstance(q.get(k), list) else []:
+            if isinstance(c, str) and c.strip() and c.strip() not in vistos:
+                vistos.append(c.strip())
+        return vistos
+
+    bloq = cmds("bloqueantes")
+    fases = q.get("fases")
+    fases = [f for f in FASES_PERFIL if f in fases] if isinstance(fases, list) else list(FASES_PERFIL)
+    return {"bloqueantes": bloq, "consultivos": [c for c in cmds("consultivos") if c not in bloq], "fases": fases}
+
+
+FALHAS_SEGUIDAS_DEFEITO = 3
+
+
+def orcamento(repo):
+    """Orçamento da fila ({spUsd, diaUsd, falhasSeguidas}) ou None sem a chave `orcamento` (comportamento antigo).
+
+    `spUsd`/`diaUsd`: número > 0, senão None (sem esse teto); `falhasSeguidas`: inteiro >= 1, defeito 3."""
+    o = _read(repo).get("orcamento")
+    if not isinstance(o, dict):
+        return None
+
+    def usd(k):
+        v = o.get(k)
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else None
+
+    f = o.get("falhasSeguidas")
+    return {"spUsd": usd("spUsd"), "diaUsd": usd("diaUsd"),
+            "falhasSeguidas": f if isinstance(f, int) and not isinstance(f, bool) and f >= 1 else FALHAS_SEGUIDAS_DEFEITO}
+
+
+PROTEGIDOS_DEFEITO = ("MEMORY.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".cursor/rules/kaizen-flow.mdc")
+
+
+def protected_files(repo: str | Path) -> list[str]:
+    """Ficheiros de contexto protegidos (`protectedFiles`, lista de caminhos relativos); ausente ou inválido = defeito.
+
+    Só se acrescenta/substitui por lista de strings não vazias; lista vazia desliga a guarda."""
+    v = _read(repo).get("protectedFiles")
+    if not isinstance(v, list):
+        return list(PROTEGIDOS_DEFEITO)
+    return [x.strip().replace("\\", "/") for x in v if isinstance(x, str) and x.strip()]
 
 
 HOOKS_NAME = "kaizen-hooks.json"

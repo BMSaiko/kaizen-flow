@@ -61,23 +61,55 @@ class PrTest(unittest.TestCase):
 
     def test_auto_cria_com_gh(self):
         with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)) as m:
-            rc, _, _ = correr(montar("auto") + ["--criar", "--base", "main"])
+            rc, _, _ = correr([*montar("auto"), "--criar", "--base", "main"])
         self.assertEqual(rc, 0)
         cmd = m.call_args[0][0]
         self.assertEqual(cmd[:3], ["gh", "pr", "create"])
         self.assertEqual(cmd[cmd.index("--base") + 1], "main")
         self.assertNotIn("Co-Authored-By", cmd[-1])
 
+    def _repo_kaizen(self):
+        d = Path(tempfile.mkdtemp())
+        (d / "bin").mkdir()
+        (d / "bin" / "kaizen.js").write_text("", encoding="utf-8")
+        return str(d)
+
+    def test_audit_com_hits_recusa_o_pr(self):
+        repo = self._repo_kaizen()
+        chamadas = []
+
+        def fake(cmd, *a, **k):
+            chamadas.append(cmd)
+            return mock.Mock(returncode=1 if "audit" in cmd else 0, stdout="hit", stderr="")
+        with mock.patch("subprocess.run", side_effect=fake):
+            rc, _, err = correr([*montar("auto"), "--criar", "--base", "main", "--repo", repo])
+        self.assertEqual(rc, 1)
+        self.assertIn("audit", err)
+        self.assertEqual(chamadas[0], ["node", "bin/kaizen.js", "audit", "."])
+        self.assertFalse(any(c[:3] == ["gh", "pr", "create"] for c in chamadas))
+
+    def test_audit_limpo_deixa_criar(self):
+        repo = self._repo_kaizen()
+        with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0, stdout="", stderr="")) as m:
+            rc, _, _ = correr([*montar("auto"), "--criar", "--base", "main", "--repo", repo])
+        self.assertEqual(rc, 0)
+        self.assertEqual(m.call_args[0][0][:3], ["gh", "pr", "create"])
+
+    def test_sem_kaizen_js_nao_corre_audit(self):
+        with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)) as m:
+            correr([*montar("auto"), "--criar", "--base", "main"])
+        self.assertFalse(any("audit" in c[0][0] for c in m.call_args_list))
+
     def test_pergunta_nunca_e_review_reprovado_nao_criam(self):
         with mock.patch("subprocess.run") as m:
-            self.assertEqual(correr(montar("pergunta") + ["--criar"])[0], 3)
-            self.assertEqual(correr(montar("nunca") + ["--criar"])[0], 4)
-            self.assertEqual(correr(montar("auto", "ESCALAR") + ["--criar"])[0], 2)
+            self.assertEqual(correr([*montar("pergunta"), "--criar"])[0], 3)
+            self.assertEqual(correr([*montar("nunca"), "--criar"])[0], 4)
+            self.assertEqual(correr([*montar("auto", "ESCALAR"), "--criar"])[0], 2)
         self.assertFalse(any(c[0][0][:1] == ["gh"] for c in m.call_args_list))
 
     def test_dry_run_imprime_e_nunca_cria(self):
         with mock.patch("subprocess.run") as m:
-            rc, out, err = correr(montar("auto") + ["--criar", "--dry-run", "--base", "main"])
+            rc, out, err = correr([*montar("auto"), "--criar", "--dry-run", "--base", "main"])
         self.assertEqual(rc, 0)
         self.assertIn("## Prova", out)
         self.assertIn("Base: main", err)
@@ -98,7 +130,7 @@ class PrTest(unittest.TestCase):
     def test_base_ambigua_com_criar_pede_confirmacao(self):
         amb = mock.Mock(stdout="  origin/main\n  origin/master\n", returncode=0)
         with mock.patch("subprocess.run", return_value=amb) as m:
-            rc, _, _ = correr(montar("auto") + ["--criar"])
+            rc, _, _ = correr([*montar("auto"), "--criar"])
         self.assertEqual(rc, 6)
         self.assertFalse(any(c[0][0][:3] == ["gh", "pr", "create"] for c in m.call_args_list))
 

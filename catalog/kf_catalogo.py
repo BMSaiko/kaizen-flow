@@ -54,6 +54,65 @@ def _nome_existe(ficheiro, nome, classe=None):
     return any(q + nome + q in texto for q in ('"', "'", "`"))
 
 
+def _problemas_id(secao, n, iid, vistos):
+    """Problemas do ID do item `n` da secção (formato, duplicado, numeração)."""
+    esperado = f"{PREFIXO[secao]}-{n:03d}"
+    if not (isinstance(iid, str) and re.fullmatch(PREFIXO[secao] + r"-\d{3}", iid)):
+        return [f"{iid}: ID mal formado (esperado {PREFIXO[secao]}-NNN)"]
+    if iid in vistos:
+        return [f"{iid}: ID duplicado"]
+    if iid != esperado:
+        return [f"{iid}: buraco ou ordem errada na numeração (esperado {esperado})"]
+    return []
+
+
+def _problemas_teste(iid, teste, root):
+    """Problemas da referência `teste` de um item (forma, ficheiro, nome, EC/UC trocado)."""
+    r = _ref(teste)
+    if r is None:
+        return [f"{iid}: teste '{teste}' fora da forma caminho/relativo.py|.js::nome"]
+    if not (root / r[0]).is_file():
+        return [f"{iid}: ficheiro de teste inexistente {r[0]}"]
+    if not _nome_existe(root / r[0], r[1], (teste.split("::")[1:-1] or [None])[-1]):
+        return [f"{iid}: teste '{r[1]}' não existe em {r[0]}"]
+    m = re.search(r"(?i)(?:^|_)(ec|uc)_(\d{3})", r[1])
+    outro = m and f"{m.group(1).upper()}-{m.group(2)}"
+    if outro and isinstance(iid, str) and outro[:2] == iid[:2] and outro != iid:
+        return [f"{iid}: teste '{r[1]}' tem o nome de {outro} (ligado ao EC/UC errado?)"]
+    return []
+
+
+def _problemas_item(secao, n, iid, item, campos, vistos, ids_cat, filhos, root):
+    """Problemas de um item do catálogo (campos, categoria, filho, teste)."""
+    probs = _problemas_id(secao, n, iid, vistos)
+    for campo in campos[1:]:
+        v = item.get(campo)
+        if not (isinstance(v, str) and v.strip()):
+            probs.append(f"{iid}: campo {campo} em falta ou vazio")
+    if secao == "edge_cases" and item.get("categoria") and item["categoria"] not in ids_cat:
+        probs.append(f"{iid}: categoria desconhecida {item['categoria']}")
+    if item.get("filho") and filhos and item["filho"] not in filhos:
+        probs.append(f"{iid}: filho desconhecido {item['filho']}")
+    teste = item.get("teste")
+    if isinstance(teste, str) and teste.strip() and teste != POR_COBRIR:
+        probs += _problemas_teste(iid, teste, root)
+    return probs
+
+
+def _problemas_secao(secao, itens, campos, ids_cat, filhos, root):
+    if not isinstance(itens, list) or not itens:
+        return [f"{secao}: lista não vazia em falta"]
+    probs, vistos = [], set()
+    for n, item in enumerate(itens, 1):
+        if not isinstance(item, dict):
+            probs.append(f"{secao}[{n}]: tem de ser um objeto")
+            continue
+        iid = item.get("id", f"{secao}[{n}]")
+        probs += _problemas_item(secao, n, iid, item, campos, vistos, ids_cat, filhos, root)
+        vistos.add(iid)
+    return probs
+
+
 def problemas(cat, root):
     """Lista de problemas de estrutura (vazia = catálogo válido)."""
     root = Path(root)
@@ -73,46 +132,7 @@ def problemas(cat, root):
         probs.append("filhos: lista não vazia de nomes")
         filhos = []
     for secao, campos in CAMPOS.items():
-        itens = cat.get(secao)
-        if not isinstance(itens, list) or not itens:
-            probs.append(f"{secao}: lista não vazia em falta")
-            continue
-        vistos = set()
-        for n, item in enumerate(itens, 1):
-            if not isinstance(item, dict):
-                probs.append(f"{secao}[{n}]: tem de ser um objeto")
-                continue
-            iid = item.get("id", f"{secao}[{n}]")
-            esperado = f"{PREFIXO[secao]}-{n:03d}"
-            if not (isinstance(iid, str) and re.fullmatch(PREFIXO[secao] + r"-\d{3}", iid)):
-                probs.append(f"{iid}: ID mal formado (esperado {PREFIXO[secao]}-NNN)")
-            elif iid in vistos:
-                probs.append(f"{iid}: ID duplicado")
-            elif iid != esperado:
-                probs.append(f"{iid}: buraco ou ordem errada na numeração (esperado {esperado})")
-            vistos.add(iid)
-            for campo in campos[1:]:
-                v = item.get(campo)
-                if not (isinstance(v, str) and v.strip()):
-                    probs.append(f"{iid}: campo {campo} em falta ou vazio")
-            if secao == "edge_cases" and item.get("categoria") and item["categoria"] not in ids_cat:
-                probs.append(f"{iid}: categoria desconhecida {item['categoria']}")
-            if item.get("filho") and filhos and item["filho"] not in filhos:
-                probs.append(f"{iid}: filho desconhecido {item['filho']}")
-            teste = item.get("teste")
-            if isinstance(teste, str) and teste.strip() and teste != POR_COBRIR:
-                r = _ref(teste)
-                if r is None:
-                    probs.append(f"{iid}: teste '{teste}' fora da forma caminho/relativo.py|.js::nome")
-                elif not (root / r[0]).is_file():
-                    probs.append(f"{iid}: ficheiro de teste inexistente {r[0]}")
-                elif not _nome_existe(root / r[0], r[1], (teste.split("::")[1:-1] or [None])[-1]):
-                    probs.append(f"{iid}: teste '{r[1]}' não existe em {r[0]}")
-                else:
-                    m = re.search(r"(?i)(?:^|_)(ec|uc)_(\d{3})", r[1])
-                    outro = m and f"{m.group(1).upper()}-{m.group(2)}"
-                    if outro and isinstance(iid, str) and outro[:2] == iid[:2] and outro != iid:
-                        probs.append(f"{iid}: teste '{r[1]}' tem o nome de {outro} (ligado ao EC/UC errado?)")
+        probs += _problemas_secao(secao, cat.get(secao), campos, ids_cat, filhos, root)
     for cid in ids_cat:
         if not any(isinstance(e, dict) and e.get("categoria") == cid for e in cat.get("edge_cases") or []):
             probs.append(f"categoria {cid}: vazia (sem EC)")
@@ -253,8 +273,8 @@ def render_use_cases(cat):
         "| ID | I want to... | Run | You get | Test |",
         "|---|---|---|---|---|",
     ]
-    for u in cat["use_cases"]:
-        linhas.append(f"| {u['id']} | {_cel(u['objetivo'])} | {_cel(u['comando'])} | {_cel(u['resultado'])} | {_teste_md(u['teste'])} |")
+    linhas += [f"| {u['id']} | {_cel(u['objetivo'])} | {_cel(u['comando'])} | {_cel(u['resultado'])} | {_teste_md(u['teste'])} |"
+               for u in cat["use_cases"]]
     return "\n".join(linhas) + "\n"
 
 
@@ -340,7 +360,7 @@ def main(argv=None):
     for s in (sys.stdout, sys.stderr):
         if hasattr(s, "reconfigure"):
             s.reconfigure(encoding="utf-8")
-    ap =argparse.ArgumentParser(prog="kaizen catalog", description="Catálogo EC/UC: validar, gerar e medir a cobertura.")
+    ap = argparse.ArgumentParser(prog="kaizen catalog", description="Catálogo EC/UC: validar, gerar e medir a cobertura.")
     ap.add_argument("acao", nargs="?", choices=("report", "render"), default="report")
     ap.add_argument("--check", action="store_true", help="validar estrutura e .md gerados")
     ap.add_argument("--json", action="store_true", help="report em JSON")

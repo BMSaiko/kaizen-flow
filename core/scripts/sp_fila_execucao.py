@@ -13,16 +13,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kf_git  # noqa: E402
 import kaizen_config  # noqa: E402
 import kaizen_engine  # noqa: E402
+import kf_orcamento  # noqa: E402
 import painel_backend  # noqa: E402
+import sp_fila_nucleo as nucleo  # noqa: E402
 import sp_painel_estado as pe  # noqa: E402
-from sp_fila_estado import RELATORIOS, REPO, REQ_POR_SP, SCRIPTS, bloqueio, guardar, ler, registar_sessao, run_hidden
+from sp_fila_estado import RELATORIOS, REPO, REQ_POR_SP, bloqueio, guardar, ler, registar_sessao, run_hidden
 import sp_fila_paineis  # noqa: E402
-from sp_fila_plano import aplicar_master, descendentes, limite, limite_paralelo, load, plan, sem_commit
+from sp_fila_plano import aplicar_master, descendentes, limite_paralelo, load, plan, sem_commit
 from sp_fila_relatorio import destino_relatorio, escrever_commit_md, progresso, relatorio
 
 
 def _backend_defeito():
     """Backend de painéis da config (`painelBackend` do kaizen.config.json); None se não houver (os testes trocam-no)."""
+    if nucleo.MOTOR_ATUAL == "herdr":
+        return nucleo.backend_herdr()
     return painel_backend.escolher(kaizen_config.painel_backend(REPO), herdr=kaizen_config.herdr(REPO))
 
 
@@ -31,15 +35,17 @@ def falta_backend():
     return painel_backend.falta(kaizen_config.painel_backend(REPO))
 
 
-def seguinte(root, estado_path, rel_dir, run=run_hidden, agora=None, custo_fn=None, slug=None, backend=None):
+def seguinte(root, estado_path, rel_dir, run=run_hidden, agora=None, custo_fn=None, slug=None, backend=None,
+             gasto_dia_fn=None, retomar=False):
     """Regista o SP que fechou, respeita os limites e lança o seguinte. Devolve {acao, ...}.
 
     `slug`: só essa sessão fecha (as outras continuam); sem ele fecham todas as registadas (formato antigo).
     Com sessões ainda em curso não lança nada (`acao: espera`) até haver teto de concorrência.
-    `backend`: painéis do modo paralelo (defeito: o da config, resolvido só quando há um SP a lançar)."""
+    `backend`: painéis do modo paralelo (defeito: o da config, resolvido só quando há um SP a lançar).
+    Orçamento (`estado.orcamento_cfg`): ao exceder um teto devolve `acao: pausa` com a razão em `estado.pausa`; `retomar` reavalia."""
     with ExitStack() as pilha:  # o lock é solto durante o spawn (`_seguinte` fecha-o e volta a prendê-lo) e solto no fim
         pilha.enter_context(bloqueio(estado_path))
-        return _seguinte(root, estado_path, rel_dir, run, agora or datetime.now(), custo_fn, slug, pilha, backend)
+        return _seguinte(root, estado_path, rel_dir, run, agora or datetime.now(), custo_fn, slug, pilha, backend, gasto_dia_fn, retomar)
 
 
 def _fechar_painel(estado, slug, feito):
@@ -85,11 +91,6 @@ def _ler_sp(sp):
     return ""
 
 
-def _sp_move_na_worktree(root, worktree, alvo):
-    """Delega em `sp_fila_paineis.sp_move_na_worktree` (um só sítio para o argv do `sp-move` na worktree)."""
-    return sp_fila_paineis.sp_move_na_worktree(root, worktree, alvo)
-
-
 def _mae_na_worktree(mae, run):
     """Ficheiro da mãe na worktree dela (`ensure`): o `## Progresso` nunca suja master (a prova real apanhou-o lá).
 
@@ -106,14 +107,17 @@ def _mae_na_worktree(mae, run):
     return wt / rel
 
 
-def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, backend=None):
-    estado = ler(estado_path)
-    if not slug and estado.get("concorrencia") and estado["sessoes"]:
-        raise SlugObrigatorio("em modo paralelo `--seguinte` exige `--slug <SP que fechou>`; sem ele fecharia sessões ainda vivas")
-    items = load(root, estado.get("projeto"))
-    if estado.get("concorrencia"):  # worktrees atrasadas: o estado dos SPs é o de master
-        aplicar_master(items)
-    so = descendentes(items, estado["programa"]) if estado.get("programa") else None
+def _lancar(alvo, estado, backend, run, root):
+    """Lança o filho num painel: vaga global, `ensure`, Doing só na worktree do filho, painel com o modelo do SP. Devolve (erro|None, item)."""
+    try:
+        item = sp_fila_paineis.lancar([alvo], estado["fila_paineis"], backend, run=run, root=root)[0]
+    except Exception as e:  # noqa: BLE001 — registo das filas ilegível ou inválido: falha só este SP
+        item = {"slug": alvo.slug, "estado": "falhou", "msg": f"erro a lançar {alvo.slug}: {e}"}
+    return (item["msg"] if item["estado"] == "falhou" else None), item
+
+
+def _registar_fechadas(root, estado, items, slug, run):
+    """Passa as sessões fechadas a feitas/falhadas (só o `slug` dado, ou todas); recusa um Done que só existe na worktree."""
     for fechada in ([slug] if slug else list(estado["sessoes"])):
         sp = next((s for s, _ in items if s.slug == fechada), None)
         if fechada in estado["sessoes"] and (sp is None or sp.status != "Done"):
@@ -130,9 +134,62 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
         estado["seguidas"] = 0 if feito else estado.get("seguidas", 0) + 1
         del estado["sessoes"][fechada]
         _fechar_painel(estado, fechada, feito)
+
+
+def _registar_lancamento(estado, alvo, erro, item, agora, lancados, itens):
+    """Regista no estado o resultado do lançamento; devolve o motivo de paragem (None se lançou)."""
+    if erro:
+        estado["sessoes"].pop(alvo.slug, None)
+        estado["falhados"].append(alvo.slug)
+        estado["seguidas"] = estado.get("seguidas", 0) + 1
+        return erro
+    registar_sessao(estado, alvo.slug, agora.isoformat(timespec="seconds"), requests=REQ_POR_SP,
+                    **({"worktree": item["worktree"], "painel": True} if item else {}))
+    estado["usados"] = estado.get("usados", 0) + REQ_POR_SP
+    lancados.append(alvo)
+    if item:
+        itens.append(item)
+    return None
+
+
+def _pausar(estado, estado_path, razao, agora):
+    """Regista a pausa por orçamento (a fila fica intacta, sem relatório) e devolve o resultado `pausa`."""
+    estado["pausa"] = {"estado": "orcamento", "razao": razao, "desde": agora.isoformat(timespec="seconds")}
+    guardar(estado_path, estado)
+    return {"acao": "pausa", "razao": razao, "sessoes": list(estado["sessoes"])}
+
+
+def _verificar_orcamento(estado, fechadas, custo_fn, gasto_dia_fn, agora):
+    """`parar` → razão (str); `aviso` → avisos impressos em stderr; sem `orcamento_cfg`, None (comportamento antigo)."""
+    cfg = estado.get("orcamento_cfg")
+    if not cfg:
+        return None
+    sp_usd = max((_custos_seguros(custo_fn).get(f, 0.0) for f in fechadas), default=0.0) if cfg.get("spUsd") and fechadas else 0.0
+    dia = (gasto_dia_fn or kf_orcamento.gasto_dia)(agora) if cfg.get("diaUsd") else 0.0
+    r = kf_orcamento.decidir(cfg, sp_usd=sp_usd, dia_usd=dia, seguidas=estado.get("seguidas", 0))
+    for a in r["avisos"]:
+        print(f"aviso de orçamento: {a}", file=sys.stderr)
+    return r["razao"] or None
+
+
+def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, backend=None, gasto_dia_fn=None, retomar=False):
+    estado = ler(estado_path)
+    if not slug and estado.get("concorrencia") and estado["sessoes"]:
+        raise SlugObrigatorio("em modo paralelo `--seguinte` exige `--slug <SP que fechou>`; sem ele fecharia sessões ainda vivas")
+    items = load(root, estado.get("projeto"))
+    if estado.get("concorrencia"):  # worktrees atrasadas: o estado dos SPs é o de master
+        aplicar_master(items)
+    so = descendentes(items, estado["programa"]) if estado.get("programa") else None
+    antes = set(estado["sessoes"])
+    _registar_fechadas(root, estado, items, slug, run)
+    if retomar and estado.get("pausa"):  # o humano subiu o teto (config ou estado): reavaliar já
+        estado.pop("pausa")
+        estado["orcamento_cfg"] = kaizen_config.orcamento(REPO) or estado.get("orcamento_cfg")
+    razao = _verificar_orcamento(estado, antes - set(estado["sessoes"]), custo_fn, gasto_dia_fn, agora)
+    if razao or estado.get("pausa"):  # pausada: nada é lançado até `--retomar`; os SPs em curso acabam (paragem só entre SPs)
+        return _pausar(estado, estado_path, razao or estado["pausa"]["razao"], agora)
     # Paralelo (--concorrencia N): sem orçamento; só `--ate` e `--max` explícito; o único travão é o guard de contexto, que continua a sessão por handoff.
     teto = estado.get("concorrencia") or 1
-    paralelo = bool(estado.get("concorrencia"))  # um só critério: com `concorrencia` (mesmo 1) lança num painel
     if len(estado["sessoes"]) >= teto:
         guardar(estado_path, estado)
         return {"acao": "espera", "sessoes": list(estado["sessoes"])}
@@ -141,95 +198,86 @@ def _seguinte(root, estado_path, rel_dir, run, agora, custo_fn, slug, pilha, bac
     parada = (f"cadeia parada: {', '.join(estado['falhados'])} não chegou a Done"
               if estado.get("modo") == "sequencial" and estado["falhados"] else None)
     done = {sp.slug for sp, _ in items if sp.status == "Done"}
-    custo = 0.0
-    if estado.get("usd") is not None and not paralelo:
-        custos = (custo_fn or _custos)()
-        custo = sum(custos.get(s, 0.0) for s in so) - estado.get("custo_inicio", 0.0)
     lancados, itens, pendentes, motivo = [], [], [], None
     # Único decisor: nunca lançar SP já iniciado (Doing), nem um que a fila já lançou/fechou ou reservou (outro `--seguinte` corre enquanto o spawn tem o lock solto).
     for alvo in (sp for sp in ([] if parada else fila) if sp.status == "TODO" and all(d in done for d in sp.depends_on)):
         if alvo.slug in set(estado["sessoes"]) | set(estado["feitos"]) | set(estado["falhados"]):
             continue
-        motivo = limite_paralelo(estado, agora) if paralelo else limite(estado, agora, custo)
+        motivo = limite_paralelo(estado, agora)
         if motivo or len(estado["sessoes"]) >= teto:
             break
-        if paralelo:
-            backend = backend or _backend_defeito()
-            if backend is None:
-                motivo = falta_backend()
-                break
-            if not estado.get("fila_paineis"):
-                estado["fila_paineis"] = sp_fila_paineis.garantir_fila(estado)
-        doing = alvo.path.parent.parent / "Doing" / alvo.path.name
-        inicio = agora.isoformat(timespec="seconds")
-        registar_sessao(estado, alvo.slug, inicio, requests=REQ_POR_SP, reserva=True)  # reservar o slug antes de soltar o lock
-        guardar(estado_path, estado)
-        pilha.close()
-        erro, item = None, None
-        if paralelo:  # painel: vaga global, `ensure`, Doing só na worktree do filho (nunca o `sp-move` do orquestrador), painel com o modelo do SP
-            try:
-                item = sp_fila_paineis.lancar([alvo], estado["fila_paineis"], backend, run=run, root=root)[0]
-            except Exception as e:  # noqa: BLE001 — registo das filas ilegível ou inválido: falha só este SP
-                item = {"slug": alvo.slug, "estado": "falhou", "msg": f"erro a lançar {alvo.slug}: {e}"}
-            if item["estado"] == "falhou":
-                erro = item["msg"]
-        else:
-            r = run([sys.executable, "-I", str(SCRIPTS / "sp-move.py"), "--root", str(root), "--project", alvo.project, alvo.slug, "doing"],
-                    capture_output=True, text=True, encoding="utf-8")
-            if r.returncode != 0:
-                erro = f"erro a lançar {alvo.slug}: {(r.stderr or r.stdout).strip()}"
-            if not erro:
-                r = run([sys.executable, "-I", str(SCRIPTS / "sp-handoff.py"), "--launch", str(doing), "--auto"], capture_output=True, text=True, encoding="utf-8")
-                if r.returncode != 0:
-                    erro = f"erro a lançar {alvo.slug}: {(r.stderr or r.stdout).strip()}"
-        pilha.enter_context(bloqueio(estado_path))
-        estado = ler(estado_path)  # outros `--seguinte` podem ter alterado o estado durante o spawn
+        if razao := _verificar_orcamento(estado, [], custo_fn, gasto_dia_fn, agora):  # o custo do dia pode ter subido durante um spawn
+            if not lancados:
+                return _pausar(estado, estado_path, razao, agora)
+            estado["pausa"] = {"estado": "orcamento", "razao": razao, "desde": agora.isoformat(timespec="seconds")}
+            break
+        estado, backend, erro, item = _spawn(alvo, estado, estado_path, (run, root, agora, backend), pilha)
+        if backend is None:
+            motivo = falta_backend()
+            break
         if item and item["estado"] == "pendente":  # sem vaga global: tira a reserva, não é falha; nada mais abre agora
             estado["sessoes"].pop(alvo.slug, None)
             pendentes.append(alvo.slug)
             motivo = None
             guardar(estado_path, estado)
             break
-        if erro:
-            motivo = erro
-            estado["sessoes"].pop(alvo.slug, None)
-            estado["falhados"].append(alvo.slug)
-            estado["seguidas"] = estado.get("seguidas", 0) + 1
-        else:
-            registar_sessao(estado, alvo.slug, agora.isoformat(timespec="seconds"), requests=REQ_POR_SP,
-                            **({"worktree": item["worktree"], "painel": True} if item else {}))
-            estado["usados"] += REQ_POR_SP
-            lancados.append(alvo)
-            if item:
-                itens.append(item)
-            motivo = None
+        motivo = _registar_lancamento(estado, alvo, erro, item, agora, lancados, itens)
         guardar(estado_path, estado)
+    return _desfecho(estado, estado_path, (lancados, itens, pendentes, motivo, parada),
+                     (items, so, fila, excluidos, rel_dir, run, agora, custo_fn))
+
+
+def _spawn(alvo, estado, estado_path, ctx, pilha):
+    """Reserva o slug, lança o painel com o lock solto e relê o estado. (estado, backend|None, erro, item)."""
+    run, root, agora, backend = ctx
+    backend = backend or _backend_defeito()
+    if backend is None:
+        return estado, None, None, None
+    if not estado.get("fila_paineis"):
+        estado["fila_paineis"] = sp_fila_paineis.garantir_fila(estado)
+    registar_sessao(estado, alvo.slug, agora.isoformat(timespec="seconds"), requests=REQ_POR_SP, reserva=True)  # reservar o slug antes de soltar o lock
+    guardar(estado_path, estado)
+    pilha.close()
+    erro, item = _lancar(alvo, estado, backend, run, root)
+    pilha.enter_context(bloqueio(estado_path))
+    return ler(estado_path), backend, erro, item  # outros `--seguinte` podem ter alterado o estado durante o spawn
+
+
+def _desfecho(estado, estado_path, res, ctx):
+    """Resultado de `--seguinte` depois do ciclo de lançamentos: espera, fim da fila ou `lancou`."""
+    lancados, itens, pendentes, motivo, parada = res
+    items, so, fila, excluidos, rel_dir, run, agora, custo_fn = ctx
     if pendentes and not lancados:
         guardar(estado_path, estado)
         return {"acao": "espera", "sessoes": list(estado["sessoes"]), "pendentes": pendentes}
     if not lancados and not estado["sessoes"]:
-        motivo = parada or motivo or (limite_paralelo(estado, agora) if paralelo else limite(estado, agora, custo)) or "fila vazia"
-        sps = {sp.slug: (sp.status, _ler_sp(sp)) for sp, _ in items
-               if sp.slug in estado["feitos"] + estado["falhados"]}
-        rel_dir, wt_slug = destino_relatorio(rel_dir, agora, run)
-        path = relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora, _custos_seguros(custo_fn), sps)
-        if wt_slug:
-            escrever_commit_md(path.parents[len(RELATORIOS.relative_to(REPO).parts)], path, agora)
-        if estado.get("programa"):
-            mae = next((sp for sp, _ in items if sp.slug == estado["programa"]), None)
-            alvo_mae = _mae_na_worktree(mae, run) if mae is not None else None
-            if alvo_mae is not None:
-                progresso(alvo_mae, estado, fila, motivo, agora)
-        Path(estado_path).replace(Path(estado_path).with_name("ultima.json"))  # `--gastos` lê-o depois do fim
-        # Programa com a árvore toda em Done (em master): o principal fecha a mãe na worktree dela.
-        fechar = estado.get("programa") if so and all(sp.status == "Done" for sp, _ in items if sp.slug in so) else None
-        return {"acao": "fim", "motivo": motivo, "relatorio": str(path), "fechar_mae": fechar}
+        motivo = parada or motivo or limite_paralelo(estado, agora) or "fila vazia"
+        return _fim(estado, estado_path, items, so, fila, excluidos, motivo, rel_dir, run, agora, custo_fn)
     guardar(estado_path, estado)
     if not lancados:
         return {"acao": "espera", "sessoes": list(estado["sessoes"])}
     alvo = lancados[0]
     return {"acao": "lancou", "slug": alvo.slug, "slugs": [sp.slug for sp in lancados], "itens": itens,
             "caminho": str(alvo.path.parent.parent / "Doing" / alvo.path.name)}
+
+
+def _fim(estado, estado_path, items, so, fila, excluidos, motivo, rel_dir, run, agora, custo_fn):
+    """Relatório final, progresso da mãe e `ultima.json`; devolve o resultado `fim`."""
+    sps = {sp.slug: (sp.status, _ler_sp(sp)) for sp, _ in items
+           if sp.slug in estado["feitos"] + estado["falhados"]}
+    rel_dir, wt_slug = destino_relatorio(rel_dir, agora, run)
+    path = relatorio(estado, fila, excluidos, motivo, rel_dir, run, agora, _custos_seguros(custo_fn), sps)
+    if wt_slug:
+        escrever_commit_md(path.parents[len(RELATORIOS.relative_to(REPO).parts)], path, agora)
+    if estado.get("programa"):
+        mae = next((sp for sp, _ in items if sp.slug == estado["programa"]), None)
+        alvo_mae = _mae_na_worktree(mae, run) if mae is not None else None
+        if alvo_mae is not None:
+            progresso(alvo_mae, estado, fila, motivo, agora)
+    Path(estado_path).replace(Path(estado_path).with_name("ultima.json"))  # `--gastos` lê-o depois do fim
+    # Programa com a árvore toda em Done (em master): o principal fecha a mãe na worktree dela.
+    fechar = estado.get("programa") if so and all(sp.status == "Done" for sp, _ in items if sp.slug in so) else None
+    return {"acao": "fim", "motivo": motivo, "relatorio": str(path), "fechar_mae": fechar}
 
 
 def _custos_seguros(custo_fn=None):

@@ -86,17 +86,21 @@ def resumo(root, slug, project=None):
         partes.append(("Esboço", _itens(_seccao_extra(texto, "Esboço"), 10)))
     if mae:
         partes.insert(3, ("Filhos (entrega, dependências)", _filhos(root, sp)[:8]))
+    return _render(slug, partes)
 
+
+def _render(slug, partes):
+    """(rc, texto) a partir de `partes` [(título, linhas)]; rc 1 se falta matéria."""
     saida, faltas = [f"RESUMO · {slug}"], []
     for titulo, linhas in partes:
         if not linhas:
             faltas.append(titulo.split(" (")[0])
             linhas = ["(em falta)"]
-        saida += [f"{titulo}:"] + [x if x.startswith(" ") or x.startswith("-") or not x else f"  {x}" for x in linhas]
+        saida += [f"{titulo}:"] + [x if x.startswith((" ", "-")) or not x else f"  {x}" for x in linhas]
     if faltas:
         saida.append(_corta(f"FALTA matéria: {', '.join(faltas)}"))
     if len(saida) > MAX_LINHAS:
-        saida = saida[:MAX_LINHAS - 1] + ["…"]
+        saida = [*saida[:MAX_LINHAS - 1], "…"]
         if faltas:
             saida[-1] = _corta(f"FALTA matéria: {', '.join(faltas)}")
     return (1 if faltas else 0), "\n".join(saida)
@@ -114,9 +118,6 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import kf_errlog
     sys.exit(kf_errlog.executar("sp-resumo", main))

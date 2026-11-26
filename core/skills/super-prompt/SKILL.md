@@ -3,7 +3,7 @@ name: super-prompt
 description: Constrói um Super Prompt de 8 secções (brainstorm, SWOT, grill-me e DR mini) e guarda-o como SP. Usar para transformar uma ideia num SP pronto para o michi.
 version: 2.0.0
 model: claude-opus-5-5
-effort: medium
+effort: low
 ---
 # Super Prompt
 
@@ -24,7 +24,7 @@ Tudo na sessão principal, sem `Agent`.
 
 ## Gerar o SP
 1. Todo o SP criado ou revisto (por esta skill, `/sp`, `pentest` ou pedido direto) é escrito num painel `sp-autor`: o principal cria o SP vazio (passo 2), grava a semente (grill, DR mini, flags) e corre `python -I scripts/sp-autor.py --sp <SP.md> --semente <ficheiro>` (o painel lê e apaga a semente e, no fim, avisa o painel de origem com o caminho do SP; revisão = painel novo com os ajustes). Exceção: numa sessão nova (1.º pedido, sem trabalho anterior no contexto) o principal escreve direto. Nunca `Agent` nem `SendMessage`.
-2. O principal corre `python -I scripts/sp-new.py --project <p> --slug <slug> --priority P1|P2|P3 [flags] (modo auto e autorizações commit/push/PR/merge vêm do método `desenvolvimento` do projeto ou, sem ele, do destino; mostrar o herdado em vez de perguntar; só passar flags para desviar)` (nunca criar o ficheiro à mão), preenche as **8 secções** a partir do grill e do DR, escolhe o `michi_modelo` de cada SP (`--michi` / `@nível`: simples, default, complexo) e valida com `sp-validate.py` sem avisos. Secção vazia = voltar ao grill-me. Projeto não inferível: `AskUserQuestion` antes de criar; nunca inventar pasta. Repo novo: perguntar a visibilidade no grill. Conteúdo e formato do resumo: `super-prompt-detalhe.md` §Autor.
+2. O principal corre `python -I scripts/sp-new.py --project <p> --slug <slug> --priority P1|P2|P3 --permissoes <seleção> [flags] (modo auto vem do método `desenvolvimento` ou do destino; permissões do repo: um `AskUserQuestion` `multiSelect` com `all (commit+push+pr+merge)`, `commit`, `push`, `pr`, `merge`, recomendado = herdado do método/destino; a seleção vai a `--permissoes`; em loops e `/sp-fila` não perguntar e omitir a flag)` (nunca criar o ficheiro à mão), preenche as **8 secções** a partir do grill e do DR, escolhe o `michi_modelo` de cada SP (`--michi` / `@nível`: simples, default, complexo) e valida com `sp-validate.py` sem avisos. Secção vazia = voltar ao grill-me. Projeto não inferível: `AskUserQuestion` antes de criar; nunca inventar pasta. Repo novo: perguntar a visibilidade no grill. Conteúdo e formato do resumo: `super-prompt-detalhe.md` §Autor.
 3. Resumo: `python -I scripts/sp-resumo.py <slug>` (1 ecrã: Quê · Porquê · Forma · Limites · Prova · Destino; mãe: + filhos; `ui: sim`: + `## Esboço`, obrigatório); mostrá-lo ao user. rc 1 = falta matéria: voltar ao grill-me nessa secção. SP com `ui: sim` leva `sp-new.py --ui`.
 4. Imprimir o «Super Prompt saved» e fazer **um só** `AskUserQuestion` com duas perguntas: «Aprovas o resumo?» (Sim / Ajustar) e «Executar já ou fica em TODO?» (sem execução por omissão; usage do plano). Sem «Sim» o SP não entra na fila.
 5. «Sim»: `python -I scripts/sp-aprovar.py <slug> [--programa] --rondas <n>` (grava `aprovado:` e `grill:`; a fila e o `/michi` em auto recusam SPs por aprovar); depois «executar já» = arranque do michi (skill `michi`), «TODO» = parar. «Ajustar»: aplicar os ajustes (SP já commitado: numa worktree) e repetir o resumo.
@@ -42,4 +42,4 @@ Super Prompt saved: <abs path>
 Sections: 1.Role 2.Context 3.Objective 4.Success 5.Constraints 6.Seams 7.Steps 8.Done-when
 Reuse:    /michi <paste body of this file> in a new session
 ```
-Sem commit, push nem DA; depois, a pergunta de §Gerar 4.
+O painel `sp-autor` commita e envia só o SP preenchido (em `master`); sem DA; depois, a pergunta de §Gerar 4.

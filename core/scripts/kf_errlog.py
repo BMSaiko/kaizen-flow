@@ -19,6 +19,7 @@ Uso: módulo; `sys.exit(kf_errlog.executar("script", main))` no fim de cada scri
 rc: propaga o rc do script envolvido
 """
 import json
+from collections.abc import Callable
 import os
 import re
 from pathlib import Path as _P
@@ -73,7 +74,7 @@ def filtrar_args(argv):
             out.append(REDACTED)
             continue
         if a.startswith("-") and "=" in a:
-            nome, _, valor = a.partition("=")
+            nome = a.partition("=")[0]
             out.append(f"{nome}={REDACTED}" if _SECRET_NAME.search(nome) else _limpar_texto(a, MAX_ARG))
             continue
         if a.startswith("-") and _SECRET_NAME.search(a):
@@ -162,8 +163,11 @@ def _msg_inesperado(script, e, gravou):
                          "repetir com `KF_DEBUG=1` para ver o stack e reportar com a linha do log")
 
 
-def executar(script, main, argv=None):
-    """Corre `main()` (lê `sys.argv`; `argv` só serve para o log) e regista exceções e rc != 0 sem mudar o resultado (re-raise, mesmo rc)."""
+def executar(script: str, main: Callable[[], int | None], argv: list[str] | None = None) -> int | None:
+    """Corre `main()` (lê `sys.argv`; `argv` só serve para o log) com stdout/stderr em UTF-8 e regista exceções e rc != 0 sem mudar o resultado (re-raise, mesmo rc)."""
+    for stream in (sys.stdout, sys.stderr):  # pipe no Windows: sem isto os acentos saem em cp1252
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     real = sys.stderr
     tee = _Tee(real)
     sys.stderr = tee

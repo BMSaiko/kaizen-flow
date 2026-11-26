@@ -12,4 +12,4 @@ function formatar(ec, oque, porque, estado, proximo) {
   return `${ec} O quê: ${o}\n  Porquê: ${p}\n  Estado guardado: ${e}\n  Próximo: ${n}`;
 }
 
-module.exports = { formatar, EC_RE };
+module.exports = { formatar };

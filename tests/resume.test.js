@@ -4,10 +4,9 @@ const assert = require("node:assert");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { spawnSync } = require("child_process");
 
-const BIN = path.join(__dirname, "..", "bin", "kaizen.js");
-const run = (cwd, ...a) => spawnSync("node", [BIN, ...a], { cwd, encoding: "utf8", env: { ...process.env, HERDR_PANE_ID: "", WEZTERM_PANE: "", TMUX_PANE: "" } });
+const { BIN, kaizen } = require("./helpers/sandbox");
+const run = (cwd, ...a) => kaizen(a, { cwd });
 
 function repo() {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-resume-"));

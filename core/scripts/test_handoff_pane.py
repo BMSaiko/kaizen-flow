@@ -47,6 +47,12 @@ def test_prompt_has_text_usa_a_ultima_linha_do_prompt():
     assert hp.prompt_has_text("sem prompt") is False
 
 
+def test_prompt_has_text_ignora_a_sugestao_do_prompt_vazio():
+    assert hp.prompt_has_text('❯ Try "edit __main__.py to…"') is False
+    assert hp.text_arrived('❯ Try "fix lint errors"', "Continua a conversa anterior: corre x") is False
+    assert hp.prompt_has_text("❯ Try fazer isto") is True
+
+
 class _Res:
     def __init__(self, stdout):
         self.stdout = stdout
@@ -128,13 +134,21 @@ def test_send_lines_com_screen_confirma_cada_linha():
     assert p.enters == 3  # 1.ª linha: Enter perdido + reenvio; 2.ª linha: um Enter (o contador perdido já passou)
 
 
+def test_wait_idle_espera_pelo_fim_do_turno():
+    ecras = iter(["⏵⏵ auto · esc to interrupt", "⏵⏵ auto · esc to interrupt", "❯ "])
+    dormiu = []
+    hp.wait_idle(1, lambda p: next(ecras), sleep=dormiu.append)
+    assert len(dormiu) == 2
+    hp.wait_idle(1, lambda p: "esc to interrupt", sleep=lambda s: None, timeout=4)  # esgota e segue
+
+
 def test_pane_exists_e_check_prompt_com_run_falso():
     run = lambda *a, **k: _Res('[{"pane_id": 4}]')  # noqa: E731
     hp.pane_exists(4, run=run)
     with pytest.raises(hp.HandoffError, match="não existe"):
         hp.pane_exists(9, run=run)
     with pytest.raises(hp.HandoffError, match="texto por enviar"):
-        hp.check_prompt(4, run=lambda *a, **k: _Res("❯ rascunho"))
+        hp.check_prompt(4, run=lambda *a, **k: _Res("❯ rascunho"), espera=0)
     hp.check_prompt(4, run=lambda *a, **k: _Res("❯ "))
 
 
@@ -200,5 +214,37 @@ def test_check_prompt_le_o_ecra_pelo_backend_herdr():
         vistos.append(argv)
         return _Res("❯ rascunho")
     with pytest.raises(hp.HandoffError):
-        hp.check_prompt("w3:p17", run=run, backend="herdr")
+        hp.check_prompt("w3:p17", run=run, backend="herdr", espera=0)
     assert vistos == [["herdr", "pane", "read", "w3:p17", "--source", "visible"]]
+
+
+def test_check_prompt_espera_que_o_rascunho_limpe():
+    ecras = iter(["❯ /sp-handoff", "❯ /sp-handoff", "❯ "])
+    dormiu = []
+    hp.check_prompt(4, run=lambda *a, **k: _Res(next(ecras)), sleep=dormiu.append)
+    assert len(dormiu) == 2
+
+
+def test_check_prompt_aborta_se_o_texto_persiste():
+    dormiu = []
+    with pytest.raises(hp.HandoffError, match="texto por enviar"):
+        hp.check_prompt(4, run=lambda *a, **k: _Res("❯ rascunho"), espera=4, sleep=dormiu.append)
+    assert len(dormiu) == 2
+
+
+def test_check_prompt_limpar_faz_ctrl_u_e_segue_se_limpa():
+    chamadas = []
+    ecras = iter(["❯ sugestao fantasma", "❯ "])
+
+    def run(argv, *a, **k):
+        chamadas.append(argv)
+        return _Res(next(ecras)) if argv[:3] == ["herdr", "pane", "read"] else _Res("")
+
+    hp.check_prompt("w:p1", run=run, backend="herdr", espera=0, sleep=lambda s: None, limpar=True)
+    assert ["herdr", "pane", "send-keys", "w:p1", "ctrl+u"] in chamadas
+
+
+def test_check_prompt_limpar_aborta_se_continua_com_texto():
+    run = lambda argv, *a, **k: _Res("❯ rascunho")  # noqa: E731
+    with pytest.raises(hp.HandoffError, match="rascunho"):
+        hp.check_prompt("w:p1", run=run, backend="herdr", espera=0, sleep=lambda s: None, limpar=True)

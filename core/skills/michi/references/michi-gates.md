@@ -4,7 +4,7 @@ Ordem fixa: **gates → harden → pentest → review**. Cada passo só corre se
 
 ## Gates por tipo de repo
 
-`python -I scripts/sp-gates.py --sugerir <repo>` imprime o bloco `gates:` para colar no frontmatter do SP.
+`python -I scripts/sp-gates.py --sugerir <repo>` imprime o bloco `gates:` para colar no frontmatter do SP (Python: `ruff`, `mypy`; TS: `tsc --noEmit --strict`; ratchet de dívida: `scripts/quality-ratchet.py`).
 
 | Tipo (deteção) | Comandos |
 |---|---|
@@ -12,6 +12,10 @@ Ordem fixa: **gates → harden → pentest → review**. Cada passo só corre se
 | Tauri (`src-tauri/Cargo.toml`) | `cargo check --manifest-path src-tauri/Cargo.toml` + os de Node |
 | Python (`pyproject.toml`/`pytest.ini`/`setup.cfg`) | `python -m pytest -q` |
 | Vault (`scripts/context-budget.py` + `scripts/test-fast.py`, este se existir) | `python -I scripts/context-budget.py`, `python -I scripts/test-fast.py` |
+
+## Perfil `qualidade`
+
+Se `kaizen.config.json` tem `qualidade: {bloqueantes, consultivos, fases}`, correr `sp-gates.py <SP> --repo <repo-alvo>`: junta os gates do perfil aos do SP (sem duplicar); `bloqueantes` travam como os do SP, `consultivos` correm no fim e só registam (`consultivo aviso` na tabela). `--perfil <repo>` sugere o bloco. O SP não desliga o perfil. No fecho, `pr_fechar.py <PR> --sp <slug> --pentest-relatorio F --review-estado F` volta a correr os bloqueantes e exige pentest «sem achados» e review `APROVADO`; falha = rc 11, sem merge, SP `bloqueado` com o motivo. Detalhe: `docs/config.md`.
 
 ## Execução e resumo
 
@@ -38,3 +42,7 @@ Ordem fixa: **gates → harden → pentest → review**. Cada passo só corre se
 ## Passos seguintes
 
 `/harden` (só leitura, FAIL bloqueia) → `/pentest` (achados viram SPs) → `/review-ciclo` (painel `revisor` independente via `sp-revisor.py`, `--inline` só se simples/sem painéis; 3 iterações, depois escalada). Detalhe: `michi-fases-detalhe.md` §Fase 5.
+
+## Gates de design (`ui: sim`)
+
+Com `ui: sim` no frontmatter, `sp-gates.py <SP> --repo <repo-alvo>` junta `ds-lint` (bloqueante) e `ds-verify` (bloqueante com Playwright no repo, senão consultivo com aviso, rc 3 nunca verde). Baselines só com `--atualizar-baselines`, registado no SP. Detalhe: `design-system/references/verificacao.md`, `docs/config.md`.

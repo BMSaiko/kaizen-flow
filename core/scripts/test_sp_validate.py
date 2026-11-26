@@ -113,7 +113,7 @@ GATES = ["gates:", "  - cmd: python -I scripts/test_sp_list.py", "    timeout: 6
 
 
 def test_gates_validos_passam():
-    assert sp_validate.validate(build(extra=GATES + ["prova: python -I scripts/x.py"]), "TODO") == []
+    assert sp_validate.validate(build(extra=[*GATES, "prova: python -I scripts/x.py"]), "TODO") == []
 
 
 @pytest.mark.parametrize("gates, msg", [
@@ -144,7 +144,7 @@ def test_aviso_modo_auto_sem_gates():
 @pytest.mark.parametrize("extra", [
     ["perfil: cauteloso"],
     ["perfil: normal", "max_tentativas: 3", "max_requests: 40", "parar_se: [gate-falha, custo]"],
-    ["perfil: autonomo"] + GATES,
+    ["perfil: autonomo", *GATES],
 ])
 def test_perfil_valido(extra):
     assert sp_validate.validate(build(extra=extra), "TODO") == []

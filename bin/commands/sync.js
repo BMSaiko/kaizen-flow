@@ -48,12 +48,15 @@ function sanitizer(cfg) {
   const keys = MARKER_KEYS.filter((k) => cfg[k]).sort((a, b) => cfg[b].length - cfg[a].length);
   for (const k of keys) {
     const v = cfg[k];
-    const b1 = /^\w/.test(v) && k !== "agentSlug" ? "\\b" : "";
-    const b2 = /\w$/.test(v) && k !== "agentSlug" ? "\\b" : "";
+    const b1 = /^\w/.test(v) ? "\\b" : "";
+    const b2 = /\w$/.test(v) ? "\\b" : "";
     rules.push([new RegExp(b1 + esc(v) + b2, "g"), `{{${k}}}`]);
   }
   // outras grafias do agente (ex.: «Heimdall») não têm marcador: saem com perdas
-  if (cfg.agentSlug) rules.push([new RegExp(esc(cfg.agentSlug), "gi"), "kaizen"]);
+  if (cfg.agentSlug) {
+    const s = cfg.agentSlug;
+    rules.push([new RegExp((/^\w/.test(s) ? "\\b" : "") + esc(s) + (/\w$/.test(s) ? "\\b" : ""), "gi"), "kaizen"]);
+  }
   return (t) => rules.reduce((acc, [re, to]) => acc.replace(re, to), t);
 }
 
@@ -73,12 +76,82 @@ function build(dest, tdir, stamp) {
   return { parts, unlisted, ...overlay(dest, tdir, stamp) };
 }
 
+// valores pessoais (chaves de marcador) que não podem ficar em core/
+function leaks(cfg, text) {
+  return MARKER_KEYS.filter((k) => cfg[k]).filter((k) => {
+    const v = cfg[k];
+    return new RegExp((/^\w/.test(v) ? "\\b" : "") + esc(v) + (/\w$/.test(v) ? "\\b" : "")).test(text);
+  });
+}
+
+// --only <caminho> (repetível): caminho relativo a core/ (com ou sem «core/»), ficheiro ou pasta
+function onlyArgs(argv) {
+  const out = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--only") {
+      if (!argv[i + 1] || argv[i + 1].startsWith("--")) throw new Error("--only precisa de um caminho (relativo a core/)");
+      out.push(argv[++i].replace(/\\/g, "/").replace(/^core\//, "").replace(/\/+$/, ""));
+    }
+  }
+  return out;
+}
+const covered = (only, rel) => only.some((o) => rel === o || rel.startsWith(`${o}/`));
+
+const git = (args) => spawnSync("git", args, { cwd: PKG, encoding: "utf8" });
+
+// escrever em core/ só numa worktree do repo e com core/ limpo (nada por commitar que se perca)
+const real = (p) => { try { return fs.realpathSync.native(p); } catch { return path.resolve(p); } }; // 8.3/symlinks (Windows)
+function guardTree() {
+  const top = git(["rev-parse", "--show-toplevel"]);
+  if (top.status !== 0 || real(top.stdout.trim()) !== real(PKG)) return; // pacote sem git (cópia/instalado): nada a verificar
+  const gd = git(["rev-parse", "--path-format=absolute", "--git-dir"]).stdout.trim();
+  const cd = git(["rev-parse", "--path-format=absolute", "--git-common-dir"]).stdout.trim();
+  if (gd && cd && real(gd) === real(cd)) throw new Error("--from-vault escreve em core/: corra-o numa worktree do kaizen-flow, nunca no checkout principal (ou use --dry-run)");
+  const st = git(["status", "--porcelain", "--", "core"]);
+  if (st.stdout.trim()) throw new Error(`core/ tem alterações por commitar; faça commit antes de --from-vault (ou use --dry-run):\n${st.stdout.trimEnd()}`);
+}
+
+// vault → core/ sem apagar: atualiza peças que existem nos dois lados; novas só com --only
 function sync(argv) {
-  const { parts, unlisted, stale, orphans } = build(CORE_DIR, path.join(PKG, "translations"), argv.includes("--stamp"));
-  for (const u of unlisted) console.warn(`aviso: peça do vault fora do sync: ${u} (acrescente a bin/sync.js ou a SKIP)`);
-  for (const t of stale) console.warn(`aviso: a fonte de ${t} mudou desde a tradução; reveja translations/${t}`);
-  for (const t of orphans) console.warn(`aviso: translations/${t} não tem peça correspondente em core/`);
-  console.log(`sync: ${parts.length} peças de ${VAULT}`);
+  const dry = argv.includes("--dry-run");
+  const only = onlyArgs(argv);
+  if (!dry) guardTree();
+  const tmp = fs.mkdtempSync(path.join(require("os").tmpdir(), "kaizen-from-"));
+  try {
+    const tdir = path.join(tmp, "translations");
+    if (fs.existsSync(path.join(PKG, "translations"))) copy(path.join(PKG, "translations"), tdir);
+    const fresh = path.join(tmp, "core");
+    const { parts, unlisted, stale, orphans } = build(fresh, tdir, false);
+    const a = files(fresh).filter((f) => !/__pycache__\/|\.pyc$/.test(f));
+    const have = new Set(files(CORE_DIR));
+    const cfg = vaultConfig(VAULT, true);
+    const upd = [], add = [], skipped = [];
+    for (const f of a) {
+      const data = fs.readFileSync(path.join(fresh, f));
+      if (have.has(f)) {
+        if (sha(fs.readFileSync(path.join(CORE_DIR, f))) !== sha(data)) upd.push(f);
+      } else if (covered(only, f) || !have.size) add.push(f);
+      else skipped.push(f);
+    }
+    const kept = [...have].filter((f) => !a.includes(f) && !/__pycache__\/|\.pyc$/.test(f));
+    const sel = (list) => (only.length ? list.filter((f) => covered(only, f)) : list);
+    const todo = [...sel(upd), ...add];
+    for (const f of todo) {
+      const l = TEXT_EXT.test(f) ? leaks(cfg, fs.readFileSync(path.join(fresh, f), "utf8")) : [];
+      if (l.length) throw new Error(`core/${f} ficaria com dados pessoais (${l.join(", ")}); nada foi escrito`);
+    }
+    for (const f of todo) console.log(`${dry ? "mudaria" : "atualiza"}: core/${f}${have.has(f) ? "" : " (novo)"}`);
+    for (const f of sel(skipped)) console.log(`ignorado (novo; use --only ${f}): core/${f}`);
+    if (kept.length) console.log(`mantido: ${kept.length} ficheiros de core/ que o vault não tem (nunca são apagados)`);
+    for (const f of kept) if (dry) console.log(`removeria (evitado): core/${f}`);
+    if (!dry) for (const f of todo) copy(path.join(fresh, f), path.join(CORE_DIR, f));
+    for (const u of unlisted) console.warn(`aviso: peça do vault fora do sync: ${u} (acrescente a bin/sync.js ou a SKIP)`);
+    for (const t of stale) console.warn(`aviso: a fonte de ${t} mudou desde a tradução; reveja translations/${t}`);
+    for (const t of orphans) console.warn(`aviso: translations/${t} não tem peça correspondente em core/`);
+    console.log(`sync${dry ? " --dry-run" : ""}: ${todo.length} peças ${dry ? "a atualizar" : "atualizadas"} de ${parts.length} (${VAULT})`);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 // ficheiros de core/ rastreados pelo git (o sync apaga os que a fonte já não gera)

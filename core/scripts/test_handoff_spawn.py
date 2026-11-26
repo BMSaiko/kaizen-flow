@@ -10,8 +10,10 @@ import handoff_spawn as hs  # noqa: E402
 
 
 class _Res:
-    def __init__(self, stdout=""):
+    def __init__(self, stdout="", returncode=0):
         self.stdout = stdout
+        self.returncode = returncode
+        self.stderr = ""
 
 
 class FakeRun:
@@ -35,6 +37,11 @@ class FakeRun:
         return _Res()
 
 
+@pytest.fixture(autouse=True)
+def _estado_nomes(tmp_path, monkeypatch):
+    monkeypatch.setenv("SP_FILA_ROOT", str(tmp_path / "estado"))
+
+
 def _spawn(slugs, **kw):
     kw.setdefault("sleep", lambda s: None)
     kw.setdefault("registar", False)
@@ -52,7 +59,7 @@ def test_dry_run_nao_toca_em_nada_e_adia_o_excedente():
 def test_tmux_cria_painel_e_envia_o_michi_auto():
     run = FakeRun()
     res = _spawn(["meu-sp"], backend="tmux", run=run)
-    assert res == [{"slug": "meu-sp", "ok": True, "painel": "%9", "worktree": "C:/wt/meu-sp"}]
+    assert res == [{"slug": "meu-sp", "ok": True, "painel": "%9", "worktree": "C:/wt/meu-sp", "nome": "handoff-meu-sp"}]
     assert ["tmux", "send-keys", "-t", "%9", "-l", "/michi --auto meu-sp"] in run.calls
     assert ["tmux", "send-keys", "-t", "%9", "Enter"] in run.calls
 
@@ -118,7 +125,7 @@ def test_painel_background_e_dry_run_levam_o_modelo(tmp_path, monkeypatch, capsy
     abertos = []
     monkeypatch.setattr(hs, "_spawn_pane", lambda b, wt, r, cmd=("claude",): abertos.append(list(cmd)) or "bg1")
     _spawn(["y"], backend="background", run=FakeRun())
-    assert abertos == [_FLAGS + ["-p", "/michi --auto y"]]
+    assert abertos == [[*_FLAGS, "-p", "/michi --auto y"]]
     res = _spawn(["z"], backend="tmux", run=FakeRun(), dry_run=True)
     assert res[0]["cmd"] == " ".join(_FLAGS)
     _spawn(["w"], backend="clipboard", run=FakeRun(), copy=lambda s: None)
@@ -160,3 +167,106 @@ def test_spawn_dry_run_leva_o_modelo_do_nivel_de_cada_sp(tmp_path, monkeypatch):
     _sp(tmp_path, "Doing", "sp-c", "complexo")
     res = _spawn(["sp-c", "outro"], backend="tmux", run=FakeRun(), dry_run=True)
     assert "claude-opus-5-5" in res[0]["cmd"] and "claude-sonnet-5-5" in res[1]["cmd"]
+
+
+def test_herdr_lanca_agente_e_envia_o_michi_por_herdr_ops(monkeypatch):
+    """No herdr o handoff fala só por `herdr_ops`: painel novo, agente `claude`, prompt `agent prompt` (sem ler o ecrã)."""
+    from herdr_fake import FakeHerdr
+    fake = FakeHerdr()
+
+    def run(argv, **kw):
+        if "ensure" in argv:
+            return _Res("aviso\n/wt/meu-sp\n")
+        return fake(argv, **kw)
+
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    res = _spawn(["meu-sp"], backend="herdr", run=run)
+    assert res[0]["ok"] and res[0]["worktree"] == "/wt/meu-sp"
+    pane = res[0]["painel"]
+    assert ["herdr", "agent", "prompt", pane, "/michi --auto meu-sp"] in fake.chamadas
+    assert not any(c[:3] == ["herdr", "pane", "send-text"] for c in fake.chamadas)
+    assert any(c[:3] == ["herdr", "pane", "run"] and "command claude" in c[4] for c in fake.chamadas)
+
+
+def test_herdr_espera_pela_deteccao_do_agente_antes_do_prompt(monkeypatch):
+    """Corrida real: `agent prompt` logo após o `claude` arrancar dá agent_not_found; repete até o agente ser detetado."""
+    import json
+    from herdr_fake import FakeHerdr
+    fake = FakeHerdr()
+    falhas = {"n": 2}
+
+    def run(argv, **kw):
+        if "ensure" in argv:
+            return _Res("/wt/meu-sp\n")
+        if argv[1:3] == ["agent", "prompt"] and falhas["n"]:
+            falhas["n"] -= 1
+            fake.chamadas.append(list(argv))
+            return _Res(json.dumps({"error": {"code": "agent_not_found", "message": "x"}}), 1)
+        return fake(argv, **kw)
+
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    res = _spawn(["meu-sp"], backend="herdr", run=run, sleep=lambda s: None)
+    assert res[0]["ok"] and falhas["n"] == 0
+
+
+def test_herdr_repete_o_enter_se_o_prompt_ficou_com_texto(monkeypatch):
+    """Falha real (2026-11-23): `agent prompt` escreveu o `/michi` mas o Enter perdeu-se; o spawn repete o Enter até o prompt esvaziar."""
+    from herdr_fake import FakeHerdr
+    fake = FakeHerdr()
+    ecras = ["\u276f /michi --auto meu-sp\n", "\u276f /michi --auto meu-sp\n", "\u276f \n"]
+    enters = []
+
+    def run(argv, **kw):
+        if "ensure" in argv:
+            return _Res("/wt/meu-sp\n")
+        if argv[1:3] == ["pane", "read"]:
+            return _Res(ecras.pop(0) if ecras else "\u276f \n")
+        if argv[1:3] == ["pane", "send-keys"]:
+            enters.append(list(argv))
+            return _Res("")
+        return fake(argv, **kw)
+
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    res = _spawn(["meu-sp"], backend="herdr", run=run, sleep=lambda s: None)
+    assert res[0]["ok"] and len(enters) == 2
+
+
+def test_herdr_falha_se_o_enter_nunca_submete(monkeypatch):
+    from herdr_fake import FakeHerdr
+    fake = FakeHerdr()
+
+    def run(argv, **kw):
+        if "ensure" in argv:
+            return _Res("/wt/meu-sp\n")
+        if argv[1:3] == ["pane", "read"]:
+            return _Res("\u276f /michi --auto meu-sp\n")
+        if argv[1:3] == ["pane", "send-keys"]:
+            return _Res("")
+        return fake(argv, **kw)
+
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    res = _spawn(["meu-sp"], backend="herdr", run=run, sleep=lambda s: None)
+    assert not res[0]["ok"] and "Enter" in res[0]["erro"]
+
+
+def test_spawn_regista_nome():
+    import kf_nomes as kn
+    run = FakeRun()
+    res = _spawn(["meu-sp"], backend="tmux", run=run)
+    e = kn.resolver("handoff-meu-sp")
+    assert res[0]["nome"] == "handoff-meu-sp" and e["pane"] == "%9" and e["backend"] == "tmux" and e["papel"] == "handoff"
+
+
+def test_spawn_dois_do_mesmo_slug_nao_colidem():
+    import kf_nomes as kn
+    run = FakeRun()
+    _spawn(["x"], backend="tmux", run=run)
+    res = _spawn(["x"], backend="tmux", run=run)
+    assert res[0]["nome"] == "handoff-x-2" and kn.resolver("handoff-x")  # o antigo continua registado (sem poda sem vivos)
+
+
+def test_spawn_que_falha_nao_regista_nome():
+    import kf_nomes as kn
+    run = FakeRun(screen="❯ /michi --auto x")
+    _spawn(["x"], backend="tmux", run=run)
+    assert kn.listar() == []

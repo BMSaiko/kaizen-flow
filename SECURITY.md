@@ -19,5 +19,5 @@ kaizen-flow uses the Node and Python standard libraries only and has no telemetr
 
 - CodeQL (JavaScript e Python) corre em cada PR, em push para `main` e semanalmente (`.github/workflows/codeql.yml`); os alertas ficam em Security > Code scanning.
 - `npm audit --omit=dev` corre no CI sem bloquear e escreve o resumo no job.
-- As actions dos workflows est„o fixadas por SHA de commit, com a vers„o em coment·rio; o Dependabot (`github-actions`) propıe as atualizaÁıes.
-- Cada workflow declara `permissions` mÌnimas (`contents: read`; sÛ o necess·rio em CodeQL, publish e release).
+- As actions dos workflows est√£o fixadas por SHA de commit, com a vers√£o em coment√°rio; o Dependabot (`github-actions`) prop√µe as atualiza√ß√µes.
+- Cada workflow declara `permissions` m√≠nimas (`contents: read`; s√≥ o necess√°rio em CodeQL, publish e release).

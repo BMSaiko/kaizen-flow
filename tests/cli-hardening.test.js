@@ -6,8 +6,8 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const BIN = path.join(__dirname, "..", "bin", "kaizen.js");
-const run = (...a) => spawnSync("node", [BIN, ...a], { encoding: "utf8", env: { ...process.env, HERDR_PANE_ID: "", WEZTERM_PANE: "", TMUX_PANE: "" } });
+const { BIN, kaizen } = require("./helpers/sandbox");
+const run = (...a) => kaizen(a);
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "kaizen-hard-"));
 
 test("harness inválido ou em falta aborta sem escrever", () => {
@@ -102,4 +102,12 @@ test("preflight propaga rc 1 e lista cada problema com EC sem alterar nada", { s
   assert.match(r.stdout, /^EC-060 O quê: .*sujo\.txt/m);
   assert.ok(fs.existsSync(path.join(d, "sujo.txt")));
   assert.strictEqual(g("rev-parse", "--abbrev-ref", "HEAD").stdout.trim(), "outro");
+});
+
+test("quality --lista mostra as etapas e rc 1 com base inválida em etapa de diff", () => {
+  const l = run("quality", "--lista");
+  assert.strictEqual(l.status, 0);
+  assert.match(l.stdout, /^lint\r?\nratchet\r?\nstrict\r?\n/);
+  const r = run("quality", "--so", "protegidos", "--base", "nao-existe");
+  assert.strictEqual(r.status, 1);
 });

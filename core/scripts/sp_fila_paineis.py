@@ -8,6 +8,7 @@ o painel se chegou a abrir e deixa a worktree intacta. Só stdlib.
 Uso: módulo importado por sp_fila_execucao.py e sp-fila.py; sem execução direta
 rc: n/a
 """
+import contextlib
 import re
 import sys
 import time
@@ -15,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sp_painel_estado as pe  # noqa: E402
+import kf_nomes  # noqa: E402
 import painel_backend  # noqa: E402
 from painel_backend import enviar_prompt  # noqa: E402
 from sp_fila_estado import REPO, SCRIPTS, run_hidden  # noqa: E402
@@ -155,8 +157,25 @@ def _por_titulo(backend, pane, texto):
         f(pane, texto)
 
 
+def _nome_do_pane(slug, pane, backend, wt, estado_root):
+    """Nome canónico `sp-<slug>` (sufixo se já usado nos títulos ou no registo) registado para `pane`."""
+    try:
+        vivos = set(backend.listar())
+    except Exception:  # noqa: BLE001 — sem lista não se poda; o registo também evita colisões
+        vivos = None
+    try:
+        tits = [t for i, t in backend.titulos().items() if vivos is None or str(i) in vivos]
+    except Exception:  # noqa: BLE001
+        tits = []
+    usados = tits + [e["nome"] for e in kf_nomes.listar(vivos=vivos, root=estado_root)]
+    nome = kf_nomes.nome_painel("sp", slug, usados)
+    with contextlib.suppress(OSError, ValueError):  # registo falhar nunca impede o painel; o título fica
+        kf_nomes.registar(nome, getattr(backend, "nome", ""), pane, wt, "sp", slug, root=estado_root)
+    return nome
+
+
 def _lancar_um(alvo, fila, backend, run, sleep, verificar, root, estado_root):
-    res = {"slug": alvo.slug, "estado": None, "modelo": None, "worktree": None, "titulo": None, "msg": None}
+    res = {"slug": alvo.slug, "estado": None, "modelo": None, "worktree": None, "titulo": None, "nome": None, "msg": None}
     if verificar and not _em_master(alvo.path, run):
         msg = f"commitar {alvo.path} em master antes de lançar (a worktree parte de master)"
         pe.registar(fila, alvo.slug, root=estado_root)
@@ -184,21 +203,19 @@ def _lancar_um(alvo, fila, backend, run, sleep, verificar, root, estado_root):
         pe.registar(fila, alvo.slug, root=estado_root, worktree=wt)
         texto = prompt_painel(alvo.slug, wt)
         interativo = getattr(backend, "interativo", True)
-        pane = painel_backend.abrir_painel(backend, cmd if interativo else cmd + [texto], wt, getattr(alvo, "project", None))
-        titulo = titulo_livre(alvo.slug, _titulos(backend))
+        pane = painel_backend.abrir_painel(backend, cmd if interativo else [*cmd, texto], wt, getattr(alvo, "project", None))
+        titulo = _nome_do_pane(alvo.slug, pane, backend, wt, estado_root)
         _por_titulo(backend, pane, titulo)
-        res["titulo"] = titulo
+        res["titulo"] = res["nome"] = titulo
         if interativo:
             enviar_prompt(backend, pane, texto, run, sleep)
-        pe.registar(fila, alvo.slug, root=estado_root, pane=str(pane))
+        pe.registar(fila, alvo.slug, root=estado_root, pane=str(pane), nome=titulo)
     except Exception as e:  # noqa: BLE001 — qualquer falha deste SP liberta a vaga e não pára os outros
         msg = f"erro a lançar {alvo.slug}: {e}"
         pe.transitar(alvo.slug, "falhou", msg=msg, fila=fila, root=estado_root)
         if pane is not None:
-            try:
+            with contextlib.suppress(Exception):  # o registo já diz falhou
                 backend.fechar(pane)
-            except Exception:  # noqa: BLE001 — o registo já diz falhou
-                pass
         return {**res, "estado": "falhou", "msg": msg}
     return {**res, "estado": "a-correr"}
 

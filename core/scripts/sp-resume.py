@@ -143,8 +143,8 @@ def _slug_valido(slug):
     return bool(slug) and slug not in (".", "..") and not any(c in slug for c in ("/", chr(92), ":"))
 
 
-def resume(raiz, slug, from_fase=None, restart=False, confirmar=None, agora=None, painel_root=None):
-    """Devolve (rc, mensagem). `confirmar` é um callable sem argumentos (True = confirmado)."""
+def _pedido_invalido(slug, from_fase, restart):
+    """(2, mensagem) se o pedido é inválido; None se pode seguir."""
     if not _slug_valido(slug):
         return 2, _msg(f"slug inválido «{slug}»", "o slug é um nome de ficheiro (sem /, \\ nem :)", "nada alterado",
                        "`kaizen resume` sem argumentos lista os SPs interrompidos", "EC-067")
@@ -154,40 +154,10 @@ def resume(raiz, slug, from_fase=None, restart=False, confirmar=None, agora=None
     if restart and from_fase is not None:
         return 2, _msg("--restart e --from não se combinam", "--restart recomeça sempre em grill", "nada alterado",
                        f"`kaizen resume {slug} --restart` ou `kaizen resume {slug} --from <fase>`", "EC-067")
-    d = sp_disco.dono(raiz, slug)
-    if d["estado"] == "vivo":
-        return 1, _msg_ocupado(slug, d)
-    p = pausa(slug, painel_root)
-    if p and p[1] and not kf_erros.ja_passou(p[1], agora):
-        ec = kf_erros.ecs_em(p[0])[0]
-        return 1, _msg(f"SP {slug} em pausa até {p[1]}", p[0], "checkpoint e journal intactos",
-                       f"esperar até {p[1]} (a fila retoma sozinha se o painel estiver vivo) e `kaizen resume {slug}`", ec)
-    if restart:
-        if confirmar is None or not confirmar():
-            return 1, _msg("--restart não confirmado", "arquivar o estado pede confirmação explícita (EOF vale não)",
-                           "nada alterado (EC-001)", f"`kaizen resume {slug} --restart --sim`", "EC-006")
-        destino = _arquivar(raiz, slug)
-        if destino is None:
-            return 1, _msg(f"SP {slug} sem estado a arquivar", "não há checkpoint nem journal em .kaizen/estado",
-                           "nada alterado (EC-001)", "`kaizen resume` lista os SPs com estado", "EC-050")
-        return 0, f"recomeçado do início em {FASES[0]}; estado anterior arquivado em {destino} (UC-032)"
-    estado_p, jp = sp_journal.caminhos(raiz, slug)
-    if not estado_p.exists() and not jp.exists():
-        return 1, _msg(f"SP {slug} sem estado a retomar", "não há checkpoint nem journal em .kaizen/estado",
-                       "nada alterado (EC-001)", f"`/michi {slug}` arranca-o do início", "EC-050")
-    if _em_done(raiz, slug):
-        return 1, _msg(f"SP {slug} já está em Done", "um SP fechado não se retoma", "nada alterado (EC-001)",
-                       "`kaizen resume` lista os SPs interrompidos", "EC-067")
-    ponto = ponto_de_retoma(raiz, slug)
-    fase = ponto["fase"]
-    if from_fase is not None:
-        idx = FASES.index(from_fase)
-        for a in ponto["abertos"]:
-            if a["fase"] in FASES and FASES.index(a["fase"]) >= idx:
-                sp_journal.revertido(raiz, slug, a["fase"], a["passo"])
-        fase = from_fase
-        antes = [f"{a['fase']}/{a['passo']}" for a in ponto["abertos"] if a["fase"] in FASES and FASES.index(a["fase"]) < idx]
-        ponto = ponto_de_retoma(raiz, slug)
+    return None
+
+
+def _texto_retoma(slug, ponto, fase, from_fase, antes):
     ult = ponto["ultimo_fim"]
     texto = f"retomar {slug} em {fase}; último passo concluído: {ult['fase'] + '/' + ult['passo'] if ult else 'nenhum'}"
     if from_fase is None and ponto["abertos"]:
@@ -201,7 +171,55 @@ def resume(raiz, slug, from_fase=None, restart=False, confirmar=None, agora=None
             )
     if from_fase is not None and antes:
         texto += f"; atenção: passos abertos em fases anteriores ficam por fechar: {', '.join(antes)}"
-    return 0, texto + " (EC-001, EC-027, UC-031)"
+    return texto
+
+
+def _recomecar(raiz, slug, confirmar):
+    """--restart: arquiva o estado e recomeça do início (pede confirmação)."""
+    if confirmar is None or not confirmar():
+        return 1, _msg("--restart não confirmado", "arquivar o estado pede confirmação explícita (EOF vale não)",
+                       "nada alterado (EC-001)", f"`kaizen resume {slug} --restart --sim`", "EC-006")
+    destino = _arquivar(raiz, slug)
+    if destino is None:
+        return 1, _msg(f"SP {slug} sem estado a arquivar", "não há checkpoint nem journal em .kaizen/estado",
+                       "nada alterado (EC-001)", "`kaizen resume` lista os SPs com estado", "EC-050")
+    return 0, f"recomeçado do início em {FASES[0]}; estado anterior arquivado em {destino} (UC-032)"
+
+
+def resume(raiz, slug, from_fase=None, restart=False, confirmar=None, agora=None, painel_root=None):
+    """Devolve (rc, mensagem). `confirmar` é um callable sem argumentos (True = confirmado)."""
+    erro = _pedido_invalido(slug, from_fase, restart)
+    if erro:
+        return erro
+    d = sp_disco.dono(raiz, slug)
+    if d["estado"] == "vivo":
+        return 1, _msg_ocupado(slug, d)
+    p = pausa(slug, painel_root)
+    if p and p[1] and not kf_erros.ja_passou(p[1], agora):
+        ec = kf_erros.ecs_em(p[0])[0]
+        return 1, _msg(f"SP {slug} em pausa até {p[1]}", p[0], "checkpoint e journal intactos",
+                       f"esperar até {p[1]} (a fila retoma sozinha se o painel estiver vivo) e `kaizen resume {slug}`", ec)
+    if restart:
+        return _recomecar(raiz, slug, confirmar)
+    estado_p, jp = sp_journal.caminhos(raiz, slug)
+    if not estado_p.exists() and not jp.exists():
+        return 1, _msg(f"SP {slug} sem estado a retomar", "não há checkpoint nem journal em .kaizen/estado",
+                       "nada alterado (EC-001)", f"`/michi {slug}` arranca-o do início", "EC-050")
+    if _em_done(raiz, slug):
+        return 1, _msg(f"SP {slug} já está em Done", "um SP fechado não se retoma", "nada alterado (EC-001)",
+                       "`kaizen resume` lista os SPs interrompidos", "EC-067")
+    ponto = ponto_de_retoma(raiz, slug)
+    fase = ponto["fase"]
+    antes = []
+    if from_fase is not None:
+        idx = FASES.index(from_fase)
+        for a in ponto["abertos"]:
+            if a["fase"] in FASES and FASES.index(a["fase"]) >= idx:
+                sp_journal.revertido(raiz, slug, a["fase"], a["passo"])
+        fase = from_fase
+        antes = [f"{a['fase']}/{a['passo']}" for a in ponto["abertos"] if a["fase"] in FASES and FASES.index(a["fase"]) < idx]
+        ponto = ponto_de_retoma(raiz, slug)
+    return 0, _texto_retoma(slug, ponto, fase, from_fase, antes) + " (EC-001, EC-027, UC-031)"
 
 
 def _perguntar():
@@ -209,6 +227,23 @@ def _perguntar():
         return input("Arquivar o estado e recomeçar do início? [s/N] ").strip().lower() in ("s", "sim", "y", "yes")
     except EOFError:
         return False
+
+
+def _cmd_lock(a):
+    """`--lock`/`--unlock <slug>`: toma ou liberta o lock sem processo; rc 0, 1 (ocupado) ou 2 (slug inválido)."""
+    if not _slug_valido(a.slug):
+        print(resume(a.raiz, a.slug)[1], file=sys.stderr)
+        return 2
+    if not a.lock:
+        print("lock libertado" if sp_disco.libertar_lock(a.raiz, a.slug, pid=None, painel=a.painel) else "sem lock próprio a libertar")
+        return 0
+    try:
+        sp_disco.tomar_lock(a.raiz, a.slug, a.painel, pid=None)
+    except sp_disco.LockOcupado as e:
+        print(_msg_ocupado(a.slug, e.dono), file=sys.stderr)
+        return 1
+    print(f"lock de {a.slug} tomado")
+    return 0
 
 
 def main(argv=None):
@@ -224,20 +259,8 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if (a.lock or a.unlock) and not a.slug:
         ap.error("--lock/--unlock precisam de <slug>")
-    if (a.lock or a.unlock) and not _slug_valido(a.slug):
-        print(resume(a.raiz, a.slug)[1], file=sys.stderr)
-        return 2
-    if a.lock:
-        try:
-            sp_disco.tomar_lock(a.raiz, a.slug, a.painel, pid=None)
-        except sp_disco.LockOcupado as e:
-            print(_msg_ocupado(a.slug, e.dono), file=sys.stderr)
-            return 1
-        print(f"lock de {a.slug} tomado")
-        return 0
-    if a.unlock:
-        print("lock libertado" if sp_disco.libertar_lock(a.raiz, a.slug, pid=None, painel=a.painel) else "sem lock próprio a libertar")
-        return 0
+    if a.lock or a.unlock:
+        return _cmd_lock(a)
     slug = a.slug
     if not slug:
         cands = candidatos(a.raiz)

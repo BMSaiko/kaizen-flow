@@ -5,8 +5,8 @@ const { loadCore } = require("../bin/core.js");
 
 const core = loadCore();
 const scripts = new Set(core.filter((f) => f.rel.startsWith("scripts/")).map((f) => f.rel.slice("scripts/".length)));
-// scripts do vault que o core/ cita como opcionais (sp-fechar.py ignora-os se faltarem)
-const OPTIONAL = new Set(["test-fast.py"]);
+// scripts fora de core/scripts que o core/ cita como opcionais (test-fast.py do vault; kaizen_usage.py vive em usage/ e o orçamento ignora-o se faltar)
+const OPTIONAL = new Set(["test-fast.py", "kaizen_usage.py"]);
 
 test("todo o script .py referido em core/ existe em core/scripts", () => {
   const missing = [];

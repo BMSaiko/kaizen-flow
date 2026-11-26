@@ -6,7 +6,7 @@ Recusa slug já existente no projeto (em qualquer pasta) e projeto inexistente.
 Nunca faz commit.
 
 Uso:
-  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--michi simples|default|complexo|critico] [--commit|--push|--pr auto|pergunta|nunca] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--ui] [--origem <veredicto:id|pentest:slug>] [--parent <slug>] [--depends-on <slug> ...]
+  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--michi simples|default|complexo|critico] [--commit|--push|--pr auto|pergunta|nunca] [--permissoes all|nenhuma|commit,push,pr,merge] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--ui] [--origem <veredicto:id|pentest:slug>] [--parent <slug>] [--depends-on <slug> ...]
   python -I scripts/sp-new.py --project <nome> --program <slug> --children a,b@complexo:a,c:a+b --priority P1|P2|P3
 
 `--parent <mãe>` exige que a mãe seja `kind: program` e acrescenta o filho a `children:` dela (depends_on, `state: TODO`, sem duplicar).
@@ -78,6 +78,25 @@ class SpNewError(Exception):
 def autorizacoes_por_destino(project):
     """Autorizações por defeito (commit/push/pr/merge) do destino do `project`, da tabela de kaizen_config."""
     return kaizen_config.autorizacoes(CONFIG_REPO, project)
+
+
+PERMISSOES = ("commit", "push", "pr", "merge")
+
+
+def permissoes_para_auth(selecao):
+    """Seleção do AskUserQuestion multiSelect (`all` ou `commit,push,...`; `nenhuma`) → commit/push/pr/merge auto|nunca."""
+    itens = {s.strip().lower() for s in (selecao or "").split(",") if s.strip()}
+    if not itens:
+        raise SpNewError("--permissoes vazio (all|nenhuma|commit,push,pr,merge)")
+    invalidos = itens - set(PERMISSOES) - {"all", "nenhuma"}
+    if invalidos:
+        raise SpNewError(f"--permissoes inválido: {', '.join(sorted(invalidos))} (all|nenhuma|{','.join(PERMISSOES)})")
+    marcadas = set(PERMISSOES) if "all" in itens else itens - {"nenhuma"}
+    auth = {k: ("auto" if k in marcadas else "nunca") for k in PERMISSOES}
+    for k, antes in zip(PERMISSOES[1:], PERMISSOES):
+        if auth[k] == "auto" and auth[antes] != "auto":
+            raise SpNewError(f"--permissoes: {k} exige {antes} (merge ⇒ pr ⇒ push ⇒ commit)")
+    return auth
 
 
 def resolver_auth(project, auth):
@@ -191,6 +210,23 @@ def check_permitir(permitir):
             raise SpNewError(f"permitir proibido ({sp_gates.forbidden(cmd)}): {cmd}")
 
 
+def _listas(**campos):
+    """Linhas «chave: [a, b]» do frontmatter, só para as listas não vazias, pela ordem dada."""
+    return [f"{k}: [{', '.join(v)}]" for k, v in campos.items() if v]
+
+
+def _corpo(slug, today, decisoes, ui):
+    """Corpo do SP: título, secções vazias e, se houver, Decisões e Esboço."""
+    body = [f"# Super Prompt - {slug} ({today.isoformat()})", ""]
+    for title in SECTIONS:
+        body += [f"## {title}", "", ""]
+    if decisoes:
+        body += ["## Decisões", ""] + [f"- {d.strip()}" for d in decisoes] + [""]
+    if ui:
+        body += ["## Esboço", "", "(ASCII ou mermaid do ecrã; o resumo mostra-o)", ""]
+    return body
+
+
 def create(root, project, slug, priority, today, parent=None, depends_on=(), extra=(), modo="manual", auth=None, gates=(), prova=None, perfil=None, escopo=(), fora_de_escopo=(), permitir=(), decisoes=(), michi="default", programa=False, ui=False, origem=None):
     root = Path(root)
     check(root, project, slug, priority, modo)
@@ -211,12 +247,7 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
         head.append("execucao:")
     head += [f"{k}: {auth[k]}" for k in ("commit", "push", "pr", "merge", "restricoes") if k in auth]
     head += [f"{k}: {perfil[k]}" for k in ("perfil", "max_tentativas", "max_requests", "escalar") if k in perfil]
-    if "parar_se" in perfil:
-        head.append(f"parar_se: [{', '.join(perfil['parar_se'])}]")
-    if escopo:
-        head.append(f"escopo: [{', '.join(escopo)}]")
-    if fora_de_escopo:
-        head.append(f"fora_de_escopo: [{', '.join(fora_de_escopo)}]")
+    head += _listas(parar_se=perfil.get("parar_se"), escopo=escopo, fora_de_escopo=fora_de_escopo)
     if gates:
         head.append("gates:")
         head += [f"  - cmd: {g.strip()}" for g in gates]
@@ -231,17 +262,10 @@ def create(root, project, slug, priority, today, parent=None, depends_on=(), ext
         head.append(f"origem: {origem.strip()}")
     if parent:
         head.append(f"parent: {parent}")
-    if depends_on:
-        head.append(f"depends_on: [{', '.join(depends_on)}]")
+    head += _listas(depends_on=depends_on)
     head.append("---")
-    body = [f"# Super Prompt - {slug} ({today.isoformat()})", ""]
-    for title in SECTIONS:
-        body += [f"## {title}", "", ""]
-    if decisoes:
-        body += ["## Decisões", ""] + [f"- {d.strip()}" for d in decisoes] + [""]
-    if ui:
-        body += ["## Esboço", "", "(ASCII ou mermaid do ecrã; o resumo mostra-o)", ""]
-    path =root / project / "sp" / "TODO" / f"{slug}.md"
+    body = _corpo(slug, today, decisoes, ui)
+    path = root / project / "sp" / "TODO" / f"{slug}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(head + body), encoding="utf-8")
     sp_list.sp_indice.invalidar()  # mtime de pasta é grosseiro no Windows: sem isto o slug novo fica fora da cache
@@ -304,10 +328,19 @@ def parse_niveis(text):
     return niveis
 
 
-def create_program(root, project, slug, priority, today, children, modo="manual", auth=None, niveis=None, gates=(), michi="default"):
-    """Mãe + filhos; `gates` e `michi` valem para todos os filhos (`niveis` sobrepõe o nível por filho)."""
-    root = Path(root)
-    auth = check_auth(auth)
+def _sem_ciclos(graph, names):
+    for name in names:
+        seen, stack = set(), [name]
+        while stack:
+            for dep in graph[stack.pop()]:
+                if dep == name:
+                    raise SpNewError(f"dependências cíclicas em '{name}'")
+                if dep not in seen:
+                    seen.add(dep)
+                    stack.append(dep)
+
+
+def _validar_filhos(root, project, slug, priority, children, modo):
     names = [name for name, _ in children]
     if not children:
         raise SpNewError("programa sem filhos (--children)")
@@ -321,16 +354,14 @@ def create_program(root, project, slug, priority, today, children, modo="manual"
         raise SpNewError(f"o programa '{slug}' não pode ser filho de si próprio")
     for name in [slug, *names]:
         check(root, project, name, priority, modo)
-    graph = dict(children)
-    for name in names:
-        seen, stack = set(), [name]
-        while stack:
-            for dep in graph[stack.pop()]:
-                if dep == name:
-                    raise SpNewError(f"dependências cíclicas em '{name}'")
-                if dep not in seen:
-                    seen.add(dep)
-                    stack.append(dep)
+    _sem_ciclos(dict(children), names)
+
+
+def create_program(root, project, slug, priority, today, children, modo="manual", auth=None, niveis=None, gates=(), michi="default"):
+    """Mãe + filhos; `gates` e `michi` valem para todos os filhos (`niveis` sobrepõe o nível por filho)."""
+    root = Path(root)
+    auth = check_auth(auth)
+    _validar_filhos(root, project, slug, priority, children, modo)
     extra = ["kind: program", "children:"]
     for name, deps in children:
         extra += [f"  - slug: {name}", f"    depends_on: [{', '.join(deps)}]", "    state: TODO"]
@@ -344,7 +375,7 @@ def split(value):
     return [x.strip() for x in value.split(",") if x.strip()] if value else []
 
 
-def main(argv=None):
+def _parser():
     ap = argparse.ArgumentParser(description="Cria um SP vazio em sp/TODO")
     ap.add_argument("--project", required=True, type=lambda v: v.replace("\\", "/").rstrip("/").split("/")[-1])
     ap.add_argument("--slug")
@@ -360,6 +391,7 @@ def main(argv=None):
     ap.add_argument("--push", help="push: auto|pergunta|nunca")
     ap.add_argument("--pr", help="pr: auto|pergunta|nunca")
     ap.add_argument("--merge", help="merge do PR: auto|nunca (defeito do destino)")
+    ap.add_argument("--permissoes", help="seleção multiSelect: all|nenhuma|commit,push,pr,merge (marcado=auto, resto=nunca; ganha a --commit/--push/--pr/--merge)")
     ap.add_argument("--restricoes", help="restrições extra do SP (uma linha)")
     ap.add_argument("--gate", action="append", default=[], help="gate executável (repetível), corrido por sp-gates.py")
     ap.add_argument("--prova", help="comando ou critério verificável da prova")
@@ -377,7 +409,40 @@ def main(argv=None):
     ap.add_argument("--parent", help="SP-mãe (kind: program); o filho é acrescentado a children: da mãe")
     ap.add_argument("--depends-on", nargs="*", default=[])
     ap.add_argument("--root", default=str(sp_list.DEFAULT_ROOT), help=argparse.SUPPRESS)
-    args = ap.parse_args(argv)
+    return ap
+
+
+def _criar_programa(args, auth, fs, today):
+    if not args.children:
+        raise SpNewError("--program exige --children")
+    children = [(fs(n), [fs(d) for d in deps]) for n, deps in parse_children(args.children)]
+    niveis = {fs(n): v for n, v in parse_niveis(args.children).items()}
+    paths = create_program(args.root, args.project, fs(args.program), args.priority, today, children, args.modo, auth, niveis, args.gate, args.michi)
+    print("\n".join(str(p) for p in paths))
+    if args.modo != "auto":
+        print("aviso: programa em modo: manual; sp-fila para a cada pergunta/commit. "
+              "Para uma fila sem paragens: --modo auto --commit auto", file=sys.stderr)
+
+
+def _criar_sp(args, auth, perfil, fs, today):
+    args.slug, args.parent = fs(args.slug), (fs(args.parent) if args.parent else None)
+    args.depends_on = [fs(d) for d in args.depends_on]
+    atras, master_paths = git_master()
+    if atras:
+        print(f"aviso: ramo {atras} commits atrás de master; git merge master", file=sys.stderr)
+    check_master(args.project, args.slug, master_paths)
+    check_links(args.root, args.project, args.parent, args.depends_on)
+    path = create(args.root, args.project, args.slug, args.priority, today, args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate,
+                  prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir,
+                  decisoes=args.decisao, michi=args.michi, ui=args.ui, origem=args.origem)
+    if args.parent:
+        link_parent(args.root, args.project, args.parent, args.slug, args.depends_on)
+    print(path)
+    print(f"modelo sp-autor (painel sp-autor.py que preenche o SP): {_modelo_sp_autor()}", file=sys.stderr)
+
+
+def main(argv=None):
+    args = _parser().parse_args(argv)
     sizing = args.ficheiros is not None and args.horas is not None
     if not args.priority and not sizing:
         print("erro: falta --priority (ou --ficheiros e --horas, que propõem o escalão e a prioridade P2)", file=sys.stderr)
@@ -390,35 +455,22 @@ def main(argv=None):
                   f"{sp_escalao.comando(escalao, args.project, args.slug or 'slug', args.priority or 'P2')}", file=sys.stderr)
     args.priority = args.priority or "P2"
     auth = {"commit": args.commit, "push": args.push, "pr": args.pr, "merge": args.merge, "restricoes": args.restricoes}
+    if args.permissoes is not None:
+        try:
+            auth.update(permissoes_para_auth(args.permissoes))
+        except SpNewError as e:
+            print(f"erro: {e}", file=sys.stderr)
+            return 2
     perfil = {"perfil": args.perfil, "max_tentativas": args.max_tentativas, "max_requests": args.max_requests, "escalar": args.escalar,
-              "parar_se": [x.strip() for x in args.parar_se.split(",") if x.strip()] if args.parar_se else None}
+              "parar_se": split(args.parar_se) or None}
     today = date.today()
     fs = lambda n: full_slug(args.project, n, today)  # noqa: E731
     try:
         auth = resolver_auth(args.project, auth)
         if args.program:
-            if not args.children:
-                raise SpNewError("--program exige --children")
-            children = [(fs(n), [fs(d) for d in deps]) for n, deps in parse_children(args.children)]
-            niveis = {fs(n): v for n, v in parse_niveis(args.children).items()}
-            paths = create_program(args.root, args.project, fs(args.program), args.priority, today, children, args.modo, auth, niveis, args.gate, args.michi)
-            print("\n".join(str(p) for p in paths))
-            if args.modo != "auto":
-                print("aviso: programa em modo: manual; sp-fila para a cada pergunta/commit. "
-                      "Para uma fila sem paragens: --modo auto --commit auto", file=sys.stderr)
+            _criar_programa(args, auth, fs, today)
         elif args.slug:
-            args.slug, args.parent = fs(args.slug), (fs(args.parent) if args.parent else None)
-            args.depends_on = [fs(d) for d in args.depends_on]
-            atras, master_paths = git_master()
-            if atras:
-                print(f"aviso: ramo {atras} commits atrás de master; git merge master", file=sys.stderr)
-            check_master(args.project, args.slug, master_paths)
-            check_links(args.root, args.project, args.parent, args.depends_on)
-            path = create(args.root, args.project, args.slug, args.priority, today, args.parent, args.depends_on, modo=args.modo, auth=auth, gates=args.gate, prova=args.prova, perfil=perfil, escopo=split(args.escopo), fora_de_escopo=split(args.fora_de_escopo), permitir=args.permitir, decisoes=args.decisao, michi=args.michi, ui=args.ui, origem=args.origem)
-            if args.parent:
-                link_parent(args.root, args.project, args.parent, args.slug, args.depends_on)
-            print(path)
-            print(f"modelo sp-autor (painel sp-autor.py que preenche o SP): {_modelo_sp_autor()}", file=sys.stderr)
+            _criar_sp(args, auth, perfil, fs, today)
         else:
             raise SpNewError("indicar --slug (ou --program com --children)")
     except SpNewError as exc:
@@ -428,9 +480,6 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")
     sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
     import kf_errlog
     sys.exit(kf_errlog.executar("sp-new", main))

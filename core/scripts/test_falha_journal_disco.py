@@ -328,7 +328,8 @@ def test_ec_043_heartbeat_em_thread_renova_e_sobrevive_a_erros_de_disco(tmp_path
     monkeypatch.setattr(lk, "heartbeat", hb)
     lk.iniciar_heartbeat(intervalo=0.01)
     limite = time.monotonic() + 5
-    while sp_disco.dono(tmp_path, SLUG)["hb"] == hb0 and time.monotonic() < limite:
+    # no Windows a leitura a meio de um replace pode dar `corrompido` (sem hb): conta como ainda não renovado
+    while sp_disco.dono(tmp_path, SLUG).get("hb", hb0) == hb0 and time.monotonic() < limite:
         time.sleep(0.01)
     lk.parar()
     assert chamadas["n"] >= 2 and sp_disco.dono(tmp_path, SLUG)["hb"] > hb0

@@ -123,7 +123,7 @@ def relancar(slug, nivel, sp, fila, backend, run=None, sleep=time.sleep, estado_
     try:
         texto = prompt_escalada(slug, wt)
         interativo = getattr(backend, "interativo", True)
-        pane = backend.abrir(cmd if interativo else cmd + [texto], wt)
+        pane = backend.abrir(cmd if interativo else [*cmd, texto], wt)
         f = getattr(backend, "titulo", None)
         if f:
             f(pane, slug)
@@ -134,10 +134,8 @@ def relancar(slug, nivel, sp, fila, backend, run=None, sleep=time.sleep, estado_
         msg = f"erro na escalada de {slug}: {e}"
         pe.transitar(slug, "falhou", msg=msg, fila=fila, root=estado_root)
         if pane is not None:
-            try:
+            with contextlib.suppress(Exception):  # noqa: BLE001
                 backend.fechar(pane)
-            except Exception:  # noqa: BLE001
-                pass
         return {"estado": "falhou", "modelo": modelo, "msg": msg}
     return {"estado": "a-correr", "modelo": modelo, "pane": str(pane), "msg": None}
 

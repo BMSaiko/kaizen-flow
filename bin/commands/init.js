@@ -140,4 +140,4 @@ function init(target, harness = "claude", metodo) {
   return n;
 }
 
-module.exports = { init, readSettings, configDir, METODOS };
+module.exports = { init, readSettings, configDir };

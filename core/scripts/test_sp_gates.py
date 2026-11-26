@@ -20,7 +20,7 @@ def sp_text(*gates):
     lines = ["---", "status: Doing", "slug: x", "gates:"]
     for cmd, extra in gates:
         lines += [f"  - cmd: {cmd}"] + [f"    {k}: {v}" for k, v in extra.items()]
-    return "\n".join(lines + ["prova: ver output", "---", "# corpo", "- cmd: rm -rf /"])
+    return "\n".join([*lines, "prova: ver output", "---", "# corpo", "- cmd: rm -rf /"])
 
 
 def test_parse_gates_le_so_o_frontmatter():
@@ -68,7 +68,7 @@ def test_run_para_no_primeiro_vermelho(tmp_path):
 
 
 def test_run_timeout(tmp_path):
-    gate = {"cmd": f'{PY} -c "import time; time.sleep(8)"', "cwd": str(tmp_path), "timeout": 1}
+    gate = {"cmd": f'{PY} -c "import time; time.sleep(8)"', "cwd": str(tmp_path), "timeout": 0.3}
     (result,) = sp_gates.run([gate])
     assert result["rc"] != 0 and result["timeout"] is True
 
@@ -259,7 +259,7 @@ def test_fase_testes_falha_bloqueia(tmp_path):
 
 
 def test_fase_testes_timeout(tmp_path):
-    rc, results = sp_gates.fase_testes(_repo(tmp_path, f"{PY} -c \"import time; time.sleep(5)\""), timeout=1)
+    rc, results = sp_gates.fase_testes(_repo(tmp_path, f"{PY} -c \"import time; time.sleep(5)\""), timeout=0.3)
     assert rc == 1 and results[0]["timeout"] is True
 
 
@@ -390,3 +390,68 @@ def test_ec_003_ctrl_c_num_gate_nao_o_deixa_verde_na_cache(tmp_path, monkeypatch
     r = sp_gates.run(g, cache_path=cache)
     assert [x["rc"] for x in r] == [0, 0] and not r[1].get("cached")
     assert chamadas.count(g[1]["cmd"]) == 2
+
+
+def test_detect_gates_python_inclui_ruff_mypy_e_ts_tsc(tmp_path):
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n", encoding="utf-8")
+    (tmp_path / "mypy.ini").write_text("[mypy]\n", encoding="utf-8")
+    (tmp_path / "ruff.toml").write_text("line-length = 100\n", encoding="utf-8")
+    cmds = sp_gates.detect_gates(tmp_path)
+    assert "python -m ruff check ." in cmds and "python -m mypy ." in cmds and cmds[-1] == "python -m pytest -q"
+    (tmp_path / "tsconfig.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "package.json").write_text("{}", encoding="utf-8")
+    assert "npx tsc --noEmit --strict" in sp_gates.detect_gates(tmp_path)
+
+
+def test_detect_gates_ts_sem_script_typecheck(tmp_path):
+    (tmp_path / "package.json").write_text('{"scripts": {"test": "x"}}', encoding="utf-8")
+    (tmp_path / "tsconfig.json").write_text("{}", encoding="utf-8")
+    assert sp_gates.detect_gates(tmp_path) == ["npx tsc --noEmit --strict", "npm test"]
+    (tmp_path / "package.json").write_text('{"scripts": {"typecheck": "tsc", "test": "x"}}', encoding="utf-8")
+    assert "npx tsc --noEmit --strict" not in sp_gates.detect_gates(tmp_path)
+
+
+def _g(cmd, **kw):
+    return {"cmd": cmd, "cwd": ".", "timeout": 30, "inputs": [], **kw}
+
+
+def test_perfil_junta_sem_duplicar_e_ordena():
+    perfil = {"bloqueantes": ["b", "a"], "consultivos": ["c", "a"], "fases": []}
+    out = sp_gates.juntar_perfil([_g("a")], perfil, "/r")
+    assert [(g["cmd"], g["modo"]) for g in out] == [("a", "bloqueante"), ("b", "bloqueante"), ("c", "consultivo")]
+
+
+def test_sem_perfil_gates_intactos_como_bloqueantes():
+    out = sp_gates.juntar_perfil([_g("a")], None, "/r")
+    assert [(g["cmd"], g["modo"]) for g in out] == [("a", "bloqueante")]
+
+
+def test_consultivo_vermelho_nao_trava_nem_falha():
+    gates = sp_gates.juntar_perfil([], {"bloqueantes": [f"{PY} -c pass"], "consultivos": [f"{PY} -c \"raise SystemExit(1)\"", f"{PY} -c \"print(1)\""], "fases": []}, ".")
+    res = sp_gates.run(gates)
+    assert len(res) == 3 and res[1]["rc"] == 1 and sp_gates.sucesso(res, gates)
+    tab = sp_gates.table(res, 3)
+    assert "consultivo aviso" in tab and "consultivo verde" in tab and "[consultivo]" in sp_gates.summary(res)
+
+
+def test_bloqueante_vermelho_do_perfil_trava_e_consultivo_nao_corre():
+    gates = sp_gates.juntar_perfil([], {"bloqueantes": [f"{PY} -c \"raise SystemExit(1)\""], "consultivos": [f"{PY} -c pass"], "fases": []}, ".")
+    res = sp_gates.run(gates)
+    assert len(res) == 1 and not sp_gates.sucesso(res, gates)
+    assert "não correu" in sp_gates.table(res, 2)
+
+
+def test_main_repo_aplica_perfil_e_sem_repo_comportamento_antigo(tmp_path, capsys):
+    import json
+    (tmp_path / "kaizen.config.json").write_text(json.dumps({"qualidade": {"bloqueantes": [f"{PY} -c \"raise SystemExit(1)\""]}}))
+    sp = tmp_path / "sp.md"
+    sp.write_text(sp_text((f"{PY} -c pass", {})), encoding="utf-8")
+    assert sp_gates.main([str(sp), "--full"]) == 0
+    assert sp_gates.main([str(sp), "--full", "--repo", str(tmp_path)]) == 1
+
+
+def test_perfil_sugerido_json_por_tipo(tmp_path):
+    import json
+    (tmp_path / "package.json").write_text(json.dumps({"scripts": {"test": "x"}}))
+    q = json.loads(sp_gates.perfil_sugerido(tmp_path))["qualidade"]
+    assert q["bloqueantes"] == ["npm test"] and q["consultivos"] == []

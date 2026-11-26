@@ -23,6 +23,8 @@ Optional, in the project root. Without it the defaults below apply. `init` only 
 | `prices` | bundled `usage/prices.json` | cost calculation |
 | `test.cmd` | detected by `init` | command that runs the target project's tests (see below) |
 | `painelBackend` | `auto` | `sp-handoff --spawn`: where the new session runs (see below) |
+| `qualidade` | `{"coberturaDiff": 85}` | `sp-cobertura-diff.py`: minimum % coverage of the lines a diff adds (0-100; invalid falls back to 85). Also the quality profile (see below) |
+| `protectedFiles` | `["MEMORY.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".cursor/rules/kaizen-flow.mdc"]` | Context files the agent must not change unasked: `kf_guard.py` (PreToolUse hook and `diff` gate) blocks edits unless `KAIZEN_ALLOW_PROTECTED=<reason>` is set (logged). An empty list turns the guard off |
 | `herdr` | `{"maxPanesPorTab": 2, "workspacePorProjeto": true}` | herdr backend layout (see below) |
 | `desenvolvimento` | none | development method: default authorisations and PR closing (see below) |
 | `userName` | `user` | name the scripts' warnings use for you; empty or non-string falls back to `user` |
@@ -115,3 +117,38 @@ Layout of the herdr backend (herdr is also picked by `auto`, before WezTerm and 
 | `workspacePorProjeto` | `true` | each repo gets one herdr workspace (label = repo name, reused if it exists, created otherwise); a git worktree uses the workspace of its main repo. `false` keeps the launching pane's workspace |
 
 Invalid values (non-integer or below 1, non-boolean) fall back to the defaults.
+
+The queue (`/sp-fila`) and the handoff (`handoff --spawn`) share one herdr layer, `core/scripts/herdr_ops.py`: new pane, `claude` as agent, prompt by `herdr agent prompt` (no screen scraping).
+
+End-to-end check of the herdr engine (isolated herdr session, 2 projects, 3 panes, cap and resume; never touches the default session): `python -I core/scripts/herdr-e2e-multiprojeto.py --isolado`.
+
+## Quality profile (`qualidade`)
+
+```json
+{"qualidade": {"bloqueantes": ["npm test", "python core/scripts/quality-ratchet.py --repo ."],
+               "consultivos": ["npm run lint"],
+               "fases": ["pentest", "review"]}}
+```
+
+A profile exists when `bloqueantes` or `consultivos` is a list; without it nothing changes (repos with only `coberturaDiff` keep the old behaviour). `python -I scripts/sp-gates.py --perfil <repo>` prints a block with sensible defaults for the repo type.
+
+- `sp-gates.py <SP> --repo R` adds the profile gates to the SP's own `gates:`, without duplicates. Blocking ones stop at the first red (rc 1); advisory ones run last, are reported as `consultivo verde|aviso` and never block.
+- `pr_fechar.py <PR> --sp <slug> --pentest-relatorio F --review-estado F`: with a profile it re-runs the blocking gates before merging; a red gate, a pentest report that is not `sem achados` or a review state that is not `APROVADO` (per `fases`; remove one only here, in the reviewed config) means rc 11, no merge, and the SP is set to `bloqueado` with the reason.
+- An SP cannot switch the profile off; only this file can.
+
+## Queue budget (`orcamento`)
+
+`{"orcamento": {"spUsd": 10, "diaUsd": 50, "falhasSeguidas": 3}}` pauses `/sp-fila` between SPs when a cost or failure ceiling is hit; resume with `sp-fila.py --seguinte --retomar`. Details in [usage and cost](usage-and-cost.md#queue-budget-orcamento).
+
+## Design gates (`design`, `ui: sim` SPs only)
+
+```json
+{"design": {"startCmd": "npm run dev", "url": "http://localhost:5173", "rotas": ["/", "/sobre"],
+            "limiarDiff": 0.01, "breakpoints": {"sm": 640, "md": 768, "xl": 1280},
+            "lighthouse": {"cmd": "npx lighthouse {url} --output=json --quiet --chrome-flags=--headless", "minPerformance": 0.8}}}
+```
+
+- `ds-lint.py [--dir D]`: colour, spacing and typography literals outside the tokens (CSS/SCSS/TSX/JSX/HTML/Vue/Svelte), `file:line`; rc 1 on any. `ds-lint-ignore` on a line skips it.
+- `ds-verify.py [--dir D]`: starts the app (`startCmd`), runs axe (WCAG 2.2 AA) and screenshots at 3 breakpoints against `design/baselines/`; rc 1 on serious/critical violations, diff above `limiarDiff`, a missing baseline or a failed performance budget; writes `design/relatorio.json`. rc 3 = no browser/Playwright/axe (never green). Baselines change only with `--atualizar-baselines` (logged in the SP with `--sp`).
+- Playwright and `@axe-core/playwright` are dev tools of the target project, never dependencies of this package.
+- `sp-gates.py <SP> --repo R` injects both only when the SP frontmatter has `ui: sim`: `ds-lint` blocking; `ds-verify` blocking when Playwright is installed in the repo, otherwise advisory with a warning.

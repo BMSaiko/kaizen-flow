@@ -16,18 +16,28 @@ ErroEstado, ILEGIVEL, MAX_PARALELO, FINAIS = pe.ErroEstado, pe.ILEGIVEL, pe.MAX_
 _LIMITES_ANTIGOS = ("max", "ate", "horas", "usd", "orcamento", "max_falhas", "concorrencia")
 
 
-def _ler_antigo(path):
-    """Lê e valida o estado antigo; devolve `(antigo, sessoes, listas, modo)` ou None se não há ficheiro."""
+_SEM_FICHEIRO = object()
+
+
+def _carregar_json(path):
+    """JSON do estado antigo, ou `_SEM_FICHEIRO`; `ErroEstado` se ilegível."""
     try:
         bruto = path.read_text(encoding="utf-8")
     except FileNotFoundError:
-        return None
+        return _SEM_FICHEIRO
     except OSError as e:
         raise ErroEstado(f"estado antigo {ILEGIVEL}: {path} ({e})") from e
     try:
-        antigo = json.loads(bruto)
+        return json.loads(bruto)
     except ValueError as e:
         raise ErroEstado(f"estado antigo {ILEGIVEL}: {path} ({e}); corrigir ou apagar à mão") from e
+
+
+def _ler_antigo(path):
+    """Lê e valida o estado antigo; devolve `(antigo, sessoes, listas, modo)` ou None se não há ficheiro."""
+    antigo = _carregar_json(path)
+    if antigo is _SEM_FICHEIRO:
+        return None
     if not isinstance(antigo, dict) or not ({"sessoes", "lancado"} & set(antigo)):
         raise ErroEstado(f"estado antigo em formato desconhecido: {path} (sem `sessoes` nem `lancado`)")
     sessoes = antigo.get("sessoes") or {}

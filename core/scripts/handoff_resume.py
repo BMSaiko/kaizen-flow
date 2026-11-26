@@ -20,10 +20,10 @@ MAX_AGE_H = 12
 SOURCES = {"clear", "startup"}
 
 
-def pending(folder, now=None, max_age_h=MAX_AGE_H):
+def pending(folder: str | Path, now: float | None = None, max_age_h: float = MAX_AGE_H) -> list[Path]:
     """Handoffs de trabalho recentes, do mais recente para o mais antigo."""
     cutoff = (now or time.time()) - max_age_h * 3600
-    found = []
+    found: list[tuple[float, Path]] = []
     for f in Path(folder).glob("*.md"):
         if f.name.endswith("-pendentes.md") or not f.is_file():
             continue
@@ -33,7 +33,7 @@ def pending(folder, now=None, max_age_h=MAX_AGE_H):
     return [f for _, f in sorted(found, key=lambda t: t[0], reverse=True)]
 
 
-def build_context(files):
+def build_context(files: list[Path]) -> str:
     if not files:
         return ""
     first = files[0].as_posix()
@@ -44,27 +44,27 @@ def build_context(files):
     return text
 
 
-def hook(stdin_text, folder, now=None):
+def hook(stdin_text: str, folder: str | Path, now: float | None = None) -> str:
     try:
         data = json.loads(stdin_text or "{}")
     except ValueError:
         data = {}
     if data.get("source", "startup") not in SOURCES:
         return ""
-    ctx = " ".join(p for p in (build_context(pending(folder, now)), loop_estado.ordem_retoma(now=now)) if p)
+    ctx = " ".join(p for p in (build_context(pending(folder, now)), loop_estado.ordem_retoma(now=now, session_id=data.get("session_id"))) if p)
     if not ctx:
         return ""
     return json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ctx}},
                       ensure_ascii=False)
 
 
-def _default_dir():
+def _default_dir() -> Path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import kaizen_engine  # noqa: E402
-    return kaizen_engine.load("kaizen_config").sp_root(Path(__file__).resolve().parent.parent) / "handoffs"
+    return Path(kaizen_engine.load("kaizen_config").sp_root(Path(__file__).resolve().parent.parent)) / "handoffs"
 
 
-def main():
+def main() -> int:
     try:
         if hasattr(sys.stdout, "reconfigure"):
             sys.stdout.reconfigure(encoding="utf-8")

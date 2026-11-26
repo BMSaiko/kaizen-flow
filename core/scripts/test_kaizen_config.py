@@ -6,8 +6,7 @@ HERE = Path(__file__).resolve().parent
 
 
 def load(name, file):
-    mod = carregar(HERE / file, name, fresco=True)
-    return mod
+    return carregar(HERE / file, name, fresco=True)
 
 
 cfg = load("kaizen_config", "kaizen_config.py")
@@ -72,7 +71,7 @@ def test_guarda_ramo_principal(tmp_path):
     assert cfg.metodo_autorizacoes(tmp_path, "agent/x") == {"commit": "auto", "push": "auto", "pr": "auto"}
     assert cfg.metodo_autorizacoes(tmp_path, "main") == {"commit": "pergunta", "push": "pergunta", "pr": "pergunta"}
     assert cfg.metodo_autorizacoes(tmp_path, "master")["commit"] == "pergunta"
-    assert cfg.metodo_autorizacoes(tmp_path, "") ["push"] == "pergunta"
+    assert cfg.metodo_autorizacoes(tmp_path, "")["push"] == "pergunta"
     (tmp_path / "kaizen.config.json").write_text("{}")
     assert cfg.metodo_autorizacoes(tmp_path, "agent/x") is None
 
@@ -84,3 +83,17 @@ def test_herdr_defeitos_e_valores(tmp_path):
     assert kc.herdr(tmp_path) == {"maxPanesPorTab": 3, "workspacePorProjeto": False}
     (tmp_path / "kaizen.config.json").write_text('{"herdr": {"maxPanesPorTab": 0, "workspacePorProjeto": "x"}}', encoding="utf-8")
     assert kc.herdr(tmp_path) == {"maxPanesPorTab": 2, "workspacePorProjeto": True}
+
+
+def test_qualidade_perfil_ausente_ou_so_cobertura_e_none(tmp_path):
+    assert cfg.qualidade(tmp_path) is None
+    (tmp_path / "kaizen.config.json").write_text(json.dumps({"qualidade": {"coberturaDiff": 90}}))
+    assert cfg.qualidade(tmp_path) is None
+
+
+def test_qualidade_perfil_limpa_e_defeitos(tmp_path):
+    conf = {"qualidade": {"bloqueantes": ["a", " a ", "", 3, "b"], "consultivos": ["b", "c"], "fases": ["review", "x"]}}
+    (tmp_path / "kaizen.config.json").write_text(json.dumps(conf))
+    assert cfg.qualidade(tmp_path) == {"bloqueantes": ["a", "b"], "consultivos": ["c"], "fases": ["review"]}
+    (tmp_path / "kaizen.config.json").write_text(json.dumps({"qualidade": {"consultivos": ["c"]}}))
+    assert cfg.qualidade(tmp_path) == {"bloqueantes": [], "consultivos": ["c"], "fases": ["pentest", "review"]}

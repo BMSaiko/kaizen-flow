@@ -138,10 +138,11 @@ def vagas_livres(root=None):
     return max(0, MAX_PARALELO - _ativos(raiz(root)))
 
 
-def transitar(slug, estado, msg=None, fila=None, root=None, agora=None, **campos):
+def transitar(slug, estado, msg=None, fila=None, root=None, agora=None, forcar_done=False, **campos):
     """Muda o estado do SP (na fila dada ou na que o regista). Inválido = `ErroEstado` sem escrever.
 
-    Entrar num estado ativo a partir de um que não ocupa vaga respeita o teto global (`SemVaga`)."""
+    Entrar num estado ativo a partir de um que não ocupa vaga respeita o teto global (`SemVaga`).
+    `forcar_done` abre só `bloqueado → done` (uso do `sp-fechar`, com o SP já em Done); a CLI não o expõe."""
     _slug(slug)
     if estado not in ESTADOS:
         raise ErroEstado(f"estado inválido: {estado!r} (válidos: {', '.join(ESTADOS)})")
@@ -158,7 +159,7 @@ def transitar(slug, estado, msg=None, fila=None, root=None, agora=None, **campos
         except FileNotFoundError:
             raise ErroEstado(f"slug desconhecido: {slug} (fila {fid})") from None
         atual = sp["estado"]
-        if estado != atual and estado not in TRANSICOES[atual]:
+        if estado != atual and estado not in TRANSICOES[atual] and not (forcar_done and estado == "done" and atual == "bloqueado"):
             raise ErroEstado(f"transição inválida: {slug} {atual} → {estado}")
         if estado in ATIVOS and atual not in ATIVOS and _ativos(r) >= MAX_PARALELO:
             raise SemVaga(f"sem vaga: {MAX_PARALELO} painéis ativos no total das filas; {slug} fica em {atual}")

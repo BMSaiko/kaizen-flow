@@ -347,3 +347,44 @@ def test_avisos_fecho_vazio_com_gates_e_decisoes(tmp_path):
     p = make_sp(tmp_path, "atlas/sp/TODO", "abc", body="# corpo\n\n## Decisões\n- x\n")
     p.write_text(p.read_text(encoding="utf-8").replace("slug: abc", "slug: abc\ngates:\n  - cmd: echo ok", 1), encoding="utf-8")
     assert sp_move.avisos_fecho(tmp_path, "abc", "atlas") == []
+
+
+def _git(repo, *args):
+    import subprocess
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                   check=True, capture_output=True)
+
+
+def test_aviso_diff_avisa_quando_o_sp_tem_diff_por_commitar(tmp_path):
+    sp = make_sp(tmp_path, "atlas/sp/TODO", "abc")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "sp vazio")
+    sp.write_text(sp.read_text(encoding="utf-8") + "preenchido\n", encoding="utf-8")
+    avisos = sp_move.aviso_diff(tmp_path, "abc", "atlas")
+    assert len(avisos) == 1 and "git add" in avisos[0] and "git commit" in avisos[0] and "abc.md" in avisos[0]
+
+
+def test_aviso_diff_calado_com_sp_limpo(tmp_path):
+    make_sp(tmp_path, "atlas/sp/TODO", "abc")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "sp")
+    assert sp_move.aviso_diff(tmp_path, "abc", "atlas") == []
+
+
+def test_aviso_diff_calado_fora_de_repo_git_e_sem_sp(tmp_path):
+    make_sp(tmp_path, "atlas/sp/TODO", "abc")
+    assert sp_move.aviso_diff(tmp_path, "abc", "atlas") == []
+    assert sp_move.aviso_diff(tmp_path, "inexistente") == []
+
+
+def test_start_avisa_do_diff_em_stderr_antes_de_mover(tmp_path, capsys):
+    sp = make_sp(tmp_path, "atlas/sp/TODO", "abc")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "sp vazio")
+    sp.write_text(sp.read_text(encoding="utf-8") + "preenchido\n", encoding="utf-8")
+    rc = sp_move.main(["abc", "doing", "--start", "--root", str(tmp_path), "--project", "atlas"])
+    err = capsys.readouterr().err
+    assert rc == 0 and "git add" in err and "atlas/sp/TODO/abc.md" in err

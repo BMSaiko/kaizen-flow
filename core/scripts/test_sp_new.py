@@ -625,3 +625,20 @@ def test_cli_escalar(tmp_path):
     assert "\nescalar: nao\n" in text and not [e for e in sp_validate.validate(text, "TODO") if "escalar" in e]
     with pytest.raises(sp_new.SpNewError):
         sp_new.create(root, "atlas", "xyz", "P2", TODAY, perfil={"escalar": "talvez"})
+
+
+@pytest.mark.parametrize("sel, esperado", [
+    ("all", {"commit": "auto", "push": "auto", "pr": "auto", "merge": "auto"}),
+    ("commit,push", {"commit": "auto", "push": "auto", "pr": "nunca", "merge": "nunca"}),
+    ("commit", {"commit": "auto", "push": "nunca", "pr": "nunca", "merge": "nunca"}),
+    ("nenhuma", {"commit": "nunca", "push": "nunca", "pr": "nunca", "merge": "nunca"}),
+    (" Commit , all ", {"commit": "auto", "push": "auto", "pr": "auto", "merge": "auto"}),
+])
+def test_permissoes_multiselect_mapeia_para_auth(sel, esperado):
+    assert sp_new.permissoes_para_auth(sel) == esperado
+
+
+@pytest.mark.parametrize("sel", ["push", "commit,pr", "commit,push,merge", "deploy", ""])
+def test_permissoes_incoerentes_ou_invalidas_falham(sel):
+    with pytest.raises(sp_new.SpNewError):
+        sp_new.permissoes_para_auth(sel)

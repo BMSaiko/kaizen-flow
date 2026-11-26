@@ -7,8 +7,10 @@ rc: n/a
 """
 import json
 import os
+import re
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -19,6 +21,7 @@ SEND_DELAY = 5.0
 SEND_GAP = 2.0
 ENTER_GAP = 0.5
 ENTER_TRIES = 3
+SEND_LOG = Path(tempfile.gettempdir()) / "handoff-send.log"
 ENTER_SETTLE = 6.0  # o Claude Code demora a limpar o prompt (hooks UserPromptSubmit)
 
 
@@ -128,10 +131,16 @@ def pane_exists(pane, run=run_hidden, env=None, retoma=None):
         raise HandoffError(f"painel {pane} não existe no WezTerm (janela fechada?){dica}")
 
 
+PLACEHOLDER = re.compile(r'^Try "[^"]*"$')  # sugestão do prompt vazio (sessão nova, depois de /clear)
+
+
 def prompt_has_text(screen):
-    """True se o prompt do Claude Code (última linha `❯`) já tem texto escrito."""
+    """True se o prompt do Claude Code (última linha `❯`) já tem texto escrito; a sugestão `Try "…"` não conta."""
     lines = [ln for ln in screen.splitlines() if ln.lstrip().startswith("❯")]
-    return bool(lines) and bool(lines[-1].lstrip()[1:].strip())
+    if not lines:
+        return False
+    resto = lines[-1].lstrip()[1:].strip()
+    return bool(resto) and not PLACEHOLDER.match(resto)
 
 
 def text_arrived(screen, text):
@@ -142,11 +151,40 @@ def text_arrived(screen, text):
     return bool(cauda) and cauda in "".join(screen.split())
 
 
-def check_prompt(pane, run=run_hidden, backend="wezterm"):
-    """Aborta se o prompt do painel já tem texto (não o corromper); lê o ecrã pelo backend (wezterm, tmux, herdr)."""
-    screen = read_screen(backend, pane, run)
-    if prompt_has_text(screen):
-        raise HandoffError(f"o prompt do painel {pane} tem texto por enviar: handoff abortado para não o corromper")
+PROMPT_PASSO = 2.0
+PROMPT_ESPERA = 30.0  # rascunho ou mensagem em fila costuma limpar quando o turno acaba
+
+
+def limpar_prompt(pane, backend, run=run_hidden):
+    """Ctrl+U no prompt: apaga a sugestão fantasma ou o rascunho (só em painéis de fila, sem humano a escrever)."""
+    argv = {"herdr": ["herdr", "pane", "send-keys", str(pane), "ctrl+u"],
+            "tmux": ["tmux", "send-keys", "-t", str(pane), "C-u"],
+            "wezterm": ["wezterm", "cli", "send-text", "--pane-id", str(pane), "--no-paste", "\x15"]}[backend]
+    run(argv, check=True)
+
+
+def check_prompt(pane, run=run_hidden, backend="wezterm", espera=PROMPT_ESPERA, sleep=time.sleep, limpar=False):  # noqa: PLR0913 — parâmetros injetáveis nos testes
+    """Aborta se o prompt do painel continua com texto depois de `espera` s (não o corromper); lê o ecrã pelo backend.
+
+    Com `limpar` (painel de fila) esgotada a espera faz Ctrl+U e confere de novo antes de abortar.
+    """
+    waited = 0.0
+    limpou = False
+    while True:
+        screen = read_screen(backend, pane, run)
+        if not prompt_has_text(screen):
+            return
+        if waited >= espera:
+            if limpar and not limpou:
+                limpar_prompt(pane, backend, run)
+                limpou = True
+                sleep(PROMPT_PASSO)
+                continue
+            ultima = [ln for ln in screen.splitlines() if ln.lstrip().startswith("❯")][-1].strip()[:80]
+            raise HandoffError(f"o prompt do painel {pane} tem texto por enviar ({ultima!r}): handoff abortado para não o corromper")
+        sleep(PROMPT_PASSO)
+        waited += PROMPT_PASSO
+
 
 def detect_backend(env=None):
     """(backend, painel): herdr, wezterm ou tmux se o agente corre num painel; senão clipboard (apps desktop)."""
@@ -233,6 +271,18 @@ def send_confirmed(pane, text, text_argv, key_argv, screen, run=run_hidden, slee
     raise HandoffError(f"painel {pane}: o Enter não submeteu {text!r}")
 
 
+BUSY = "esc to interrupt"  # linha de estado do Claude Code enquanto o turno corre (o Enter só enfileirava o /clear)
+IDLE_TIMEOUT = 180.0
+
+
+def wait_idle(pane, screen, sleep=time.sleep, timeout=IDLE_TIMEOUT, step=2.0):
+    """Espera que o Claude Code acabe o turno (hooks Stop incluídos) antes de escrever; esgotado o tempo, segue."""
+    waited = 0.0
+    while waited < timeout and BUSY in screen(pane):
+        sleep(PROMPT_PASSO)
+        waited += PROMPT_PASSO
+
+
 def send_lines(lines, pane, text_argv, key_argv, delay=SEND_DELAY, gap=SEND_GAP, enter_gap=ENTER_GAP, run=run_hidden,
                sleep=time.sleep, inspect=None, screen=None):
     """Espera `delay`, confere o prompt (`inspect`) e envia cada linha de `lines` com Enter, com `gap` entre elas.
@@ -248,6 +298,8 @@ def send_lines(lines, pane, text_argv, key_argv, delay=SEND_DELAY, gap=SEND_GAP,
         run(key_argv(pane), check=True)
 
     sleep(delay)
+    if screen:
+        wait_idle(pane, screen, sleep)
     if inspect:
         inspect(pane)
     for n, text in enumerate(lines):
@@ -275,6 +327,9 @@ def consume_ficheiro(path, out=print):
 def launch_detached(script, args, env=None):
     """Corre `script args...` num processo separado, sem janela, para o envio só chegar depois de o turno atual acabar."""
     argv = [sys.executable, "-I", str(Path(script).resolve()), *args]
-    popen_sem_janela(argv, "grupo", stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     close_fds=True, **({"env": env} if env is not None else {}))
+    with open(SEND_LOG, "a", encoding="utf-8") as log:  # erros do envio (HandoffError) ficam aqui, não no vazio
+        log.write(f"--- {time.strftime('%Y-%m-%d %H:%M:%S')} {' '.join(argv)}\n")
+        log.flush()
+        popen_sem_janela(argv, "grupo", stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=log,
+                         close_fds=True, **({"env": env} if env is not None else {}))
     return argv

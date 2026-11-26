@@ -10,6 +10,9 @@ const BIN = path.join(ROOT, "bin", "kaizen.js");
 const PY = process.env.KAIZEN_PYTHON || (process.platform === "win32" ? "python" : "python3");
 const TIMEOUT = 30_000;
 
+// corre o CLI sem variáveis de painel herdadas (herdr, WezTerm, tmux)
+const kaizen = (args, opts = {}) => spawnSync("node", [BIN, ...args], { encoding: "utf8", ...opts, env: { ...process.env, HERDR_PANE_ID: "", WEZTERM_PANE: "", TMUX_PANE: "" } });
+
 function envIsolado(dir) {
   const home = path.join(dir, ".home");
   fs.mkdirSync(home, { recursive: true });
@@ -86,4 +89,4 @@ function esperarSaida(child) {
   return new Promise((res) => { if (child.exitCode !== null || child.signalCode) res(); else child.on("exit", () => res()); });
 }
 
-module.exports = { ROOT, BIN, PY, TIMEOUT, sandbox, caminhoSp, preencherSp, matar, lancarPy, esperarSaida };
+module.exports = { ROOT, BIN, kaizen, TIMEOUT, sandbox, caminhoSp, preencherSp, matar, lancarPy, esperarSaida };

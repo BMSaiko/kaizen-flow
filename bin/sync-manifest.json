@@ -6,6 +6,8 @@
     "context-budget.py",
     "handoff.py",
     "handoff_pane.py",
+    "avisos_caixa.py",
+    "test_avisos_caixa.py",
     "handoff_spawn.py",
     "handoff_resume.py",
     "test_handoff_autoconsumo.py",
@@ -42,6 +44,10 @@
     "test_kf_erros_formato.py",
     "pentest.py",
     "test_pentest.py",
+    "sp-cobertura-diff.py",
+    "test_sp_cobertura_diff.py",
+    "quality-ratchet.py",
+    "test_quality_ratchet.py",
     "review_ciclo.py",
     "test_review_ciclo.py",
     "pr_corpo.py",
@@ -65,6 +71,10 @@
     "tab-title.py",
     "test_tab_title.py"
   ],
+  "dirs": [
+    "scripts/fixtures/par-watch",
+    "scripts/wez-layouts"
+  ],
   "skip": [
     "test_michi_nucleo.py",
     "test_context_guard.py",
@@ -77,6 +87,19 @@
     "test_michi_metodologias.py",
     "sp-migrar-slug.py",
     "test_sp_migrar_slug.py",
-    "test_kf_erros.py"
+    "test_kf_erros.py",
+    "ds_core.py",
+    "ds-init.py",
+    "ds-validate.py",
+    "ds-export.py",
+    "ds-lint.py",
+    "ds-verify.py",
+    "ds_verify_driver.js",
+    "test_ds_gates.py",
+    "test_ds.py",
+    "sp-visao.py",
+    "test_sp_visao.py",
+    "sp-decompor.py",
+    "test_sp_decompor.py"
   ]
 }

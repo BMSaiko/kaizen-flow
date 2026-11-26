@@ -198,7 +198,7 @@ def build_tree(sps):
     def depth(sp, seen=()):
         if sp.slug in seen:
             return 0
-        return 1 + max((depth(by_slug[(sp.project, d)], seen + (sp.slug,)) for d in sp.depends_on
+        return 1 + max((depth(by_slug[(sp.project, d)], (*seen, sp.slug)) for d in sp.depends_on
                         if (sp.project, d) in by_slug), default=-1)
 
     def unmet(sp):
@@ -268,6 +268,11 @@ def render_tree(groups, loose, visible):
     rows += [(ICONS[sp.status], sp.status, sp.priority, sp.slug, fmt_created(sp), sp.project, sp.warning) for sp in loose if visible(sp)]
     if rows and rows[-1] is None:
         rows.pop()
+    return _render_rows(rows)
+
+
+def _render_rows(rows):
+    """Alinha e pinta as linhas de `render_tree`; `None` = linha em branco."""
     real = [r for r in rows if r]
     if not real:
         return ""
@@ -335,7 +340,7 @@ def clip(lines, budget, tudo=False):
     """Corta `lines` a `budget` linhas, com aviso de `--tudo`, salvo se `tudo`."""
     if tudo or len(lines) <= budget:
         return lines
-    return lines[:max(budget - 1, 0)] + [f"… +{len(lines) - budget + 1} linhas (--tudo)"]
+    return [*lines[:max(budget - 1, 0)], f"… +{len(lines) - budget + 1} linhas (--tudo)"]
 
 
 def summary(sps):
@@ -360,7 +365,7 @@ def main_tree(args):
     head = next_block(sps, args.tudo)
     foot = summary([sp for sp in sps if visible(sp)])
     body = render_tree(groups, loose, visible).splitlines() or [""]
-    head = head + [""] if head else []
+    head = [*head, ""] if head else []
     budget = MAX_LINES - len(head) - 1  # resumo
     print("\n".join(head + clip(body, budget, args.tudo) + [foot]))
     return 0
@@ -422,16 +427,10 @@ def main(argv=None):
     ap.add_argument("--flat", action="store_true", help="tabela plana (sem agrupar programas)")
     ap.add_argument("--tudo", action="store_true", help="sem limite de 40 linhas (nem de bloqueados)")
     ap.add_argument("--tree", action="store_true", help="(predefinido) agrupa os filhos sob o SP-mãe")
-    ap.add_argument("--tipo", choices=("sp",) + doc_ops.TYPES, default="sp", help="sp (predefinido) | dr | dp: lista DRs/DPs por estado")
+    ap.add_argument("--tipo", choices=("sp", *doc_ops.TYPES), default="sp", help="sp (predefinido) | dr | dp: lista DRs/DPs por estado")
     ap.add_argument("--sem-envelhecer", action="store_true", help="não mostra as subidas de prioridade pendentes (sp-envelhecer em dry-run)")
-    ap.add_argument("--por-rever", action="store_true", help="SPs fechados por rever (veredicto em falta; ver /rever)")
     ap.add_argument("--root", default=None, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
-    if args.por_rever:
-        import sp_carregar
-        sr = sp_carregar.carregar(Path(__file__).resolve().parent / "sp-rever.py", "sp_rever", registar=False)
-        sr.listar(sr.por_rever())
-        return 0
     explicit_root = args.root is not None
     if args.tipo != "sp":
         return doc_ops.listar(args.root or doc_ops.DEFAULT_ROOT, args.tipo, args.all)

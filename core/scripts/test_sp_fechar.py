@@ -1,6 +1,7 @@
 """E2E de sp-fechar.py: gate verde fecha e gera COMMIT; gate vermelho deixa o SP em Doing."""
 import re
 import subprocess
+from types import SimpleNamespace
 import sys
 from pathlib import Path
 
@@ -94,7 +95,7 @@ def test_gate_verde_fecha_e_gera_commit(root):
 
 def test_gate_vermelho_nao_move(root):
     novo_doing(root, fs("vermelho"), f'"{sys.executable}" -c "import sys; sys.exit(1)"')
-    rc, out, err = fechar(root, fs("vermelho"))
+    rc, _out, _err = fechar(root, fs("vermelho"))
     assert rc == 1
     assert list((root / "vault" / PROJECT / "sp" / "Doing").glob(f"{fs('vermelho')}.md"))
     assert not list((root / "vault" / PROJECT / "sp" / "Done").glob(f"{fs('vermelho')}.md"))
@@ -121,8 +122,7 @@ def test_worktree_hint_so_em_worktree(tmp_path):
 
 
 def _mod():
-    m = carregar(SCRIPTS / "sp-fechar.py", "sp_fechar", fresco=True)
-    return m
+    return carregar(SCRIPTS / "sp-fechar.py", "sp_fechar", fresco=True)
 
 
 def test_avisos_sem_prova_nem_reflect():
@@ -285,17 +285,17 @@ def test_docs_secao_fecha(root):
 
 
 def test_docs_linha_na_prova_fecha(root):
-    slug, (rc, out, err) = _completo(root, "docslinha", docs=None, prova_extra="Docs: README atualizado\n")
+    _slug, (rc, out, err) = _completo(root, "docslinha", docs=None, prova_extra="Docs: README atualizado\n")
     assert rc == 0, out + err
 
 
 def test_docs_skip_com_motivo_fecha(root):
-    slug, (rc, out, err) = _completo(root, "docsskip", docs=None, prova_extra="Docs: skip — só código interno\n")
+    _slug, (rc, out, err) = _completo(root, "docsskip", docs=None, prova_extra="Docs: skip — só código interno\n")
     assert rc == 0, out + err
 
 
 def test_docs_skip_sem_motivo_bloqueia(root):
-    slug, (rc, out, err) = _completo(root, "docsskipv", docs=None, prova_extra="Docs: skip — \n")
+    slug, (rc, _out, _err) = _completo(root, "docsskipv", docs=None, prova_extra="Docs: skip — \n")
     assert rc == 1 and _doing(root, slug)
 
 
@@ -345,3 +345,88 @@ def test_fecha_com_slug_sem_data(root):
     rc, out, err = fechar(root, f"{PROJECT}-curto")
     assert rc == 0, out + err
     assert list((root / "vault" / PROJECT / "sp" / "Done").glob(f"{fs('curto')}.md"))
+
+
+class _Backend:
+    def __init__(self, falha=False):
+        self.fechados, self.falha = [], falha
+
+    def fechar(self, id):
+        if self.falha:
+            raise RuntimeError("backend em baixo")
+        self.fechados.append(id)
+
+
+def _fila(tmp_path, slug, estado):
+    """Estado da mãe (`sessoes`) + fila de painéis com o SP no `estado` e o pane `%7`."""
+    import json
+    import sp_painel_estado as pe
+    base, paineis = tmp_path / "maes", tmp_path / "paineis"
+    fid = pe.criar_fila(None, ordem=[slug], root=paineis)
+    pe.registar(fid, slug, root=paineis, pane="%7")
+    pe.transitar(slug, "a-correr", fila=fid, root=paineis)
+    if estado == "bloqueado":
+        pe.transitar(slug, "bloqueado", fila=fid, root=paineis)
+    (base / "mae").mkdir(parents=True)
+    f = base / "mae" / "fila.json"
+    f.write_text(json.dumps({"fila_paineis": fid, "sessoes": {slug: {}}, "feitos": [], "falhados": []}), encoding="utf-8")
+    return pe, fid, f, base, paineis
+
+
+@pytest.mark.parametrize("estado", ["a-correr", "bloqueado"])
+def test_grava_done_na_fila_e_fecha_pane(tmp_path, estado):
+    import json
+    pe, fid, f, base, paineis = _fila(tmp_path, "s", estado)
+    b = _Backend()
+    linhas = _mod().gravar_done_fila("s", backend=b, caminhos=_mod().CaminhosFila(paineis, base, tmp_path / "x.json"))
+    assert pe.ler(fid, "s", root=paineis)["estado"] == "done"
+    dados = json.loads(f.read_text(encoding="utf-8"))
+    assert "s" not in dados["sessoes"] and dados["feitos"] == ["s"]
+    assert b.fechados == ["%7"] and linhas
+
+
+def test_fora_da_fila_nada_muda(tmp_path):
+    pe, fid, f, base, paineis = _fila(tmp_path, "s", "a-correr")
+    antes = f.read_text(encoding="utf-8")
+    b = _Backend()
+    assert _mod().gravar_done_fila("outro", backend=b, caminhos=_mod().CaminhosFila(paineis, base, tmp_path / "x.json")) == []
+    assert f.read_text(encoding="utf-8") == antes and b.fechados == []
+    assert pe.ler(fid, "s", root=paineis)["estado"] == "a-correr"
+
+
+def test_backend_em_falha_ou_ausente_nao_rebenta(tmp_path):
+    pe, fid, f, base, paineis = _fila(tmp_path, "s", "bloqueado")
+    linhas = _mod().gravar_done_fila("s", backend=_Backend(falha=True), caminhos=_mod().CaminhosFila(paineis, base, tmp_path / "x.json"))
+    assert pe.ler(fid, "s", root=paineis)["estado"] == "done"
+    assert any("aviso" in x for x in linhas)
+    pe2, fid2, f2, base2, p2 = _fila(tmp_path / "2", "t", "a-correr")
+    assert _mod().gravar_done_fila("t", backend=None, caminhos=_mod().CaminhosFila(p2, base2, tmp_path / "x.json"))
+
+
+def test_sem_pane_registado_nao_falha(tmp_path):
+    pe, fid, f, base, paineis = _fila(tmp_path, "s", "a-correr")
+    pe.registar(fid, "s", root=paineis, pane=None)
+    b = _Backend()
+    _mod().gravar_done_fila("s", backend=b, caminhos=_mod().CaminhosFila(paineis, base, tmp_path / "x.json"))
+    assert b.fechados == [] and pe.ler(fid, "s", root=paineis)["estado"] == "done"
+
+
+def test_kaizenflow_exige_sync_total_antes_de_fechar(tmp_path, monkeypatch):
+    mod = carregar(SCRIPTS / "sp-fechar.py", "sp_fechar_kf", registar=False, fresco=True)
+    core, scripts = tmp_path / "core", tmp_path / "repo" / "scripts"
+    core.mkdir()
+    scripts.mkdir(parents=True)
+    (core / "a.py").write_text("novo")
+    (scripts / "a.py").write_text("velho")
+    monkeypatch.setattr(mod.kf_ligados, "core_dir", lambda: core)
+    monkeypatch.setattr(mod.kf_ligados, "ligados", lambda c: ["a.py"])
+    monkeypatch.setattr(mod, "changed_paths", lambda cwd: [])  # o diff não toca no motor
+    repo = str(tmp_path / "repo")
+    assert mod.kf_por_sincronizar(repo) == ""
+    assert "a.py" in mod.kf_por_sincronizar(repo, tudo=True)
+    lines = []
+    sp_kf = SimpleNamespace(slug="s", project="kaizenflow")
+    assert mod._bloqueado(sp_kf, lines, True, False, repo) is True
+    assert mod._bloqueado(SimpleNamespace(slug="s", project="demo"), [], True, False, repo) is False
+    (scripts / "a.py").write_text("novo")
+    assert mod._bloqueado(sp_kf, [], True, False, repo) is False

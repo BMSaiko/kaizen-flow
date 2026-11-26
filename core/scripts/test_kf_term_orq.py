@@ -78,7 +78,7 @@ def test_ler_painel_inexistente():
 
 def test_injecao_texto_do_painel_nao_executa_nada():
     b = Falso()
-    rc, out = run(["acao", "ler", "2"], b)
+    rc, _out = run(["acao", "ler", "2"], b)
     assert rc == 0 and b.fechados == [] and b.enviados == [] and b.abertos == []
 
 
@@ -91,7 +91,7 @@ def test_enviar_sem_confirmacao_explicita_cancela(resp):
 
 def test_enviar_confirmado_mostra_texto_exato():
     b = Falso()
-    rc, out = run(["acao", "enviar", "1", "sim"], b, "s")
+    _rc, out = run(["acao", "enviar", "1", "sim"], b, "s")
     assert b.enviados == [("1", "sim")] and "'sim'" in out
 
 
@@ -131,3 +131,65 @@ def test_lista_branca_fora_da_lista_rejeitada():
 
 def test_acao_sem_argumentos_rc2():
     assert run(["acao", "matar"], Falso())[0] == 2
+
+
+# --- nomes canónicos ---
+
+@pytest.fixture
+def estado(tmp_path, monkeypatch):
+    monkeypatch.setenv("SP_FILA_ROOT", str(tmp_path / "estado"))
+    return tmp_path / "estado"
+
+
+def _registar(nome="sp-a", pane="2", **kw):
+    import kf_nomes as kn
+    kn.registar(nome, "falso", pane, kw.get("cwd", "/wt"), kw.get("papel", "sp"), kw.get("slug", "a"), raiz_sb=kw.get("raiz_sb"))
+
+
+def test_enviar_por_nome(estado):
+    _registar()
+    b = Falso()
+    rc, out = run(["acao", "enviar", "sp-a", "olá"], b, resp="s")
+    assert rc == 0 and b.enviados == [("2", "olá")] and "sp-a" in out
+
+
+def test_matar_por_nome_fecha_e_tira_do_registo(estado):
+    import kf_nomes as kn
+    _registar()
+    b = Falso()
+    rc, out = run(["acao", "matar", "sp-a"], b, resp="s")
+    assert rc == 0 and b.fechados == ["2"] and kn.resolver("sp-a") is None
+
+
+def test_matar_cancelado_mantem_registo(estado):
+    import kf_nomes as kn
+    _registar()
+    b = Falso()
+    run(["acao", "matar", "sp-a"], b, resp="n")
+    assert b.fechados == [] and kn.resolver("sp-a")
+
+
+def test_id_opaco_continua_a_funcionar(estado):
+    b = Falso()
+    rc, _ = run(["acao", "matar", "2"], b, resp="s")
+    assert rc == 0 and b.fechados == ["2"]
+
+
+def test_matar_principal_recusado(estado):
+    import kf_nomes as kn
+    kn.registar("kaizen", "falso", "2", "/sb", "livre", "kaizen", raiz_sb="/sb")
+    b = Falso()
+    rc, out = run(["acao", "matar", "kaizen"], b, resp="s")
+    assert rc == 2 and b.fechados == []
+    rc, _ = run(["acao", "matar", "2"], b, resp="s")  # também pelo id
+    assert rc == 2 and b.fechados == []
+
+
+def test_enviar_a_nome_inexistente_e_erro(estado):
+    assert run(["acao", "enviar", "sp-x", "olá"], Falso(), resp="s")[0] == 2
+
+
+def test_ler_por_nome(estado):
+    _registar(pane="1")
+    rc, out = run(["acao", "ler", "sp-a"], Falso(), resp="s")
+    assert rc == 0 and "olá" in out

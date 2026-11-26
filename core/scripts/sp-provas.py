@@ -20,7 +20,6 @@ from painel_backend import run_hidden  # noqa: E402
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 import sp_leitura  # noqa: E402
 
@@ -31,7 +30,7 @@ TIPOS = ("antes", "depois", "diagrama", "terminal")
 MAX_BYTES = 2 * 1024 * 1024
 DATA_MIN = "2026-11-13"
 PROIBIDOS = (".env", ".key", ".pem", ".p12", ".pfx", "id_rsa", ".kdbx", "secrets.", ".secrets")
-SEGREDO = re.compile(r"(ghp_\w{10,}|github_pat_\w+|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{12,}|xox[abprs]-[\w-]+|"
+SEGREDO = re.compile(r"(ghp_\w{10,}|github_pat_\w+|(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{12,}|xox[abprs]-[\w-]+|"
                      r"eyJ[\w-]{15,}\.[\w-]{10,}\.[\w-]+|Bearer\s+[\w.-]{16,}|(password|passwd|secret|token|api[_-]?key)\s*[=:]\s*\S{6,})", re.I)
 PERIGOSO = re.compile(r"git\s+(reset|push\s+.*(--force|-f\b))|--force|--hard", re.I)
 
@@ -176,6 +175,39 @@ def gates_svg(gates):
     return "\n".join(o)
 
 
+def _problemas_imagens(imagens, pasta):
+    """(problemas, tipos) das imagens do pacote."""
+    p, tipos = [], []
+    for im in imagens:
+        if not isinstance(im, dict) or not {"ficheiro", "legenda", "tipo"} <= set(im):
+            p.append("imagens: cada item precisa de ficheiro, legenda e tipo")
+            continue
+        if im["tipo"] not in TIPOS:
+            p.append(f"imagens: tipo inválido {im['tipo']!r}")
+        if caminho_proibido(im["ficheiro"]):
+            p.append(f"imagens: caminho proibido {im['ficheiro']}")
+        tipos.append(im["tipo"])
+        if pasta is not None and not (Path(pasta) / im["ficheiro"]).is_file():
+            p.append(f"imagens: ficheiro em falta {im['ficheiro']}")
+    return p, tipos
+
+
+def _problemas_pacote(d, ui, pasta):
+    """Problemas de imagens, segredos e tamanho do pacote."""
+    p, tipos = _problemas_imagens(d["imagens"], pasta)
+    if ui and "depois" not in tipos:
+        p.append("SP com ui: sim exige uma imagem `depois` (app a correr)")
+    if not ui and not ({"diagrama", "terminal"} & set(tipos)):
+        p.append("SP sem UI exige pelo menos uma imagem diagrama ou terminal")
+    if SEGREDO.search(json.dumps(d, ensure_ascii=False)):
+        p.append("possível segredo no pacote")
+    if pasta is not None:
+        total = sum(f.stat().st_size for f in Path(pasta).rglob("*") if f.is_file())
+        if total > MAX_BYTES:
+            p.append(f"pacote com {total} bytes (máximo {MAX_BYTES})")
+    return p
+
+
 def validar(d, ui=False, pasta=None):
     """Lista de problemas (vazia = válido)."""
     p = [f"campo em falta: {c}" for c in CAMPOS if c not in d]
@@ -187,31 +219,9 @@ def validar(d, ui=False, pasta=None):
         p.append("experimentar: máximo 3 linhas")
     if not isinstance(d["criterios"], dict) or not {"cumpridos", "por_cumprir"} <= set(d["criterios"]):
         p.append("criterios: precisa de cumpridos e por_cumprir")
-    for r in d["reverter"] if isinstance(d["reverter"], list) else [d["reverter"]]:
-        if PERIGOSO.search(str(r)):
-            p.append(f"reverter: comando perigoso (reset/force): {r}")
-    tipos = []
-    for im in d["imagens"]:
-        if not isinstance(im, dict) or not {"ficheiro", "legenda", "tipo"} <= set(im):
-            p.append("imagens: cada item precisa de ficheiro, legenda e tipo")
-            continue
-        if im["tipo"] not in TIPOS:
-            p.append(f"imagens: tipo inválido {im['tipo']!r}")
-        if caminho_proibido(im["ficheiro"]):
-            p.append(f"imagens: caminho proibido {im['ficheiro']}")
-        tipos.append(im["tipo"])
-        if pasta is not None and not (Path(pasta) / im["ficheiro"]).is_file():
-            p.append(f"imagens: ficheiro em falta {im['ficheiro']}")
-    if ui and "depois" not in tipos:
-        p.append("SP com ui: sim exige uma imagem `depois` (app a correr)")
-    if not ui and not ({"diagrama", "terminal"} & set(tipos)):
-        p.append("SP sem UI exige pelo menos uma imagem diagrama ou terminal")
-    if SEGREDO.search(json.dumps(d, ensure_ascii=False)):
-        p.append("possível segredo no pacote")
-    if pasta is not None:
-        total = sum(f.stat().st_size for f in Path(pasta).rglob("*") if f.is_file())
-        if total > MAX_BYTES:
-            p.append(f"pacote com {total} bytes (máximo {MAX_BYTES})")
+    reverter = d["reverter"] if isinstance(d["reverter"], list) else [d["reverter"]]
+    p += [f"reverter: comando perigoso (reset/force): {r}" for r in reverter if PERIGOSO.search(str(r))]
+    p += _problemas_pacote(d, ui, pasta)
     return p
 
 

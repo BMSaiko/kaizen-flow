@@ -7,7 +7,8 @@ ficam lá); sem worktree cria-a primeiro com `sb-worktree ensure`.
 Uso: módulo importado por sp-move.py e sp-fechar.py (`redirect`); sem execução direta
 rc: 2 se não for possível criar a worktree do SP
 """
-import sys as _s, pathlib as _p
+import sys as _s
+import pathlib as _p
 _s.path.insert(0, str(_p.Path(__file__).resolve().parent))
 from painel_backend import run_hidden, run_visivel  # noqa: E402
 import sys
@@ -17,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_engine  # noqa: E402
 
 
-def _worktree_of(repo, slug):
+def _worktree_of(repo: str | Path, slug: str) -> tuple[Path | None, bool]:
     """(worktree, no_principal): worktree registada do SP (ou None) e se `repo` é o checkout principal."""
     if not Path(__file__).with_name("sb-worktree.py").is_file():
         return None, False
@@ -25,17 +26,18 @@ def _worktree_of(repo, slug):
     try:
         if Path(sbwt.agent.main_root(repo)).resolve() != Path(repo).resolve():
             return None, False
-        return sbwt._find(Path(repo), sbwt.name_of(slug)), True
+        found = sbwt._find(Path(repo), sbwt.name_of(slug))
+        return (Path(found) if found else None), True
     except sbwt.SbWorktreeError:
         return None, False
 
 
-def _sp_existe(repo, slug):
+def _sp_existe(repo: str | Path, slug: str) -> bool:
     sp_list = kaizen_engine.load("sp-list")
     return any(s.slug == slug for s in sp_list.collect(sp_list.default_root(repo), include_done=True))
 
 
-def _levar_nao_commitado(repo, wt, slug):
+def _levar_nao_commitado(repo: str | Path, wt: str | Path, slug: str) -> None:
     """Copia para a worktree o ficheiro do SP que só existe, por commitar, no principal; só depois apaga o original."""
     sp_list = kaizen_engine.load("sp-list")
     for s in sp_list.collect(sp_list.default_root(repo), include_done=True):
@@ -56,7 +58,7 @@ def _levar_nao_commitado(repo, wt, slug):
         return
 
 
-def redirect(script, slug, argv):
+def redirect(script: str, slug: str, argv: list[str]) -> int | None:
     """RC da cópia da worktree, ou None se o script já corre numa worktree ou o SP não existe (o chamador dá o erro).
 
     No checkout principal, um SP existente sem worktree cria-a (`ensure`); se falhar, aborta com RC 2 sem escrever em `master`.
@@ -75,4 +77,4 @@ def redirect(script, slug, argv):
     target = wt / "scripts" / here.name if wt else None
     if target is None or not target.is_file():
         return None
-    return run_visivel([sys.executable, "-I", str(target), *argv], cwd=wt).returncode
+    return int(run_visivel([sys.executable, "-I", str(target), *argv], cwd=wt).returncode)

@@ -22,8 +22,8 @@ ORDER = ("Doing", "TODO", "Done")
 DESTS = {"todo": "TODO", "doing": "Doing", "done": "Done"}
 
 
-def default_root(repo=REPO):
-    return _kc.docs_root(repo)
+def default_root(repo: Path = REPO) -> Path:
+    return Path(_kc.docs_root(repo))
 
 
 DEFAULT_ROOT = default_root()
@@ -33,9 +33,9 @@ class DocMoveError(Exception):
     pass
 
 
-def collect(root, kind, include_done=False):
+def collect(root: str | Path, kind: str, include_done: bool = False) -> list[tuple[int, str, str, Path]]:
     folders = ORDER if include_done else ORDER[:2]
-    rows = []
+    rows: list[tuple[int, str, str, Path]] = []
     for path in Path(root).rglob("*.md"):
         parts = path.relative_to(root).parts
         if len(parts) < 3 or parts[-3] != kind or parts[-2] not in folders or "arquivo" in parts:
@@ -44,7 +44,7 @@ def collect(root, kind, include_done=False):
     return sorted(rows)
 
 
-def listar(root, kind, include_done=False):
+def listar(root: str | Path, kind: str, include_done: bool = False) -> int:
     """Imprime os DRs/DPs por estado, com idade em dias da última modificação."""
     print("# Estado Slug (idade)")
     for i, (_, slug, status, path) in enumerate(collect(root, kind, include_done), 1):
@@ -53,8 +53,8 @@ def listar(root, kind, include_done=False):
     return 0
 
 
-def find(root, kind, slug):
-    found = []
+def find(root: str | Path, kind: str, slug: str) -> list[Path]:
+    found: list[Path] = []
     for path in Path(root).rglob(f"{slug}.md"):
         parts = path.relative_to(root).parts
         if len(parts) >= 3 and parts[-3] == kind and parts[-2] in DESTS.values() and "arquivo" not in parts:
@@ -62,7 +62,7 @@ def find(root, kind, slug):
     return found
 
 
-def rewrite(raw, status, updated):
+def rewrite(raw: bytes, status: str, updated: str) -> bytes:
     text = raw.decode("utf-8")
     lines = text.splitlines(keepends=True)
     eol = "\r\n" if lines and lines[0].endswith("\r\n") else "\n"
@@ -82,7 +82,7 @@ def rewrite(raw, status, updated):
     return "".join(lines).encode("utf-8")
 
 
-def move(root, kind, slug, dest):
+def move(root: str | Path, kind: str, slug: str, dest: str) -> str:
     if kind not in TYPES:
         raise DocMoveError(f"tipo inválido '{kind}' (dr|dp)")
     if dest.lower() not in DESTS:

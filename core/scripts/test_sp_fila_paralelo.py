@@ -32,7 +32,7 @@ def test_concorrencia_so_lanca_ate_ao_teto(tmp_path):
     assert estado["sessoes"]["a"]["painel"] is True and "subagent" not in estado["sessoes"]["a"]
     assert estado["sessoes"]["b"]["worktree"] == "/wt/sb-b"
     assert [cwd for _, cwd in painel.abertos] == ["/wt/sb-a", "/wt/sb-b"] and painel.abertos[0][0][0] == "claude"
-    assert sorted(painel.titulos_postos.values()) == ["a", "b"]
+    assert sorted(painel.titulos_postos.values()) == ["sp-a", "sp-b"]
     assert estado["fila_paineis"] and pe.ler(estado["fila_paineis"], "a")["estado"] == "a-correr"
 
 
@@ -88,6 +88,7 @@ def test_paralelo_painel_que_nao_abre_marca_falhado(tmp_path):
 
 def test_paralelo_sem_backend_termina_com_erro_claro(tmp_path, monkeypatch):
     monkeypatch.setattr(sys.modules["sp_fila_execucao"], "_backend_defeito", lambda: None)
+    monkeypatch.setattr(sys.modules["sp_fila_execucao"].kaizen_config, "painel_backend", lambda repo: "auto")
     root = tmp_path / "sps"
     make_sp(root, "a")
     calls = []
@@ -99,6 +100,7 @@ def test_paralelo_sem_backend_termina_com_erro_claro(tmp_path, monkeypatch):
 
 def test_main_paralelo_sem_backend_recusa_antes_de_criar_estado(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(sys.modules["sp_fila_execucao"], "_backend_defeito", lambda: None)
+    monkeypatch.setattr(sys.modules["sp_fila_execucao"].kaizen_config, "painel_backend", lambda repo: "auto")
     make_sp(tmp_path / "sps", "a")
     st = tmp_path / "estado.json"
     rc = sp_fila.main(["--concorrencia", "2", "--estado", str(st), "--root", str(tmp_path / "sps"), "--relatorios", str(tmp_path / "rel")])
@@ -156,7 +158,7 @@ def test_concorrencia_1_sp_move_doing_corre_na_worktree_do_filho(tmp_path):
     assert len(moves) == 1
     argv, cwd = moves[0]
     assert Path(cwd) == Path("/wt/sb-a") and Path(argv[2]) == Path("/wt/sb-a") / "scripts" / "sp-move.py"
-    assert str(sys.modules["sp_fila_execucao"].SCRIPTS) not in " ".join(map(str, argv))
+    assert str(sys.modules["sp_fila_estado"].SCRIPTS) not in " ".join(map(str, argv))
 
 
 def test_concorrencia_cheia_espera_e_vaga_lanca_so_uma(tmp_path):
@@ -501,7 +503,7 @@ def test_segunda_mae_arranca_com_estado_proprio(tmp_path, monkeypatch, capsys):
     em_curso = fe.estado_de("mae-a")
     em_curso.parent.mkdir(parents=True)
     fe.guardar(em_curso, {"sessoes": {"mae-a-f1": {}}, "feitos": [], "falhados": [], "inicio": datetime.now().isoformat(timespec="seconds")})
-    monkeypatch.setattr(sp_fila.sp_fila_execucao, "_backend_defeito", lambda: PainelFalso())
+    monkeypatch.setattr(sp_fila.sp_fila_execucao, "_backend_defeito", PainelFalso)
     monkeypatch.setattr(sp_fila, "seguinte", lambda *a, **k: {"acao": "espera", "sessoes": ["mae-a-f1"], "pendentes": ["mae-b-f1"]})
     monkeypatch.setattr(sp_fila, "_arrancar_vigia", lambda *a, **k: None)
     rc = sp_fila.main(["--programa", "mae-b", "--root", str(root), "--relatorios", str(tmp_path / "rel")])

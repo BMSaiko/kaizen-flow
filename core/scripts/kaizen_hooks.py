@@ -17,7 +17,6 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_config  # noqa: E402
 
 LOG = Path.home() / ".claude" / "kaizen-hooks.log"

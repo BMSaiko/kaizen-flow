@@ -3,7 +3,6 @@
 Uso: módulo importado por sp-fila.py; sem execução direta
 rc: n/a
 """
-from datetime import datetime
 import sys
 from pathlib import Path
 
@@ -12,7 +11,7 @@ import kaizen_engine  # noqa: E402
 import kf_git  # noqa: E402
 import sp_aprovacao  # noqa: E402
 import sp_indice  # noqa: E402
-from sp_fila_estado import REQ_POR_SP, USER, run_hidden
+from sp_fila_estado import USER, run_hidden
 
 sp_list = kaizen_engine.load("sp-list")
 
@@ -108,7 +107,13 @@ def plan(items, maximo=None, so=None, por_commitar=()):
         fila.append(sp)
         feitos.add(sp.slug)
 
-    resto = {s: sp for s, sp in cand.items() if s not in feitos}
+    excluidos += _motivos_resto({s: sp for s, sp in cand.items() if s not in feitos}, feitos)
+    return (fila[:maximo] if maximo else fila), sorted(excluidos)
+
+
+def _motivos_resto(resto, feitos):
+    """[(slug, motivo)] dos candidatos que não entraram na fila: dependência em falta (direta ou herdada) ou ciclo."""
+    excluidos = []
     bloqueados = {s: [d for d in sp.depends_on if d not in feitos and d not in resto] for s, sp in resto.items()}
     bloqueados = {s: ds for s, ds in bloqueados.items() if ds}
     mudou = True
@@ -122,7 +127,7 @@ def plan(items, maximo=None, so=None, por_commitar=()):
             excluidos.append((s, f"dependência em falta ({', '.join(bloqueados[s])})"))
         else:
             excluidos.append((s, "ciclo de dependências"))
-    return (fila[:maximo] if maximo else fila), sorted(excluidos)
+    return excluidos
 
 
 def falhas(estado):
@@ -144,27 +149,6 @@ def limite_paralelo(estado, agora):
         h, m = (int(x) for x in estado["ate"].split(":"))
         if (agora.hour, agora.minute) >= (h, m):
             return f"atingida a hora limite {estado['ate']}"
-    return None
-
-
-def limite(estado, agora, custo=0.0):
-    """Motivo para parar a fila, ou None. `custo`: USD gasto nesta corrida (só conta com orcamento_usd)."""
-    if motivo := falhas(estado):
-        return motivo
-    if len(estado["feitos"]) + len(estado["falhados"]) + len(estado.get("sessoes", {})) >= estado["max"]:
-        return f"atingido o máximo de {estado['max']} SPs"
-    if estado.get("ate"):
-        h, m = (int(x) for x in estado["ate"].split(":"))
-        if (agora.hour, agora.minute) >= (h, m):
-            return f"atingida a hora limite {estado['ate']}"
-    if estado.get("horas") is not None:
-        gastas = (agora - datetime.fromisoformat(estado["inicio"])).total_seconds() / 3600
-        if gastas >= estado["horas"]:
-            return f"orçamento de tempo esgotado ({gastas:.1f}/{estado['horas']} h)"
-    if estado.get("usd") is not None and custo >= estado["usd"]:
-        return f"orçamento de custo esgotado ({custo:.2f}/{estado['usd']} USD)"
-    if estado.get("orcamento") is not None and estado["usados"] + REQ_POR_SP > estado["orcamento"]:
-        return f"orçamento de requests esgotado ({estado['usados']}/{estado['orcamento']})"
     return None
 
 

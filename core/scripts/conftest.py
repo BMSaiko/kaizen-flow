@@ -54,7 +54,7 @@ def _sem_custos_reais(monkeypatch):
         import sp_fila_execucao
     except ImportError:
         return
-    monkeypatch.setattr(sp_fila_execucao, "_custos", lambda: {})
+    monkeypatch.setattr(sp_fila_execucao, "_custos", dict)
 
 
 @pytest.fixture(autouse=True)
@@ -66,7 +66,7 @@ def _paineis_falsos(monkeypatch, tmp_path_factory):
         from sp_fila_testlib import PainelFalso
     except ImportError:
         return
-    monkeypatch.setattr(sp_fila_execucao, "_backend_defeito", lambda: PainelFalso(), raising=False)
+    monkeypatch.setattr(sp_fila_execucao, "_backend_defeito", PainelFalso, raising=False)
 
 
 @pytest.fixture(autouse=True)

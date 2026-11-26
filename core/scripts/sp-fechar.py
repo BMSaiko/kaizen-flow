@@ -13,11 +13,14 @@ rc: 0 fechado, 1 verificação falhou (SP continua em Doing), 2 gates inválidos
 """
 import argparse
 import re
-import sys as _s, pathlib as _p
+import sys as _s
+import pathlib as _p
 _s.path.insert(0, str(_p.Path(__file__).resolve().parent))
+import painel_backend  # noqa: E402
 from painel_backend import run_hidden  # noqa: E402
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -163,12 +166,16 @@ def changed_paths(cwd):
     return sorted(set(paths))
 
 
-def kf_por_sincronizar(cwd):
-    """Mensagem de bloqueio se o diff altera ficheiros do motor cuja cópia no pacote kaizen-flow difere; senão ''."""
+PROJETO_KF = "kaizenflow"
+
+
+def kf_por_sincronizar(cwd, tudo=False):
+    """Mensagem de bloqueio se o diff altera ficheiros do motor cuja cópia no pacote kaizen-flow difere; senão ''.
+    `tudo` (SP do projeto kaizenflow): o sync é obrigatório, compara todos os ficheiros ligados e não só os tocados."""
     core = kf_ligados.core_dir()
     if core is None:
         return ""
-    nomes = kf_ligados.tocados(changed_paths(cwd), core)
+    nomes = None if tudo else kf_ligados.tocados(changed_paths(cwd), core)
     difs = kf_ligados.fora_de_sincronia(Path(cwd) / "scripts", core, nomes)
     if not difs:
         return ""
@@ -207,11 +214,71 @@ def em_fila(slug, estado=None):
     if estado is None:  # estados por mãe (`~/.claude/sp-fila/<mãe>/fila.json`) e o único antigo
         base = Path.home() / ".claude" / "sp-fila"
         cands = sorted(base.glob("*/fila.json")) if base.is_dir() else []
-        return any(em_fila(slug, c) for c in cands + [FILA_ESTADO])
+        return any(em_fila(slug, c) for c in [*cands, FILA_ESTADO])
     try:
         return slug in ler_json(estado, {}).get("sessoes", {})
     except AttributeError:
         return False
+
+
+@dataclass(frozen=True)
+class CaminhosFila:
+    """Raízes do estado da fila (injetáveis nos testes); `None` = defeito do módulo dono."""
+    estado_root: object = None
+    base: object = None
+    legado: object = None
+
+
+def _gravar_estado(slug, caminhos=None):
+    """Grava `done` na fila do SP (mãe: `sessoes` → `feitos`; painéis: `done`, também vindo de `bloqueado`).
+
+    Devolve (linhas, pane a fechar ou None); fora da fila: ([], None)."""
+    import sp_fila_estado as fe
+    import sp_painel_estado as pe
+    c = caminhos or CaminhosFila()
+    estado_root = c.estado_root
+    caminho = fe.localizar(slug, base=c.base, legado=c.legado)
+    if caminho is None:
+        return [], None
+    dados = {}
+
+    def _mover(estado):
+        dados["fila"] = estado.get("fila_paineis")
+        if estado["sessoes"].pop(slug, None) is not None and slug not in estado["feitos"]:
+            estado["feitos"].append(slug)
+
+    fe.atualizar(caminho, _mover)
+    linhas, pane = [f"{slug}: fila — sessão passa a feita"], None
+    fila = dados["fila"]
+    if not fila:
+        return linhas, None
+    try:
+        pane = pe.ler(fila, slug, root=estado_root).get("pane")
+        pe.transitar(slug, "done", fila=fila, root=estado_root, forcar_done=True)
+        linhas[0] = f"{slug}: fila {fila} gravada em done"
+    except pe.ErroEstado as exc:
+        linhas.append(f"aviso: estado da fila não gravado ({exc})")
+    return linhas, pane
+
+
+def _fechar_pane(pane, backend, emitir=None, linhas=()):
+    """Fecha o pane do SP por último (pode ser o do próprio `sp-fechar`): `emitir(linhas)` antes; falha = linha de aviso."""
+    if not pane:
+        return
+    if backend is None:
+        return [f"aviso: sem backend de painéis, pane {pane} fica aberto"]
+    if emitir:
+        emitir(list(linhas))
+    try:
+        backend.fechar(pane)
+    except Exception as exc:  # noqa: BLE001 — fechar o pane nunca muda o rc
+        return [f"aviso: pane {pane} não fechado ({exc})"]
+
+
+def gravar_done_fila(slug, backend=None, caminhos=None, emitir=None):
+    """Estado da fila em `done` e pane fechado (injetável nos testes); devolve as linhas, vazias fora da fila."""
+    linhas, pane = _gravar_estado(slug, caminhos)
+    return [*linhas, *(_fechar_pane(pane, backend, emitir, linhas) or [])]
 
 
 def filhos_da_mae(sps, kid):
@@ -252,21 +319,18 @@ def seguinte(root, slug, project=None, fila=False):
     return f"SEGUINTE: nenhum filho elegível de {kid.parent} (os restantes dependem de SPs por fechar)"
 
 
-def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True, sem_prova=None):
-    """Corre o fecho. Devolve (rc, linhas)."""
-    t_total = time.monotonic()
-    sp = find_doing(root, slug, project)
-    slug = sp.slug  # o resto (sp_move, seguinte, COMMIT) usa o slug completo, não o `ref` curto
+def _verificar(sp, slug, testes, sem_prova, commit_dir):
+    """Gates, test-fast, Docs, prova/reflect e pacote de provas. Devolve (rc, linhas); rc None = pode fechar."""
     lines = []
     rc, text, resultados = passo("gates", run_gates, sp)
     lines.append(text)
     if rc:
-        return rc, lines + [f"{slug}: gate vermelho, SP continua em Doing"]
+        return rc, [*lines, f"{slug}: gate vermelho, SP continua em Doing"]
     if testes and not sp_gates.parse_gates(sp.path.read_text(encoding="utf-8")):
         rc, text = passo("test-fast", run_fast)
         lines.append(text)
         if rc:
-            return 1, lines + [f"{slug}: test-fast vermelho, SP continua em Doing"]
+            return 1, [*lines, f"{slug}: test-fast vermelho, SP continua em Doing"]
     docs = falta_docs(sp.path.read_text(encoding="utf-8"))
     if docs:  # --sem-prova não dispensa Docs
         return 1, lines + docs + [f"{slug}: SP continua em Doing (registar a fase Docs; --sem-prova não a dispensa)"]
@@ -281,35 +345,64 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
         lines += extra
         if rc:
             return 1, lines
+    return None, lines
+
+
+def _linha_commit(commit_dir, slug, msg):
+    paths = changed_paths(commit_dir)
+    if not paths:
+        return "COMMIT: nada para stage (sem alterações ou fora de repo git)"
+    return f"COMMIT: {write_commit(commit_dir, slug, msg or f'vault: fecha {slug}', paths)}"
+
+
+def _bloqueado(sp, lines, commit, budget, commit_dir):
+    """Acrescenta a `lines` o motivo e devolve True se o fecho não pode avançar (sync/orçamento)."""
     if commit:
-        bloqueio = kf_por_sincronizar(commit_dir)
+        bloqueio = kf_por_sincronizar(commit_dir, tudo=sp.project == PROJETO_KF)
         if bloqueio:
-            return 1, lines + [bloqueio, f"{slug}: kaizen-flow por sincronizar, SP continua em Doing"]
+            lines += [bloqueio, f"{sp.slug}: kaizen-flow por sincronizar, SP continua em Doing"]
+            return True
     if budget:
         rc, text = passo("context-budget", run_budget)
         lines.append(text)
         if rc:
-            return 1, lines + [f"{slug}: orçamento de contexto excedido, SP continua em Doing"]
+            lines.append(f"{sp.slug}: orçamento de contexto excedido, SP continua em Doing")
+            return True
+    return False
+
+
+def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True, sem_prova=None,
+           backend=None, emitir=None, estado_root=None):
+    """Corre o fecho. Devolve (rc, linhas). Sessão da fila: grava `done` na fila e, com `backend`, fecha o pane no fim (`emitir` imprime antes)."""
+    t_total = time.monotonic()
+    sp = find_doing(root, slug, project)
+    slug = sp.slug  # o resto (sp_move, seguinte, COMMIT) usa o slug completo, não o `ref` curto
+    rc, lines = _verificar(sp, slug, testes, sem_prova, commit_dir)
+    if rc is not None:
+        return rc, lines
+    if _bloqueado(sp, lines, commit, budget, commit_dir):
+        return 1, lines
     fila = em_fila(slug)
     if nxt and fila:
-        return 1, lines + [f"{slug}: sessão da fila, --next não se aplica (o driver lança o seguinte)"]
+        return 1, [*lines, f"{slug}: sessão da fila, --next não se aplica (o driver lança o seguinte)"]
+    pane = None
     if nxt:
         lines.append(sp_move.advance(root, slug, sp.project))
     else:
         lines.append(sp_move.move(root, slug, "done", sp.project))
+        linhas_fila, pane = _gravar_estado(slug, CaminhosFila(estado_root)) if fila else ([], None)
+        lines += linhas_fila
     prox = "" if nxt else seguinte(root, slug, sp.project, fila)
     if prox:
         lines.append(prox)
     if commit:
-        paths = changed_paths(commit_dir)
-        if paths:
-            lines.append(f"COMMIT: {write_commit(commit_dir, slug, msg or f'vault: fecha {slug}', paths)}")
-        else:
-            lines.append("COMMIT: nada para stage (sem alterações ou fora de repo git)")
+        lines.append(_linha_commit(commit_dir, slug, msg))
     hint = worktree_hint(commit_dir, slug)
     if hint:
         lines.append(hint)
     print(f"[sp-fechar] total {time.monotonic() - t_total:.1f}s", file=sys.stderr, flush=True)
+    if not nxt and pane:
+        lines += _fechar_pane(pane, backend, emitir, lines) or []
     return 0, lines
 
 
@@ -335,21 +428,27 @@ def main(argv=None):
         rc = wt_redirect.redirect(__file__, args.slug, sys.argv[1:])
         if rc is not None:
             return rc
+    impresso = []
+
+    def emitir(linhas):  # o pane pode ser o deste processo: as linhas saem antes de ele fechar
+        print("\n".join(linhas), flush=True)
+        impresso.append(1)
     try:
+        backend = painel_backend.escolher_por_config("auto") if em_fila(args.slug) else None
         rc, lines = fechar(args.root, args.slug, args.project, args.next, args.msg,
                            not args.sem_budget, not args.sem_commit, args.commit_dir,
-                           not args.sem_testes, args.sem_prova)
+                           not args.sem_testes, args.sem_prova, backend=backend, emitir=emitir)
     except (FecharError, sp_move.SpMoveError) as exc:
         print(f"erro: {exc}", file=sys.stderr)
         return 2
-    print("\n".join(lines))
+    if impresso:  # o `emitir` já imprimiu tudo menos o que veio depois do fecho do pane
+        lines = lines[-1:] if lines and lines[-1].startswith("aviso: pane") else []
+    if lines:
+        print("\n".join(lines))
     return rc
 
 
 if __name__ == "__main__":
-    for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")
     sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
     import kf_errlog
     sys.exit(kf_errlog.executar("sp-fechar", main))

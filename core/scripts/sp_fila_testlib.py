@@ -5,7 +5,6 @@ rc: n/a
 """
 import json
 import sys
-from datetime import datetime
 from pathlib import Path
 sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent))
 from sp_carregar import carregar  # noqa: E402
@@ -140,11 +139,3 @@ class PainelFalso:
 
     def titulos(self):
         return dict(self._titulos)
-
-
-def _relatorio_com(tmp_path, **estado_over):
-    root = tmp_path / "sps"
-    make_sp(root, "a", folder="Done")
-    st = _estado(tmp_path, sessoes={"a": {}}, feitos=["a"], **estado_over)
-    out = sp_fila.seguinte(root, st, tmp_path / "rel", _runner([]), datetime(2026, 11, 6, 12, 0))
-    return Path(out["relatorio"]).read_text(encoding="utf-8")

@@ -260,7 +260,7 @@ def render_text(agg, top=5):
     L = table("By day (cost = API-equivalent)", sorted(agg["day"].items()), "day")
     L += ["", f"TOTAL: {t['req']} requests · {len(agg['session'])} sessions · ${cell(t)}", ""]
     L += table("By model", sorted(agg["model"].items(), key=lambda kv: -kv[1]["cost"]), "model")
-    L += [""] + table(f"Top {top} sessions", sorted(agg["session"].items(), key=lambda kv: -kv[1]["cost"])[:top], "session")
+    L += ["", *table(f"Top {top} sessions", sorted(agg["session"].items(), key=lambda kv: -kv[1]["cost"])[:top], "session")]
     L += ["", "## 5 h windows (start = first request)"]
     L += [f"- {w['start']:%Y-%m-%d %H:%M} · {w['req']} requests · ${w['cost']:.2f}" for w in agg["windows"][-12:]]
     if agg["unpriced"]:
@@ -286,8 +286,8 @@ def render_report(label, mon, nxt, agg):
     L = ["---", "type: usage-report", f"week: {label}", f"from: {mon}", f"to: {sun}", "---",
          f"# Usage {label} ({mon} to {sun})", ""]
     if not agg["total"]["req"]:
-        return "\n".join(L + ["No usage this week.", ""])
-    return "\n".join(L + [render_text(agg), ""])
+        return "\n".join([*L, "No usage this week.", ""])
+    return "\n".join([*L, render_text(agg), ""])
 
 
 def common(ap):
