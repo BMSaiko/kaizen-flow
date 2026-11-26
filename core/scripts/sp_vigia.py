@@ -33,6 +33,10 @@ INTERVALO = 10.0
 ECRA_LINHAS = 15  # cauda do ecrã lida para quota/rede/sessão (o resto é histórico)
 EC_PAUSA = (kf_erros.EC_QUOTA, kf_erros.EC_REDE, kf_erros.EC_SESSAO)
 RETOMA_TEXTO = "continua"  # enviado ao painel quando a pausa (quota/rede) acaba
+TICK_TEXTO = "continua"  # tick: turn parado (agente idle/done) sem estado final
+TICK_ESPERA = 2  # ticks do vigia seguidos com o agente parado antes do 1.º envio (~20 s)
+TICK_TETO = 5  # envios seguidos sem o agente voltar a `working`; depois → `bloqueado`
+TICK_INTERVALO = 60.0  # segundos mínimos entre dois envios
 
 
 def memoria_nova():
@@ -276,6 +280,38 @@ def _evento_agente(ctx, sp):
     return False
 
 
+def _tick_continuar(ctx, mem, sp):
+    """SP a-correr com o agente herdr parado (`idle`/`done`) sem estado final: envia `continua` com espera, intervalo e teto.
+
+    Contadores em `mem["ticks"]`; zerados quando o agente volta a trabalhar ou deixa de estar parado. True se agiu."""
+    ticks = mem.setdefault("ticks", {})
+    slug = sp["slug"]
+    ag = _seguro(ctx, ctx.agente_estado, sp["pane"])
+    if sp.get("estado") != "a-correr" or ag not in ("idle", "done") or ec_pausa(sp):
+        ticks.pop(slug, None)
+        return False
+    enviar = getattr(ctx.backend, "enviar", None)
+    if enviar is None:
+        return False
+    t = ticks.setdefault(slug, {"parado": 0, "enviados": 0, "ultimo": None})
+    t["parado"] += 1
+    if t["parado"] < TICK_ESPERA:
+        return False
+    agora = ctx.agora()
+    if t["ultimo"] and (agora - datetime.fromisoformat(t["ultimo"])).total_seconds() < TICK_INTERVALO:
+        return False
+    if t["enviados"] >= TICK_TETO:
+        _bloquear(ctx, mem, sp, f"turn parado sem estado ({t['enviados']} ticks)")
+        ticks.pop(slug, None)
+        return True
+    if not _seguro(ctx, enviar, sp["pane"], TICK_TEXTO):
+        return False
+    t["enviados"] += 1
+    t["ultimo"] = agora.isoformat()
+    ctx.log(f"tick {slug}: {TICK_TEXTO} enviado ({t['enviados']}/{TICK_TETO})")
+    return True
+
+
 def _um(ctx, mem, sp):
     slug, estado = sp["slug"], sp.get("estado")
     if slug in mem["tratados"]:
@@ -289,6 +325,8 @@ def _um(ctx, mem, sp):
     if sp.get("pane") and estado in ("a-correr", "pergunta") and _evento_agente(ctx, sp):
         return None
     if estado == "a-correr" and sp.get("pane") and _falha_no_ecra(ctx, mem, sp):
+        return None
+    if estado == "a-correr" and sp.get("pane") and _tick_continuar(ctx, mem, sp):
         return None
     if estado == "bloqueado" and _retomar_pausa(ctx, mem, sp):
         return None
