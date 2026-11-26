@@ -93,6 +93,22 @@ def test_gate_verde_fecha_e_gera_commit(root):
     assert "git add a.txt" in commit[0].read_text(encoding="utf-8")
 
 
+def test_fecho_limpa_estado_do_sp(root):
+    slug = fs("limpa")
+    novo_doing(root, slug, f'"{sys.executable}" -c "import sys; sys.exit(0)"')
+    estado = root / "vault" / ".kaizen" / "estado"
+    estado.mkdir(parents=True)
+    (estado / f"{slug}.json").write_text("{}", encoding="utf-8")
+    (estado / f"{slug}.journal.jsonl").write_text("", encoding="utf-8")
+    (estado / "outro.json").write_text("{}", encoding="utf-8")
+    rc, out, err = fechar(root, slug)
+    assert rc == 0, out + err
+    assert "ESTADO: limpo" in out
+    assert not (estado / f"{slug}.json").exists()
+    assert not (estado / f"{slug}.journal.jsonl").exists()
+    assert (estado / "outro.json").exists()
+
+
 def test_gate_vermelho_nao_move(root):
     novo_doing(root, fs("vermelho"), f'"{sys.executable}" -c "import sys; sys.exit(1)"')
     rc, _out, _err = fechar(root, fs("vermelho"))
@@ -430,3 +446,43 @@ def test_kaizenflow_exige_sync_total_antes_de_fechar(tmp_path, monkeypatch):
     assert mod._bloqueado(SimpleNamespace(slug="s", project="demo"), [], True, False, repo) is False
     (scripts / "a.py").write_text("novo")
     assert mod._bloqueado(sp_kf, [], True, False, repo) is False
+
+
+def test_limpar_estado_in_process(tmp_path, monkeypatch):
+    mod = _mod()
+    a, b = tmp_path / "a", tmp_path / "b"
+    est = a / ".kaizen" / "estado"
+    est.mkdir(parents=True)
+    (est / "s.json").write_text("{}", encoding="utf-8")
+    (est / "s.journal.jsonl").write_text("", encoding="utf-8")
+    assert mod.limpar_estado("s", a, a, b, None) == ["ESTADO: limpo s.json, s.journal.jsonl"]
+    assert not (est / "s.json").exists()
+    assert mod.limpar_estado("s", a, b) == []
+
+
+def test_limpar_estado_oserror_fica_na_linha(tmp_path, monkeypatch):
+    mod = _mod()
+    est = tmp_path / ".kaizen" / "estado"
+    est.mkdir(parents=True)
+    (est / "s.json").write_text("{}", encoding="utf-8")
+
+    def falha(self, *a, **k):
+        raise OSError("bloqueado")
+    monkeypatch.setattr(Path, "unlink", falha)
+    out = mod.limpar_estado("s", tmp_path)
+    assert out == ["ESTADO: limpo s.json (falhou: bloqueado)"]
+
+
+def test_fechar_in_process_limpa_estado(root, monkeypatch):
+    mod = _mod()
+    slug = fs("inproc")
+    novo_doing(root, slug, f'"{sys.executable}" -c "import sys; sys.exit(0)"')
+    estado = root / "repo" / ".kaizen" / "estado"
+    estado.mkdir(parents=True)
+    (estado / f"{slug}.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(mod, "em_fila", lambda s, estado=None: False)
+    rc, linhas = mod.fechar(root / "vault", slug, PROJECT, budget=False, commit=False,
+                            commit_dir=root / "repo", sem_prova="teste")
+    assert rc == 0, linhas
+    assert any(ln.startswith("ESTADO: limpo") for ln in linhas)
+    assert not (estado / f"{slug}.json").exists()
