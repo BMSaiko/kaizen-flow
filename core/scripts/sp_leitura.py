@@ -6,27 +6,28 @@ Uso: módulo importado (`import sp_leitura`); `frontmatter(texto)`, `campos(text
 rc: n/a
 """
 import re
+from os import PathLike
 from pathlib import Path
 
 
-def _lf(texto):
+def _lf(texto: str) -> str:
     return texto.replace("\r\n", "\n")
 
 
-def bloco(texto):
+def bloco(texto: str) -> str:
     """Texto entre as cercas `---` do frontmatter ("" se não há frontmatter ou não fecha)."""
     m = re.match(r"---\n(.*?)\n---", _lf(texto), re.S)
     return m.group(1) if m else ""
 
 
-def frontmatter(texto):
+def frontmatter(texto: str) -> dict[str, str]:
     """Campos do frontmatter como dict: sem comentários `# ...` nem aspas; sem frontmatter {}.
 
     Um frontmatter por fechar lê até ao fim do ficheiro (como o `kaizen_engine` sempre fez)."""
     linhas = texto.splitlines()
     if not linhas or linhas[0].strip() != "---":
         return {}
-    fm = {}
+    fm: dict[str, str] = {}
     for linha in linhas[1:]:
         if linha.strip() == "---":
             break
@@ -37,9 +38,9 @@ def frontmatter(texto):
     return fm
 
 
-def campos(texto):
+def campos(texto: str) -> dict[str, str]:
     """Campos de topo do frontmatter, valor só com `strip` (aspas e comentários ficam); por fechar dá {}."""
-    out = {}
+    out: dict[str, str] = {}
     for linha in bloco(texto).splitlines():
         chave, sep, valor = linha.partition(":")
         if sep and not chave.startswith(" "):
@@ -47,7 +48,7 @@ def campos(texto):
     return out
 
 
-def seccao(texto, titulo, *, maiusculas=True):
+def seccao(texto: str, titulo: str, *, maiusculas: bool = True) -> str:
     """Corpo (sem `strip`) da primeira secção `## <titulo>...` até ao próximo `## `; "" se não existe.
 
     `titulo` casa por prefixo; `maiusculas=False` ignora a caixa."""
@@ -56,7 +57,7 @@ def seccao(texto, titulo, *, maiusculas=True):
     return m.group(1) if m else ""
 
 
-def ler(caminho):
+def ler(caminho: str | PathLike[str]) -> tuple[dict[str, str], str]:
     """`(frontmatter, texto)` do ficheiro `caminho` (UTF-8; o `read_text` já devolve o texto com LF)."""
     texto = Path(caminho).read_text(encoding="utf-8")
     return frontmatter(texto), texto

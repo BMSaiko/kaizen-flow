@@ -8,18 +8,22 @@ rc: n/a
 """
 import importlib.util
 import sys
+from collections.abc import Mapping
 from datetime import datetime
+from os import PathLike
 from pathlib import Path
+from typing import Any
 
 AVISO = 0.8
 USAGE_DIR = Path(__file__).resolve().parents[2] / "usage"
 _TETOS = (("spUsd", "custo do SP", "USD"), ("diaUsd", "custo do dia", "USD"), ("falhasSeguidas", "falhas seguidas", ""))
 
 
-def decidir(cfg, sp_usd=0.0, dia_usd=0.0, seguidas=0):
+def decidir(cfg: Mapping[str, Any] | None, sp_usd: float = 0.0, dia_usd: float = 0.0, seguidas: int = 0) -> dict[str, Any]:
     """{estado: ok|aviso|parar, razao, avisos}; `razao` é a do primeiro teto atingido, `avisos` os tetos a >= 80 %."""
     valores = {"spUsd": sp_usd, "diaUsd": dia_usd, "falhasSeguidas": seguidas}
-    razao, avisos = "", []
+    razao = ""
+    avisos: list[str] = []
     for chave, nome, unidade in _TETOS:
         teto = (cfg or {}).get(chave)
         if not teto:
@@ -33,7 +37,7 @@ def decidir(cfg, sp_usd=0.0, dia_usd=0.0, seguidas=0):
     return {"estado": "parar" if razao else "aviso" if avisos else "ok", "razao": razao, "avisos": avisos}
 
 
-def gasto_dia(agora=None, usage_dir=None, claude_root=None):
+def gasto_dia(agora: datetime | None = None, usage_dir: str | PathLike[str] | None = None, claude_root: str | PathLike[str] | None = None) -> float:
     """USD equivalentes à API gastos no dia de `agora` (via `usage/kaizen_usage.py`); 0.0 se a medição não existe ou falha."""
     agora = agora or datetime.now()
     pasta = Path(usage_dir or USAGE_DIR)
@@ -42,6 +46,8 @@ def gasto_dia(agora=None, usage_dir=None, claude_root=None):
         return 0.0
     try:
         spec = importlib.util.spec_from_file_location("kf_orc_usage", ficheiro)
+        if spec is None or spec.loader is None:
+            return 0.0
         ku = importlib.util.module_from_spec(spec)
         sys.modules.setdefault("kf_orc_usage", ku)
         spec.loader.exec_module(ku)
@@ -49,6 +55,6 @@ def gasto_dia(agora=None, usage_dir=None, claude_root=None):
         recs = ku.ClaudeTranscripts(claude_root).read(inicio)
         preco = ku.Pricing.load(pasta / "prices.json")
         dia = inicio.strftime("%Y-%m-%d")
-        return sum(c for r in recs if r["ts"].strftime("%Y-%m-%d") == dia and (c := preco.cost(r)) is not None)
+        return float(sum(c for r in recs if r["ts"].strftime("%Y-%m-%d") == dia and (c := preco.cost(r)) is not None))
     except (Exception, SystemExit):  # noqa: BLE001 — a medição nunca pode impedir a fila (preços ilegíveis fazem sys.exit)
         return 0.0

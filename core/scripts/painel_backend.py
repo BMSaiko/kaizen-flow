@@ -17,6 +17,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sp_disco import ler_json  # noqa: E402
@@ -48,13 +49,13 @@ _FLAGS = {
 }
 
 
-def run_hidden(*args, **kwargs):
+def run_hidden(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[Any]:
     """Único sítio que corre `subprocess.run` sem abrir janela de consola no Windows."""
     kwargs.setdefault("creationflags", NO_WINDOW)
     return subprocess.run(*args, **kwargs)
 
 
-def run_visivel(*args, **kwargs):
+def run_visivel(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[Any]:
     """Único sítio que corre `subprocess.run` herdando a consola (CLI interativa: o filho escreve no terminal do utilizador)."""
     return subprocess.run(*args, **kwargs)
 
