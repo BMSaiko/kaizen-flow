@@ -1,4 +1,27 @@
 {
+ "bin/commands/doctor.js": {
+  "no-unused-vars": 1
+ },
+ "bin/commands/erros.js": {
+  "eqeqeq": 1,
+  "no-control-regex": 1
+ },
+ "bin/commands/init.js": {
+  "no-irregular-whitespace": 5,
+  "no-unused-vars": 5,
+  "preserve-caught-error": 1
+ },
+ "bin/commands/sync.js": {
+  "no-unused-vars": 1,
+  "preserve-caught-error": 1
+ },
+ "bin/markers.js": {
+  "eqeqeq": 1
+ },
+ "bin/run-tests.js": {
+  "no-empty": 1,
+  "tsc": 2
+ },
  "catalog/kf_catalogo.py": {
   "PLR0913": 2
  },
@@ -185,6 +208,22 @@
  },
  "core/scripts/test_sp_vigia.py": {
   "PLR0913": 1
+ },
+ "tests/cli-hardening.test.js": {
+  "no-regex-spaces": 1,
+  "no-unused-vars": 1
+ },
+ "tests/helpers/sandbox.js": {
+  "tsc": 2
+ },
+ "tests/init-config.test.js": {
+  "tsc": 3
+ },
+ "tests/resume.test.js": {
+  "no-unused-vars": 1
+ },
+ "tests/sync.test.js": {
+  "no-regex-spaces": 1
  },
  "tests/test_usage.py": {
   "PLR0913": 1
