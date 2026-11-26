@@ -155,12 +155,33 @@ PROMPT_PASSO = 2.0
 PROMPT_ESPERA = 30.0  # rascunho ou mensagem em fila costuma limpar quando o turno acaba
 
 
-def check_prompt(pane, run=run_hidden, backend="wezterm", espera=PROMPT_ESPERA, sleep=time.sleep):
-    """Aborta se o prompt do painel continua com texto depois de `espera` s (não o corromper); lê o ecrã pelo backend."""
+def limpar_prompt(pane, backend, run=run_hidden):
+    """Ctrl+U no prompt: apaga a sugestão fantasma ou o rascunho (só em painéis de fila, sem humano a escrever)."""
+    argv = {"herdr": ["herdr", "pane", "send-keys", str(pane), "ctrl+u"],
+            "tmux": ["tmux", "send-keys", "-t", str(pane), "C-u"],
+            "wezterm": ["wezterm", "cli", "send-text", "--pane-id", str(pane), "--no-paste", "\x15"]}[backend]
+    run(argv, check=True)
+
+
+def check_prompt(pane, run=run_hidden, backend="wezterm", espera=PROMPT_ESPERA, sleep=time.sleep, limpar=False):  # noqa: PLR0913 — parâmetros injetáveis nos testes
+    """Aborta se o prompt do painel continua com texto depois de `espera` s (não o corromper); lê o ecrã pelo backend.
+
+    Com `limpar` (painel de fila) esgotada a espera faz Ctrl+U e confere de novo antes de abortar.
+    """
     waited = 0.0
-    while prompt_has_text(read_screen(backend, pane, run)):
+    limpou = False
+    while True:
+        screen = read_screen(backend, pane, run)
+        if not prompt_has_text(screen):
+            return
         if waited >= espera:
-            raise HandoffError(f"o prompt do painel {pane} tem texto por enviar: handoff abortado para não o corromper")
+            if limpar and not limpou:
+                limpar_prompt(pane, backend, run)
+                limpou = True
+                sleep(PROMPT_PASSO)
+                continue
+            ultima = [ln for ln in screen.splitlines() if ln.lstrip().startswith("❯")][-1].strip()[:80]
+            raise HandoffError(f"o prompt do painel {pane} tem texto por enviar ({ultima!r}): handoff abortado para não o corromper")
         sleep(PROMPT_PASSO)
         waited += PROMPT_PASSO
 
