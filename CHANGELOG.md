@@ -5,6 +5,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 
 ## [Unreleased]
 
+### Fixed
+- `kaizen sync --from-vault` já não apaga peças de `core/` que o vault não tem nem deixa dados pessoais em `core/`: atualiza só peças existentes nos dois lados (novas com `--only <caminho>`), recusa dados pessoais, árvore suja e o checkout principal, e `--dry-run` lista o que mudaria e as remoções evitadas.
+
 ### Added
 - Guarda de casos indesejados `core/scripts/kf_guard.py` (hook PreToolUse do adapter claude e `kf_guard.py diff` como gate): bloqueia, com a razão, alterar ficheiros de `protectedFiles` (`kaizen.config.json`; override só com `KAIZEN_ALLOW_PROTECTED=<razão>`, registado em `~/.claude/kaizen-guard.log`), ler segredos, force-push, `--admin`, merge com CI não verde, tag/publish locais e escrita fora do repo; `test_kf_guard.py` tem um teste por caso.
 - `kaizen quality` (`core/scripts/kf_quality.py`): gate único local e CI (lint, ratchet, mypy strict, testes com cobertura, guarda de testes protegidos, cobertura do diff); o CI passa a ter um só job `quality` (substitui `lint`, `typecheck`, `quality` e `coverage`) e a branch protection do `main` está documentada em `docs/testes.md`.

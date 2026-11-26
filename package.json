@@ -37,7 +37,10 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node bin/run-tests.js"
+    "test": "node bin/run-tests.js",
+    "lint": "eslint .",
+    "typecheck": "tsc -p .",
+    "quality:js": "python core/scripts/quality-ratchet.py --so eslint && python core/scripts/quality-ratchet.py --so tsc"
   },
   "engines": {
     "node": ">=18"
@@ -53,5 +56,12 @@
   "publishConfig": {
     "access": "public",
     "provenance": true
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^18.19.130",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
+    "typescript": "^7.0.2"
   }
 }
