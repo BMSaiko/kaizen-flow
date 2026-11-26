@@ -49,6 +49,33 @@ def test_atualizar_nao_sobe_baseline(tmp_path, monkeypatch):
     assert json.loads(bl.read_text(encoding="utf-8")) == {}
 
 
+def test_contar_eslint_e_tsc():
+    esl = json.dumps([{"filePath": "/r/bin/a.js", "messages": [{"ruleId": "eqeqeq"}, {"ruleId": "eqeqeq"}, {"ruleId": None}]}])
+    assert qr.contar_eslint(esl, "/r") == {"bin/a.js": {"eqeqeq": 2, "eslint-parse": 1}}
+    tsc = "bin/a.js(3,5): error TS2339: x\nbin/a.js(9,1): error TS2810: y\n  detalhe\n"
+    assert qr.contar_tsc(tsc) == {"bin/a.js": {"tsc": 2}}
+
+
+def test_js_violacao_nova_falha_e_divida_baixa_atualiza(tmp_path, monkeypatch):
+    bl = tmp_path / "quality-baseline.json"
+    bl.write_text(json.dumps({"bin/a.js": {"eqeqeq": 2}, "x.py": {"mypy": 4}}), encoding="utf-8")
+    atual = {"v": {"bin/a.js": {"eqeqeq": 2, "no-undef": 1}}}
+    monkeypatch.setattr(qr, "medir", lambda repo, ferramentas: atual["v"])
+    assert qr.main(["--repo", str(tmp_path), "--so", "eslint"]) == 1  # violação nova
+    atual["v"] = {"bin/a.js": {"eqeqeq": 1}}
+    assert qr.main(["--repo", str(tmp_path), "--so", "eslint", "--atualizar"]) == 0
+    assert json.loads(bl.read_text(encoding="utf-8")) == {"bin/a.js": {"eqeqeq": 1}, "x.py": {"mypy": 4}}  # mypy intacto
+
+
+def test_ferramenta_js_nova_e_semeada(tmp_path, monkeypatch):
+    bl = tmp_path / "quality-baseline.json"
+    bl.write_text(json.dumps({"x.py": {"mypy": 4}}), encoding="utf-8")
+    monkeypatch.setattr(qr, "medir", lambda repo, ferramentas: {"bin/a.js": {"tsc": 3}})
+    assert qr.main(["--repo", str(tmp_path), "--so", "tsc"]) == 1
+    assert qr.main(["--repo", str(tmp_path), "--so", "tsc", "--atualizar"]) == 0
+    assert json.loads(bl.read_text(encoding="utf-8"))["bin/a.js"] == {"tsc": 3}
+
+
 def _git(repo, *a):
     import subprocess
     subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *a], check=True, capture_output=True)
