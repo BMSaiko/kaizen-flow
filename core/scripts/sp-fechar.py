@@ -13,10 +13,12 @@ rc: 0 fechado, 1 verificação falhou (SP continua em Doing), 2 gates inválidos
 """
 import argparse
 import re
+from collections.abc import Callable, Sequence
+from typing import Any
 import sys as _s
 import pathlib as _p
 _s.path.insert(0, str(_p.Path(__file__).resolve().parent))
-import painel_backend  # noqa: E402
+import painel_backend as _painel_backend  # noqa: E402
 from painel_backend import run_hidden  # noqa: E402
 import sys
 import time
@@ -25,17 +27,23 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import kf_git  # noqa: E402
+import kf_git as _kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
 import kf_ligados  # noqa: E402
-import sp_journal  # noqa: E402
+import sp_journal as _sp_journal  # noqa: E402
 import wt_redirect  # noqa: E402
-from sp_disco import ler_json  # noqa: E402
+from sp_disco import ler_json as _ler_json  # noqa: E402
 
-sp_list = kaizen_engine.load("sp-list")
-sp_gates = kaizen_engine.load("sp-gates")
-sp_move = kaizen_engine.load("sp-move")
-sp_provas = kaizen_engine.load("sp-provas")
+# Módulos de dependência ainda sem tipos: vistos como Any aqui (o ratchet não os mede).
+painel_backend: Any = _painel_backend
+kf_git: Any = _kf_git
+sp_journal: Any = _sp_journal
+ler_json: Any = _ler_json
+
+sp_list: Any = kaizen_engine.load("sp-list")
+sp_gates: Any = kaizen_engine.load("sp-gates")
+sp_move: Any = kaizen_engine.load("sp-move")
+sp_provas: Any = kaizen_engine.load("sp-provas")
 
 HERE = Path(__file__).resolve().parent
 SECRETS = (".env", ".key", ".pem", ".p12", ".pfx", "id_rsa", ".kdbx", "secrets.", ".secrets")
@@ -45,7 +53,7 @@ class FecharError(Exception):
     pass
 
 
-def find_doing(root, slug, project=None):
+def find_doing(root: str | Path, slug: str, project: str | None = None) -> Any:
     found = sp_list.encontrar(sp_list.collect(root, include_done=True), slug, project)
     if not found:
         raise FecharError(f"SP '{slug}' não encontrado; ver scripts/sp-list.py")
@@ -56,7 +64,7 @@ def find_doing(root, slug, project=None):
     return found[0]
 
 
-def passo(nome, fn, *args):
+def passo(nome: str, fn: Callable[..., Any], *args: Any) -> Any:
     """Corre um passo com progresso no stderr (início, fim e duração); devolve o resultado de fn."""
     print(f"[sp-fechar] > {nome} ...", file=sys.stderr, flush=True)
     t0 = time.monotonic()
@@ -67,7 +75,7 @@ def passo(nome, fn, *args):
     return res
 
 
-def run_gates(sp):
+def run_gates(sp: Any) -> tuple[int, str, list[dict[str, Any]]]:
     """Devolve (rc, texto, resultados). rc 0 = verdes ou sem gates."""
     gates = sp_gates.parse_gates(sp.path.read_text(encoding="utf-8"))
     if not gates:
@@ -80,7 +88,7 @@ def run_gates(sp):
     return (0 if ok else 1), sp_gates.summary(results), results
 
 
-def pacote_de_provas(sp, resultados, cwd):
+def pacote_de_provas(sp: Any, resultados: list[dict[str, Any]], cwd: str | Path) -> tuple[int, list[str]]:
     """Gera `sp/proofs/<slug>/provas.json` e valida-o. Devolve (rc, linhas); só SPs de 2026-11-13 em diante."""
     if not sp_provas.exige_pacote(sp):
         return 0, []
@@ -91,7 +99,7 @@ def pacote_de_provas(sp, resultados, cwd):
     return 0, [f"PROVAS: {pasta / 'provas.json'}"]
 
 
-def run_budget():
+def run_budget() -> tuple[int, str]:
     # opcional: o pacote kaizen-flow não leva o script do orçamento (glob evita referência dura)
     script = next(iter(HERE.glob("context-budg*.py")), None)
     if script is None:
@@ -102,7 +110,7 @@ def run_budget():
     return r.returncode, f"context-budget rc={r.returncode}\n{tail}"
 
 
-def run_fast():
+def run_fast() -> tuple[int, str]:
     """test-fast.py fast quando o SP não declara gates. Opcional: o pacote kaizen-flow pode não o levar."""
     script = HERE / "test-fast.py"
     if not script.exists():
@@ -113,9 +121,9 @@ def run_fast():
     return r.returncode, f"test-fast rc={r.returncode}\n{tail}"
 
 
-def avisos(sp_text):
+def avisos(sp_text: str) -> list[str]:
     """Faltas (bloqueiam o fecho sem --sem-prova) se faltar a prova de done ou o Reflect de fase/final."""
-    def body(title):
+    def body(title: str) -> str:
         m = re.search(rf"^## {title}[^\n]*\n(.*?)(?=^## |\Z)", sp_text, re.S | re.M)
         return m.group(1) if m else ""
     out = []
@@ -126,10 +134,10 @@ def avisos(sp_text):
     return out
 
 
-def falta_docs(sp_text):
+def falta_docs(sp_text: str) -> list[str]:
     """Lista de faltas (vazia = ok) da fase Docs. Aceita `## Docs` não vazia, `Docs: <algo>` na
     `## Prova de done`, ou `Docs: skip — <motivo>` com motivo. `Docs: skip` sem motivo não conta."""
-    def body(title):
+    def body(title: str) -> str:
         m = re.search(rf"^## {title}[^\n]*\n(.*?)(?=^## |\Z)", sp_text, re.S | re.M)
         return m.group(1) if m else ""
     skip = re.search(r"^Docs:\s*skip\b(.*)$", body("Prova de done"), re.M | re.I)
@@ -141,7 +149,7 @@ def falta_docs(sp_text):
     return ["FALTA: sem prova da fase Docs (registar '## Docs' ou 'Docs: skip — <motivo>')"]
 
 
-def registar_dispensa(path, motivo):
+def registar_dispensa(path: Path, motivo: str) -> None:
     """Acrescenta ao SP a dispensa consciente de prova/reflect (bytes: preserva CRLF)."""
     nl = "\r\n" if b"\r\n" in path.read_bytes() else "\n"
     linha = nl + "## Dispensa de prova/reflect" + nl + nl + f"{datetime.now():%Y-%m-%d}: {motivo}" + nl
@@ -149,7 +157,7 @@ def registar_dispensa(path, motivo):
         fh.write(linha.encode("utf-8"))
 
 
-def changed_paths(cwd):
+def changed_paths(cwd: str | Path) -> list[str]:
     """Caminhos alterados/novos segundo o git, sem COMMIT_*.md nem segredos. Vazio fora de repo git."""
     r = run_hidden(["git", "-C", str(cwd), "status", "--porcelain", "-uall"],
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -170,7 +178,7 @@ def changed_paths(cwd):
 PROJETO_KF = "kaizenflow"
 
 
-def kf_por_sincronizar(cwd, tudo=False):
+def kf_por_sincronizar(cwd: str | Path, tudo: bool = False) -> str:
     """Mensagem de bloqueio se o diff altera ficheiros do motor cuja cópia no pacote kaizen-flow difere; senão ''.
     `tudo` (SP do projeto kaizenflow): o sync é obrigatório, compara todos os ficheiros ligados e não só os tocados."""
     core = kf_ligados.core_dir()
@@ -183,7 +191,7 @@ def kf_por_sincronizar(cwd, tudo=False):
     return f"kaizen-flow fora de sincronia ({', '.join(difs)}): correr /kaizen-sync e repetir o fecho"
 
 
-def write_commit(cwd, slug, subject, paths):
+def write_commit(cwd: str | Path, slug: str, subject: str, paths: Sequence[str]) -> Path:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out = Path(cwd) / f"COMMIT_{stamp}.md"
     stage = "\n".join(f"git add {p}" for p in paths)
@@ -195,9 +203,9 @@ def write_commit(cwd, slug, subject, paths):
     return out
 
 
-def worktree_hint(cwd, slug):
+def worktree_hint(cwd: str | Path, slug: str) -> str | None:
     """Se `cwd` é uma worktree (não o checkout principal), o passo que falta depois do commit."""
-    def git(*a):
+    def git(*a: str) -> str | None:
         r = kf_git.run(cwd, *a, run=run_hidden)
         return r.stdout.strip() if r.returncode == 0 else None
     gd, common = git("rev-parse", "--path-format=absolute", "--git-dir"), git("rev-parse", "--path-format=absolute", "--git-common-dir")
@@ -210,7 +218,7 @@ def worktree_hint(cwd, slug):
 FILA_ESTADO = Path.home() / ".claude" / "sp-fila-estado.json"
 
 
-def em_fila(slug, estado=None):
+def em_fila(slug: str, estado: Path | None = None) -> bool:
     """True se `slug` é uma sessão lançada pela fila (consta de `sessoes` no estado)."""
     if estado is None:  # estados por mãe (`~/.claude/sp-fila/<mãe>/fila.json`) e o único antigo
         base = Path.home() / ".claude" / "sp-fila"
@@ -230,12 +238,14 @@ class CaminhosFila:
     legado: object = None
 
 
-def _gravar_estado(slug, caminhos=None):
+def _gravar_estado(slug: str, caminhos: "CaminhosFila | None" = None) -> tuple[list[str], Any]:
     """Grava `done` na fila do SP (mãe: `sessoes` → `feitos`; painéis: `done`, também vindo de `bloqueado`).
 
     Devolve (linhas, pane a fechar ou None); fora da fila: ([], None)."""
-    import sp_fila_estado as fe
-    import sp_painel_estado as pe
+    import sp_fila_estado as _fe
+    import sp_painel_estado as _pe
+    fe: Any = _fe
+    pe: Any = _pe
     c = caminhos or CaminhosFila()
     estado_root = c.estado_root
     caminho = fe.localizar(slug, base=c.base, legado=c.legado)
@@ -243,7 +253,7 @@ def _gravar_estado(slug, caminhos=None):
         return [], None
     dados = {}
 
-    def _mover(estado):
+    def _mover(estado: dict[str, Any]) -> None:
         dados["fila"] = estado.get("fila_paineis")
         if estado["sessoes"].pop(slug, None) is not None and slug not in estado["feitos"]:
             estado["feitos"].append(slug)
@@ -262,7 +272,7 @@ def _gravar_estado(slug, caminhos=None):
     return linhas, pane
 
 
-def limpar_estado(slug, *raizes):
+def limpar_estado(slug: str, *raizes: str | Path | None) -> list[str]:
     """Apaga o checkpoint e o journal do SP fechado (`.kaizen/estado/<slug>.*`) em cada raiz; devolve as linhas."""
     apagados = []
     for raiz in dict.fromkeys(str(r) for r in raizes if r):
@@ -276,10 +286,11 @@ def limpar_estado(slug, *raizes):
     return [f"ESTADO: limpo {', '.join(apagados)}"] if apagados else []
 
 
-def _fechar_pane(pane, backend, emitir=None, linhas=()):
+def _fechar_pane(pane: Any, backend: Any, emitir: Callable[[list[str]], None] | None = None,
+                 linhas: Sequence[str] = ()) -> list[str] | None:
     """Fecha o pane do SP por último (pode ser o do próprio `sp-fechar`): `emitir(linhas)` antes; falha = linha de aviso."""
     if not pane:
-        return
+        return None
     if backend is None:
         return [f"aviso: sem backend de painéis, pane {pane} fica aberto"]
     if emitir:
@@ -288,15 +299,17 @@ def _fechar_pane(pane, backend, emitir=None, linhas=()):
         backend.fechar(pane)
     except Exception as exc:  # noqa: BLE001 — fechar o pane nunca muda o rc
         return [f"aviso: pane {pane} não fechado ({exc})"]
+    return None
 
 
-def gravar_done_fila(slug, backend=None, caminhos=None, emitir=None):
+def gravar_done_fila(slug: str, backend: Any = None, caminhos: "CaminhosFila | None" = None,
+                     emitir: Callable[[list[str]], None] | None = None) -> list[str]:
     """Estado da fila em `done` e pane fechado (injetável nos testes); devolve as linhas, vazias fora da fila."""
     linhas, pane = _gravar_estado(slug, caminhos)
     return [*linhas, *(_fechar_pane(pane, backend, emitir, linhas) or [])]
 
 
-def filhos_da_mae(sps, kid):
+def filhos_da_mae(sps: Sequence[Any], kid: Any) -> list[str]:
     """Slugs em `children:` do frontmatter da mãe de `kid` (vazio se a mãe não existe ou não os lista)."""
     mae = next((s for s in sps if s.slug == kid.parent and s.project == kid.project), None)
     if not mae:
@@ -306,7 +319,7 @@ def filhos_da_mae(sps, kid):
     return re.findall(r"^\s+- slug:\s*(\S+)", texto[:fim] if fim > 0 else texto, flags=re.M)
 
 
-def seguinte(root, slug, project=None, fila=False):
+def seguinte(root: str | Path, slug: str, project: str | None = None, fila: bool = False) -> str:
     """Linha com o passo seguinte de um filho fechado: próximo elegível, fecho da mãe, ou '' (SP sem mãe).
 
     Em fila só o driver lança o seguinte: a sessão regista e reporta (`sp-fila.py --seguinte --slug`)."""
@@ -334,7 +347,8 @@ def seguinte(root, slug, project=None, fila=False):
     return f"SEGUINTE: nenhum filho elegível de {kid.parent} (os restantes dependem de SPs por fechar)"
 
 
-def _verificar(sp, slug, testes, sem_prova, commit_dir):
+def _verificar(sp: Any, slug: str, testes: bool, sem_prova: str | None,
+               commit_dir: str | Path) -> tuple[int | None, list[str]]:
     """Gates, test-fast, Docs, prova/reflect e pacote de provas. Devolve (rc, linhas); rc None = pode fechar."""
     lines = []
     rc, text, resultados = passo("gates", run_gates, sp)
@@ -353,7 +367,7 @@ def _verificar(sp, slug, testes, sem_prova, commit_dir):
     if faltas and not sem_prova:
         return 1, lines + faltas + [f"{slug}: sem prova/reflect, SP continua em Doing (registar, ou --sem-prova \"motivo\")"]
     if faltas:
-        registar_dispensa(sp.path, sem_prova)
+        registar_dispensa(sp.path, sem_prova or "")
         lines += [f.replace("AVISO", "DISPENSADO") for f in faltas]
     if not sem_prova:
         rc, extra = passo("pacote de provas", pacote_de_provas, sp, resultados, commit_dir)
@@ -363,14 +377,14 @@ def _verificar(sp, slug, testes, sem_prova, commit_dir):
     return None, lines
 
 
-def _linha_commit(commit_dir, slug, msg):
+def _linha_commit(commit_dir: str | Path, slug: str, msg: str | None) -> str:
     paths = changed_paths(commit_dir)
     if not paths:
         return "COMMIT: nada para stage (sem alterações ou fora de repo git)"
     return f"COMMIT: {write_commit(commit_dir, slug, msg or f'vault: fecha {slug}', paths)}"
 
 
-def _bloqueado(sp, lines, commit, budget, commit_dir):
+def _bloqueado(sp: Any, lines: list[str], commit: bool, budget: bool, commit_dir: str | Path) -> bool:
     """Acrescenta a `lines` o motivo e devolve True se o fecho não pode avançar (sync/orçamento)."""
     if commit:
         bloqueio = kf_por_sincronizar(commit_dir, tudo=sp.project == PROJETO_KF)
@@ -386,8 +400,10 @@ def _bloqueado(sp, lines, commit, budget, commit_dir):
     return False
 
 
-def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=True, commit_dir=".", testes=True, sem_prova=None,
-           backend=None, emitir=None, estado_root=None):
+def fechar(root: str | Path, slug: str, project: str | None = None, nxt: bool = False, msg: str | None = None,
+           budget: bool = True, commit: bool = True, commit_dir: str | Path = ".", testes: bool = True,
+           sem_prova: str | None = None, backend: Any = None, emitir: Callable[[list[str]], None] | None = None,
+           estado_root: Any = None) -> tuple[int, list[str]]:
     """Corre o fecho. Devolve (rc, linhas). Sessão da fila: grava `done` na fila e, com `backend`, fecha o pane no fim (`emitir` imprime antes)."""
     t_total = time.monotonic()
     sp = find_doing(root, slug, project)
@@ -422,7 +438,7 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
     return 0, lines
 
 
-def main(argv=None):
+def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Fecha um SP: gates, orçamento, Done e COMMIT_*.md")
     ap.add_argument("slug", nargs="?")
     ap.add_argument("--slug", dest="slug_opt", help="alias de slug posicional")
@@ -444,9 +460,9 @@ def main(argv=None):
         rc = wt_redirect.redirect(__file__, args.slug, sys.argv[1:])
         if rc is not None:
             return rc
-    impresso = []
+    impresso: list[int] = []
 
-    def emitir(linhas):  # o pane pode ser o deste processo: as linhas saem antes de ele fechar
+    def emitir(linhas: list[str]) -> None:  # o pane pode ser o deste processo: as linhas saem antes de ele fechar
         print("\n".join(linhas), flush=True)
         impresso.append(1)
     try:
