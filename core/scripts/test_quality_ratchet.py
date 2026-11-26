@@ -69,7 +69,7 @@ def test_diff_modulo_novo_nao_strict_falha(tmp_path):
     repo = _repo_diff(tmp_path, "core/scripts/ok.py\n")
     (repo / "core/scripts/novo.py").write_text("y = 2\n", encoding="utf-8")
     (repo / "core/scripts/ok.py").write_text("z = 3\n", encoding="utf-8")
-    (repo / "core/scripts/" + "test_" + "zz.py").write_text("", encoding="utf-8")
+    (repo / "core/scripts" / ("test_" + "zz.py")).write_text("", encoding="utf-8")
     _git(repo, "add", ".")
     _git(repo, "commit", "-qm", "feat")
     assert qr.nao_strict(str(repo), "main") == ["core/scripts/novo.py"]
