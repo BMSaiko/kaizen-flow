@@ -107,7 +107,7 @@ test("preflight propaga rc 1 e lista cada problema com EC sem alterar nada", { s
 test("quality --lista mostra as etapas e rc 1 com base inválida em etapa de diff", () => {
   const l = run("quality", "--lista");
   assert.strictEqual(l.status, 0);
-  assert.match(l.stdout, /^lint\nratchet\nstrict\n/);
+  assert.match(l.stdout, /^lint\r?\nratchet\r?\nstrict\r?\n/);
   const r = run("quality", "--so", "protegidos", "--base", "nao-existe");
   assert.strictEqual(r.status, 1);
 });
