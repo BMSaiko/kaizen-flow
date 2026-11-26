@@ -113,6 +113,19 @@ def orcamento(repo):
             "falhasSeguidas": f if isinstance(f, int) and not isinstance(f, bool) and f >= 1 else FALHAS_SEGUIDAS_DEFEITO}
 
 
+PROTEGIDOS_DEFEITO = ("MEMORY.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".cursor/rules/kaizen-flow.mdc")
+
+
+def protected_files(repo: str | Path) -> list[str]:
+    """Ficheiros de contexto protegidos (`protectedFiles`, lista de caminhos relativos); ausente ou inválido = defeito.
+
+    Só se acrescenta/substitui por lista de strings não vazias; lista vazia desliga a guarda."""
+    v = _read(repo).get("protectedFiles")
+    if not isinstance(v, list):
+        return list(PROTEGIDOS_DEFEITO)
+    return [x.strip().replace("\\", "/") for x in v if isinstance(x, str) and x.strip()]
+
+
 HOOKS_NAME = "kaizen-hooks.json"
 EVENTS = ("sp.created", "sp.moved", "michi.phase.start", "michi.phase.end",
           "michi.gate.failed", "michi.commit", "michi.closed")

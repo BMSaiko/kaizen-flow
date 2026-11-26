@@ -7,5 +7,12 @@
   "herdr": {
     "maxPanesPorTab": 2,
     "workspacePorProjeto": true
-  }
+  },
+  "protectedFiles": [
+    "MEMORY.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    ".cursor/rules/kaizen-flow.mdc"
+  ]
 }
