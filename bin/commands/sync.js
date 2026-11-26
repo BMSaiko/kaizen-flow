@@ -100,12 +100,13 @@ const covered = (only, rel) => only.some((o) => rel === o || rel.startsWith(`${o
 const git = (args) => spawnSync("git", args, { cwd: PKG, encoding: "utf8" });
 
 // escrever em core/ só numa worktree do repo e com core/ limpo (nada por commitar que se perca)
+const real = (p) => { try { return fs.realpathSync.native(p); } catch { return path.resolve(p); } }; // 8.3/symlinks (Windows)
 function guardTree() {
   const top = git(["rev-parse", "--show-toplevel"]);
-  if (top.status !== 0 || path.resolve(top.stdout.trim()) !== path.resolve(PKG)) return; // pacote sem git (cópia/instalado): nada a verificar
+  if (top.status !== 0 || real(top.stdout.trim()) !== real(PKG)) return; // pacote sem git (cópia/instalado): nada a verificar
   const gd = git(["rev-parse", "--path-format=absolute", "--git-dir"]).stdout.trim();
   const cd = git(["rev-parse", "--path-format=absolute", "--git-common-dir"]).stdout.trim();
-  if (gd && cd && path.resolve(gd) === path.resolve(cd)) throw new Error("--from-vault escreve em core/: corra-o numa worktree do kaizen-flow, nunca no checkout principal (ou use --dry-run)");
+  if (gd && cd && real(gd) === real(cd)) throw new Error("--from-vault escreve em core/: corra-o numa worktree do kaizen-flow, nunca no checkout principal (ou use --dry-run)");
   const st = git(["status", "--porcelain", "--", "core"]);
   if (st.stdout.trim()) throw new Error(`core/ tem alterações por commitar; faça commit antes de --from-vault (ou use --dry-run):\n${st.stdout.trimEnd()}`);
 }
