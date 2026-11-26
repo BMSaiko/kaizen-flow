@@ -103,3 +103,11 @@ test("preflight propaga rc 1 e lista cada problema com EC sem alterar nada", { s
   assert.ok(fs.existsSync(path.join(d, "sujo.txt")));
   assert.strictEqual(g("rev-parse", "--abbrev-ref", "HEAD").stdout.trim(), "outro");
 });
+
+test("quality --lista mostra as etapas e rc 1 com base inválida em etapa de diff", () => {
+  const l = run("quality", "--lista");
+  assert.strictEqual(l.status, 0);
+  assert.match(l.stdout, /^lint\nratchet\nstrict\n/);
+  const r = run("quality", "--so", "protegidos", "--base", "nao-existe");
+  assert.strictEqual(r.status, 1);
+});
