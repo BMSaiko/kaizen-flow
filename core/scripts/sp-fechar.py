@@ -166,12 +166,16 @@ def changed_paths(cwd):
     return sorted(set(paths))
 
 
-def kf_por_sincronizar(cwd):
-    """Mensagem de bloqueio se o diff altera ficheiros do motor cuja cópia no pacote kaizen-flow difere; senão ''."""
+PROJETO_KF = "kaizenflow"
+
+
+def kf_por_sincronizar(cwd, tudo=False):
+    """Mensagem de bloqueio se o diff altera ficheiros do motor cuja cópia no pacote kaizen-flow difere; senão ''.
+    `tudo` (SP do projeto kaizenflow): o sync é obrigatório, compara todos os ficheiros ligados e não só os tocados."""
     core = kf_ligados.core_dir()
     if core is None:
         return ""
-    nomes = kf_ligados.tocados(changed_paths(cwd), core)
+    nomes = None if tudo else kf_ligados.tocados(changed_paths(cwd), core)
     difs = kf_ligados.fora_de_sincronia(Path(cwd) / "scripts", core, nomes)
     if not difs:
         return ""
@@ -351,18 +355,18 @@ def _linha_commit(commit_dir, slug, msg):
     return f"COMMIT: {write_commit(commit_dir, slug, msg or f'vault: fecha {slug}', paths)}"
 
 
-def _bloqueado(slug, lines, commit, budget, commit_dir):
+def _bloqueado(sp, lines, commit, budget, commit_dir):
     """Acrescenta a `lines` o motivo e devolve True se o fecho não pode avançar (sync/orçamento)."""
     if commit:
-        bloqueio = kf_por_sincronizar(commit_dir)
+        bloqueio = kf_por_sincronizar(commit_dir, tudo=sp.project == PROJETO_KF)
         if bloqueio:
-            lines += [bloqueio, f"{slug}: kaizen-flow por sincronizar, SP continua em Doing"]
+            lines += [bloqueio, f"{sp.slug}: kaizen-flow por sincronizar, SP continua em Doing"]
             return True
     if budget:
         rc, text = passo("context-budget", run_budget)
         lines.append(text)
         if rc:
-            lines.append(f"{slug}: orçamento de contexto excedido, SP continua em Doing")
+            lines.append(f"{sp.slug}: orçamento de contexto excedido, SP continua em Doing")
             return True
     return False
 
@@ -376,7 +380,7 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
     rc, lines = _verificar(sp, slug, testes, sem_prova, commit_dir)
     if rc is not None:
         return rc, lines
-    if _bloqueado(slug, lines, commit, budget, commit_dir):
+    if _bloqueado(sp, lines, commit, budget, commit_dir):
         return 1, lines
     fila = em_fila(slug)
     if nxt and fila:

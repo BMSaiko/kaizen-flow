@@ -1,6 +1,7 @@
 """E2E de sp-fechar.py: gate verde fecha e gera COMMIT; gate vermelho deixa o SP em Doing."""
 import re
 import subprocess
+from types import SimpleNamespace
 import sys
 from pathlib import Path
 
@@ -408,3 +409,24 @@ def test_sem_pane_registado_nao_falha(tmp_path):
     b = _Backend()
     _mod().gravar_done_fila("s", backend=b, caminhos=_mod().CaminhosFila(paineis, base, tmp_path / "x.json"))
     assert b.fechados == [] and pe.ler(fid, "s", root=paineis)["estado"] == "done"
+
+
+def test_kaizenflow_exige_sync_total_antes_de_fechar(tmp_path, monkeypatch):
+    mod = carregar(SCRIPTS / "sp-fechar.py", "sp_fechar_kf", registar=False, fresco=True)
+    core, scripts = tmp_path / "core", tmp_path / "repo" / "scripts"
+    core.mkdir()
+    scripts.mkdir(parents=True)
+    (core / "a.py").write_text("novo")
+    (scripts / "a.py").write_text("velho")
+    monkeypatch.setattr(mod.kf_ligados, "core_dir", lambda: core)
+    monkeypatch.setattr(mod.kf_ligados, "ligados", lambda c: ["a.py"])
+    monkeypatch.setattr(mod, "changed_paths", lambda cwd: [])  # o diff não toca no motor
+    repo = str(tmp_path / "repo")
+    assert mod.kf_por_sincronizar(repo) == ""
+    assert "a.py" in mod.kf_por_sincronizar(repo, tudo=True)
+    lines = []
+    sp_kf = SimpleNamespace(slug="s", project="kaizenflow")
+    assert mod._bloqueado(sp_kf, lines, True, False, repo) is True
+    assert mod._bloqueado(SimpleNamespace(slug="s", project="demo"), [], True, False, repo) is False
+    (scripts / "a.py").write_text("novo")
+    assert mod._bloqueado(sp_kf, [], True, False, repo) is False

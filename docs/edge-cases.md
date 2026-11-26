@@ -63,7 +63,7 @@ Measure with `kaizen catalog` (rc 0 only when EC coverage >= 0.9 and UC coverage
 
 | ID | Trigger | Expected | Owner | Test |
 |---|---|---|---|---|
-| EC-023 | PR merge hits a conflict | rc 12 and no merge; the conflict is reported | testes-falha-90 | `core/scripts/test_pr_fechar.py::test_conflito_rc12` |
+| EC-023 | PR merge hits a conflict | rc 12 and no merge; the conflict is reported | testes-falha-90 | `core/scripts/test_pr_fechar.py::test_conflito_rc12_bloqueia_logo` |
 | EC-024 | Watcher about to merge a story with red gates or a conflict | the story is blocked with the reason; no merge | testes-falha-90 | `core/scripts/test_sp_vigia.py::test_gates_vermelhos_ou_conflito_bloqueiam_com_motivo` |
 | EC-025 | Story branch is behind the main branch | `sp-estado.py` warns and says to merge the main branch first | preflight-erros-ux | `core/scripts/test_sp_estado.py::test_avisa_ramo_atras_de_master` |
 | EC-026 | Worktree to clean is still in use by a process | the clean is retried instead of leaving a half-removed worktree | resume-orfaos | `core/scripts/test_sp_vigia.py::test_clean_repete_enquanto_worktree_em_uso` |

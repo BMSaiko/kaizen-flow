@@ -25,13 +25,40 @@ def test_verde_faz_merge_com_estrategia(tmp_path):
     assert rc == 0 and m == ["rebase"]
 
 
-def test_checks_vermelhos_bloqueiam(tmp_path):
-    rc, _, m = run(tmp_path, pr(checks=[bad()]))
-    assert rc == 11 and m == []
+def test_checks_vermelhos_corrigiveis_rc13_sem_merge(tmp_path):
+    rc, msg, m = run(tmp_path, pr(checks=[bad()]))
+    assert rc == 13 and m == [] and "corrigível" in msg and "tentativa 1/3" in msg
 
 
-def test_conflito_rc12(tmp_path):
-    rc, _, m = run(tmp_path, pr(mergeable="CONFLICTING", checks=[ok()]))
+def test_vermelho_persistente_bloqueia_sp_com_url(tmp_path, monkeypatch):
+    regs = []
+    monkeypatch.setattr(pr_fechar, "_bloquear", lambda slug, m: regs.append((slug, m)))
+    merges = []
+    url = "https://github.com/o/r/pull/7"
+    rc, msg = pr_fechar.fechar(url, repo(tmp_path), fetch_fn=lambda p, r: pr(checks=[bad()]),
+                               merge_fn=lambda p, e, r: (merges.append(e) or (0, "")), interval=10,
+                               sp="s", tentativa=3, max_tentativas=3)
+    assert rc == 11 and merges == [] and regs and regs[0][0] == "s" and url in regs[0][1]
+
+
+def test_corrigido_na_tentativa_seguinte_faz_merge(tmp_path):
+    cur = {"d": pr(checks=[bad()])}
+    merges = []
+    kw = {"fetch_fn": lambda p, r: cur["d"], "merge_fn": lambda p, e, r: (merges.append(e) or (0, "")), "interval": 10}
+    assert pr_fechar.fechar("7", repo(tmp_path), tentativa=1, **kw)[0] == 13
+    cur["d"] = pr(checks=[ok()])  # correção feita e pushed
+    assert pr_fechar.fechar("7", repo(tmp_path), tentativa=2, **kw)[0] == 0 and merges == ["squash"]
+
+
+def test_gate_local_vermelho_com_ci_verde_nao_faz_merge(tmp_path):
+    rc, msg, m = fechar_perfil(tmp_path, lambda r, p: "npm test")
+    assert rc == 13 and m == [] and "npm test" in msg
+
+
+def test_conflito_rc12_bloqueia_logo(tmp_path, monkeypatch):
+    regs = []
+    monkeypatch.setattr(pr_fechar, "_bloquear", lambda slug, m: regs.append(m))
+    rc, _, m = run(tmp_path, pr(mergeable="CONFLICTING", checks=[ok()]), )
     assert rc == 12 and m == []
 
 
@@ -77,9 +104,9 @@ def fechar_perfil(tmp_path, gates_fn, **kw):
 def test_gate_bloqueante_vermelho_nao_faz_merge_e_bloqueia_sp(tmp_path, monkeypatch):
     regs = []
     monkeypatch.setattr(pr_fechar, "_bloquear", lambda slug, m: regs.append((slug, m)))
-    rc, msg, m = fechar_perfil(tmp_path, lambda r, p: "npm test", sp="meu-sp")
+    rc, msg, m = fechar_perfil(tmp_path, lambda r, p: "npm test", sp="meu-sp", tentativa=3)
     assert rc == 11 and m == [] and "npm test" in msg
-    assert regs == [("meu-sp", "gate bloqueante vermelho: npm test")]
+    assert regs == [("meu-sp", "gate bloqueante vermelho: npm test; PR 7; 3 tentativas esgotadas")]
 
 
 def test_perfil_verde_exige_pentest_e_review(tmp_path, monkeypatch):
