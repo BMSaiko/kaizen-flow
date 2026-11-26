@@ -107,10 +107,10 @@ def resume_commands(harness, sp_path, nivel=None, pane=None):
     return [clear, *([f"/model {modelo_nivel(nivel)}"] if nivel else []), fila or resume.format(sp=sp_path)]
 
 
-def _inspect(backend):
-    """Confere o prompt vazio antes de escrever, em qualquer backend com ecrã legível."""
+def _inspect(backend, limpar=False):
+    """Confere o prompt vazio antes de escrever, em qualquer backend com ecrã legível (`limpar`: painel de fila, Ctrl+U se sobra texto)."""
     if backend in ("wezterm", "tmux", "herdr"):
-        return lambda p: check_prompt(p, backend=backend)
+        return lambda p: check_prompt(p, backend=backend, limpar=limpar)
     return None
 
 
@@ -261,7 +261,7 @@ def main(argv=None):
         elif args.send:
             backend = args.backend or "wezterm"
             send(args.send, args.pane or pane_id(backend=backend), backend=backend, harness=args.harness,
-                 inspect=_inspect(backend), confirm=True, nivel=args.nivel)
+                 inspect=_inspect(backend, limpar=prompt_da_fila(args.send, args.pane) is not None), confirm=True, nivel=args.nivel)
         elif args.dry_run:
             _cmd_dry_run(args)
         else:

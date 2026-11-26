@@ -230,3 +230,21 @@ def test_check_prompt_aborta_se_o_texto_persiste():
     with pytest.raises(hp.HandoffError, match="texto por enviar"):
         hp.check_prompt(4, run=lambda *a, **k: _Res("❯ rascunho"), espera=4, sleep=dormiu.append)
     assert len(dormiu) == 2
+
+
+def test_check_prompt_limpar_faz_ctrl_u_e_segue_se_limpa():
+    chamadas = []
+    ecras = iter(["❯ sugestao fantasma", "❯ "])
+
+    def run(argv, *a, **k):
+        chamadas.append(argv)
+        return _Res(next(ecras)) if argv[:3] == ["herdr", "pane", "read"] else _Res("")
+
+    hp.check_prompt("w:p1", run=run, backend="herdr", espera=0, sleep=lambda s: None, limpar=True)
+    assert ["herdr", "pane", "send-keys", "w:p1", "ctrl+u"] in chamadas
+
+
+def test_check_prompt_limpar_aborta_se_continua_com_texto():
+    run = lambda argv, *a, **k: _Res("❯ rascunho")  # noqa: E731
+    with pytest.raises(hp.HandoffError, match="rascunho"):
+        hp.check_prompt("w:p1", run=run, backend="herdr", espera=0, sleep=lambda s: None, limpar=True)
