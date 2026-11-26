@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kf_git  # noqa: E402
 import kaizen_engine  # noqa: E402
 import kf_ligados  # noqa: E402
+import sp_journal  # noqa: E402
 import wt_redirect  # noqa: E402
 from sp_disco import ler_json  # noqa: E402
 
@@ -261,6 +262,20 @@ def _gravar_estado(slug, caminhos=None):
     return linhas, pane
 
 
+def limpar_estado(slug, *raizes):
+    """Apaga o checkpoint e o journal do SP fechado (`.kaizen/estado/<slug>.*`) em cada raiz; devolve as linhas."""
+    apagados = []
+    for raiz in dict.fromkeys(str(r) for r in raizes if r):
+        for f in sp_journal.caminhos(raiz, slug):
+            if f.exists():
+                try:
+                    f.unlink()
+                    apagados.append(f.name)
+                except OSError as exc:
+                    apagados.append(f"{f.name} (falhou: {exc})")
+    return [f"ESTADO: limpo {', '.join(apagados)}"] if apagados else []
+
+
 def _fechar_pane(pane, backend, emitir=None, linhas=()):
     """Fecha o pane do SP por último (pode ser o do próprio `sp-fechar`): `emitir(linhas)` antes; falha = linha de aviso."""
     if not pane:
@@ -390,6 +405,7 @@ def fechar(root, slug, project=None, nxt=False, msg=None, budget=True, commit=Tr
         lines.append(sp_move.advance(root, slug, sp.project))
     else:
         lines.append(sp_move.move(root, slug, "done", sp.project))
+        lines += limpar_estado(slug, root, commit_dir)
         linhas_fila, pane = _gravar_estado(slug, CaminhosFila(estado_root)) if fila else ([], None)
         lines += linhas_fila
     prox = "" if nxt else seguinte(root, slug, sp.project, fila)
