@@ -95,3 +95,12 @@ def test_ferramenta_em_falta_falha_a_etapa(monkeypatch, repo):
 def test_comando_testes_liga_cobertura(repo):
     cmd, env = kq.comando("testes", repo, None)
     assert cmd[-1].endswith("run-tests.js") and env == {"KAIZEN_COVERAGE": "1"}
+
+
+def test_added_lines_ignora_mnemonicprefix(repo):
+    import pentest
+    _git(repo, "config", "diff.mnemonicPrefix", "true")
+    (repo / "m.js").write_text("a\nb\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "m")
+    assert [f for f, _n, _t in pentest.added_lines(str(repo), "main")] == ["m.js", "m.js"]
