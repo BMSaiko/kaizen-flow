@@ -747,3 +747,75 @@ def test_contexto_real_herdr_publica_metadata_e_le_agente(tmp_path):
     assert any(c[1:4] == ["workspace", "report-metadata", "--source"] and "fila=fila 0/1 · 2 vagas" in c for c in fake.chamadas)
     ctx.esperar(0.01, lambda s: None)
     assert any(c[1:3] == ["agent", "wait"] for c in fake.chamadas)
+
+
+# --- tick «continua» num turn parado ---------------------------------------------------
+
+from datetime import timedelta as _td  # noqa: E402
+
+
+def _tick_ctx(ag, estado="a-correr", **kw):
+    b = BackendEcra({})
+    b.agentes["p-a"] = ag
+    return CtxPausa({"a": {"estado": estado, **kw}}, backend=b)
+
+
+def _andar(ctx, mem, n, seg=0):
+    for _ in range(n):
+        sp_vigia.passo(ctx, mem)
+        ctx._agora += _td(seconds=seg)
+
+
+def test_tick_idle_envia_continua_depois_de_dois_ticks_com_log():
+    ctx, mem = _tick_ctx("idle"), sp_vigia.memoria_nova()
+    _andar(ctx, mem, 1)
+    assert ctx.backend.enviados == []
+    _andar(ctx, mem, 1)
+    assert ctx.backend.enviados == [("p-a", "continua")]
+    assert sum("tick a:" in l for l in ctx.logs) == 1
+
+
+def test_tick_nao_envia_em_working_blocked_nem_estados_finais():
+    for ag, est in (("working", "a-correr"), ("blocked", "a-correr"), ("idle", "pergunta"), ("idle", "bloqueado"), ("idle", "falhou")):
+        ctx = _tick_ctx(ag, est)
+        _andar(ctx, sp_vigia.memoria_nova(), 4)
+        assert ctx.backend.enviados == [], (ag, est)
+    ctx = _tick_ctx("blocked")
+    _andar(ctx, sp_vigia.memoria_nova(), 1)
+    assert ctx.sps["a"]["estado"] == "pergunta"
+
+
+def test_tick_nao_envia_em_pausa_por_quota():
+    ctx = _tick_ctx("idle", motivo="EC-016 quota")
+    _andar(ctx, sp_vigia.memoria_nova(), 4)
+    assert ctx.backend.enviados == []
+
+
+def test_tick_respeita_intervalo_minimo():
+    ctx, mem = _tick_ctx("idle"), sp_vigia.memoria_nova()
+    _andar(ctx, mem, 6, seg=10)
+    assert len(ctx.backend.enviados) == 1
+    _andar(ctx, mem, 2, seg=10)
+    assert len(ctx.backend.enviados) == 2
+
+
+def test_tick_teto_bloqueia_com_motivo():
+    ctx, mem = _tick_ctx("idle"), sp_vigia.memoria_nova()
+    _andar(ctx, mem, 8, seg=61)
+    assert len(ctx.backend.enviados) == sp_vigia.TICK_TETO
+    assert ctx.sps["a"]["estado"] == "bloqueado"
+    assert ctx.sps["a"]["msg"] == f"turn parado sem estado ({sp_vigia.TICK_TETO} ticks)"
+
+
+def test_tick_zera_contadores_quando_o_agente_volta_a_working():
+    ctx, mem = _tick_ctx("idle"), sp_vigia.memoria_nova()
+    _andar(ctx, mem, 3, seg=61)
+    ctx.backend.agentes["p-a"] = "working"
+    _andar(ctx, mem, 1, seg=61)
+    assert "a" not in mem["ticks"]
+
+
+def test_tick_sem_herdr_nao_faz_nada():
+    ctx = _tick_ctx(None)
+    _andar(ctx, sp_vigia.memoria_nova(), 4, seg=61)
+    assert ctx.backend.enviados == []

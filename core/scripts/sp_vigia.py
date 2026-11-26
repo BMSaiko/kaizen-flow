@@ -10,20 +10,36 @@ Os efeitos vivem no `Contexto` (o real é `ContextoReal`; os testes trocam-no).
 
 Uso: módulo importado por sp-vigia.py; sem execução direta
 rc: sem execução direta"""
+from __future__ import annotations
+
 import contextlib
 import hashlib
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kf_erros as _kf_erros  # noqa: E402
+import sp_disco as _sp_disco  # noqa: E402
 import sp_leitura  # noqa: E402
-import sp_vigia_reacao  # noqa: E402
-from painel_backend import popen_sem_janela, run_hidden  # noqa: E402
-from sp_disco import guardar, ler_json  # noqa: E402
-import kf_erros  # noqa: E402
+import sp_vigia_reacao as _sp_vigia_reacao  # noqa: E402
+from painel_backend import popen_sem_janela as _popen_sem_janela  # noqa: E402
+from painel_backend import run_hidden  # noqa: E402
+
+# Dependências ainda não-strict: vistas como `Any` para o mypy --strict não as propagar.
+kf_erros: Any = _kf_erros
+sp_vigia_reacao: Any = _sp_vigia_reacao
+guardar: Any = _sp_disco.guardar
+ler_json: Any = _sp_disco.ler_json
+popen_sem_janela: Any = _popen_sem_janela
+
+Mem = dict[str, Any]
+SP = dict[str, Any]
+Res = tuple[int, str]
 
 AVISAM = ("pergunta", "bloqueado", "falhou")
 MAX_PARALELO = 3
@@ -33,13 +49,17 @@ INTERVALO = 10.0
 ECRA_LINHAS = 15  # cauda do ecrã lida para quota/rede/sessão (o resto é histórico)
 EC_PAUSA = (kf_erros.EC_QUOTA, kf_erros.EC_REDE, kf_erros.EC_SESSAO)
 RETOMA_TEXTO = "continua"  # enviado ao painel quando a pausa (quota/rede) acaba
+TICK_TEXTO = "continua"  # tick: turn parado (agente idle/done) sem estado final
+TICK_ESPERA = 2  # ticks do vigia seguidos com o agente parado antes do 1.º envio (~20 s)
+TICK_TETO = 5  # envios seguidos sem o agente voltar a `working`; depois → `bloqueado`
+TICK_INTERVALO = 60.0  # segundos mínimos entre dois envios
 
 
-def memoria_nova():
+def memoria_nova() -> Mem:
     return {"avisos": {}, "tratados": []}
 
 
-def ler_memoria(path):
+def ler_memoria(path: str | Path) -> Mem:
     dados = ler_json(path)
     try:
         mem = {"avisos": dict(dados.get("avisos") or {}), "tratados": list(dados.get("tratados") or [])}
@@ -50,11 +70,11 @@ def ler_memoria(path):
         return memoria_nova()
 
 
-def guardar_memoria(path, mem):
+def guardar_memoria(path: str | Path, mem: Mem) -> None:
     guardar(path, mem)
 
 
-def reclamar_pidfile(path, pid, vivo):
+def reclamar_pidfile(path: str | Path, pid: int, vivo: Callable[[int], bool]) -> bool:
     """Um só vigia por fila: escreve `pid` se não há dono vivo; False se outro vigia vivo já o tem."""
     p = Path(path)
     try:
@@ -70,59 +90,59 @@ def reclamar_pidfile(path, pid, vivo):
 
 class Contexto:
     """Efeitos do vigia. Ver `ContextoReal` para o significado de cada método."""
-    backend = None
+    backend: Any = None
 
-    def ler_fila(self): raise NotImplementedError
-    def transitar(self, slug, estado, msg=None): raise NotImplementedError
-    def modo(self, sp): raise NotImplementedError
-    def arrumar(self, sp): raise NotImplementedError
-    def merge(self, slug): raise NotImplementedError
-    def clean(self, slug): raise NotImplementedError
-    def seguinte(self, slug): raise NotImplementedError
-    def fechar_mae(self, mae): raise NotImplementedError
-    def nota_relatorio(self, path, texto): raise NotImplementedError
-    def estado_global(self): raise NotImplementedError
-    def log(self, msg): raise NotImplementedError
+    def ler_fila(self) -> dict[str, Any]: raise NotImplementedError
+    def transitar(self, slug: str, estado: str, msg: str | None = None) -> None: raise NotImplementedError
+    def modo(self, sp: SP) -> str | None: raise NotImplementedError
+    def arrumar(self, sp: SP) -> Res: raise NotImplementedError
+    def merge(self, slug: str) -> Res: raise NotImplementedError
+    def clean(self, slug: str) -> Res: raise NotImplementedError
+    def seguinte(self, slug: str) -> dict[str, Any]: raise NotImplementedError
+    def fechar_mae(self, mae: str) -> Res: raise NotImplementedError
+    def nota_relatorio(self, path: str | Path, texto: str) -> None: raise NotImplementedError
+    def estado_global(self) -> bool: raise NotImplementedError
+    def log(self, msg: str) -> None: raise NotImplementedError
 
-    def agora(self):
+    def agora(self) -> datetime:
         return datetime.now()
 
-    def agente_estado(self, pane):
+    def agente_estado(self, pane: str) -> str | None:
         """Estado do agente no painel segundo o multiplexer (herdr: idle/working/blocked/done); None se não sabe."""
-        return  # noqa: RET501
+        return None
 
-    def metadata(self, texto):
+    def metadata(self, texto: str) -> None:
         """Publica `texto` como metadata do workspace (herdr); sem efeito nos outros backends."""
 
-    def esperar(self, intervalo, dormir):
+    def esperar(self, intervalo: float, dormir: Callable[[float], Any]) -> None:
         """Pausa entre ticks; o contexto real acorda mais cedo por evento do herdr."""
         dormir(intervalo)
 
-    def pausar(self, slug, msg, motivo, retoma_em):
+    def pausar(self, slug: str, msg: str, motivo: str | None, retoma_em: str | None) -> None:
         """SP a-correr → bloqueado por quota/rede/sessão, com `motivo` e `retoma_em` (o contexto real grava os campos)."""
         self.transitar(slug, "bloqueado", msg)
 
-    def retomar(self, slug, msg):
+    def retomar(self, slug: str, msg: str) -> None:
         """bloqueado (pausa acabada) → a-correr, limpando `motivo` e `retoma_em`."""
         self.transitar(slug, "a-correr", msg)
 
-    def escalar(self, sp):
+    def escalar(self, sp: SP) -> dict[str, Any] | None:
         """Relança o SP no nível seguinte se `sp_escalada` o pedir; {de, para, ...} ou None (sem escalada)."""
-        return
+        return None
 
-    def texto_sp(self, sp):
+    def texto_sp(self, sp: SP) -> str | None:
         """Texto do SP na worktree (restricoes/permitir/## Decisões para a reação); None se não há."""
-        return
+        return None
 
-    def registar_reacao(self, sp, linha):
+    def registar_reacao(self, sp: SP, linha: str) -> None:
         """Acrescenta a reação do vigia a `## Report modo auto` do SP."""
 
-    def retomar_contexto(self, sp):
+    def retomar_contexto(self, sp: SP) -> bool:
         """Handoff no próprio painel (`sp-handoff.py --launch --auto`); True se lançou."""
         return False
 
 
-def _seguro(ctx, f, *a):
+def _seguro(ctx: Contexto, f: Callable[..., Any], *a: Any) -> Any:
     try:
         return f(*a)
     except Exception as e:  # noqa: BLE001 — um aviso falhado nunca pára o vigia
@@ -130,7 +150,7 @@ def _seguro(ctx, f, *a):
         return None
 
 
-def _avisar(ctx, mem, sp):
+def _avisar(ctx: Contexto, mem: Mem, sp: SP) -> None:
     """Uma linha de log por transição para pergunta/bloqueado/falhou (o aviso ao utilizador é nativo do herdr)."""
     slug, estado = sp["slug"], sp.get("estado")
     if mem["avisos"].get(slug) == estado:
@@ -143,21 +163,21 @@ def _avisar(ctx, mem, sp):
     ctx.log(f"aviso {estado} {slug}" + (f": {msg}" if msg else ""))
 
 
-def texto_fila(sps):
+def texto_fila(sps: dict[str, SP]) -> str:
     """«fila n/N · v vagas»: SPs done sobre o total e vagas livres do teto global."""
     estados = [sp.get("estado") for sp in sps.values()]
     ativos = sum(1 for e in estados if e in ("a-correr", "pergunta"))
     return f"fila {sum(1 for e in estados if e == 'done')}/{len(estados)} · {max(MAX_PARALELO - ativos, 0)} vagas"
 
 
-def _publicar(ctx, mem, sps):
+def _publicar(ctx: Contexto, mem: Mem, sps: dict[str, SP]) -> None:
     texto = texto_fila(sps)
     if mem.get("meta") != texto:
         mem["meta"] = texto
         _seguro(ctx, ctx.metadata, texto)
 
 
-def _fim(ctx, res):
+def _fim(ctx: Contexto, res: dict[str, Any]) -> str:
     mae = res.get("fechar_mae")
     if mae:
         rc, out = ctx.fechar_mae(mae)
@@ -170,25 +190,27 @@ def _fim(ctx, res):
     return "fim"
 
 
-def _seguinte(ctx, mem, slug):
+def _seguinte(ctx: Contexto, mem: Mem, slug: str) -> str | None:
     mem["tratados"].append(slug)
     res = ctx.seguinte(slug) or {}
     ctx.log(f"seguinte {slug}: {res.get('acao')}")
     return _fim(ctx, res) if res.get("acao") == "fim" else None
 
 
-def _bloquear(ctx, mem, sp, motivo):
+def _bloquear(ctx: Contexto, mem: Mem, sp: SP, motivo: str) -> None:
     ctx.transitar(sp["slug"], "bloqueado", motivo)
     _avisar(ctx, mem, {**sp, "estado": "bloqueado", "msg": motivo})
 
 
-def _done(ctx, mem, sp):
+def _done(ctx: Contexto, mem: Mem, sp: SP) -> str | None:
     slug = sp["slug"]
     if ctx.modo(sp) != "auto":
-        return _bloquear(ctx, mem, sp, "SP manual: merge pelo utilizador")
+        _bloquear(ctx, mem, sp, "SP manual: merge pelo utilizador")
+        return None
     rc, out = ctx.arrumar(sp)
     if rc != 0:
-        return _bloquear(ctx, mem, sp, "resto do fecho por commitar: " + (out or "").strip()[-300:])
+        _bloquear(ctx, mem, sp, "resto do fecho por commitar: " + (out or "").strip()[-300:])
+        return None
     if out:
         ctx.log(f"arrumar {slug}: {out}")
     rc, out = ctx.merge(slug)
@@ -196,7 +218,8 @@ def _done(ctx, mem, sp):
         if LOCK_OCUPADO in (out or ""):
             ctx.log(f"merge {slug}: lock ocupado, repetir")
             return None
-        return _bloquear(ctx, mem, sp, "merge recusado: " + (out or "").strip()[-300:])
+        _bloquear(ctx, mem, sp, "merge recusado: " + (out or "").strip()[-300:])
+        return None
     ctx.log(f"merge {slug}: {out}")
     if sp.get("pane"):
         _seguro(ctx, ctx.backend.fechar, sp["pane"])
@@ -206,13 +229,13 @@ def _done(ctx, mem, sp):
     return _seguinte(ctx, mem, slug)
 
 
-def ec_pausa(sp):
+def ec_pausa(sp: SP) -> str | None:
     """EC da pausa (quota/rede/sessão) gravada no `motivo` do SP, ou None."""
     ecs = kf_erros.ecs_em(sp.get("motivo") or "")
     return ecs[0] if ecs and ecs[0] in EC_PAUSA else None
 
 
-def _falha_no_ecra(ctx, mem, sp):
+def _falha_no_ecra(ctx: Contexto, mem: Mem, sp: SP) -> bool:
     """SP a correr com a cauda do ecrã parada em dois ticks e com quota/rede/sessão → `bloqueado` com motivo e retoma.
 
     Parada = igual ao tick anterior: um agente a trabalhar (ou a escrever sobre quotas) muda o ecrã e não bloqueia."""
@@ -238,7 +261,7 @@ def _falha_no_ecra(ctx, mem, sp):
     return True
 
 
-def _retomar_pausa(ctx, mem, sp):
+def _retomar_pausa(ctx: Contexto, mem: Mem, sp: SP) -> bool:
     """Pausa por quota/rede com `retoma_em` já passado e painel vivo: volta a `a-correr` e envia «continua»."""
     pane = sp.get("pane")
     if ec_pausa(sp) not in (kf_erros.EC_QUOTA, kf_erros.EC_REDE) or not sp.get("retoma_em") or not pane:
@@ -263,7 +286,7 @@ def _retomar_pausa(ctx, mem, sp):
     return True
 
 
-def _evento_agente(ctx, sp):
+def _evento_agente(ctx: Contexto, sp: SP) -> bool:
     """Agente herdr `blocked` num SP a-correr → `pergunta`; a trabalhar outra vez → `a-correr`. True se transitou."""
     ag = _seguro(ctx, ctx.agente_estado, sp["pane"])
     if sp.get("estado") == "a-correr" and ag == "blocked":
@@ -276,7 +299,67 @@ def _evento_agente(ctx, sp):
     return False
 
 
-def _um(ctx, mem, sp):
+def _tick_agir(ctx: Contexto, mem: Mem, sp: SP, t: dict[str, Any], enviar: Callable[..., Any]) -> bool:
+    """Contadores do tick já a postos: espera, intervalo, teto e envio. True se agiu."""
+    t["parado"] += 1
+    agora = ctx.agora()
+    ultimo = t["ultimo"]
+    if t["parado"] < TICK_ESPERA or (ultimo and (agora - datetime.fromisoformat(ultimo)).total_seconds() < TICK_INTERVALO):
+        return False
+    if t["enviados"] >= TICK_TETO:
+        _bloquear(ctx, mem, sp, f"turn parado sem estado ({t['enviados']} ticks)")
+        mem["ticks"].pop(sp["slug"], None)
+        return True
+    if not _seguro(ctx, enviar, sp["pane"], TICK_TEXTO):
+        return False
+    t["enviados"] += 1
+    t["ultimo"] = agora.isoformat()
+    ctx.log(f"tick {sp['slug']}: {TICK_TEXTO} enviado ({t['enviados']}/{TICK_TETO})")
+    return True
+
+
+def _tick_continuar(ctx: Contexto, mem: Mem, sp: SP) -> bool:
+    """SP a-correr com o agente herdr parado (`idle`/`done`) sem estado final: envia `continua` com espera, intervalo e teto.
+
+    Contadores em `mem["ticks"]`; zerados quando o agente volta a trabalhar ou deixa de estar parado. True se agiu."""
+    ticks = mem.setdefault("ticks", {})
+    slug = sp["slug"]
+    ag = _seguro(ctx, ctx.agente_estado, sp["pane"])
+    enviar = getattr(ctx.backend, "enviar", None)
+    if sp.get("estado") != "a-correr" or ag not in ("idle", "done") or ec_pausa(sp):
+        ticks.pop(slug, None)
+        return False
+    if enviar is None:
+        return False
+    t = ticks.setdefault(slug, {"parado": 0, "enviados": 0, "ultimo": None})
+    return _tick_agir(ctx, mem, sp, t, enviar)
+
+
+def _reagir_pane(ctx: Contexto, mem: Mem, sp: SP, estado: str | None) -> bool:
+    """Reações de um SP com painel (evento do agente, ecrã parado, tick, retoma de pausa, reação). True se agiu."""
+    if estado in ("a-correr", "pergunta") and _evento_agente(ctx, sp):
+        return True
+    if estado == "a-correr" and (_falha_no_ecra(ctx, mem, sp) or _tick_continuar(ctx, mem, sp)):
+        return True
+    return estado in ("bloqueado", "pergunta") and not ec_pausa(sp) and bool(sp_vigia_reacao.reagir(ctx, mem, sp))
+
+
+def _escalada(ctx: Contexto, mem: Mem, sp: SP) -> bool:
+    """falhou/bloqueado sem pausa: tenta uma escalada de modelo por SP. True se relançou (o tick acaba aí)."""
+    slug = sp["slug"]
+    if slug in mem.get("escalados", []) or ec_pausa(sp):
+        return False
+    esc = _seguro(ctx, ctx.escalar, sp)
+    if esc is not None:
+        mem.setdefault("escalados", []).append(slug)  # uma tentativa por SP, mesmo se o relançamento falhou
+    if not esc or esc.get("estado", "a-correr") != "a-correr":
+        return False
+    ctx.log(f"escalada {slug}: {esc.get('de')} → {esc.get('para')}")
+    mem["avisos"].pop(slug, None)
+    return True
+
+
+def _um(ctx: Contexto, mem: Mem, sp: SP) -> str | None:
     slug, estado = sp["slug"], sp.get("estado")
     if slug in mem["tratados"]:
         return None
@@ -286,29 +369,17 @@ def _um(ctx, mem, sp):
         ctx.transitar(slug, "falhou", "painel fechou sem estado")
         sp = {**sp, "estado": "falhou", "msg": "painel fechou sem estado"}
         estado = "falhou"
-    if sp.get("pane") and estado in ("a-correr", "pergunta") and _evento_agente(ctx, sp):
-        return None
-    if estado == "a-correr" and sp.get("pane") and _falha_no_ecra(ctx, mem, sp):
+    if sp.get("pane") and _reagir_pane(ctx, mem, sp, estado):
         return None
     if estado == "bloqueado" and _retomar_pausa(ctx, mem, sp):
         return None
-    if estado in ("bloqueado", "pergunta") and sp.get("pane") and not ec_pausa(sp) and sp_vigia_reacao.reagir(ctx, mem, sp):
+    if estado in ("falhou", "bloqueado") and _escalada(ctx, mem, sp):
         return None
-    if estado in ("falhou", "bloqueado") and slug not in mem.get("escalados", []) and not ec_pausa(sp):
-        esc = _seguro(ctx, ctx.escalar, sp)
-        if esc is not None:
-            mem.setdefault("escalados", []).append(slug)  # uma tentativa por SP, mesmo se o relançamento falhou
-        if esc and esc.get("estado", "a-correr") == "a-correr":
-            ctx.log(f"escalada {slug}: {esc.get('de')} → {esc.get('para')}")
-            mem["avisos"].pop(slug, None)
-            return None
     _avisar(ctx, mem, sp)
-    if estado == "falhou":
-        return _seguinte(ctx, mem, slug)
-    return None
+    return _seguinte(ctx, mem, slug) if estado == "falhou" else None
 
 
-def passo(ctx, mem):
+def passo(ctx: Contexto, mem: Mem) -> str:
     """Um tick do vigia; "fim" quando a fila acabou ou foi parada (`sp-fila.py --parar`)."""
     if not ctx.estado_global():
         ctx.log("estado da fila desapareceu (--parar): fim")
@@ -328,7 +399,8 @@ def passo(ctx, mem):
     return "continua"
 
 
-def correr(ctx, mem_path, intervalo=INTERVALO, uma_vez=False, dormir=None):
+def correr(ctx: Contexto, mem_path: str | Path, intervalo: float = INTERVALO, uma_vez: bool = False,
+           dormir: Callable[[float], Any] | None = None) -> str:
     """Ciclo do vigia: `passo` + memória em disco + pausa, até "fim" (ou um só tick com `uma_vez`)."""
     import time
     dormir = dormir or time.sleep
@@ -341,19 +413,19 @@ def correr(ctx, mem_path, intervalo=INTERVALO, uma_vez=False, dormir=None):
         ctx.esperar(intervalo, dormir)
 
 
-def caminhos(pasta):
+def caminhos(pasta: str | Path) -> tuple[Path, Path, Path]:
     """pidfile, log e memória do vigia dentro da pasta da fila de painéis."""
     p = Path(pasta)
     return p / "vigia.pid", p / "vigia.log", p / "vigia.json"
 
 
-def arrancar(fila, script, run=None):
+def arrancar(fila: str | Path, script: str | Path, run: Callable[..., Any] | None = None) -> Any:
     """Lança `sp-vigia.py <fila>` destacado da sessão (sobrevive ao fim do turno); devolve o processo."""
     return popen_sem_janela([sys.executable, "-I", str(script), str(fila)], "destacado", run=run, close_fds=True,
                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def parar(pidfile, vivo, matar):
+def parar(pidfile: str | Path, vivo: Callable[[int], bool], matar: Callable[[int], Any]) -> int | None:
     """Termina o vigia dono do pidfile (se vivo) e apaga o pidfile; devolve o pid terminado ou None."""
     p = Path(pidfile)
     try:
@@ -367,7 +439,7 @@ def parar(pidfile, vivo, matar):
     return alvo
 
 
-def matar_pid(pid):
+def matar_pid(pid: int) -> None:
     if os.name == "nt":
         run_hidden(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
     else:
@@ -377,9 +449,9 @@ def matar_pid(pid):
 
 # --- contexto real -------------------------------------------------------------------------------
 
-def arrumar_worktree(run, wt, slug):
+def arrumar_worktree(run: Callable[..., Any], wt: str | Path, slug: str) -> Res:
     """Commit do resto do fecho (sem COMMIT_*.md nem segredos); apaga os COMMIT_*.md da raiz."""
-    def git(*a):
+    def git(*a: str) -> Res:
         r = run(["git", "-C", str(wt), *a], capture_output=True, text=True,
                 encoding="utf-8", errors="replace")
         return r.returncode, ((r.stdout or "") + (r.stderr or "")).rstrip()  # porcelain: espaço inicial conta
@@ -389,7 +461,7 @@ def arrumar_worktree(run, wt, slug):
     rc, out = git("status", "--porcelain", "-uall")
     if rc:
         return rc, out
-    caminhos = []
+    caminhos: list[str] = []
     for linha in out.splitlines():
         p = linha[3:].split(" -> ")[-1].strip().strip('"')
         nome = Path(p).name
@@ -405,7 +477,7 @@ def arrumar_worktree(run, wt, slug):
     return (rc, out) if rc else (0, f"commit de {len(caminhos)} caminho(s)")
 
 
-def _sp_na_worktree(worktree, slug):
+def _sp_na_worktree(worktree: str | Path | None, slug: str) -> Path | None:
     if not worktree:
         return None
     for p in Path(worktree).glob(f"knowledge/**/sp/*/{slug}.md"):
@@ -413,20 +485,24 @@ def _sp_na_worktree(worktree, slug):
     return None
 
 
-def modo_do_sp(path):
+def modo_do_sp(path: str | Path | None) -> str | None:
     """`modo:` do frontmatter (None se não há ficheiro ou campo)."""
     try:
-        texto = Path(path).read_text(encoding="utf-8")
+        texto = Path(path).read_text(encoding="utf-8")  # type: ignore[arg-type]
     except (OSError, TypeError):
         return None
     return sp_leitura.frontmatter(texto).get("modo") or None
 
 
 class ContextoReal(Contexto):
-    def __init__(self, fila, log_path, root=None, estado_path=None, rel_dir=None, backend=None, run=None):
-        import painel_backend
-        import sp_fila_estado as fe
-        import sp_painel_estado as pe
+    def __init__(self, fila: str | Path, log_path: str | Path, root: Any = None, estado_path: str | Path | None = None,
+                 rel_dir: str | Path | None = None, backend: Any = None, run: Callable[..., Any] | None = None) -> None:
+        import painel_backend as _painel_backend
+        painel_backend: Any = _painel_backend
+        import sp_fila_estado
+        import sp_painel_estado
+        fe: Any = sp_fila_estado
+        pe: Any = sp_painel_estado
         self.pe, self.fila, self.log_path = pe, fila, Path(log_path)
         self.run = run or fe.run_hidden
         self.scripts, self.repo = fe.SCRIPTS, fe.REPO
@@ -436,31 +512,32 @@ class ContextoReal(Contexto):
         self.rel_dir = Path(rel_dir or fe.RELATORIOS)
         self.root = root
         if backend is None:
-            import kaizen_config
+            import kaizen_config as _kaizen_config
+            kaizen_config: Any = _kaizen_config
             backend = painel_backend.escolher(kaizen_config.painel_backend(fe.REPO), herdr=kaizen_config.herdr(fe.REPO))
         self.backend = backend
 
-    def _py(self, *args, cwd=None):
+    def _py(self, *args: Any, cwd: str | Path | None = None) -> Res:
         r = self.run([sys.executable, "-I", *map(str, args)], capture_output=True, text=True,
                      encoding="utf-8", errors="replace", cwd=str(cwd or self.repo))
         return r.returncode, ((r.stdout or "") + (r.stderr or "")).strip()
 
-    def ler_fila(self):
-        return self.pe.ler(self.fila)
+    def ler_fila(self) -> dict[str, Any]:
+        return dict(self.pe.ler(self.fila))
 
-    def transitar(self, slug, estado, msg=None):
+    def transitar(self, slug: str, estado: str, msg: str | None = None) -> None:
         self.pe.transitar(slug, estado, msg=msg, fila=self.fila)
 
-    def pausar(self, slug, msg, motivo, retoma_em):
+    def pausar(self, slug: str, msg: str, motivo: str | None, retoma_em: str | None) -> None:
         self.pe.transitar(slug, "bloqueado", msg=msg, fila=self.fila, motivo=motivo, retoma_em=retoma_em)
 
-    def retomar(self, slug, msg):
+    def retomar(self, slug: str, msg: str) -> None:
         self.pe.transitar(slug, "a-correr", msg=msg, fila=self.fila, motivo=None, retoma_em=None)
 
-    def modo(self, sp):
+    def modo(self, sp: SP) -> str | None:
         return modo_do_sp(_sp_na_worktree(sp.get("worktree"), sp["slug"]))
 
-    def arrumar(self, sp):
+    def arrumar(self, sp: SP) -> Res:
         """Commita o que o `sp-fechar` deixou na worktree (mãe, métricas) e apaga o COMMIT_*.md.
 
         Só corre em SP `auto` (o `_done` já filtrou). Devolve (0, "") se a worktree estava limpa.
@@ -470,10 +547,10 @@ class ContextoReal(Contexto):
             return 0, ""
         return arrumar_worktree(self.run, Path(wt), sp["slug"])
 
-    def merge(self, slug):
+    def merge(self, slug: str) -> Res:
         return self._py(self.scripts / "sb-worktree.py", "merge", slug)
 
-    def clean(self, slug, tentativas=6, pausa=5.0):
+    def clean(self, slug: str, tentativas: int = 6, pausa: float = 5.0) -> Res:
         """Clean com repetição: o painel acabado de fechar ainda segura a worktree uns segundos."""
         import time
         for i in range(tentativas):
@@ -483,20 +560,22 @@ class ContextoReal(Contexto):
             time.sleep(pausa)
         return rc, out
 
-    def seguinte(self, slug):
-        import kaizen_engine
-        import sp_fila_execucao as fx
+    def seguinte(self, slug: str) -> dict[str, Any]:
+        import kaizen_engine as _kaizen_engine
+        kaizen_engine: Any = _kaizen_engine
+        import sp_fila_execucao as _fx
+        fx: Any = _fx
         root = self.root or kaizen_engine.load("sp-list").DEFAULT_ROOT
         try:
             if self.estado_path is None:
                 self.log(f"seguinte {slug}: fila sem estado da sp-fila (painéis avulsos)")
                 return {"acao": "erro"}
-            return fx.seguinte(root, self.estado_path, self.rel_dir, slug=slug, backend=self.backend)
+            return dict(fx.seguinte(root, self.estado_path, self.rel_dir, slug=slug, backend=self.backend))
         except (fx.IntegracaoPendente, fx.SlugObrigatorio, TimeoutError, ValueError) as e:
             self.log(f"seguinte {slug}: {e}")
             return {"acao": "erro"}
 
-    def fechar_mae(self, mae):
+    def fechar_mae(self, mae: str) -> Res:
         """Fecho da mãe na worktree dela: ensure → sp-move done → commit → merge → clean."""
         rc, out = self._py(self.scripts / "sb-worktree.py", "ensure", mae)
         if rc:
@@ -515,9 +594,10 @@ class ContextoReal(Contexto):
             return rc, f"merge: {out}"
         return self.clean(mae)
 
-    def escalar(self, sp):
+    def escalar(self, sp: SP) -> dict[str, Any] | None:
         """Escalada de modelo (`sp_escalada`): decide pelo SP na worktree, relança o painel e regista no SP e na fila."""
-        import sp_escalada
+        import sp_escalada as _sp_escalada
+        sp_escalada: Any = _sp_escalada
         path = _sp_na_worktree(sp.get("worktree"), sp["slug"])
         if path is None or path.parent.name == "Done":
             return None
@@ -534,20 +614,21 @@ class ContextoReal(Contexto):
             _seguro(self, sp_escalada.registar_fila, self.estado_path, sp["slug"], de, para)
         return {"de": de, "para": para, "causa": causa, **res}
 
-    def texto_sp(self, sp):
+    def texto_sp(self, sp: SP) -> str | None:
         path = _sp_na_worktree(sp.get("worktree"), sp["slug"])
         try:
             return path.read_text(encoding="utf-8") if path else None
         except OSError:
             return None
 
-    def registar_reacao(self, sp, linha):
-        import sp_escalada
+    def registar_reacao(self, sp: SP, linha: str) -> None:
+        import sp_escalada as _sp_escalada
+        sp_escalada: Any = _sp_escalada
         path = _sp_na_worktree(sp.get("worktree"), sp["slug"])
         if path is not None and path.parent.name != "Done":
             sp_escalada.registar_report(path, linha)
 
-    def retomar_contexto(self, sp):
+    def retomar_contexto(self, sp: SP) -> bool:
         """`sp-handoff.py --launch <SP> --auto` no painel do SP (mesmo painel, SP e vaga; repete o prompt da fila)."""
         path, nome = _sp_na_worktree(sp.get("worktree"), sp["slug"]), getattr(self.backend, "nome", None)
         if path is None or not nome:
@@ -558,33 +639,36 @@ class ContextoReal(Contexto):
             self.log(f"retoma de contexto {sp['slug']}: {out[-300:]}")
         return rc == 0
 
-    def _ops(self):
+    def _ops(self) -> Any:
         """HerdrOps sobre o backend atual, ou None se o painel não é herdr."""
         if getattr(self.backend, "nome", None) != "herdr":
             return None
-        import herdr_ops
+        import herdr_ops as _herdr_ops
+        herdr_ops: Any = _herdr_ops
         return herdr_ops.HerdrOps(run=self.backend.run)
 
-    def agente_estado(self, pane):
+    def agente_estado(self, pane: str) -> str | None:
         ops = self._ops()
         return ops.estado(pane) if ops else None
 
-    def metadata(self, texto):
+    def metadata(self, texto: str) -> None:
         ops = self._ops()
         pane = next((sp.get("pane") for sp in self.ler_fila().get("sps", {}).values() if sp.get("pane")), None)
         ws = ops.workspace_do_pane(pane) if ops and pane else None
         if ws:
             ops.workspace_metadata(ws, "sp-fila", texto)
 
-    def esperar(self, intervalo, dormir):
+    def esperar(self, intervalo: float, dormir: Callable[[float], Any]) -> None:
         """Acorda por evento: `agent wait` (blocked/done) no 1.º agente a correr, com o intervalo como teto."""
         import time
-        import herdr_ops
+        import herdr_ops as _herdr_ops
+        herdr_ops: Any = _herdr_ops
         ops = self._ops()
         pane = next((sp.get("pane") for sp in self.ler_fila().get("sps", {}).values()
                      if sp.get("pane") and sp.get("estado") == "a-correr"), None)
         if ops is None or pane is None:
-            return dormir(intervalo)
+            dormir(intervalo)
+            return
         t0 = time.monotonic()
         with contextlib.suppress(herdr_ops.HerdrErro, OSError):
             ops.esperar(pane, ate=("blocked", "done"), timeout_ms=int(intervalo * 1000))
@@ -592,24 +676,23 @@ class ContextoReal(Contexto):
         if resto > 0:
             dormir(resto)
 
-    def nota_relatorio(self, path, texto):
+    def nota_relatorio(self, path: str | Path, texto: str) -> None:
         with open(path, "a", encoding="utf-8") as f:
             f.write(texto)
 
     @property
-    def estado_path(self):
+    def estado_path(self) -> Path | None:
         """Estado da fila-mãe (`fila_paineis` == esta fila), procurado a cada uso; None sem mãe."""
         return self._estado_path or self.fe.da_fila_paineis(self.fila)
 
     @estado_path.setter
-    def estado_path(self, valor):
+    def estado_path(self, valor: str | Path | None) -> None:
         self._estado_path = Path(valor) if valor else None
 
-    def estado_global(self):
+    def estado_global(self) -> bool:
         p = self.estado_path
         return (p or self.painel_path).exists()
 
-    def log(self, msg):
-        from datetime import datetime
+    def log(self, msg: str) -> None:
         with open(self.log_path, "a", encoding="utf-8") as f:
             f.write(f"{datetime.now().isoformat(timespec='seconds')} {msg}\n")
