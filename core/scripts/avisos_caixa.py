@@ -16,23 +16,23 @@ from pathlib import Path
 OCUPADO = ("esc to interrupt", "Enter to select", "Review your answers", "Esc to cancel")
 
 
-def raiz():
+def raiz() -> Path:
     return Path(os.environ.get("AVISOS_DIR") or Path.home() / ".claude" / "avisos")
 
 
-def _ficheiro(pane, root=None):
+def _ficheiro(pane: object, root: Path | None = None) -> Path:
     nome = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(pane))
     return (root or raiz()) / f"{nome}.jsonl"
 
 
-def depositar(pane, msg, root=None):
+def depositar(pane: object, msg: object, root: Path | None = None) -> None:
     f = _ficheiro(pane, root)
     f.parent.mkdir(parents=True, exist_ok=True)
     with f.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps({"t": time.time(), "msg": " ".join(str(msg).split())}, ensure_ascii=False) + "\n")
 
 
-def recolher(pane, root=None):
+def recolher(pane: object, root: Path | None = None) -> list[str]:
     """Devolve as mensagens pendentes do painel e esvazia a caixa (rename atómico antes de ler)."""
     if not pane:
         return []
@@ -42,7 +42,7 @@ def recolher(pane, root=None):
         f.replace(tmp)
     except OSError:
         return []
-    msgs = []
+    msgs: list[str] = []
     with contextlib.suppress(OSError):
         for ln in tmp.read_text(encoding="utf-8").splitlines():
             with contextlib.suppress(ValueError):
@@ -51,6 +51,6 @@ def recolher(pane, root=None):
     return msgs
 
 
-def livre(ecra):
+def livre(ecra: str | None) -> bool:
     """True se o ecrã mostra o Claude Code parado no prompt (sem turno a correr nem diálogo)."""
-    return bool(ecra) and not any(m in ecra for m in OCUPADO)
+    return ecra is not None and bool(ecra) and not any(m in ecra for m in OCUPADO)

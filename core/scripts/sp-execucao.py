@@ -10,6 +10,7 @@ rc: 0 ok, 1 erro (não é mãe, valor inválido, SP em falta)
 """
 import argparse
 import sys
+from typing import Any
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -25,7 +26,7 @@ class SpExecucaoError(Exception):
     pass
 
 
-def _mae(root, slug, project):
+def _mae(root: str | Path, slug: str, project: str | None) -> tuple[Any, dict[str, str]]:
     found = [s for s in sp_list.collect(root, include_done=True) if s.slug == slug and (not project or s.project == project)]
     if not found:
         raise SpExecucaoError(f"SP '{slug}' não encontrado; ver scripts/sp-list.py")
@@ -38,12 +39,12 @@ def _mae(root, slug, project):
     return sp, fm
 
 
-def ler(root, slug, project=None):
+def ler(root: str | Path, slug: str, project: str | None = None) -> str:
     _, fm = _mae(root, slug, project)
     return fm.get("execucao") or "por escolher"
 
 
-def gravar(root, slug, modo, project=None):
+def gravar(root: str | Path, slug: str, modo: str, project: str | None = None) -> str:
     if modo not in MODOS:
         raise SpExecucaoError(f"execucao '{modo}' inválido ({'|'.join(MODOS)})")
     sp, fm = _mae(root, slug, project)
@@ -65,7 +66,7 @@ def gravar(root, slug, modo, project=None):
     return f"{slug}: execucao = {modo}"
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Lê ou grava execucao: de um SP-mãe")
     ap.add_argument("slug")
     ap.add_argument("modo", nargs="?")

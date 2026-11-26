@@ -665,7 +665,7 @@ def test_dry_run_herdr_na_fila_mostra_o_prompt_da_fila(tmp_path, monkeypatch, ca
 
 def test_send_herdr_confere_o_prompt_antes_de_escrever(monkeypatch):
     vistos = []
-    monkeypatch.setattr(sp_handoff, "check_prompt", lambda p, backend: vistos.append((p, backend)))
+    monkeypatch.setattr(sp_handoff, "check_prompt", lambda p, backend, limpar=False: vistos.append((p, backend)))
     insp = sp_handoff._inspect("herdr")
     insp("w3:p17")
     assert vistos == [("w3:p17", "herdr")] and sp_handoff._inspect("clipboard") is None

@@ -7,13 +7,16 @@ Exceções (único sítio): SPs com `origem:` (correção nascida de um veredict
 ficam aprovados pela origem, sem grill. SPs de `date` anterior a DESDE não precisam de `aprovado`.
 """
 import re
+from collections.abc import Mapping
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
 
 DESDE = "2026-11-13"
 RONDAS_MINIMAS = 1
 
 
-def por_aprovar(fm):
+def por_aprovar(fm: Mapping[str, Any]) -> bool:
     """True se o SP é novo (date ≥ DESDE), não tem `aprovado:` nem `origem:`."""
     data = str(fm.get("date", ""))
     if not data or data < DESDE:
@@ -21,18 +24,18 @@ def por_aprovar(fm):
     return not (fm.get("aprovado") or fm.get("origem"))
 
 
-def oito_secoes(texto):
+def oito_secoes(texto: str) -> bool:
     """True se o corpo tem as secções `## 1.` a `## 8.` todas com texto (SP completo: o grill pode saltar-se, `--rondas 0`)."""
     partes = re.split(r"(?m)^## (\d)\.", texto)
     corpos = {partes[i]: partes[i + 1] for i in range(1, len(partes) - 1, 2)}
     return all(str(n) in corpos and corpos[str(n)].split("\n", 1)[-1].strip() for n in range(1, 9))
 
 
-def agora():
+def agora() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def gravar_campos(path, campos):
+def gravar_campos(path: Path, campos: Mapping[str, object]) -> bool:
     """Grava `campos` (dict chave -> valor) no frontmatter e atualiza `updated:`; idempotente (sem mudança, não reescreve)."""
     original = path.read_bytes()
     linhas = original.decode("utf-8").splitlines(keepends=True)

@@ -19,6 +19,7 @@ Uso: módulo; `sys.exit(kf_errlog.executar("script", main))` no fim de cada scri
 rc: propaga o rc do script envolvido
 """
 import json
+from collections.abc import Callable
 import os
 import re
 from pathlib import Path as _P
@@ -162,7 +163,7 @@ def _msg_inesperado(script, e, gravou):
                          "repetir com `KF_DEBUG=1` para ver o stack e reportar com a linha do log")
 
 
-def executar(script, main, argv=None):
+def executar(script: str, main: Callable[[], int | None], argv: list[str] | None = None) -> int | None:
     """Corre `main()` (lê `sys.argv`; `argv` só serve para o log) com stdout/stderr em UTF-8 e regista exceções e rc != 0 sem mudar o resultado (re-raise, mesmo rc)."""
     for stream in (sys.stdout, sys.stderr):  # pipe no Windows: sem isto os acentos saem em cp1252
         if hasattr(stream, "reconfigure"):

@@ -60,13 +60,23 @@ Além da cobertura de linhas, o workflow mede a cobertura de casos: `docs/catalo
 
 Correr só estes: `node --test tests/e2e-use-cases.test.js` (cerca de 15 s); um caso: `node --test --test-name-pattern "UC-015" tests/e2e-use-cases.test.js`.
 
+## `kaizen quality` e branch protection
+
+`kaizen quality` (`core/scripts/kf_quality.py`) é o único gate de qualidade: o job `quality` do CI chama só este comando (em PR com `--base origin/<base>`), e localmente corre-se o mesmo antes de abrir o PR. Etapas: lint, ratchet, strict, strict-diff, testes (com cobertura e limiares de `package.json`), protegidos e cobertura-diff; falha (rc 1) em qualquer violação e lista todas as etapas vermelhas. A matriz `test` (Windows/Linux/macOS, Node 18/22, Python 3.10/3.13) continua a correr só os testes.
+
+Branch protection do `main` (GitHub: Settings → Branches → regra para `main`), sem `--admin`:
+- «Require status checks to pass before merging» + «Require branches to be up to date», com os checks `quality` e a matriz `test / test (...)`;
+- «Require a pull request before merging»; «Do not allow bypassing the above settings» (inclui administradores);
+- sem force-push nem apagar o `main`.
+Com a regra ativa, o merge só é possível com `quality` verde: `pr_fechar.py` já não faz merge com CI vermelho.
+
 ## Cobertura do diff
 
 O limiar global não diz se as linhas **alteradas** estão testadas. `python core/scripts/sp-cobertura-diff.py --repo . --base main` calcula a cobertura só das linhas adicionadas (mesmo parser de diff do `pentest.py`) a partir de relatórios já gerados (`coverage/lcov.info`, JSON do coverage.py ou `coverage/python.xml` do CI) e sai com rc 1 abaixo de `qualidade.coberturaDiff` (defeito 85, ver `docs/config.md`). Ignora testes, docs, config e linhas não executáveis; ficheiros de código sem dados no relatório são avisados e não contam. Não altera os limiares globais.
 
 ## Tipos e complexidade (ratchet)
 
-`python core/scripts/quality-ratchet.py` mede `ruff` (C901 com `max-complexity = 12` em `ruff.toml`, PLR0911/0912/0913/0915) e `mypy` (`mypy.ini`) e compara com `quality-baseline.json` (`{ficheiro: {regra: n}}`). Dívida antiga passa; subir num ficheiro/regra falha (rc 1). `--atualizar` só grava quando desce (ou cria a baseline). Módulos novos: `mypy --strict` (job CI `typecheck`); job `quality` corre o ratchet. `ruff`/`mypy` são ferramentas de dev, sem dependência de runtime. `sp-gates.py --sugerir` passa a incluir `ruff`, `mypy` (Python) e `npx tsc --noEmit --strict` (repo TS com `tsconfig.json` sem script `typecheck`).
+`python core/scripts/quality-ratchet.py` mede `ruff` (C901 com `max-complexity = 12` em `ruff.toml`, PLR0911/0912/0913/0915) e `mypy` (`mypy.ini`) e compara com `quality-baseline.json` (`{ficheiro: {regra: n}}`). Dívida antiga passa; subir num ficheiro/regra falha (rc 1). `--atualizar` só grava quando desce (ou cria a baseline). Módulos novos: `mypy --strict` (etapas `strict` e `strict-diff` do `kaizen quality`); a etapa `ratchet` corre o ratchet. `ruff`/`mypy` são ferramentas de dev, sem dependência de runtime. `sp-gates.py --sugerir` passa a incluir `ruff`, `mypy` (Python) e `npx tsc --noEmit --strict` (repo TS com `tsconfig.json` sem script `typecheck`).
 
 ## Testes de falha e propriedades
 

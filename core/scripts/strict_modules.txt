@@ -1,0 +1,30 @@
+# Módulos de core/scripts em mypy --strict (um por linha). Módulo tocado ou novo tem de constar aqui (quality-ratchet.py --diff).
+core/scripts/avisos_caixa.py
+core/scripts/da-stop.py
+core/scripts/doc-list.py
+core/scripts/doc-move.py
+core/scripts/doc_ops.py
+core/scripts/dr-check.py
+core/scripts/handoff_resume.py
+core/scripts/kaizen_engine.py
+core/scripts/kf_ligados.py
+core/scripts/kf_orcamento.py
+core/scripts/open-doc.py
+core/scripts/quality-ratchet.py
+core/scripts/skill-cut.py
+core/scripts/sp-escalao.py
+core/scripts/sp-execucao.py
+core/scripts/sp-prova.py
+core/scripts/sp-validate-hook.py
+core/scripts/sp_aprovacao.py
+core/scripts/sp_carregar.py
+core/scripts/sp_leitura.py
+core/scripts/sp_list_mod.py
+core/scripts/wt_redirect.py
+# dívida declarada (tocado sem ser strict; remover quando passar a strict)
+~core/scripts/painel_backend.py
+~core/scripts/loop_estado.py
+~core/scripts/kf_errlog.py
+~core/scripts/handoff_pane.py
+~core/scripts/sp-handoff.py
+core/scripts/kf_quality.py
