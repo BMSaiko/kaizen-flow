@@ -80,7 +80,7 @@ jobs:
         run: python -m pip install ruff==0.17.1 mypy==2.4.1 pytest pytest-cov hypothesis
       - name: node_modules (eslint e tsc do ratchet JS; só CI)
         run: npm install --no-audit --no-fund --no-package-lock
-      - name: kaizen quality (PR: etapas de diff contra a base)
+      - name: "kaizen quality (PR: etapas de diff contra a base)"
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
