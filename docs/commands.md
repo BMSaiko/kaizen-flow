@@ -16,8 +16,8 @@ kaizen term ls [--json] [--fila X]|fila|michi|limpar|retomar|orq  # terminal pan
 kaizen ds init <project>|validate|export  # design system (DESIGN.md + DTCG tokens)
 kaizen vision init <project>|validate|resumo|decompor  # VISION.md: the factory's intake (goal, criteria, budget)
 kaizen factory run|status|stop|step|approve|pause|resume|skip|takeover <project>  # the factory, autonomous or by hand: VISION -> backlog -> queue -> gates -> merge -> reflect
-kaizen resume [slug] [--from PHASE] [--restart]  # resume an interrupted story
-kaizen preflight [slug] [--repo DIR] [--json] [--fix]  # git/worktree/tools check before a run
+kaizen resume [slug] [--from PHASE] [--restart]  # resume an interrupted story (skill `/resume`)
+kaizen preflight [slug] [--repo DIR] [--json] [--fix]  # git/worktree/tools check before a run (skill `/preflight`)
 ```
 
 | Command | Option | Meaning |

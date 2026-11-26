@@ -168,3 +168,12 @@ test("init instala as skills vision e release em todos os harnesses", () => {
     for (const s of ["vision", "release"]) assert.ok(keys.some((k) => k.endsWith(`skills/${s}/SKILL.md`)), `${h}: falta ${s}`);
   }
 });
+
+test("init instala as skills resume e preflight em todos os harnesses", () => {
+  for (const h of ["claude", "codex", "opencode", "cursor", "gemini"]) {
+    const d = tmp();
+    assert.strictEqual(kz("init", d, "--harness", h).status, 0);
+    const keys = Object.keys(tree(d));
+    for (const s of ["resume", "preflight"]) assert.ok(keys.some((k) => k.endsWith(`skills/${s}/SKILL.md`)), `${h}: falta ${s}`);
+  }
+});
