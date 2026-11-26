@@ -5,6 +5,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 
 ## [Unreleased]
 
+### Fixed
+- `kaizen sync --from-vault` já não apaga peças de `core/` que o vault não tem nem deixa dados pessoais em `core/`: atualiza só peças existentes nos dois lados (novas com `--only <caminho>`), recusa dados pessoais, árvore suja e o checkout principal, e `--dry-run` lista o que mudaria e as remoções evitadas.
+
 ### Added
 - `kaizen quality` (`core/scripts/kf_quality.py`): gate único local e CI (lint, ratchet, mypy strict, testes com cobertura, guarda de testes protegidos, cobertura do diff); o CI passa a ter um só job `quality` (substitui `lint`, `typecheck`, `quality` e `coverage`) e a branch protection do `main` está documentada em `docs/testes.md`.
 - Skills `resume` (`/resume`: `kaizen resume [slug] [--from FASE]`, `--restart` só com confirmação) e `preflight` (`/preflight`: ler primeiro, `--fix` um comando seguro de cada vez), instaladas por todos os adapters (UC-046, UC-047).

@@ -29,7 +29,7 @@ test("plan inclui o conftest.py (isola o cwd dos testes) para o sync n�o o apa
 
 test("sync sem fonte falha com mensagem clara e não toca em core/", () => {
   const before = fs.readdirSync(path.join(__dirname, "..", "core"));
-  const r = spawnSync("node", [KZ, "sync", "--from-vault"], { encoding: "utf8", env: { ...process.env, KAIZEN_SOURCE: path.join(tmp(), "nao-existe") } });
+  const r = spawnSync("node", [KZ, "sync", "--from-vault", "--dry-run"], { encoding: "utf8", env: { ...process.env, KAIZEN_SOURCE: path.join(tmp(), "nao-existe") } });
   assert.strictEqual(r.status, 1);
   assert.match(r.stderr, /fonte do sync não existe/);
   assert.deepStrictEqual(fs.readdirSync(path.join(__dirname, "..", "core")), before);
@@ -78,7 +78,8 @@ test("sync --check sai 0 com core/ em dia e 1 quando o vault mudou, sem tocar em
   // cópia do pacote: o teste escreve em core/ e os outros ficheiros de teste correm em paralelo
   const pkg = tmp();
   const root = path.join(__dirname, "..");
-  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true, filter: semCache });
+  for (const d of ["bin", "adapters"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true, filter: semCache });
+  fs.mkdirSync(path.join(pkg, "core")); // core/ vazio: o 1.º --from-vault só acrescenta
   const kz = path.join(pkg, "bin", "kaizen.js");
   const v = fakeVault();
   const env = { ...process.env, KAIZEN_SOURCE: v };
@@ -97,7 +98,8 @@ test("sync --check sai 0 com core/ em dia e 1 quando o vault mudou, sem tocar em
 test("sync --check falha com ficheiro órfão em core/ que o vault já não gera, sem lhe tocar", () => {
   const pkg = tmp();
   const root = path.join(__dirname, "..");
-  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true, filter: semCache });
+  for (const d of ["bin", "adapters"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true, filter: semCache });
+  fs.mkdirSync(path.join(pkg, "core")); // core/ vazio: o 1.º --from-vault só acrescenta
   const kz = path.join(pkg, "bin", "kaizen.js");
   const v = fakeVault();
   const env = { ...process.env, KAIZEN_SOURCE: v };
@@ -118,10 +120,11 @@ test("owns() reconhece caminhos do vault que entram no sync", () => {
   assert.ok(!owns("knowledge/projects/p/sp/TODO/x.md"));
 });
 
-test("sync --check imprime a fonte e sai 1 quando o sync apagaria ficheiros rastreados de core/", () => {
+test("sync --check imprime a fonte e sai 1 com ficheiros rastreados de core/ que o vault não tem (o sync não os apaga)", () => {
   const pkg = tmp();
   const root = path.join(__dirname, "..");
-  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true, filter: semCache });
+  for (const d of ["bin", "adapters"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true, filter: semCache });
+  fs.mkdirSync(path.join(pkg, "core")); // core/ vazio: o 1.º --from-vault só acrescenta
   const kz = path.join(pkg, "bin", "kaizen.js");
   const git = (...a) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...a], { cwd: pkg, encoding: "utf8" });
   git("init", "-q");
@@ -130,12 +133,11 @@ test("sync --check imprime a fonte e sai 1 quando o sync apagaria ficheiros rast
   git("commit", "-q", "-m", "base");
   const v = fakeVault();
   const env = { ...process.env, KAIZEN_SOURCE: v };
-  assert.strictEqual(spawnSync("node", [kz, "sync", "--from-vault"], { encoding: "utf8", env }).status, 0);
-  assert.ok(!fs.existsSync(path.join(pkg, "core", "scripts", "rastreado.py")));
   const r = spawnSync("node", [kz, "sync", "--from-vault", "--check"], { encoding: "utf8", env });
   assert.strictEqual(r.status, 1, r.stdout + r.stderr);
   assert.ok(r.stdout.includes(`fonte ${v}`), r.stdout);
   assert.match(r.stdout, /removeria rastreado: core\/scripts\/rastreado\.py/);
+  assert.ok(fs.existsSync(path.join(pkg, "core", "scripts", "rastreado.py")));
 });
 
 test("owns(rel) é verdadeiro exatamente para as origens que plan() devolve", () => {
@@ -157,7 +159,8 @@ test("owns(rel) é verdadeiro exatamente para as origens que plan() devolve", ()
 function pkgCopy() {
   const pkg = tmp();
   const root = path.join(__dirname, "..");
-  for (const d of ["bin", "adapters", "core"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true, filter: semCache });
+  for (const d of ["bin", "adapters"]) fs.cpSync(path.join(root, d), path.join(pkg, d), { recursive: true, filter: semCache });
+  fs.mkdirSync(path.join(pkg, "core")); // core/ vazio: o 1.º --from-vault só acrescenta
   return { pkg, kz: path.join(pkg, "bin", "kaizen.js") };
 }
 
@@ -358,4 +361,81 @@ test("pasta listada em dirs é copiada pelo plan e reconhecida por owns", () => 
   assert.ok(plan(v).parts.some((p) => p[1] === d));
   assert.ok(owns(`${d}/x.txt`));
   assert.ok(!owns("scripts/outra-pasta/x.txt"));
+});
+
+// --- incidente 2026-11-26: --from-vault apagava peças de core/ que o vault não tem e trocava marcadores por «BMS»
+function pkgComCore() {
+  const { pkg, kz } = pkgCopy();
+  fs.cpSync(path.join(__dirname, "..", "core"), path.join(pkg, "core"), { recursive: true, filter: semCache });
+  return { pkg, kz };
+}
+const fromVault = (kz, v, ...a) => spawnSync("node", [kz, "sync", "--from-vault", ...a], { encoding: "utf8", env: { ...process.env, KAIZEN_SOURCE: v } });
+
+test("--from-vault nunca apaga peças de core/ que o vault não tem", () => {
+  const { pkg, kz } = pkgComCore();
+  put(pkg, "core/skills/so-no-core/SKILL.md", "só em core");
+  put(pkg, "core/scripts/test_so_no_core.py", "x");
+  const r = fromVault(kz, personalVault());
+  assert.strictEqual(r.status, 0, r.stdout + r.stderr);
+  assert.ok(fs.existsSync(path.join(pkg, "core/skills/so-no-core/SKILL.md")));
+  assert.ok(fs.existsSync(path.join(pkg, "core/scripts/test_so_no_core.py")));
+  assert.match(r.stdout, /mantido: \d+ ficheiros/);
+});
+
+test("--from-vault repõe marcadores e não deixa dados pessoais em core/", () => {
+  const { pkg, kz } = pkgComCore();
+  const v = personalVault();
+  put(v, ".claude/commands/sp.md", `# sp\n${PERSONAL}`);
+  const r = fromVault(kz, v);
+  assert.strictEqual(r.status, 0, r.stdout + r.stderr);
+  const c = fs.readFileSync(path.join(pkg, "core/commands/sp.md"), "utf8");
+  assert.match(c, /\{\{userName\}\}/);
+  assert.doesNotMatch(c, /Ana Costa|\bAC\b|ODIN/);
+});
+
+test("--from-vault: peça nova só entra com --only; --dry-run não escreve e lista remoções evitadas", () => {
+  const { pkg, kz } = pkgComCore();
+  const v = personalVault();
+  put(v, "scripts/sp-novo.py", "# novo\n");
+  const f = path.join(pkg, "core/scripts/sp-novo.py");
+  const sem = fromVault(kz, v);
+  assert.strictEqual(sem.status, 0, sem.stdout + sem.stderr);
+  assert.ok(!fs.existsSync(f));
+  assert.match(sem.stdout, /ignorado \(novo; use --only scripts\/sp-novo\.py\)/);
+  const dry = fromVault(kz, v, "--dry-run", "--only", "scripts/sp-novo.py");
+  assert.strictEqual(dry.status, 0, dry.stdout + dry.stderr);
+  assert.match(dry.stdout, /mudaria: core\/scripts\/sp-novo\.py \(novo\)/);
+  assert.match(dry.stdout, /removeria \(evitado\)/);
+  assert.ok(!fs.existsSync(f));
+  assert.strictEqual(fromVault(kz, v, "--only", "core/scripts/sp-novo.py").status, 0);
+  assert.strictEqual(fs.readFileSync(f, "utf8"), "# novo\n");
+});
+
+test("--from-vault --only limita a atualização às peças indicadas", () => {
+  const { pkg, kz } = pkgComCore();
+  const v = personalVault();
+  put(v, ".claude/skills/michi/SKILL.md", "michi novo\n");
+  put(v, ".claude/skills/dr/SKILL.md", "dr novo\n");
+  assert.strictEqual(fromVault(kz, v, "--only", "skills/michi").status, 0);
+  assert.strictEqual(fs.readFileSync(path.join(pkg, "core/skills/michi/SKILL.md"), "utf8"), "michi novo\n");
+  assert.notStrictEqual(fs.readFileSync(path.join(pkg, "core/skills/dr/SKILL.md"), "utf8"), "dr novo\n");
+});
+
+test("--from-vault recusa árvore suja e checkout principal; --dry-run passa", () => {
+  const { pkg, kz } = pkgComCore();
+  const g = (...a) => spawnSync("git", a, { cwd: pkg, encoding: "utf8" });
+  g("init", "-q"); g("add", "-A");
+  g("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base");
+  const v = personalVault();
+  const main = fromVault(kz, v);
+  assert.notStrictEqual(main.status, 0);
+  assert.match(main.stderr, /worktree/);
+  g("worktree", "add", "-q", "-b", "wt", path.join(pkg, "..", path.basename(pkg) + "-wt"));
+  const wt = path.join(pkg, "..", path.basename(pkg) + "-wt");
+  put(wt, "core/skills/dr/SKILL.md", "sujo");
+  const wkz = path.join(wt, "bin", "kaizen.js");
+  const sujo = fromVault(wkz, v);
+  assert.notStrictEqual(sujo.status, 0);
+  assert.match(sujo.stderr, /por commitar/);
+  assert.strictEqual(fromVault(wkz, v, "--dry-run").status, 0);
 });
