@@ -14,10 +14,11 @@ import sys
 from pathlib import Path
 
 
-def split_blocks(body, numbered):
+def split_blocks(body: list[str], numbered: bool) -> tuple[list[str], list[str]]:
     start = re.compile(r"^(\d+\. |### )" if numbered else r"^(- |### )")
-    blocks, current = [], None
-    preamble = []
+    blocks: list[list[str]] = []
+    current: list[str] | None = None
+    preamble: list[str] = []
     for line in body:
         if start.match(line):
             if current is not None:
@@ -32,7 +33,7 @@ def split_blocks(body, numbered):
     return preamble, ["\n".join(b).rstrip("\n") for b in blocks]
 
 
-def label(block):
+def label(block: str) -> str:
     first = block.split("\n", 1)[0]
     if first.startswith("### "):
         return first[4:].strip()
@@ -42,7 +43,7 @@ def label(block):
     return text[:110]
 
 
-def main():
+def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("skill")
     ap.add_argument("heading", help="ex.: '## Pitfalls'")

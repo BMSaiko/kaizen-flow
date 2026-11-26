@@ -6,14 +6,16 @@ primeiro, depois o resto dos .md por data de modificação (mais recente primeir
 rc: 0 ok
 """
 import argparse
+import io
 import os
 import sys
+from collections.abc import Iterator
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKIP = {".git", "node_modules", ".venv", "__pycache__"}
 
 
-def walk():
+def walk() -> Iterator[tuple[str, float]]:
     for base, dirs, files in os.walk(ROOT):
         dirs[:] = [d for d in dirs if d not in SKIP]
         for name in files:
@@ -22,11 +24,12 @@ def walk():
                 yield path, os.path.getmtime(path)
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=1500)
     args = ap.parse_args()
-    sps, rest = [], []
+    sps: list[tuple[bool, float, str, str]] = []
+    rest: list[tuple[float, str, str]] = []
     for path, mtime in walk():
         rel = os.path.relpath(path, ROOT).replace("\\", "/")
         parts = rel.split("/")
@@ -36,7 +39,8 @@ def main():
             rest.append((-mtime, rel, path))
     out = [(label, path) for _, _, label, path in sorted(sps)]
     out += [(rel, path) for _, rel, path in sorted(rest)[: args.limit]]
-    sys.stdout.reconfigure(encoding="utf-8")
+    if isinstance(sys.stdout, io.TextIOWrapper):
+        sys.stdout.reconfigure(encoding="utf-8")
     for label, path in out:
         print(label + "\t" + path)
 

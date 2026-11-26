@@ -87,9 +87,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.13"
       - run: python -m pip install mypy==2.4.1
-      - name: mypy --strict nos módulos novos
-        run: python -m mypy --strict core/scripts/quality-ratchet.py
+      - name: mypy --strict na lista core/scripts/strict_modules.txt
+        run: python core/scripts/quality-ratchet.py --strict-lista
+      - name: módulo tocado ou novo tem de ser strict (só em PR)
+        if: github.event_name == 'pull_request'
+        run: python core/scripts/quality-ratchet.py --diff "origin/${{ github.base_ref }}"

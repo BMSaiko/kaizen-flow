@@ -6,6 +6,7 @@ Uso:
 rc: 0 movido, 1 erro
 """
 import argparse
+import io
 import sys
 from pathlib import Path
 
@@ -16,7 +17,7 @@ DocMoveError, find, rewrite, move = doc_ops.DocMoveError, doc_ops.find, doc_ops.
 default_root, DEFAULT_ROOT, DESTS, TYPES = doc_ops.default_root, doc_ops.DEFAULT_ROOT, doc_ops.DESTS, doc_ops.TYPES
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="OBSOLETO: usa sp-move.py --tipo dr|dp")
     ap.add_argument("kind", help="dr | dp")
     ap.add_argument("slug")
@@ -33,6 +34,6 @@ def main(argv=None):
 
 if __name__ == "__main__":
     for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
+        if isinstance(stream, io.TextIOWrapper):
             stream.reconfigure(encoding="utf-8")
     sys.exit(main())

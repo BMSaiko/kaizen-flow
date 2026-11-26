@@ -13,9 +13,9 @@ GATES = {"Full", "Delta", "Skipped"}
 FONTE = re.compile(r"`[^`\s]+:\d+(?:-\d+)?`")
 
 
-def check(path):
+def check(path: str) -> list[str]:
     t = Path(path).read_text(encoding="utf-8")
-    erros = []
+    erros: list[str] = []
     m = re.search(r"Scope Gate:\*\*\s*(\S+)", t)
     if not m or m.group(1) not in GATES:
         erros.append("Scope Gate em falta ou inválido (Full/Delta/Skipped)")
@@ -35,7 +35,7 @@ def check(path):
     return erros
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     if len(argv) != 1:
         print(__doc__)
         return 2

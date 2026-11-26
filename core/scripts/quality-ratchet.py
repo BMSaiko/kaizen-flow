@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Ratchet de qualidade: complexidade (ruff C901/PLR) e tipos (mypy) só podem descer.
 
-Uso: quality-ratchet.py [--repo R] [--baseline F] [--so ruff|mypy] [--atualizar]
+Uso: quality-ratchet.py [--repo R] [--baseline F] [--so ruff|mypy] [--atualizar] [--diff BASE]
 Compara as violações atuais com `quality-baseline.json` ({ficheiro: {regra: n}}): dívida antiga passa,
 dívida nova (ficheiro/regra a subir) falha. `--atualizar` grava a baseline quando só desceu (nunca a sobe).
+`--diff BASE`: ficheiros .py de core/scripts adicionados ou alterados face a BASE (git) que não constam de
+`core/scripts/strict_modules.txt` falham (módulo tocado ou novo tem de ser strict); linhas `~ficheiro` são dívida tolerada; `--strict-lista` corre `mypy --strict` sobre a lista.
 Regras ruff medidas: C901 (limite em ruff.toml), PLR0911/0912/0913/0915. Sem rede; ruff e mypy são ferramentas de dev.
 rc: 0 sem regressão, 1 regressão, 2 ferramenta em falta ou saída ilegível
 """
@@ -80,13 +82,46 @@ def medir(repo: str, ferramentas: tuple[str, ...]) -> Contagens:
     return total
 
 
+STRICT_LISTA = "core/scripts/strict_modules.txt"
+
+
+def ler_strict(repo: str) -> set[str]:
+    f = Path(repo) / STRICT_LISTA
+    if not f.is_file():
+        return set()
+    return {_norm(l.strip()) for l in f.read_text(encoding="utf-8").splitlines() if l.strip() and not l.startswith(("#", "~"))}
+
+
+def ler_toleradas(repo: str) -> set[str]:
+    """Linhas `~ficheiro` de strict_modules.txt: dívida declarada, tocar não falha (não contam como strict)."""
+    f = Path(repo) / STRICT_LISTA
+    if not f.is_file():
+        return set()
+    return {_norm(l[1:].strip()) for l in f.read_text(encoding="utf-8").splitlines() if l.startswith("~")}
+
+
+def tocados(repo: str, base: str) -> list[str]:
+    """.py de core/scripts (sem testes) adicionados ou alterados face a `base`."""
+    saida = _correr(["git", "diff", "--name-only", "--diff-filter=AMR", f"{base}...HEAD", "--", "core/scripts"], repo)
+    return [f for f in map(_norm, saida.splitlines()) if f.endswith(".py") and not Path(f).name.startswith("test_")]
+
+
+def nao_strict(repo: str, base: str) -> list[str]:
+    ok = ler_strict(repo) | ler_toleradas(repo)
+    return [f for f in tocados(repo, base) if f not in ok]
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--repo", default=".")
     ap.add_argument("--baseline", default=None)
     ap.add_argument("--so", choices=("ruff", "mypy"), default=None)
     ap.add_argument("--atualizar", action="store_true")
+    ap.add_argument("--diff", metavar="BASE", default=None, help="falha se um .py tocado face a BASE não está em strict_modules.txt")
+    ap.add_argument("--strict-lista", action="store_true", help="mypy --strict sobre strict_modules.txt")
     args = ap.parse_args(argv)
+    if args.diff or args.strict_lista:
+        return _verificar_strict(args)
     bl = Path(args.baseline) if args.baseline else Path(args.repo) / "quality-baseline.json"
     ferramentas: tuple[str, ...] = (args.so,) if args.so else ("ruff", "mypy")
     try:
@@ -113,6 +148,26 @@ def main(argv: list[str] | None = None) -> int:
     elif melhor:
         print("dívida desceu: correr com --atualizar para fixar a baseline")
     return 0
+
+
+def _verificar_strict(args: argparse.Namespace) -> int:
+    rc = 0
+    if args.diff:
+        try:
+            falta = nao_strict(args.repo, args.diff)
+        except RuntimeError as e:
+            print(f"quality-ratchet: {e}", file=sys.stderr)
+            return 2
+        for f in falta:
+            print(f"NAO-STRICT {f}: tocado ou novo; tipar e acrescentar a {STRICT_LISTA}")
+        rc = 1 if falta else 0
+    if args.strict_lista:
+        lista = sorted(ler_strict(args.repo))
+        saida = _correr([sys.executable, "-m", "mypy", "--strict", "--no-color-output", "--no-error-summary", *lista], args.repo) if lista else ""
+        erros = [l for l in saida.splitlines() if ERRO_MYPY.match(l)]
+        print("\n".join(erros))
+        rc = 1 if erros else rc
+    return rc
 
 
 if __name__ == "__main__":

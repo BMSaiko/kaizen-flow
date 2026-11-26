@@ -47,3 +47,51 @@ def test_atualizar_nao_sobe_baseline(tmp_path, monkeypatch):
     monkeypatch.setattr(qr, "medir", lambda repo, ferramentas: {"a.py": {"C901": 1}})
     assert qr.main(["--repo", str(tmp_path), "--atualizar"]) == 1
     assert json.loads(bl.read_text(encoding="utf-8")) == {}
+
+
+def _git(repo, *a):
+    import subprocess
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *a], check=True, capture_output=True)
+
+
+def _repo_diff(tmp_path, lista):
+    (tmp_path / "core/scripts").mkdir(parents=True)
+    (tmp_path / "core/scripts/strict_modules.txt").write_text("# c\n" + lista, encoding="utf-8")
+    (tmp_path / "core/scripts/velho.py").write_text("x = 1\n", encoding="utf-8")
+    _git(tmp_path, "init", "-q", "-b", "main")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "base")
+    _git(tmp_path, "checkout", "-qb", "feat")
+    return tmp_path
+
+
+def test_diff_modulo_novo_nao_strict_falha(tmp_path):
+    repo = _repo_diff(tmp_path, "core/scripts/ok.py\n")
+    (repo / "core/scripts/novo.py").write_text("y = 2\n", encoding="utf-8")
+    (repo / "core/scripts/ok.py").write_text("z = 3\n", encoding="utf-8")
+    (repo / "core/scripts" / ("test_" + "zz.py")).write_text("", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "feat")
+    assert qr.nao_strict(str(repo), "main") == ["core/scripts/novo.py"]
+    assert qr.main(["--repo", str(repo), "--diff", "main"]) == 1
+
+
+def test_diff_tocado_estrito_passa(tmp_path):
+    repo = _repo_diff(tmp_path, "core/scripts/velho.py\n")
+    (repo / "core/scripts/velho.py").write_text("x = 2\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "feat")
+    assert qr.main(["--repo", str(repo), "--diff", "main"]) == 0
+
+
+def test_ler_strict_ignora_comentarios_e_vazias(tmp_path):
+    (tmp_path / "core/scripts").mkdir(parents=True)
+    (tmp_path / "core/scripts/strict_modules.txt").write_text("# x\n\ncore\\scripts\\a.py\n", encoding="utf-8")
+    assert qr.ler_strict(str(tmp_path)) == {"core/scripts/a.py"}
+
+
+def test_ler_strict_separa_toleradas(tmp_path):
+    (tmp_path / "core/scripts").mkdir(parents=True)
+    (tmp_path / "core/scripts/strict_modules.txt").write_text("core/scripts/a.py\n~core/scripts/b.py\n", encoding="utf-8")
+    assert qr.ler_strict(str(tmp_path)) == {"core/scripts/a.py"}
+    assert qr.ler_toleradas(str(tmp_path)) == {"core/scripts/b.py"}

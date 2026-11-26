@@ -22,16 +22,16 @@ _cfg = kaizen_engine.load("kaizen_config")
 NOME_OK = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
-def destino(root, nome, project):
+def destino(root: str | Path, nome: str, project: str) -> Path:
     project = project.replace("\\", "/").rstrip("/").split("/")[-1]  # «proj/kaizenflow» = «kaizenflow»
     if not NOME_OK.match(nome) or ".." in nome:
         raise ValueError(f"nome inválido: {nome!r}")
     if not nome.endswith(".md"):
         nome += ".md"
-    return _cfg.sp_root(root) / project / "sp" / "proofs" / nome
+    return Path(_cfg.sp_root(root)) / project / "sp" / "proofs" / nome
 
 
-def gravar(root, nome, origem, project="kaizenflow", forcar=False):
+def gravar(root: str | Path, nome: str, origem: str | Path, project: str = "kaizenflow", forcar: bool = False) -> Path:
     src = Path(origem)
     if not src.is_file():
         raise FileNotFoundError(f"origem não existe: {src}")
@@ -43,7 +43,7 @@ def gravar(root, nome, origem, project="kaizenflow", forcar=False):
     return dst
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("nome")
     ap.add_argument("--arquivo", required=True, help="ficheiro com o texto")

@@ -5,6 +5,7 @@ Uso: python -I scripts/da-stop.py <SP> --passo N.M --tentativas K --causa TXT [-
 rc: 0 tentar de novo, 1 parar (relatório no stdout)
 """
 import argparse
+import io
 import sys
 from pathlib import Path
 
@@ -18,11 +19,11 @@ PERFIS = {
 }
 
 
-def _front(path):
+def _front(path: str | Path) -> dict[str, str]:
     return sp_leitura.campos(Path(path).read_text(encoding="utf-8"))
 
 
-def limites(path):
+def limites(path: str | Path) -> tuple[int, list[str]]:
     f = _front(path)
     tentativas, parar = PERFIS.get(f.get("perfil", "normal"), PERFIS["normal"])
     if f.get("max_tentativas", "").isdigit():
@@ -32,17 +33,17 @@ def limites(path):
     return tentativas, list(parar)
 
 
-def decide(path, tentativas):
+def decide(path: str | Path, tentativas: int) -> str:
     maximo, parar = limites(path)
     return "parar" if "gate-falha" in parar and tentativas >= maximo else "tentar"
 
 
-def relatorio(passo, tentativas, causa, proximo):
+def relatorio(passo: str, tentativas: int, causa: str, proximo: str) -> str:
     return "\n".join(["## Paragem DA", f"- Passo: {passo}", f"- Tentativas: {tentativas}",
                       f"- Causa: {causa}", f"- Próximo passo: {proximo}"])
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("sp")
     ap.add_argument("--passo", required=True)
@@ -58,5 +59,6 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    sys.stdout.reconfigure(encoding="utf-8")
+    if isinstance(sys.stdout, io.TextIOWrapper):
+        sys.stdout.reconfigure(encoding="utf-8")
     sys.exit(main(sys.argv[1:]))
