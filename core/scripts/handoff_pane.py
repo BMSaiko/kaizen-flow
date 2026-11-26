@@ -163,7 +163,7 @@ def limpar_prompt(pane, backend, run=run_hidden):
     run(argv, check=True)
 
 
-def check_prompt(pane, run=run_hidden, backend="wezterm", espera=PROMPT_ESPERA, sleep=time.sleep, limpar=False):
+def check_prompt(pane, run=run_hidden, backend="wezterm", espera=PROMPT_ESPERA, sleep=time.sleep, limpar=False):  # noqa: PLR0913 — parâmetros injetáveis nos testes
     """Aborta se o prompt do painel continua com texto depois de `espera` s (não o corromper); lê o ecrã pelo backend.
 
     Com `limpar` (painel de fila) esgotada a espera faz Ctrl+U e confere de novo antes de abortar.
