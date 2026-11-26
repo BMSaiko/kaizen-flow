@@ -198,3 +198,60 @@ def test_ratchet_falha_com_regressao(tmp_path):
     ratchet = carregar(HERE / "quality-ratchet.py", "quality_ratchet", fresco=True)
     pior, _ = ratchet.comparar({"a.py": {"C901": 2}}, {"a.py": {"C901": 1}})
     assert pior == ["a.py C901: 1 -> 2"]
+
+
+# --- cobertura: ramos auxiliares e CLI
+def test_log_tolera_erro_de_disco(tmp_path, monkeypatch):
+    monkeypatch.setattr(guard, "LOG", tmp_path / "ficheiro" / "x" / "g.log")
+    (tmp_path / "ficheiro").write_text("é ficheiro, não pasta")
+    guard._log("não rebenta")
+
+
+def test_rel_fora_do_repo_devolve_none(tmp_path):
+    assert guard._rel("../fora.txt", tmp_path) is None
+    assert guard._rel("a/b.txt", tmp_path) == "a/b.txt"
+
+
+def test_segmentos_aspas_por_fechar_nao_rebenta():
+    assert guard._segmentos("git push 'x && ls") == [["git", "push", "'x"], ["ls"]]
+
+
+def _repo_git(tmp_path):
+    def g(*a):
+        subprocess.run(["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t", *a], check=True, capture_output=True)
+    g("init", "-q", "-b", "main")
+    (tmp_path / "CLAUDE.md").write_text("a")
+    g("add", ".")
+    g("commit", "-qm", "base")
+    g("checkout", "-qb", "feat")
+    (tmp_path / "CLAUDE.md").write_text("b")
+    g("commit", "-qam", "muda")
+    return tmp_path
+
+
+def test_cmd_diff_bloqueia_e_override_regista(tmp_path, capsys):
+    repo = _repo_git(tmp_path)
+    assert guard.cmd_diff(repo, "main", env={}) == 1
+    assert "CLAUDE.md" in capsys.readouterr().err
+    assert guard.cmd_diff(repo, "main", env={"KAIZEN_ALLOW_PROTECTED": "pedido do BMS"}) == 0
+    assert "override diff" in guard.LOG.read_text()
+
+
+def test_alterados_protegidos_base_invalida_cai_para_diff_direto(tmp_path):
+    repo = _repo_git(tmp_path)
+    assert guard.alterados_protegidos(repo, "main") == ["CLAUDE.md"]
+    assert guard.alterados_protegidos(repo, "nao-existe") == []
+
+
+def test_main_diff_com_argumentos(tmp_path):
+    repo = _repo_git(tmp_path)
+    assert guard.main(["diff", "--repo", str(repo), "--base", "main"]) == 1
+
+
+def test_main_stdin_bloqueia_ignora_lixo_e_nao_dict(tmp_path, monkeypatch, capsys):
+    import io
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    for entrada, rc in (("lixo", 0), ("[1]", 0), (json.dumps({"tool_name": "Read", "tool_input": {"file_path": ".env"}}), 2)):
+        monkeypatch.setattr(sys, "stdin", io.StringIO(entrada))
+        assert guard.main([]) == rc
+    assert "kf_guard: bloqueado" in capsys.readouterr().err
