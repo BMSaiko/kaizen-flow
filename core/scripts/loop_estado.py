@@ -27,6 +27,7 @@ import re
 import sys
 import tempfile
 import time
+from typing import Any
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -244,7 +245,7 @@ def bloco_handoff(base=None, now=None, session_id=TODOS):
     return "\n".join(linhas)
 
 
-def ordem_retoma(base=None, now=None, session_id=None):
+def ordem_retoma(base: Any = None, now: float | None = None, session_id: str | None = None) -> str:
     """Texto para o hook de retoma injetar na sessão nova; "" sem loops ativos de que ela seja dona."""
     est = ativos(base, now, session_id=session_id)
     if not est:

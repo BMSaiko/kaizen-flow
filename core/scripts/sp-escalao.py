@@ -17,7 +17,7 @@ ESCALOES = ("pequena", "media", "grande")
 RISCOS = ("baixo", "medio", "alto")
 
 
-def classificar(ficheiros, risco, horas):
+def classificar(ficheiros: int, risco: str, horas: float) -> str:
     if ficheiros > 15 or horas > 8 or (risco == "alto" and ficheiros > 5):
         return "grande"
     if ficheiros > 3 or horas > 2 or risco == "alto":
@@ -25,7 +25,7 @@ def classificar(ficheiros, risco, horas):
     return "pequena"
 
 
-def comando(escalao, project, slug, priority):
+def comando(escalao: str, project: str, slug: str, priority: str) -> str:
     base = f"python -I scripts/sp-new.py --project {project} --priority {priority}"
     if escalao == "pequena":
         return f"{base} --slug {slug}"
@@ -34,7 +34,7 @@ def comando(escalao, project, slug, priority):
     return f"{base} --program {slug} --children {slug}-a,{slug}-b:{slug}-a,{slug}-c:{slug}-a+{slug}-b"
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--project", required=True)
     p.add_argument("--slug", required=True)

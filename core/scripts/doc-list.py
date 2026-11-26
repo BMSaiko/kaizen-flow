@@ -6,6 +6,7 @@ Uso:
 rc: 0 ok
 """
 import argparse
+import io
 import sys
 from pathlib import Path
 
@@ -15,7 +16,7 @@ import doc_ops  # noqa: E402
 collect, default_root, DEFAULT_ROOT, ORDER = doc_ops.collect, doc_ops.default_root, doc_ops.DEFAULT_ROOT, doc_ops.ORDER
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="OBSOLETO: usa sp-list.py --tipo dr|dp")
     ap.add_argument("kind", choices=doc_ops.TYPES)
     ap.add_argument("--all", action="store_true")
@@ -26,6 +27,6 @@ def main(argv=None):
 
 if __name__ == "__main__":
     for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
+        if isinstance(stream, io.TextIOWrapper):
             stream.reconfigure(encoding="utf-8")
     sys.exit(main())

@@ -8,9 +8,6 @@
  "core/scripts/context-guard.py": {
   "PLR0911": 1
  },
- "core/scripts/da-stop.py": {
-  "mypy": 1
- },
  "core/scripts/ds_core.py": {
   "PLR0911": 1
  },
@@ -152,9 +149,6 @@
  },
  "core/scripts/test_herdr_spike_agent.py": {
   "mypy": 3
- },
- "core/scripts/test_kf_erros_formato.py": {
-  "mypy": 1
  },
  "core/scripts/test_kf_term_limpar.py": {
   "PLR0913": 1
