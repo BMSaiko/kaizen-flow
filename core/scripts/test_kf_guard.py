@@ -34,7 +34,7 @@ def test_protected_files_defeito_e_config(tmp_path):
 
 
 def test_repo_kaizen_config_lista_protegidos():
-    repo = HERE.parent.parent
+    repo = next(d for d in HERE.parents if (d / "kaizen.config.json").exists())
     data = json.loads((repo / "kaizen.config.json").read_text(encoding="utf-8"))
     assert {"MEMORY.md", "AGENTS.md", "CLAUDE.md"} <= set(data["protectedFiles"])
 
