@@ -116,7 +116,7 @@ def orcamento(repo):
 PROTEGIDOS_DEFEITO = ("MEMORY.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".cursor/rules/kaizen-flow.mdc")
 
 
-def protected_files(repo):
+def protected_files(repo: str | Path) -> list[str]:
     """Ficheiros de contexto protegidos (`protectedFiles`, lista de caminhos relativos); ausente ou inválido = defeito.
 
     Só se acrescenta/substitui por lista de strings não vazias; lista vazia desliga a guarda."""
