@@ -6,6 +6,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 ## [Unreleased]
 
 ### Added
+- Guarda de casos indesejados `core/scripts/kf_guard.py` (hook PreToolUse do adapter claude e `kf_guard.py diff` como gate): bloqueia, com a razão, alterar ficheiros de `protectedFiles` (`kaizen.config.json`; override só com `KAIZEN_ALLOW_PROTECTED=<razão>`, registado em `~/.claude/kaizen-guard.log`), ler segredos, force-push, `--admin`, merge com CI não verde, tag/publish locais e escrita fora do repo; `test_kf_guard.py` tem um teste por caso.
 - Skills `resume` (`/resume`: `kaizen resume [slug] [--from FASE]`, `--restart` só com confirmação) e `preflight` (`/preflight`: ler primeiro, `--fix` um comando seguro de cada vez), instaladas por todos os adapters (UC-046, UC-047).
 - Skills `vision` (`/vision`: `kaizen vision init|validate|resumo|decompor` com aprovação do resumo antes de decompor) e `release` (`/release`: `kf_release.py plan|prepare`, merge por `kf-ship`, `publish --confirmo` só com o «sim» humano), instaladas por todos os harnesses e sincronizadas para o vault; a pausa `release` da factory aponta para a skill.
 - Release assistida: `kf_release.py plan|prepare|publish` (bump semver pelos commits convencionais, CHANGELOG `[Unreleased]` -> `[x.y.z]`, branch `agent/release-x-y-z`, gates e PR sem merge); `publish` só com `--confirmo` e só empurra a tag (nunca reescreve tags, o npm publish fica no workflow); a factory pausa no marco com release e aponta para ele.

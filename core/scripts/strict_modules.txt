@@ -27,3 +27,5 @@ core/scripts/wt_redirect.py
 ~core/scripts/kf_errlog.py
 ~core/scripts/handoff_pane.py
 ~core/scripts/sp-handoff.py
+core/scripts/kf_guard.py
+~core/scripts/kaizen_config.py

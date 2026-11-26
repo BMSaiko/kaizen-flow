@@ -3,7 +3,9 @@ const { remap } = require("../util");
 
 const GUARD = 'python -I "$CLAUDE_PROJECT_DIR/scripts/context-guard.py"';
 const PAINEL = 'python -I "$CLAUDE_PROJECT_DIR/scripts/kf_painel_hook.py"';
+const FGUARD = 'python -I "$CLAUDE_PROJECT_DIR/scripts/kf_guard.py"';
 const HOOKS = {
+  PreToolUse: [{ matcher: "Bash|Read|Write|Edit|MultiEdit|NotebookEdit", hooks: [{ type: "command", command: FGUARD }] }],
   UserPromptSubmit: [{ hooks: [{ type: "command", command: GUARD }, { type: "command", command: PAINEL }] }],
   Stop: [{ hooks: [{ type: "command", command: PAINEL }] }],
   Notification: [{ hooks: [{ type: "command", command: PAINEL }] }],
