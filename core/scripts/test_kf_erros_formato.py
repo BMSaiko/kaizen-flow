@@ -59,7 +59,7 @@ def test_ecs_em_texto():
     assert kf_erros.ecs_em("a EC-016 e EC-060; UC-001 não; EC-1 não") == ["EC-016", "EC-060"]
 
 
-texto_pt = st.text(alphabet=st.characters(blacklist_categories=("Cs",)), min_size=1, max_size=80).filter(lambda s: s.strip())
+texto_pt = st.text(alphabet=st.characters(blacklist_categories=["Cs"]), min_size=1, max_size=80).filter(lambda s: s.strip())
 
 
 @settings(max_examples=150, deadline=None)

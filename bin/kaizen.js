@@ -36,10 +36,11 @@ const cmds = {
   ds: () => process.exit(require("./commands/ds.js").run(argv.slice(1))),
   vision: () => process.exit(require("./commands/vision.js").run(argv.slice(1))),
   factory: () => process.exit(require("./commands/factory.js").run(argv.slice(1))),
+  quality: () => process.exit(py([path.join(__dirname, "..", "core", "scripts", "kf_quality.py"), ...argv.slice(1)], process.cwd())),
   preflight: () => process.exit(py([path.join(__dirname, "..", "core", "scripts", "sp-preflight.py"), ...argv.slice(1), ...(fix ? ["--fix"] : [])], process.cwd())),
 };
 if (!Object.hasOwn(cmds, cmd)) {
-  console.log(`kaizen <init [repo] [--metodo worktree-pr|worktree-merge|direto] [--harness ${Object.keys(ADAPTERS).join("|")}] | doctor [repo] [--harness h] [--fix] | status [repo] | usage [flags] | report [--week YYYY-WNN] [flags] | audit [dir] | catalog [render|--check|--json|--no-run] | sync [--check|--stamp] | term <ls|fila|michi|limpar|orq> | resume [slug] [--from <passo>] [--restart] | preflight [slug] [--repo dir] [--fix] [--json] | ds <init|validate|export> | vision <init|validate|resumo|decompor> | factory <run|status|stop> <projeto> | demo [--factory] [--keep]>`);
+  console.log(`kaizen <init [repo] [--metodo worktree-pr|worktree-merge|direto] [--harness ${Object.keys(ADAPTERS).join("|")}] | doctor [repo] [--harness h] [--fix] | status [repo] | usage [flags] | report [--week YYYY-WNN] [flags] | audit [dir] | catalog [render|--check|--json|--no-run] | sync [--check|--stamp] | term <ls|fila|michi|limpar|orq> | resume [slug] [--from <passo>] [--restart] | quality [--base REF] [--so etapa...] [--lista] | preflight [slug] [--repo dir] [--fix] [--json] | ds <init|validate|export> | vision <init|validate|resumo|decompor> | factory <run|status|stop> <projeto> | demo [--factory] [--keep]>`);
   process.exit(cmd ? 1 : 0);
 }
 try {
