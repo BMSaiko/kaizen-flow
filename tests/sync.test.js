@@ -29,7 +29,7 @@ test("plan inclui o conftest.py (isola o cwd dos testes) para o sync n�o o apa
 
 test("sync sem fonte falha com mensagem clara e não toca em core/", () => {
   const before = fs.readdirSync(path.join(__dirname, "..", "core"));
-  const r = spawnSync("node", [KZ, "sync", "--from-vault"], { encoding: "utf8", env: { ...process.env, KAIZEN_SOURCE: path.join(tmp(), "nao-existe") } });
+  const r = spawnSync("node", [KZ, "sync", "--from-vault", "--dry-run"], { encoding: "utf8", env: { ...process.env, KAIZEN_SOURCE: path.join(tmp(), "nao-existe") } });
   assert.strictEqual(r.status, 1);
   assert.match(r.stderr, /fonte do sync não existe/);
   assert.deepStrictEqual(fs.readdirSync(path.join(__dirname, "..", "core")), before);
