@@ -27,3 +27,4 @@ core/scripts/wt_redirect.py
 ~core/scripts/kf_errlog.py
 ~core/scripts/handoff_pane.py
 ~core/scripts/sp-handoff.py
+core/scripts/sp_vigia.py
