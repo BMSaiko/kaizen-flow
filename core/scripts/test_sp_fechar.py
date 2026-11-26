@@ -1,6 +1,7 @@
 """E2E de sp-fechar.py: gate verde fecha e gera COMMIT; gate vermelho deixa o SP em Doing."""
 import re
 import subprocess
+from types import SimpleNamespace
 import sys
 from pathlib import Path
 
@@ -424,7 +425,8 @@ def test_kaizenflow_exige_sync_total_antes_de_fechar(tmp_path, monkeypatch):
     assert mod.kf_por_sincronizar(repo) == ""
     assert "a.py" in mod.kf_por_sincronizar(repo, tudo=True)
     lines = []
-    assert mod._bloqueado("s", lines, True, False, repo, "kaizenflow") is True
-    assert mod._bloqueado("s", [], True, False, repo, "demo") is False
+    sp_kf = SimpleNamespace(slug="s", project="kaizenflow")
+    assert mod._bloqueado(sp_kf, lines, True, False, repo) is True
+    assert mod._bloqueado(SimpleNamespace(slug="s", project="demo"), [], True, False, repo) is False
     (scripts / "a.py").write_text("novo")
-    assert mod._bloqueado("s", [], True, False, repo, "kaizenflow") is False
+    assert mod._bloqueado(sp_kf, [], True, False, repo) is False

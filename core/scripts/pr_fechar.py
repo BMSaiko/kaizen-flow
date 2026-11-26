@@ -72,6 +72,38 @@ def _bloquear(slug, motivo):
         print(f"aviso: bloqueado não registado ({e})", file=sys.stderr)
 
 
+def _qualidade(perfil, ctx, vermelho):
+    """Gates bloqueantes + prova de fases do perfil `qualidade`: (rc, msg) se não pode haver merge, senão None."""
+    repo, gates_fn, provas, sp = ctx
+    gate = gates_fn(repo, perfil)
+    if gate:
+        return vermelho(f"gate bloqueante vermelho: {gate}")
+    motivo = _prova_fases(perfil, *provas)
+    if motivo:
+        _bloquear(sp, motivo)
+        return 11, f"{motivo}; sem merge"
+    return None
+
+
+def _vigia(fetch_fn, interval, max_seconds):
+    """watch_fn por defeito: pr_watch.watch com o fetch, intervalo e limite dados."""
+    return lambda p, r: pr_watch.watch(p, r, fetch_fn=fetch_fn, interval=interval, max_seconds=max_seconds)
+
+
+def _nao_pronto(pr, repo, fetch_fn, sp):
+    """(rc, msg) se o PR já está merged ou não está pronto (bloqueia o SP); None se pode avançar."""
+    try:
+        estado, det = pr_watch.classify(fetch_fn(pr, repo))
+    except pr_watch.GhError as e:
+        return 4, f"gh falhou: {e}"
+    if estado == "merged":
+        return 0, "já merged"
+    if estado != "pronto":
+        _bloquear(sp, f"{estado}{' - ' + det if det else ''}; PR {pr}")
+        return 11, f"{estado}{' - ' + det if det else ''}; sem merge"
+    return None
+
+
 def _gh_merge(pr, estrategia, repo):
     r = run_hidden(["gh", "pr", "merge", pr, f"--{estrategia}", "--delete-branch"],
                        capture_output=True, text=True, cwd=repo, timeout=120)
@@ -87,7 +119,7 @@ def _vermelho(pr, motivo, tentativa, max_tentativas, sp):
     return 11, f"{motivo}; sem merge"
 
 
-def _vigia_parou(rc, pr, tentativa, max_tentativas, sp, detalhe):
+def _vigia_parou(rc, pr, sp, vermelho):
     """Traduz o rc do vigia em (rc, mensagem) quando não há merge a fazer; None se o PR está verde."""
     if rc == 0:
         return None
@@ -97,7 +129,7 @@ def _vigia_parou(rc, pr, tentativa, max_tentativas, sp, detalhe):
     if rc in (3, 4):
         return rc, "vigia parou (limite de duração ou gh falhou); sem merge"
     if rc == 5:
-        return _vermelho(pr, f"checks vermelhos: {detalhe()}", tentativa, max_tentativas, sp)
+        return vermelho("checks vermelhos")
     return 11, "PR fechado ou erro; sem merge"
 
 
@@ -107,37 +139,27 @@ def fechar(pr, repo, watch_fn=None, fetch_fn=pr_watch.fetch, merge_fn=_gh_merge,
     d = kaizen_config.desenvolvimento(repo)
     if d is None or d["metodo"] != "worktree-pr":
         return 64, "projeto sem método worktree-pr"
-    if watch_fn is None:
-        def watch_fn(p, r):
-            return pr_watch.watch(p, r, fetch_fn=fetch_fn, interval=interval, max_seconds=max_seconds)
+    watch_fn = watch_fn or _vigia(fetch_fn, interval, max_seconds)
     def detalhe():
         try:
             return pr_watch.classify(fetch_fn(pr, repo))[1] or "sem detalhe"
         except pr_watch.GhError:
             return "sem detalhe"
-    parou = _vigia_parou(watch_fn(pr, repo), pr, tentativa, max_tentativas, sp, detalhe)
+    def vermelho(motivo):
+        return _vermelho(pr, f"{motivo}: {detalhe()}" if "checks" in motivo else motivo, tentativa, max_tentativas, sp)
+    parou = _vigia_parou(watch_fn(pr, repo), pr, sp, vermelho)
     if parou:
         return parou
-    try:
-        estado, det = pr_watch.classify(fetch_fn(pr, repo))
-    except pr_watch.GhError as e:
-        return 4, f"gh falhou: {e}"
-    if estado == "merged":
-        return 0, "já merged"
-    if estado != "pronto":
-        _bloquear(sp, f"{estado}{' - ' + det if det else ''}; PR {pr}")
-        return 11, f"{estado}{' - ' + det if det else ''}; sem merge"
+    parou = _nao_pronto(pr, repo, fetch_fn, sp)
+    if parou:
+        return parou
     if d["pr_merge"] != "auto-se-verde":
         return 10, f"pronto, mas pr_merge={d['pr_merge']}; sem merge"
     perfil = kaizen_config.qualidade(repo)
     if perfil:
-        vermelho = gates_fn(repo, perfil)
-        if vermelho:
-            return _vermelho(pr, f"gate bloqueante vermelho: {vermelho}", tentativa, max_tentativas, sp)
-        motivo = _prova_fases(perfil, pentest_relatorio, review_estado)
-        if motivo:
-            _bloquear(sp, motivo)
-            return 11, f"{motivo}; sem merge"
+        parar = _qualidade(perfil, (repo, gates_fn, (pentest_relatorio, review_estado), sp), vermelho)
+        if parar:
+            return parar
     mrc, out = merge_fn(pr, d["merge_estrategia"], repo)
     if mrc != 0:
         return 11, f"gh pr merge falhou: {out}"
