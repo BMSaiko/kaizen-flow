@@ -5,6 +5,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/); versões: 
 
 ## [Unreleased]
 
+### Fixed
+- `kaizen sync --from-vault` já não apaga peças de `core/` que o vault não tem nem deixa dados pessoais em `core/`: atualiza só peças existentes nos dois lados (novas com `--only <caminho>`), recusa dados pessoais, árvore suja e o checkout principal, e `--dry-run` lista o que mudaria e as remoções evitadas.
+
 ### Added
 - Skills `resume` (`/resume`: `kaizen resume [slug] [--from FASE]`, `--restart` só com confirmação) e `preflight` (`/preflight`: ler primeiro, `--fix` um comando seguro de cada vez), instaladas por todos os adapters (UC-046, UC-047).
 - Skills `vision` (`/vision`: `kaizen vision init|validate|resumo|decompor` com aprovação do resumo antes de decompor) e `release` (`/release`: `kf_release.py plan|prepare`, merge por `kf-ship`, `publish --confirmo` só com o «sim» humano), instaladas por todos os harnesses e sincronizadas para o vault; a pausa `release` da factory aponta para a skill.
