@@ -12,7 +12,7 @@ Typed inside Claude Code / Codex, not in the shell. These are skills and prompt 
 | `/sp-fila [--dry-run] [--max N] [--ate HH:MM] [--projeto P] [--programa SLUG] [--concorrencia N] [--orcamento N]` | optional limits | Runs the eligible stories in sequence (`modo: auto`, `gates:` set, dependencies met), each in a clean session; stops on the first failure and writes a report. `--programa` runs only a parent story's tree, bounded by its `orcamento_horas`/`orcamento_usd`/`orcamento_requests`; on a stop it appends `## Progresso` to the parent so the next run resumes. `--concorrencia N` runs up to N stories at once in separate panes, each in its own worktree; `--orcamento N` is an optional request cap (none by default). A pane that ends with a question or needs a permission is brought to you, never approved on its own. Nothing is pushed. |
 | `/factory run\|status\|stop <project>` | `run`, `status` or `stop` plus the project | Drives `kaizen factory`: from `VISION.md` to merged milestones under the budget and quality gates. Pauses (rc 3) on budget, a blocked gate, a release or an invalid vision; never tags or publishes. |
 | `/auditar [rapido|normal|total]` | optional mode | Read-only audit that detects the context (vault, code, story/PR, UI) and reports what is wrong (`auditar.py`); `--criar-sps` turns findings into fix stories; `auditar.py ciclo` loops fix and re-audit until approved. |
-| `/pr-fase` | | Final phase: opens the PR from the story, the pen test and the review (`pr_corpo.py`), following the story's `pr:` authorization. |
+| `/pr-fase` | | Used by the Ship phase (`/kf-ship`): opens the PR from the story, the pen test and the review (`pr_corpo.py`), following the story's `pr:` authorization. |
 | `/kf-ship` | | Ships the current branch: test-contract guard (`kf_ship_testes_guard.py`), review loop, PR, CI watch and merge only when green and the project method allows it (`pr_fechar.py`). |
 | `design-system` (skill, by reference) | | Principles, component checklist and a11y rules for a project's `DESIGN.md` and DTCG tokens; pairs with `kaizen ds`. |
 | `/grill-me`, `/dr`, `/dp`, `/da`, `/brainstorm`, `/swot` | topic | The building blocks michi chains; usable alone. |
@@ -33,7 +33,7 @@ Stop after any step, resume later.
 | 8 | Reflect | friction found and a proposed fix to the workflow itself; you apply it |
 | 9 | Commit proposal | one conventional message; nothing is committed or pushed until you confirm |
 
-After the gates, the delivery flow can continue with optional phases: `/auditar` (security scan of the diff), `/auditar` (fix and review until approved) and `/pr-fase` (open the PR). The Docs phase is mandatory before closing the story. `skip review` skips the review loop.
+After the gates, the delivery flow can continue with optional phases: `/auditar` (security scan of the diff), `/auditar` (fix and review until approved) and `/kf-ship` (Ship phase: PR via `/pr-fase`, CI watch, merge only when green and allowed). The Docs phase is mandatory before closing the story. `skip review` skips the review loop.
 
 A Super Prompt given as input skips phases 1-2. Say "skip <phase>" or "go to DA" to jump. If you say the work is wrong or broken, michi asks which phase failed and restarts there (default: grill).
 

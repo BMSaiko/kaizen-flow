@@ -65,11 +65,11 @@ def save(name, s):
 
 # ---------- michi-cycle
 s = head(1200, 710, "michi cycle",
-         "michi cycle: dr, grill, dp, da, gates, auditar, review, docs, pr-fase, report, reflect and commit proposal, with proof per phase, handoff per phase and a kaizen loop.",
+         "michi cycle: dr, grill, dp, da, gates, auditar, review, docs, ship, report, reflect and commit proposal, with proof per phase, handoff per phase and a kaizen loop.",
          "michi", "The cycle that executes an SP")
 rows = [(130, [("1 · dr", "blue", "research"), ("2 · grill", "blue", "align"), ("3 · dp", "violet", "TDD-shaped plan"), ("4 · da", "violet", "act, proof per phase")]),
         (290, [("5 · gates", "amber", "build, tests, lint"), ("6 · auditar", "amber", "diff-local, findings → SPs"), ("7 · review", "amber", "fix and re-audit, capped"), ("8 · docs", "amber", "README, MOC, CHANGELOG")]),
-        (450, [("9 · pr-fase", "green", "PR from SP + proofs"), ("10 · report", "green", "what, verified, open"), ("11 · reflect", "green", "patch the workflow"), ("12 · commit", "green", "proposal, never auto")])]
+        (450, [("9 · ship", "green", "kf-ship: PR, CI, merge if allowed"), ("10 · report", "green", "what, verified, open"), ("11 · reflect", "green", "patch the workflow"), ("12 · commit", "green", "proposal, never auto")])]
 for y, items in rows:
     for i, (t, c, sub) in enumerate(items):
         s += box(xs[i], y, W, H, c, t, sub, dash=(t == "↻ kaizen"))
