@@ -35,7 +35,7 @@ const commandNames = new Set(core.filter((f) => /^commands\/[^/]+\.md$/.test(f.r
 // scripts do vault, fora do pacote (sb-worktree.py e o guard de worktree são específicos do vault)
 const VAULT_SCRIPTS = new Set(["sb-worktree.py", "sb.py", "test-fast.py"]);
 // skills e comandos do vault, opcionais no pacote (o michi diz o que fazer sem eles)
-const VAULT_SKILLS = new Set(["reflect", "harden", "report", "commit-msg", "commit"]);
+const VAULT_SKILLS = new Set(["reflect", "report", "commit-msg", "commit"]);
 // comandos do harness (Claude Code) e do vault que o pacote cita sem os trazer
 const HARNESS = new Set(["clear", "usage", "compact", "model", "kaizen-sync", "quit", "help", "stop", "rename", "resume"]);
 // falsos positivos: caminhos e exemplos em prosa, não comandos

@@ -111,6 +111,39 @@ def ambito(repo, modo, base):
     return {f: v for f, v in out.items() if (Path(repo) / f).is_file()}
 
 
+def added_lines(repo, base):
+    """(ficheiro, nº linha, texto) das linhas adicionadas, incluindo ficheiros novos não rastreados (conteúdo de segredos não lido)."""
+    out = []
+    cur, ln = None, 0
+    for raw in git(repo, "diff", "-U0", "--no-color", "--src-prefix=a/", "--dst-prefix=b/", base).splitlines():
+        if raw.startswith("+++ "):
+            cur = raw[6:] if raw.startswith("+++ b/") else None
+        elif raw.startswith("@@"):
+            m = re.search(r"\+(\d+)", raw)
+            ln = int(m.group(1)) if m else 0
+        elif raw.startswith("+") and cur:
+            out.append((cur, ln, raw[1:]))
+            ln += 1
+    for f in git(repo, "ls-files", "--others", "--exclude-standard").splitlines():
+        if SECRET_FILES.search(norm(f)):
+            out.append((f, 1, ""))
+            continue
+        texto = ler(repo, f)
+        out += [(f, i, t) for i, t in enumerate((texto or "").splitlines(), 1)]
+    return out
+
+
+CHECKLISTS = {
+    "codigo": ["testes cobrem o comportamento novo e os casos limite", "erros e entradas inválidas tratados", "sem segredos, injeção ou caminhos não validados", "sem regressão nas interfaces públicas"],
+    "ui": ["estados vazio, erro e carregamento", "teclado e contraste (acessibilidade)", "responsivo em largura estreita", "prova visual anexada"],
+    "docs": ["links e wikilinks resolvem", "frontmatter e MOC/README atualizados", "sem duplicar regra existente", "orçamento de contexto respeitado"],
+}
+
+
+def checklist(tipo):
+    return "\n".join(f"- [ ] {i}" for i in CHECKLISTS[tipo])
+
+
 def contextos(repo, ficheiros, sp):
     ctx = []
     fs = [norm(f) for f in ficheiros]
@@ -293,7 +326,7 @@ def criar_sps(achados, project, prefixo):
     return res
 
 
-# --- ciclo corrigir -> reauditar (porta de review_ciclo.py) ---
+# --- ciclo corrigir -> reauditar (porta de auditar.py ciclo) ---
 LINHA = re.compile(r"^\[(bloqueante|menor)\]\s+(\S+)\s+(.*)$")
 VERIFICAR = re.compile(r"\s*\|\s*verificar:\s*(.*)$")
 

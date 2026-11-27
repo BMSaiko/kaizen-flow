@@ -14,4 +14,4 @@ Sem grill humano: `kaizen vision decompor <VISION.md>` (ou `python -I scripts/sp
 ## Garantias
 - Idempotente: marco já existente (qualquer data) não é recriado; só os que faltam.
 - Valida tudo com `sp-validate`; se algo falhar, remove o que criou (rc 1).
-- `--dry-run` só lista. Revisão de qualidade: `sp-revisor` sobre cada SP antes do `sp-fila` (`/review-ciclo`).
+- `--dry-run` só lista. Revisão de qualidade: `sp-revisor` sobre cada SP antes do `sp-fila` (`/auditar`).

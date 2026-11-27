@@ -5,9 +5,9 @@ version: 1.1.0
 ---
 # pr-fase
 
-Só depois do `review-ciclo` APROVADO.
+Só depois do ciclo `/auditar` APROVADO.
 
-`python -I scripts/pr_corpo.py <SP.md> --review <estado.json> [--pentest <relatorio>] [--repo R] [--titulo T] [--base B] [--pacote <sp/proofs/slug>] [--url-base U] [--criar] [--dry-run]`
+`python -I scripts/pr_corpo.py <SP.md> --review <estado.json> [--auditoria <relatorio auditar.py>] [--repo R] [--titulo T] [--base B] [--pacote <sp/proofs/slug>] [--url-base U] [--criar] [--dry-run]`
 
 Sem `--criar` (ou com `--dry-run`, que nunca cria) imprime o corpo (template `PR_TEMPLATE.md`: O que foi feito, Decisões tomadas, O que ficou por fazer, Prova). O corpo vem do SP (Objective, Progresso, Decisões, Por fazer, Prova de done) mais o relatório do pen test e o veredicto do review.
 

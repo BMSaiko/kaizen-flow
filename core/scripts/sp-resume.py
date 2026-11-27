@@ -22,7 +22,7 @@ import kf_erros  # noqa: E402
 import sp_disco  # noqa: E402
 import sp_journal  # noqa: E402
 
-FASES = ("grill", "dr", "dp", "da", "gates", "pentest", "review", "docs", "pr", "report", "reflect", "commit")
+FASES = ("grill", "dr", "dp", "da", "gates", "auditar", "review", "docs", "pr", "report", "reflect", "commit")
 
 
 def _slugs_com_estado(raiz):

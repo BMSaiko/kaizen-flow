@@ -2,9 +2,9 @@
 """Fecho `worktree-pr`: vigia o PR (pr_watch) e faz merge só com checks verdes (`pr_merge: auto-se-verde`).
 
 Uso: python -I scripts/pr_fechar.py <nº|URL> [--repo CAMINHO] [--intervalo S] [--max-min M]
-     [--sp SLUG] [--pentest-relatorio F] [--review-estado F] [--tentativa N] [--max-tentativas M]
+     [--sp SLUG] [--auditoria-relatorio F] [--review-estado F] [--tentativa N] [--max-tentativas M]
 Com perfil `qualidade` na config do repo: antes do merge corre os gates bloqueantes (vermelho = sem merge) e exige
-`pentest` (relatório «sem achados») e `review` (estado APROVADO) conforme `qualidade.fases`; o motivo fica no estado
+`auditar` (relatório «sem achados») e `review` (estado APROVADO) conforme `qualidade.fases`; o motivo fica no estado
 `bloqueado` do SP (`--sp`). Sem perfil, comportamento antigo.
 Estratégia e permissão vêm de `desenvolvimento` em kaizen.config.json (`--repo`, defeito raiz do vault).
 Merge por `gh pr merge --<estratégia> --delete-branch`; nunca `--admin`, nunca force.
@@ -43,22 +43,22 @@ def _gates_bloqueantes(repo, perfil):
     return next((r["cmd"] for r in res if r["rc"] != 0), None)
 
 
-def _prova_fases(perfil, pentest_relatorio, review_estado):
+def _prova_fases(perfil, auditoria_relatorio, review_estado):
     """Motivo se falta/falha a prova de uma fase exigida pelo perfil; None se tudo cumprido."""
-    if "pentest" in perfil["fases"]:
+    if "auditar" in perfil["fases"]:
         try:
-            txt = Path(pentest_relatorio).read_text(encoding="utf-8") if pentest_relatorio else None
+            txt = Path(auditoria_relatorio).read_text(encoding="utf-8") if auditoria_relatorio else None
         except OSError:
             txt = None
-        if txt is None or txt.strip() != "sem achados":
-            return "pentest: relatório em falta ou com achados"
+        if txt is None or "sem achados" not in txt.splitlines():
+            return "auditar: relatório em falta ou com achados"
     if "review" in perfil["fases"]:
         try:
             ok = json.loads(Path(review_estado).read_text(encoding="utf-8")).get("veredicto") == "APROVADO" if review_estado else False
         except (OSError, ValueError, AttributeError):
             ok = False
         if not ok:
-            return "review-ciclo: sem veredicto APROVADO"
+            return "review (auditar ciclo): sem veredicto APROVADO"
     return None
 
 
@@ -134,7 +134,7 @@ def _vigia_parou(rc, pr, sp, vermelho):
 
 
 def fechar(pr, repo, watch_fn=None, fetch_fn=pr_watch.fetch, merge_fn=_gh_merge, interval=60, max_seconds=7200,
-           sp=None, pentest_relatorio=None, review_estado=None, gates_fn=_gates_bloqueantes, tentativa=1, max_tentativas=3):
+           sp=None, auditoria_relatorio=None, review_estado=None, gates_fn=_gates_bloqueantes, tentativa=1, max_tentativas=3):
     """Devolve (rc, mensagem). `watch_fn(pr, repo)` devolve o rc do pr_watch (injetável nos testes)."""
     d = kaizen_config.desenvolvimento(repo)
     if d is None or d["metodo"] != "worktree-pr":
@@ -157,7 +157,7 @@ def fechar(pr, repo, watch_fn=None, fetch_fn=pr_watch.fetch, merge_fn=_gh_merge,
         return 10, f"pronto, mas pr_merge={d['pr_merge']}; sem merge"
     perfil = kaizen_config.qualidade(repo)
     if perfil:
-        parar = _qualidade(perfil, (repo, gates_fn, (pentest_relatorio, review_estado), sp), vermelho)
+        parar = _qualidade(perfil, (repo, gates_fn, (auditoria_relatorio, review_estado), sp), vermelho)
         if parar:
             return parar
     mrc, out = merge_fn(pr, d["merge_estrategia"], repo)
@@ -173,8 +173,8 @@ def main(argv=None):
     ap.add_argument("--intervalo", type=int, default=60)
     ap.add_argument("--max-min", type=int, default=120)
     ap.add_argument("--sp", help="slug do SP onde registar `bloqueado` com o motivo")
-    ap.add_argument("--pentest-relatorio", help="ficheiro do `pentest.py --relatorio` (exigido pelo perfil)")
-    ap.add_argument("--review-estado", help="JSON de estado do `review_ciclo.py` (exigido pelo perfil)")
+    ap.add_argument("--auditoria-relatorio", help="ficheiro do `auditar.py --relatorio` (exigido pelo perfil)")
+    ap.add_argument("--review-estado", help="JSON de estado do `auditar.py ciclo` (exigido pelo perfil)")
     ap.add_argument("--tentativa", type=int, default=1, help="nº da tentativa de correção (1 = primeira)")
     ap.add_argument("--max-tentativas", type=int, default=3, help="tentativas antes de bloquear o SP")
     a = ap.parse_args(argv)
@@ -184,7 +184,7 @@ def main(argv=None):
         print(e, file=sys.stderr)
         return 64
     rc, msg = fechar(ref, a.repo, interval=max(10, a.intervalo), max_seconds=a.max_min * 60,
-                   sp=a.sp, pentest_relatorio=a.pentest_relatorio, review_estado=a.review_estado,
+                   sp=a.sp, auditoria_relatorio=a.auditoria_relatorio, review_estado=a.review_estado,
                    tentativa=a.tentativa, max_tentativas=a.max_tentativas)
     print(f"PR {ref}: {msg}", flush=True)
     return rc

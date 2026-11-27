@@ -5,7 +5,7 @@ version: 2.7
 ---
 ## michi — orquestrador do ciclo de projeto
 
-**Fluxo:** dr → grill → dp → da → gates → pentest → review → docs → pr → report → reflect → commit. **Regras duras:** prova e reflect por fase; commit, push e merge só com autorização (§Regras transversais). Detalhe: skills de fase e `references/` (índice `michi-orquestracao.md`).
+**Fluxo:** dr → grill → dp → da → gates → auditar → review → docs → pr → report → reflect → commit. **Regras duras:** prova e reflect por fase; commit, push e merge só com autorização (§Regras transversais). Detalhe: skills de fase e `references/` (índice `michi-orquestracao.md`).
 
 **Help:** `/michi help|-h|?` responde só com a Usage e pára. Uso: `/michi [--auto] [<idea>|<SP>]`, `skip <fase>`, `go to DA`.
 
@@ -17,9 +17,9 @@ version: 2.7
 | 2 | Deep Research | `/dr` | síntese de 1 ecrã | agente |
 | 3 | Deep Planning (TDD) | `/dp` | auditoria por fase + pattern-fit; sign-off | {{userName}} |
 | 4 | Deep Acting | `/da` | prova por fase + `/reflect fase` | agente |
-| 5 | Gates | `sp-gates.py` · `/harden` | cada comando com RC; falha = corrigir e repetir tudo | agente |
-| 6 | Pentest | `/pentest` | sem achados abertos (ou decisão do {{userName}}) | agente / {{userName}} |
-| 7 | Review | `/review-ciclo` (`sp-revisor.py`, revisor independente) | APROVADO; ESCALAR após 3 iterações | agente / {{userName}} |
+| 5 | Gates | `sp-gates.py` | cada comando com RC; falha = corrigir e repetir tudo | agente |
+| 6 | Auditoria | `/auditar` (rapido/normal) | sem achados abertos (ou decisão do {{userName}}) | agente / {{userName}} |
+| 7 | Review | `/auditar` ciclo (`sp-revisor.py`, revisor independente) | APROVADO; ESCALAR após 3 iterações | agente / {{userName}} |
 | 8 | Docs | `references/michi-docs.md` | README/MOC/CHANGELOG atualizados ou skip justificado; prova em `## Docs` | agente |
 | 9 | PR | `/pr-fase` | corpo pela template, respeitando `pr:` | agente |
 | 10 | Report | `/report` (`sp-report.py`) | 5 secções, «Dificuldades» não vazia | agente |
@@ -28,7 +28,7 @@ version: 2.7
 
 Fases `dr`, `dp`, `da`: carregar a skill com a ferramenta `Skill` (escrever `/dr` não a carrega; o hook `skill-fase-aviso.py` avisa). Sem a skill de um passo, faz-se à mão; fase **2b Spike** (só com `spike: incerto`): `michi-orquestracao.md`, `michi-spike.md`.
 
-`skip <fase>` salta essa fase (`skip harden|pentest|review`; nunca os gates). SP completo: `sp-fechar.py <slug>` com `## Prova de done`. Nunca omitir a linha `PRÓXIMO FILHO`/`ÚLTIMO FILHO`: manual = `AskUserQuestion`, auto ou fila = sem perguntar (`--seguinte` abre o próximo; `fechar-mae` no fim) e fechar a mãe numa worktree (`michi-lifecycle.md` §Fecho).
+`skip <fase>` salta essa fase (`skip auditar|review`; nunca os gates). SP completo: `sp-fechar.py <slug>` com `## Prova de done`. Nunca omitir a linha `PRÓXIMO FILHO`/`ÚLTIMO FILHO`: manual = `AskUserQuestion`, auto ou fila = sem perguntar (`--seguinte` abre o próximo; `fechar-mae` no fim) e fechar a mãe numa worktree (`michi-lifecycle.md` §Fecho).
 
 ## Arranque
 

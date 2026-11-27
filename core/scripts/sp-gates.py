@@ -18,7 +18,7 @@ Uso:
   python -I scripts/sp-gates.py --testes <repo> --sp <SP>  # fase de testes: corre `test.cmd` de <repo>/kaizen.config.json,
                                                        # regista `## Testes` no SP; rc 0 verde, 1 vermelho, 2 proibido,
                                                        # 3 sem test.cmd (perguntar ao user), 4 limite de tentativas
-Ordem da fase 5: gates -> harden -> pentest -> review (michi/references/michi-gates.md).
+Ordem da fase 5: gates -> auditar (rapido/normal) -> ciclo (michi/references/michi-gates.md).
 SP `ui: sim` com `--repo`: junta `ds-lint` (bloqueante) e `ds-verify` (bloqueante com Playwright no repo, senão consultivo).
 Perfil `qualidade`: gates `bloqueantes` juntam-se aos do SP (sem duplicar) e travam; `consultivos` correm no fim, só registam.
 rc: 0 gates verdes (consultivos à parte), 1 gate bloqueante falhou, 2 erro de uso ou gates inválidos

@@ -11,8 +11,7 @@ Typed inside Claude Code / Codex, not in the shell. These are skills and prompt 
 | `/handoff [slug]` | optional short name | Like `/sp-handoff`, for a free conversation with no story: writes an ephemeral handoff (`handoff.py --write`), and (if you say yes) clears the context; the new session runs `handoff.py --consume`, which prints and deletes it. |
 | `/sp-fila [--dry-run] [--max N] [--ate HH:MM] [--projeto P] [--programa SLUG] [--concorrencia N] [--orcamento N]` | optional limits | Runs the eligible stories in sequence (`modo: auto`, `gates:` set, dependencies met), each in a clean session; stops on the first failure and writes a report. `--programa` runs only a parent story's tree, bounded by its `orcamento_horas`/`orcamento_usd`/`orcamento_requests`; on a stop it appends `## Progresso` to the parent so the next run resumes. `--concorrencia N` runs up to N stories at once in separate panes, each in its own worktree; `--orcamento N` is an optional request cap (none by default). A pane that ends with a question or needs a permission is brought to you, never approved on its own. Nothing is pushed. |
 | `/factory run\|status\|stop <project>` | `run`, `status` or `stop` plus the project | Drives `kaizen factory`: from `VISION.md` to merged milestones under the budget and quality gates. Pauses (rc 3) on budget, a blocked gate, a release or an invalid vision; never tags or publishes. |
-| `/pentest [repo]` | optional repo | Defensive, local pen test of the lines added in the diff (`pentest.py`); each finding becomes a fix story. |
-| `/review-ciclo` | | Review phase that loops fix and review until approved, with an iteration limit and escalation to you (`review_ciclo.py`). |
+| `/auditar [rapido|normal|total]` | optional mode | Read-only audit that detects the context (vault, code, story/PR, UI) and reports what is wrong (`auditar.py`); `--criar-sps` turns findings into fix stories; `auditar.py ciclo` loops fix and re-audit until approved. |
 | `/pr-fase` | | Final phase: opens the PR from the story, the pen test and the review (`pr_corpo.py`), following the story's `pr:` authorization. |
 | `/kf-ship` | | Ships the current branch: test-contract guard (`kf_ship_testes_guard.py`), review loop, PR, CI watch and merge only when green and the project method allows it (`pr_fechar.py`). |
 | `design-system` (skill, by reference) | | Principles, component checklist and a11y rules for a project's `DESIGN.md` and DTCG tokens; pairs with `kaizen ds`. |
@@ -28,13 +27,13 @@ Stop after any step, resume later.
 | 2 | Deep research (`/dr`) | where the change lands, constraints, risks |
 | 3 | Deep planning (`/dp`) | 3-7 TDD-shaped phases, audit table, risks |
 | 4 | Deep acting (`/da`) | implementation phase by phase, with a proof per phase (screenshot, real call, output) saved in `proofs/` |
-| 5 | Gates | build, tests, lint, e2e, plus the `/harden` gate when that skill is installed (not shipped in `core/`); every command and rc recorded; proof of done before the story moves to Done |
+| 5 | Gates | build, tests, lint, e2e, plus the `/auditar` gate when that skill is installed (not shipped in `core/`); every command and rc recorded; proof of done before the story moves to Done |
 | 6 | Docs | README, MOC and CHANGELOG updated, or `Docs: skip — <reason>`; proof in `## Docs`; `sp-fechar.py` blocks without it |
 | 7 | Report | what changed, what was verified, real difficulties, what is open; no commit |
 | 8 | Reflect | friction found and a proposed fix to the workflow itself; you apply it |
 | 9 | Commit proposal | one conventional message; nothing is committed or pushed until you confirm |
 
-After the gates, the delivery flow can continue with optional phases: `/pentest` (security scan of the diff), `/review-ciclo` (fix and review until approved) and `/pr-fase` (open the PR). The Docs phase is mandatory before closing the story. `skip review` skips the review loop.
+After the gates, the delivery flow can continue with optional phases: `/auditar` (security scan of the diff), `/auditar` (fix and review until approved) and `/pr-fase` (open the PR). The Docs phase is mandatory before closing the story. `skip review` skips the review loop.
 
 A Super Prompt given as input skips phases 1-2. Say "skip <phase>" or "go to DA" to jump. If you say the work is wrong or broken, michi asks which phase failed and restarts there (default: grill).
 
@@ -46,6 +45,6 @@ A Super Prompt given as input skips phases 1-2. Say "skip <phase>" or "go to DA"
 | `/michi <path/to/sp.md>` | start from an existing story (moved to Doing with `sp-move.py`); with no `--auto` and no `mode:` it asks once "with or without auto?" (default: without) |
 | `/michi --auto <sp>` (or `mode: auto` in the front matter) | no questions (no start-up prompt): local commit, `sp-move done` on its own; never pushes |
 | `/michi help` | usage and supplementary skills |
-| `skip <phase>`, `go to DA` | jump phases (`skip harden` skips the optional `/harden` gate) |
+| `skip <phase>`, `go to DA` | jump phases (`skip auditar` skips the optional `/auditar` gate) |
 
 Typical flow: `/sp login page` (write the story) → `/michi <path to the story>` (do it) → review the report → confirm the commit. When the context fills up, `/sp-handoff` moves to a fresh one without losing the thread.

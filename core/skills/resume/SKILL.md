@@ -13,7 +13,7 @@ Retoma um SP onde parou, sem refazer fases já provadas. Script: `kaizen resume`
 |---|---|---|
 | 1. Escolher | `kaizen resume` (sem slug) | um só órfão: é esse; vários: lista e rc 2, escolher e repetir com o slug |
 | 2. Retomar | `kaizen resume <slug>` | lê o journal, corre o preflight (só avisos) e continua na fase seguinte à última concluída |
-| 3. Forçar fase | `kaizen resume <slug> --from <fase>` | recomeça nessa fase (`grill dr dp da gates pentest review docs pr report reflect commit`) |
+| 3. Forçar fase | `kaizen resume <slug> --from <fase>` | recomeça nessa fase (`grill dr dp da gates auditar review docs pr report reflect commit`) |
 | 4. Recomeçar | `kaizen resume <slug> --restart` | arquiva o estado e volta ao grill; **só com confirmação do {{userName}}** |
 
 ## Códigos de saída

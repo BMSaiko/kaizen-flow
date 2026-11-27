@@ -72,7 +72,7 @@ Com a regra ativa, o merge só é possível com `quality` verde: `pr_fechar.py` 
 
 ## Cobertura do diff
 
-O limiar global não diz se as linhas **alteradas** estão testadas. `python core/scripts/sp-cobertura-diff.py --repo . --base main` calcula a cobertura só das linhas adicionadas (mesmo parser de diff do `pentest.py`) a partir de relatórios já gerados (`coverage/lcov.info`, JSON do coverage.py ou `coverage/python.xml` do CI) e sai com rc 1 abaixo de `qualidade.coberturaDiff` (defeito 85, ver `docs/config.md`). Ignora testes, docs, config e linhas não executáveis; ficheiros de código sem dados no relatório são avisados e não contam. Não altera os limiares globais.
+O limiar global não diz se as linhas **alteradas** estão testadas. `python core/scripts/sp-cobertura-diff.py --repo . --base main` calcula a cobertura só das linhas adicionadas (mesmo parser de diff do `auditar.py`) a partir de relatórios já gerados (`coverage/lcov.info`, JSON do coverage.py ou `coverage/python.xml` do CI) e sai com rc 1 abaixo de `qualidade.coberturaDiff` (defeito 85, ver `docs/config.md`). Ignora testes, docs, config e linhas não executáveis; ficheiros de código sem dados no relatório são avisados e não contam. Não altera os limiares globais.
 
 ## Tipos e complexidade (ratchet)
 

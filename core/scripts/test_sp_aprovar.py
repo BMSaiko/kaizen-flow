@@ -97,7 +97,7 @@ def test_validate_sp_sem_gates_falha_mesmo_manual():
 
 
 def test_validate_origem_dispensa_decisoes():
-    assert not any("Decisões" in e for e in sp_validate.validate(_texto("origem: pentest:x\n")))
+    assert not any("Decisões" in e for e in sp_validate.validate(_texto("origem: auditar:x\n")))
 
 
 def test_validate_sp_antigo_dispensa_decisoes():

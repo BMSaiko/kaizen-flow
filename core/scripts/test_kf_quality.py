@@ -98,9 +98,9 @@ def test_comando_testes_liga_cobertura(repo):
 
 
 def test_added_lines_ignora_mnemonicprefix(repo):
-    import pentest
+    import auditar
     _git(repo, "config", "diff.mnemonicPrefix", "true")
     (repo / "m.js").write_text("a\nb\n")
     _git(repo, "add", ".")
     _git(repo, "commit", "-qm", "m")
-    assert [f for f, _n, _t in pentest.added_lines(str(repo), "main")] == ["m.js", "m.js"]
+    assert [f for f, _n, _t in auditar.added_lines(str(repo), "main")] == ["m.js", "m.js"]

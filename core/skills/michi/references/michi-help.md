@@ -16,7 +16,7 @@ here and reply with the Usage block below — do NOT start the workflow.**
 /michi help | --help | -h | ?         # this help
 /michi skip grill                     # honour "skip phase X" requests
 /michi skip reflect                   # honour "no time for reflection this cycle"
-/michi skip harden                    # salta o gate /harden (segurança/robustez/guardas)
+/michi skip auditar                   # salta a auditoria /auditar (fase 6)
 /michi go to DA                       # jump to implementation with the current plan
 ```
 

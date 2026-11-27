@@ -3,7 +3,7 @@
 O painel abre `claude --model <M> --effort <E>` (papel `revisor` de `.claude/modelos.json`; se coincidir com o modelo do
 executor do SP, usa o seguinte da cadeia e avisa) com permissões só de leitura: `git diff/log/show`, `Read`, `Grep`, `Glob`
 e `Edit(<achados>)` (cobre `Write`) apenas no ficheiro de achados. A semente leva as secções 3-5 do SP, `git diff <base>...HEAD --stat`, a checklist
-do tipo e o formato dos achados que `review_ciclo.py` consome. O painel grava `revisor-<slug> done` em `sp-estado.py`; o
+do tipo e o formato dos achados que `auditar.py ciclo` consome. O painel grava `revisor-<slug> done` em `sp-estado.py`; o
 executor espera com `--esperar` (sem polling por LLM). Conta para o teto global de painéis; sem vaga fica `pendente`.
 `--inline` mantém o review na própria sessão (SP `michi_modelo: simples` ou sem backend): imprime a semente e marca
 «review não independente» para o Report.
@@ -26,7 +26,7 @@ from pathlib import Path
 
 import modelos  # noqa: E402
 import sp_painel_estado as pe  # noqa: E402
-from review_ciclo import CHECKLISTS, checklist  # noqa: E402
+from auditar import CHECKLISTS, checklist  # noqa: E402
 from sp_carregar import carregar  # noqa: E402
 
 _autor = carregar(Path(__file__).resolve().parent / "sp-autor.py", "sp_autor")  # backend de lançamento comum
@@ -209,10 +209,10 @@ def main(argv=None, diff=None):
     ap = argparse.ArgumentParser(description="Review independente num painel revisor só de leitura (sem Agent).")
     ap.add_argument("--sp", required=True, help="SP (.md) a rever")
     ap.add_argument("--base", default="master", help="ref base do diff (defeito: master)")
-    ap.add_argument("--achados", help="ficheiro de achados que o revisor escreve (entrada de review_ciclo.py)")
+    ap.add_argument("--achados", help="ficheiro de achados que o revisor escreve (entrada de `auditar.py ciclo`)")
     ap.add_argument("--cwd", default=str(Path.cwd()), help="pasta do painel (a worktree; defeito: cwd)")
     ap.add_argument("--checklist", default="codigo", choices=sorted(CHECKLISTS))
-    ap.add_argument("--rever-so", nargs="+", metavar="F", help="re-review: só estes ficheiros (saída «Rever só» de review_ciclo.py)")
+    ap.add_argument("--rever-so", nargs="+", metavar="F", help="re-review: só estes ficheiros (saída «Rever só» de `auditar.py ciclo`)")
     ap.add_argument("--backend", default="auto", help="auto (usa painelBackend)|herdr|wezterm|tmux|background")
     ap.add_argument("--modelos", help="modelos.json alternativo")
     ap.add_argument("--inline", action="store_true", help="review na própria sessão (imprime a semente; não independente)")

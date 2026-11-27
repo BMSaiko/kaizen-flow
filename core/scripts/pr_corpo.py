@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fase final: corpo do PR a partir do SP, do pen test e do review; abre o PR se a política deixar.
 
-Uso: pr_corpo.py <SP.md> --review <estado.json> [--pentest <relatorio>] [--repo R] [--titulo T] [--base B] [--criar] [--dry-run]
+Uso: pr_corpo.py <SP.md> --review <estado.json> [--auditoria <relatorio>] [--repo R] [--titulo T] [--base B] [--criar] [--dry-run]
 Sem --criar (ou com --dry-run) só imprime o corpo e a base detetada; nunca cria PR. Com --criar: exige review APROVADO e respeita `pr:` do SP
 (auto cria; pergunta sai com rc 3 para o agente pedir confirmação; nunca recusa).
 rc 0 ok, 1 `kaizen audit` com hits (só repos com bin/kaizen.js), 2 review não aprovado, 3 pedir confirmação, 4 política `nunca`/em falta, 5 corpo incompleto,
@@ -90,7 +90,7 @@ def bloco_provas(pasta, url_base=""):
     return "\n".join(out)
 
 
-def corpo(sp_texto, review, pentest_txt, pacote="", url_base=""):
+def corpo(sp_texto, review, auditoria_txt, pacote="", url_base=""):
     feito = seccao(sp_texto, "3. Objective", "Objective") or seccao(sp_texto, "Progresso")
     progresso = seccao(sp_texto, "Progresso")
     if progresso and progresso not in feito:
@@ -99,8 +99,8 @@ def corpo(sp_texto, review, pentest_txt, pacote="", url_base=""):
     por_fazer = seccao(sp_texto, "Por fazer") or "Nada em aberto."
     prova = seccao(sp_texto, "Prova de done", "Prova")
     extra = []
-    if pentest_txt is not None:
-        extra.append(f"Pen test: {pentest_txt.strip() or 'sem achados'}")
+    if auditoria_txt is not None:
+        extra.append(f"Auditoria: {auditoria_txt.strip() or 'sem achados'}")
     if review:
         extra.append(f"Review: {review.get('veredicto')} ao fim de {review.get('iteracao')} iteração(ões)")
     prova = "\n".join([p for p in [prova, *provas_e_gates(sp_texto), *extra] if p])
@@ -116,7 +116,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("sp")
     ap.add_argument("--review", required=True)
-    ap.add_argument("--pentest")
+    ap.add_argument("--auditoria")
     ap.add_argument("--repo", default=".")
     ap.add_argument("--titulo")
     ap.add_argument("--base")
@@ -130,7 +130,7 @@ def main(argv=None):
             s.reconfigure(encoding="utf-8")
     sp = Path(a.sp).read_text(encoding="utf-8")
     review = json.loads(Path(a.review).read_text(encoding="utf-8"))
-    pent = Path(a.pentest).read_text(encoding="utf-8") if a.pentest else None
+    pent = Path(a.auditoria).read_text(encoding="utf-8") if a.auditoria else None
     texto, completo = corpo(sp, review, pent, a.pacote or "", a.url_base)
     print(texto)
     base, cand = (a.base, [a.base]) if a.base else detetar_base(a.repo)
