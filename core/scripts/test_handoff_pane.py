@@ -215,7 +215,7 @@ def test_check_prompt_le_o_ecra_pelo_backend_herdr():
         return _Res("❯ rascunho")
     with pytest.raises(hp.HandoffError):
         hp.check_prompt("w3:p17", run=run, backend="herdr", espera=0)
-    assert vistos == [["herdr", "pane", "read", "w3:p17", "--source", "visible"]]
+    assert vistos == [["herdr", "pane", "read", "w3:p17", "--source", "visible", "--ansi"]]
 
 
 def test_check_prompt_espera_que_o_rascunho_limpe():
@@ -248,3 +248,34 @@ def test_check_prompt_limpar_aborta_se_continua_com_texto():
     run = lambda argv, *a, **k: _Res("❯ rascunho")  # noqa: E731
     with pytest.raises(hp.HandoffError, match="rascunho"):
         hp.check_prompt("w:p1", run=run, backend="herdr", espera=0, sleep=lambda s: None, limpar=True)
+
+
+# Captura real do herdr (--ansi): sugestão fantasma esmaecida (\x1b[2m) depois de um turno.
+ECRA_SUGESTAO = ("\x1b[0m\x1b[2m────\x1b[0m\r\n❯\xa0\x1b[0m\x1b[2mler o conteúdo de /tmp/x1.txt\x1b[0m\r\n"
+                 "\x1b[2m────\x1b[0m\r\n")
+ECRA_TEXTO = "❯\xa0\x1b[0m\x1b[38;2;255;255;255mcontinua o michi\x1b[0m\r\n"
+
+
+def test_strip_ghost_remove_so_a_sugestao_esmaecida():
+    assert not hp.prompt_has_text(hp.strip_ghost(ECRA_SUGESTAO))
+    assert hp.prompt_has_text(hp.strip_ghost(ECRA_TEXTO))
+
+
+def test_read_screen_herdr_le_com_ansi_e_ignora_a_sugestao():
+    vistos = []
+    run = lambda argv, **k: vistos.append(argv) or _Res(ECRA_SUGESTAO)  # noqa: E731
+    ecra = hp.read_screen("herdr", "wG:p1", run)
+    assert vistos == [["herdr", "pane", "read", "wG:p1", "--source", "visible", "--ansi"]]
+    assert not hp.prompt_has_text(ecra)
+
+
+def test_check_prompt_herdr_nao_aborta_com_sugestao_fantasma():
+    run = lambda argv, **k: _Res(ECRA_SUGESTAO)  # noqa: E731
+    hp.check_prompt("wG:p1", run=run, backend="herdr", espera=0, sleep=lambda s: None)
+
+
+def test_wait_idle_espera_pelo_dialogo_askuserquestion():
+    ecras = iter(["❯ 1. Azul\nEnter to select · ↑/↓ to navigate", "❯ 1. Azul\nEnter to select", "❯\n"])
+    passos = []
+    hp.wait_idle("p", lambda p: next(ecras), sleep=passos.append)
+    assert len(passos) == 2
