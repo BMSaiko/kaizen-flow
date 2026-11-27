@@ -63,7 +63,7 @@ More detail in [Install](#install) and the [documentation](#documentation).
 </p>
 
 <p align="center">
-  <img src="docs/assets/michi-cycle.svg" alt="michi cycle: dr, grill, dp, da, then gates, auditar, review and docs, then pr-fase, report, reflect and commit proposal" width="100%">
+  <img src="docs/assets/michi-cycle.svg" alt="michi cycle: dr, grill, dp, da, then gates, auditar, review and docs, then ship (kf-ship), report, reflect and commit proposal" width="100%">
 </p>
 
 <p align="center">

@@ -5,7 +5,7 @@ version: 1.0.0
 ---
 # kf-ship
 
-Os testes são o contrato: o {{userName}} escreve os testes, o agente faz o código passar. Orquestra skills e scripts existentes; não reimplementa nenhum.
+Chamado pela fase 9 «Ship» do michi. Os testes são o contrato: o {{userName}} escreve os testes, o agente faz o código passar. Orquestra skills e scripts existentes; não reimplementa nenhum.
 
 ## Pré-condições
 

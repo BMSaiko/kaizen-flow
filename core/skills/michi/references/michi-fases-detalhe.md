@@ -25,7 +25,7 @@ Ler a fase em que se está a entrar.
    **Vault/scripts (só se `scripts/test-fast.py` existir):** `python -I scripts/test-fast.py` (só o que o diff tocou) em cada fase; `... full` (suite completa) no fecho.
    **Gate `auditar`** (após DA, antes do Report): `/auditar rapido|normal` sobre o diff da DA; achados viram SPs (`--criar-sps`) executados com prova; só passa sem confirmados abertos ou com decisão do {{userName}}. `skip auditar` salta-o (modo auto: corre sempre, sem perguntar).
    **Gate `review`** (após `auditar`, antes do PR): revisor independente (`sp-revisor.py`) e ciclo corrigir → reauditar (`auditar.py ciclo`); APROVADO segue para PR, ESCALAR (3 iterações) pede decisão ao {{userName}}. `skip review` salta-o.
-   **Fase `pr-fase`** (após ciclo `/auditar` APROVADO): corpo do PR pela template (`/pr-fase`), respeitando `pr:` do SP; sem atribuição a agentes.
+   **Fase `ship`** (após ciclo `/auditar` APROVADO): `/kf-ship` leva o ramo ao merge (contrato de testes, PR via `/pr-fase` respeitando `pr:`, vigia CI, merge só com verde, método e `merge:` a permitir; rc 10 = pedir merge ao {{userName}}); sem atribuição a agentes. `pr: nunca` = parar antes do PR. O ship nativo do harness só o {{userName}} o escreve.
    **Prova de done (antes de `sp-move.py ... done` e do `COMMIT_*.md`).** Agir como o cliente final da feature: executar o caminho real do
    utilizador (app/CLI/comando, skill `run` se aplicável; em docs/vault,
    ler o resultado como leitor: links resolvem, instruções reproduzem; em
