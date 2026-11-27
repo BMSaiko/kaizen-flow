@@ -288,7 +288,7 @@ def test_prompt_has_text_so_com_texto_depois_do_marcador():
 
 def test_check_prompt_aborta_com_texto_por_enviar():
     with pytest.raises(sp_handoff.HandoffError, match="texto por enviar"):
-        sp_handoff.check_prompt("3", run=lambda argv, **kw: _Out("❯ rascunho\n"))
+        sp_handoff.check_prompt("3", run=lambda argv, **kw: _Out("❯ rascunho\n"), sleep=lambda s: None)
 
 
 def test_send_aborta_antes_do_clear_se_inspect_falha():
