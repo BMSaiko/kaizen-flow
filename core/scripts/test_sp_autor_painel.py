@@ -408,3 +408,38 @@ def test_manifesto_ignora_comentarios_e_valida(tmp_path):
     m.write_text("so-sp\n", encoding="utf-8")
     with pytest.raises(sa.SpAutorErro):
         sa.ler_manifesto(m)
+
+
+def test_lote_sem_vaga_volta_a_tentar_ate_lancar(monkeypatch, tmp_path):
+    respostas = iter([{"estado": "pendente", "msg": "sem vaga"}, {"estado": "pendente", "msg": "sem vaga"}, {"estado": "falhou", "msg": "x"}])
+    monkeypatch.setattr(sa, "lancar", lambda *a, **k: next(respostas))
+    esperas, saidas = [], []
+    res = sa.lote([("a-2026.md", "s")], object(), tmp_path, sleep=esperas.append, intervalo=5, out=saidas.append)
+    assert res == [("a-2026", "falhou")]
+    assert esperas == [5, 5]
+    assert saidas == ["sp-autor-a-2026 · falhou · x"]
+
+
+def test_lote_sem_vaga_desiste_no_max_espera(monkeypatch, tmp_path):
+    monkeypatch.setattr(sa, "lancar", lambda *a, **k: {"estado": "pendente", "msg": ""})
+    esperas = []
+    res = sa.lote([("a-2026.md", "s")], object(), tmp_path, sleep=esperas.append, intervalo=10, max_espera=20, out=lambda _: None)
+    assert res == [("a-2026", "pendente")]
+    assert esperas == [10, 10]
+
+
+def test_main_lote_dry_run_lista_titulos(tmp_path, capsys):
+    m = tmp_path / "m.txt"
+    m.write_text("a-2026.md|s1\nb-2026.md|s2\n", encoding="utf-8")
+    assert sa.main(["--lote", str(m), "--dry-run"]) == 0
+    linhas = capsys.readouterr().out.splitlines()
+    assert len(linhas) == 2 and linhas[0].startswith("1. ") and linhas[1].startswith("2. ")
+
+
+@pytest.mark.parametrize("finais,rc", [(["done", "done"], 0), (["done", "falhou"], 1)])
+def test_main_lote_rc_segundo_estados(monkeypatch, tmp_path, finais, rc):
+    m = tmp_path / "m.txt"
+    m.write_text("a-2026.md|s1\nb-2026.md|s2\n", encoding="utf-8")
+    monkeypatch.setattr(sa.painel_backend, "escolher_por_config", lambda *a, **k: object())
+    monkeypatch.setattr(sa, "lote", lambda pares, *a, **k: [(slug, e) for (slug, _), e in zip(((p[0], p[1]) for p in pares), finais)])
+    assert sa.main(["--lote", str(m)]) == rc
