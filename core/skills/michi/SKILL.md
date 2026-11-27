@@ -1,7 +1,9 @@
 ---
 name: michi
 description: Orquestra o ciclo de um projeto ou SP, do grill ao commit, com gates, prova e reflect por fase. Usar para executar um SP ou levar uma ideia até ao commit.
-version: 2.7
+version: 2.8
+model: sonnet
+effort: low
 ---
 ## michi — orquestrador do ciclo de projeto
 

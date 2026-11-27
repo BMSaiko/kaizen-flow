@@ -1,6 +1,6 @@
 ---
 name: kf-ship
-description: Leva o ramo atual até ao merge: abre ou reutiliza o PR com o contexto de desenvolvimento do projeto, corre o ciclo `/auditar`, garante que os testes do {{userName}} não foram enfraquecidos, vigia o CI e faz merge só com verde e o método a permitir. Usar com «/kf-ship» quando o código está pronto para entregar.
+description: "Leva o ramo atual até ao merge: abre ou reutiliza o PR com o contexto de desenvolvimento do projeto, corre o ciclo `/auditar`, garante que os testes do {{userName}} não foram enfraquecidos, vigia o CI e faz merge só com verde e o método a permitir. Usar com «/kf-ship» quando o código está pronto para entregar."
 version: 1.0.0
 ---
 # kf-ship
