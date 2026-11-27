@@ -14,7 +14,7 @@ Thanks for helping. The rules are short:
 ```
 git clone https://github.com/BMSaiko/kaizen-flow.git
 cd kaizen-flow
-python -m pip install pytest
+python -m pip install pytest pytest-xdist   # xdist é opcional: paraleliza o pytest (-n auto)
 npm test
 node bin/kaizen.js audit .
 ```

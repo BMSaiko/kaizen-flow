@@ -12,11 +12,13 @@ for (const k of ["TMPDIR", "TEMP", "TMP"]) process.env[k] = runTmp;
 process.on("exit", () => { try { require("fs").rmSync(runTmp, { recursive: true, force: true }); } catch {} });
 const jsArgs = ["--test", ...(cov ? ["--experimental-test-coverage", `--test-coverage-exclude=${require("os").tmpdir().replace(/\\/g, "/")}/**`] : []), ...files];
 // sem cobertura, o pytest arranca já em paralelo com o JS (saída para ficheiro, impressa no fim): ~25 % menos de tempo total
+// pytest-xdist (opcional): se instalado, reparte os testes pelos núcleos (-n auto); senão corre em série
+const xdist = spawnSync("python", ["-c", "import xdist"], { stdio: "ignore" }).status === 0 ? ["-n", "auto"] : [];
 let bg = null;
 if (!cov) {
   const out = require("path").join(require("os").tmpdir(), `kaizen-pytest-${process.pid}.txt`);
   const fd = require("fs").openSync(out, "w");
-  bg = { out, proc: require("child_process").spawn("python", ["-m", "pytest", "-q", "tests", "core/scripts"], { stdio: ["ignore", fd, fd] }) };
+  bg = { out, proc: require("child_process").spawn("python", ["-m", "pytest", "-q", ...xdist, "tests", "core/scripts"], { stdio: ["ignore", fd, fd] }) };
   bg.done = new Promise((res) => { bg.proc.on("error", (e) => res({ error: e })); bg.proc.on("close", (status) => res({ status })); });
 }
 const js = spawnSync(process.execPath, jsArgs, { stdio: cov ? ["inherit", "pipe", "inherit"] : "inherit" });
