@@ -23,10 +23,9 @@ Ler a fase em que se está a entrar.
 
 5. **Gates.** Correr os comandos de verificação do projeto (build, testes, lint, typecheck, e2e); cada comando e o seu RC vão para o Report. Gate falhado: corrigir a causa e repetir todos, sem `|| true`.
    **Vault/scripts (só se `scripts/test-fast.py` existir):** `python -I scripts/test-fast.py` (só o que o diff tocou) em cada fase; `... full` (suite completa) no fecho.
-   **Gate `harden`** (após DA, antes do Report): `/harden vault` (ou o repo do SP) sobre o que a DA alterou; FAIL bloqueia o Report até corrigir a causa; o resultado vai para o Report. `skip harden` salta-o (modo auto: corre sempre, sem perguntar).
-   **Gate `pentest`** (após `harden`, antes do Report e do review): `/pentest <repo do SP>` sobre o diff; achados viram SPs (`--criar-sps`) executados com prova; só passa sem achados abertos ou com decisão do {{userName}}. `skip pentest` salta-o.
-   **Gate `review-ciclo`** (após `pentest`, antes do PR): review só leitura com ciclo corrigir → rever (`/review-ciclo`); APROVADO segue para PR, ESCALAR (3 iterações) pede decisão ao {{userName}}. `skip review` salta-o.
-   **Fase `pr-fase`** (após `review-ciclo` APROVADO): corpo do PR pela template (`/pr-fase`), respeitando `pr:` do SP; sem atribuição a agentes.
+   **Gate `auditar`** (após DA, antes do Report): `/auditar rapido|normal` sobre o diff da DA; achados viram SPs (`--criar-sps`) executados com prova; só passa sem confirmados abertos ou com decisão do {{userName}}. `skip auditar` salta-o (modo auto: corre sempre, sem perguntar).
+   **Gate `review`** (após `auditar`, antes do PR): revisor independente (`sp-revisor.py`) e ciclo corrigir → reauditar (`auditar.py ciclo`); APROVADO segue para PR, ESCALAR (3 iterações) pede decisão ao {{userName}}. `skip review` salta-o.
+   **Fase `pr-fase`** (após ciclo `/auditar` APROVADO): corpo do PR pela template (`/pr-fase`), respeitando `pr:` do SP; sem atribuição a agentes.
    **Prova de done (antes de `sp-move.py ... done` e do `COMMIT_*.md`).** Agir como o cliente final da feature: executar o caminho real do
    utilizador (app/CLI/comando, skill `run` se aplicável; em docs/vault,
    ler o resultado como leitor: links resolvem, instruções reproduzem; em

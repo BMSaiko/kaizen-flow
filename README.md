@@ -63,7 +63,7 @@ More detail in [Install](#install) and the [documentation](#documentation).
 </p>
 
 <p align="center">
-  <img src="docs/assets/michi-cycle.svg" alt="michi cycle: dr, grill, dp, da, then gates, pentest, review-ciclo and docs, then pr-fase, report, reflect and commit proposal" width="100%">
+  <img src="docs/assets/michi-cycle.svg" alt="michi cycle: dr, grill, dp, da, then gates, auditar, review and docs, then pr-fase, report, reflect and commit proposal" width="100%">
 </p>
 
 <p align="center">
@@ -147,7 +147,7 @@ If you prefer to do it by hand, read `AGENTS.md` after `init` and follow the blo
 | [Edge cases](docs/edge-cases.md) | numbered `EC-NNN` catalog of interruptions, crashes and broken state, each linked to its test; coverage with `kaizen catalog` |
 | [Term keys](docs/term.md) | Optional WezTerm shortcuts for `kaizen term` (menu and F2 table) |
 | [Commands](docs/commands.md) | every `kaizen` command, option and workflow script |
-| [Agent commands](docs/agent-commands.md) | `/sp`, `/michi`, `/sp-handoff`, `/sp-fila`, `/pentest`, `/review-ciclo`, `/pr-fase`, `/kf-ship` and the michi cycle |
+| [Agent commands](docs/agent-commands.md) | `/sp`, `/michi`, `/sp-handoff`, `/sp-fila`, `/auditar`, `/pr-fase`, `/kf-ship` and the michi cycle |
 | [Tests](docs/testes.md) | `npm test`, test-command detection in `init`, the michi test phase (`sp-gates --testes`), CI and coverage |
 | [Usage and cost](docs/usage-and-cost.md) | transcripts read, prices file, reports |
 | [Software factory](docs/factory.md) | architecture, configuration, autonomy limits, troubleshooting, the `demo --factory` proof |

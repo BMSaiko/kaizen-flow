@@ -267,22 +267,22 @@ test("UC-021 sp-fila --concorrencia planeia vários sem abrir painéis", T, comS
   assert.ok(!sb.existe(".kaizen/fila-paineis.json"), "nenhum painel registado");
 }));
 
-test("UC-022 pentest deteta uma falha plantada no diff", T, comSandbox({}, (sb) => {
+test("UC-022 auditar deteta uma falha plantada no diff", T, comSandbox({}, (sb) => {
   commitTudo(sb);
   sb.escrever("app.py", "import subprocess\nsubprocess.run(cmd, shell=True)\n");
-  const r = sb.py("pentest.py", "--repo", ".");
+  const r = sb.py("auditar.py", "--repo", ".", "--no-baseline");
   assert.strictEqual(r.status, 1, r.out);
-  assert.match(r.out, /injecao/);
+  assert.match(r.out, /shell=True/);
   assert.match(r.out, /app\.py/);
 }));
 
-test("UC-023 review_ciclo corrige e repete até aprovar", T, comSandbox({}, (sb) => {
+test("UC-023 auditar ciclo corrige e repete até aprovar", T, comSandbox({}, (sb) => {
   const ach = sb.escrever("achados.txt", "[bloqueante] x.py:3 divide por zero\n");
   const est = path.join(sb.dir, "review.json");
-  assert.strictEqual(sb.py("review_ciclo.py", est, "--achados", ach).status, 1);
+  assert.strictEqual(sb.py("auditar.py", "ciclo", est, "--achados", ach).status, 1);
   assert.strictEqual(JSON.parse(fs.readFileSync(est, "utf8")).veredicto, "CORRIGIR");
   fs.writeFileSync(ach, "[menor] x.py:3 comentário\n");
-  ok(sb.py("review_ciclo.py", est, "--achados", ach), "segunda ronda");
+  ok(sb.py("auditar.py", "ciclo", est, "--achados", ach), "segunda ronda");
   const e = JSON.parse(fs.readFileSync(est, "utf8"));
   assert.strictEqual(e.veredicto, "APROVADO");
   assert.strictEqual(e.iteracao, 2);

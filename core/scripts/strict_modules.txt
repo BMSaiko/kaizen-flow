@@ -33,3 +33,12 @@ core/scripts/sp_vigia.py
 core/scripts/kf_quality.py
 core/scripts/sp-fechar.py
 ~core/scripts/sp-autor.py
+~core/scripts/auditar.py
+~core/scripts/pr_corpo.py
+~core/scripts/pr_fechar.py
+~core/scripts/sp-cobertura-diff.py
+~core/scripts/sp-gates.py
+~core/scripts/sp-new.py
+~core/scripts/sp-resume.py
+~core/scripts/sp-revisor.py
+~core/scripts/strict_modules.txt

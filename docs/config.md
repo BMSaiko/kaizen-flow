@@ -127,13 +127,13 @@ End-to-end check of the herdr engine (isolated herdr session, 2 projects, 3 pane
 ```json
 {"qualidade": {"bloqueantes": ["npm test", "python core/scripts/quality-ratchet.py --repo ."],
                "consultivos": ["npm run lint"],
-               "fases": ["pentest", "review"]}}
+               "fases": ["auditar", "review"]}}
 ```
 
 A profile exists when `bloqueantes` or `consultivos` is a list; without it nothing changes (repos with only `coberturaDiff` keep the old behaviour). `python -I scripts/sp-gates.py --perfil <repo>` prints a block with sensible defaults for the repo type.
 
 - `sp-gates.py <SP> --repo R` adds the profile gates to the SP's own `gates:`, without duplicates. Blocking ones stop at the first red (rc 1); advisory ones run last, are reported as `consultivo verde|aviso` and never block.
-- `pr_fechar.py <PR> --sp <slug> --pentest-relatorio F --review-estado F`: with a profile it re-runs the blocking gates before merging; a red gate, a pentest report that is not `sem achados` or a review state that is not `APROVADO` (per `fases`; remove one only here, in the reviewed config) means rc 11, no merge, and the SP is set to `bloqueado` with the reason.
+- `pr_fechar.py <PR> --sp <slug> --auditoria-relatorio F --review-estado F`: with a profile it re-runs the blocking gates before merging; a red gate, a audit report that is not `sem achados` or a review state that is not `APROVADO` (per `fases`; remove one only here, in the reviewed config) means rc 11, no merge, and the SP is set to `bloqueado` with the reason.
 - An SP cannot switch the profile off; only this file can.
 
 ## Queue budget (`orcamento`)

@@ -37,7 +37,7 @@ Chamar `Skill` (`skill=da`): `/da <plano assinado>`: fase a fase pelo plano TDD,
 
 ## Fase 5 — Gates
 
-Build/tests/lint/typecheck/e2e aplicáveis; cada comando e RC vão para o report; falha = corrigir a causa e repetir todos, sem `|| true`. Ordem: gates → `/harden` → `/pentest` → `/review-ciclo` (`michi-gates.md`). SP com `gates:`: `python -I scripts/sp-gates.py <SP>` (rc≠0 = não fecha). **Fecho num só passo:** `python -I scripts/sp-fechar.py <slug> [--next]` = gates + context-budget + `done` + `COMMIT_*.md` (pára sem mover se falhar). Antes de `sp-move.py ... done` e do `COMMIT_*.md`: prova de done como cliente final, em `## Prova de done` (se falhar, o SP não passa a Done); E2E de fecho de árvore só quando este SP fecha mãe+filhos+netos (`sp-list.py --tree-closed <slug>`). Detalhe: `michi-fases-detalhe.md` §Fase 5.
+Build/tests/lint/typecheck/e2e aplicáveis; cada comando e RC vão para o report; falha = corrigir a causa e repetir todos, sem `|| true`. Ordem: gates → `/auditar` → ciclo `/auditar` (`michi-gates.md`). SP com `gates:`: `python -I scripts/sp-gates.py <SP>` (rc≠0 = não fecha). **Fecho num só passo:** `python -I scripts/sp-fechar.py <slug> [--next]` = gates + context-budget + `done` + `COMMIT_*.md` (pára sem mover se falhar). Antes de `sp-move.py ... done` e do `COMMIT_*.md`: prova de done como cliente final, em `## Prova de done` (se falhar, o SP não passa a Done); E2E de fecho de árvore só quando este SP fecha mãe+filhos+netos (`sp-list.py --tree-closed <slug>`). Detalhe: `michi-fases-detalhe.md` §Fase 5.
 
 ## Fase 8 — Docs
 
@@ -83,5 +83,5 @@ DR/DP/SP movem-se TODO → Doing → Done com `sp-move.py`/`doc-move.py`; `/mich
 
 ## Fases sem skill e Spike
 
-- Sem a skill de um passo (`/harden`, `/report`, `/reflect`, `/commit`), faz-se à mão: gates com RC, `sp-report.py`, `## Reflect`, commit com stage explícito.
+- Sem a skill de um passo (`/report`, `/reflect`, `/commit`), faz-se à mão: gates com RC, `sp-report.py`, `## Reflect`, commit com stage explícito.
 - Fase **2b Spike** (opcional): só com `spike: incerto` no SP, timebox `max_requests`, go/no-go em Decisões; `references/michi-spike.md`.

@@ -65,10 +65,10 @@ def save(name, s):
 
 # ---------- michi-cycle
 s = head(1200, 710, "michi cycle",
-         "michi cycle: dr, grill, dp, da, gates, pentest, review-ciclo, docs, pr-fase, report, reflect and commit proposal, with proof per phase, handoff per phase and a kaizen loop.",
+         "michi cycle: dr, grill, dp, da, gates, auditar, review, docs, pr-fase, report, reflect and commit proposal, with proof per phase, handoff per phase and a kaizen loop.",
          "michi", "The cycle that executes an SP")
 rows = [(130, [("1 · dr", "blue", "research"), ("2 · grill", "blue", "align"), ("3 · dp", "violet", "TDD-shaped plan"), ("4 · da", "violet", "act, proof per phase")]),
-        (290, [("5 · gates", "amber", "build, tests, lint"), ("6 · pentest", "amber", "diff-local, findings → SPs"), ("7 · review-ciclo", "amber", "fix and review, capped"), ("8 · docs", "amber", "README, MOC, CHANGELOG")]),
+        (290, [("5 · gates", "amber", "build, tests, lint"), ("6 · auditar", "amber", "diff-local, findings → SPs"), ("7 · review", "amber", "fix and re-audit, capped"), ("8 · docs", "amber", "README, MOC, CHANGELOG")]),
         (450, [("9 · pr-fase", "green", "PR from SP + proofs"), ("10 · report", "green", "what, verified, open"), ("11 · reflect", "green", "patch the workflow"), ("12 · commit", "green", "proposal, never auto")])]
 for y, items in rows:
     for i, (t, c, sub) in enumerate(items):
@@ -107,7 +107,7 @@ save("sp-workflow.svg", s)
 s = head(1200, 640, "Architecture",
          "kaizen-flow architecture: the core (skills, commands, scripts) is rendered by the claude, codex and agents-md adapters into the target project.",
          "Architecture", "One core, rendered per harness into your project")
-s += panel(200, 130, 800, 110, "violet", "core", ["skills (michi, dp, da, dr, pentest, pr-fase…) · commands (/sp, /sp-fila, /handoff…)", "scripts (sp-*.py on kaizen_engine) · CLI: bin/kaizen.js routes to bin/commands/*"])
+s += panel(200, 130, 800, 110, "violet", "core", ["skills (michi, dp, da, dr, auditar, pr-fase…) · commands (/sp, /sp-fila, /handoff…)", "scripts (sp-*.py on kaizen_engine) · CLI: bin/kaizen.js routes to bin/commands/*"])
 for x, (t, sub) in zip(ax, [("adapter claude", ".claude/skills, commands + hooks"), ("adapter codex", "Codex CLI layout"), ("adapter agents-md", "AGENTS.md for any harness")]):
     s += box(x, 320, aw, 90, "blue", t, sub)
     s += varrow(600, 242, 320) if x == 455 else elbow(600, 242, 282, x + aw // 2, 320)

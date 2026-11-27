@@ -3,7 +3,7 @@
 Uso: módulo importado por sp-aprovar.py, sp-validate.py e sp_fila_plano.py; sem execução direta
 rc: n/a
 
-Exceções (único sítio): SPs com `origem:` (correção nascida de um veredicto `ajustar`, SP de `pentest`)
+Exceções (único sítio): SPs com `origem:` (correção nascida de um veredicto `ajustar`, SP de `auditar --criar-sps`)
 ficam aprovados pela origem, sem grill. SPs de `date` anterior a DESDE não precisam de `aprovado`.
 """
 import re

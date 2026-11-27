@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="710" viewBox="0 0 1200 710" role="img" aria-labelledby="t d">
   <title id="t">michi cycle</title>
-  <desc id="d">michi cycle: dr, grill, dp, da, gates, pentest, review-ciclo, docs, pr-fase, report, reflect and commit proposal, with proof per phase, handoff per phase and a kaizen loop.</desc>
+  <desc id="d">michi cycle: dr, grill, dp, da, gates, auditar, docs, pr-fase, report, reflect and commit proposal, with proof per phase, handoff per phase and a kaizen loop.</desc>
   <rect width="1200" height="710" rx="24" fill="#0f172a"/>
   <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
 <text x="600.0" y="62" text-anchor="middle" font-size="40" font-weight="700" fill="#f8fafc">michi</text>
@@ -14,9 +14,9 @@
 <rect x="895" y="130" width="220" height="86" rx="18" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/><text x="1005.0" y="171.0" text-anchor="middle" font-size="22" font-weight="600" fill="#a78bfa">4 · da</text><text x="1005.0" y="195.0" text-anchor="middle" font-size="15" fill="#cbd5e1">act, proof per phase</text>
 <rect x="85" y="290" width="220" height="86" rx="18" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/><text x="195.0" y="331.0" text-anchor="middle" font-size="22" font-weight="600" fill="#fbbf24">5 · gates</text><text x="195.0" y="355.0" text-anchor="middle" font-size="15" fill="#cbd5e1">build, tests, lint</text>
 <path d="M307 333H345" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M353 333l-10-6v12z" fill="#94a3b8"/>
-<rect x="355" y="290" width="220" height="86" rx="18" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/><text x="465.0" y="331.0" text-anchor="middle" font-size="22" font-weight="600" fill="#fbbf24">6 · pentest</text><text x="465.0" y="355.0" text-anchor="middle" font-size="15" fill="#cbd5e1">diff-local, findings → SPs</text>
+<rect x="355" y="290" width="220" height="86" rx="18" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/><text x="465.0" y="331.0" text-anchor="middle" font-size="22" font-weight="600" fill="#fbbf24">6 · auditar</text><text x="465.0" y="355.0" text-anchor="middle" font-size="15" fill="#cbd5e1">diff-local, findings → SPs</text>
 <path d="M577 333H615" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M623 333l-10-6v12z" fill="#94a3b8"/>
-<rect x="625" y="290" width="220" height="86" rx="18" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/><text x="735.0" y="331.0" text-anchor="middle" font-size="22" font-weight="600" fill="#fbbf24">7 · review-ciclo</text><text x="735.0" y="355.0" text-anchor="middle" font-size="15" fill="#cbd5e1">fix and review, capped</text>
+<rect x="625" y="290" width="220" height="86" rx="18" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/><text x="735.0" y="331.0" text-anchor="middle" font-size="22" font-weight="600" fill="#fbbf24">7 · auditar (ciclo)</text><text x="735.0" y="355.0" text-anchor="middle" font-size="15" fill="#cbd5e1">fix and review, capped</text>
 <path d="M847 333H885" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/><path d="M893 333l-10-6v12z" fill="#94a3b8"/>
 <rect x="895" y="290" width="220" height="86" rx="18" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/><text x="1005.0" y="331.0" text-anchor="middle" font-size="22" font-weight="600" fill="#fbbf24">8 · docs</text><text x="1005.0" y="355.0" text-anchor="middle" font-size="15" fill="#cbd5e1">README, MOC, CHANGELOG</text>
 <rect x="85" y="450" width="220" height="86" rx="18" fill="#1e293b" stroke="#34d399" stroke-width="2"/><text x="195.0" y="491.0" text-anchor="middle" font-size="22" font-weight="600" fill="#34d399">9 · pr-fase</text><text x="195.0" y="515.0" text-anchor="middle" font-size="15" fill="#cbd5e1">PR from SP + proofs</text>

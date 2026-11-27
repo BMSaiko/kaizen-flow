@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaizen_config  # noqa: E402
-import pentest  # noqa: E402
+import auditar  # noqa: E402
 
 CODIGO = re.compile(r"\.(py|js|jsx|ts|tsx|mjs|cjs|vue|svelte)$")
 RELATORIOS = ("coverage/lcov.info", "coverage/coverage.json", "coverage/python.xml")
@@ -106,7 +106,7 @@ def _procurar(dados, ficheiro):
 
 def e_codigo(p):
     p = _norm(p)
-    return bool(CODIGO.search(p)) and not pentest.TESTE.search(p) and "/tests/" not in "/" + p \
+    return bool(CODIGO.search(p)) and not auditar.TESTE.search(p) and "/tests/" not in "/" + p \
         and "/__tests__/" not in "/" + p and not p.endswith("conftest.py")
 
 
@@ -114,7 +114,7 @@ def calcular(repo, base, dados):
     """(cobertas, total, por_ficheiro{f: [linhas por cobrir]}, sem_dados[f]) sobre as linhas adicionadas."""
     cobertas = total = 0
     por_cobrir, sem_dados = {}, []
-    for f, ln, _t in pentest.added_lines(repo, base):
+    for f, ln, _t in auditar.added_lines(repo, base):
         if not e_codigo(f):
             continue
         linhas = _procurar(dados, _norm(f))

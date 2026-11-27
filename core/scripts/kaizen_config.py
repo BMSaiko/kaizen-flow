@@ -67,14 +67,15 @@ def cobertura_diff(repo):
     return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 100 else COBERTURA_DIFF_DEFEITO
 
 
-FASES_PERFIL = ("pentest", "review")
+FASES_PERFIL = ("auditar", "review")
+ALIAS_FASES = {"pentest": "auditar"}  # auditar: ok alias de leitura de configs antigas
 
 
 def qualidade(repo):
     """Perfil `qualidade` ({bloqueantes, consultivos, fases}) ou None sem perfil (repo sem a chave: comportamento antigo).
 
     Há perfil se `qualidade.bloqueantes` ou `qualidade.consultivos` for uma lista. Entradas não-string/vazias e
-    duplicados caem; `fases` (pentest|review exigidas pelo `pr_fechar`) tem defeito as duas.
+    duplicados caem; `fases` (auditar|review exigidas pelo `pr_fechar`) tem defeito as duas.
     """
     q = _read(repo).get("qualidade")
     if not isinstance(q, dict) or not any(isinstance(q.get(k), list) for k in ("bloqueantes", "consultivos")):
@@ -89,7 +90,7 @@ def qualidade(repo):
 
     bloq = cmds("bloqueantes")
     fases = q.get("fases")
-    fases = [f for f in FASES_PERFIL if f in fases] if isinstance(fases, list) else list(FASES_PERFIL)
+    fases = [f for f in FASES_PERFIL if f in [ALIAS_FASES.get(x, x) for x in fases]] if isinstance(fases, list) else list(FASES_PERFIL)
     return {"bloqueantes": bloq, "consultivos": [c for c in cmds("consultivos") if c not in bloq], "fases": fases}
 
 

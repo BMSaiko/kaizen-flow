@@ -6,7 +6,7 @@ Recusa slug já existente no projeto (em qualquer pasta) e projeto inexistente.
 Nunca faz commit.
 
 Uso:
-  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--michi simples|default|complexo|critico] [--commit|--push|--pr auto|pergunta|nunca] [--permissoes all|nenhuma|commit,push,pr,merge] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--ui] [--origem <veredicto:id|pentest:slug>] [--parent <slug>] [--depends-on <slug> ...]
+  python -I scripts/sp-new.py --project <nome> --slug <slug> --priority P1|P2|P3 [--modo auto|manual] [--michi simples|default|complexo|critico] [--commit|--push|--pr auto|pergunta|nunca] [--permissoes all|nenhuma|commit,push,pr,merge] [--restricoes "<texto>"] [--gate "<cmd>" ...] [--prova "<cmd>"] [--permitir "<cmd>" ...] [--decisao "<texto>" ...] [--ui] [--origem <veredicto:id|auditar:slug>] [--parent <slug>] [--depends-on <slug> ...]
   python -I scripts/sp-new.py --project <nome> --program <slug> --children a,b@complexo:a,c:a+b --priority P1|P2|P3
 
 `--parent <mãe>` exige que a mãe seja `kind: program` e acrescenta o filho a `children:` dela (depends_on, `state: TODO`, sem duplicar).
@@ -398,7 +398,7 @@ def _parser():
     ap.add_argument("--permitir", action="append", default=[], help="comando pré-aprovado (repetível; irreversíveis são recusados)")
     ap.add_argument("--decisao", action="append", default=[], help="decisão do grill (repetível), vai para ## Decisões")
     ap.add_argument("--ui", action="store_true", help="SP com UI: grava ui: sim e a secção ## Esboço (obrigatória)")
-    ap.add_argument("--origem", help="origem do SP (veredicto:<id> ou pentest:<slug>): fica aprovado pela origem, sem grill")
+    ap.add_argument("--origem", help="origem do SP (veredicto:<id> ou auditar:<slug>): fica aprovado pela origem, sem grill")
     ap.add_argument("--perfil", help="perfil de execução: cauteloso|normal|autonomo")
     ap.add_argument("--max-tentativas", type=int, help="tentativas por gate (override do perfil)")
     ap.add_argument("--max-requests", type=int, help="máximo de pedidos (override do perfil)")

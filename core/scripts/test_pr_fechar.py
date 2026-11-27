@@ -109,18 +109,18 @@ def test_gate_bloqueante_vermelho_nao_faz_merge_e_bloqueia_sp(tmp_path, monkeypa
     assert regs == [("meu-sp", "gate bloqueante vermelho: npm test; PR 7; 3 tentativas esgotadas")]
 
 
-def test_perfil_verde_exige_pentest_e_review(tmp_path, monkeypatch):
+def test_perfil_verde_exige_auditar_e_review(tmp_path, monkeypatch):
     regs = []
     monkeypatch.setattr(pr_fechar, "_bloquear", lambda slug, m: regs.append(m))
     rc, msg, m = fechar_perfil(tmp_path, lambda r, p: None, sp="s")
-    assert rc == 11 and m == [] and "pentest" in regs[0]
+    assert rc == 11 and m == [] and "auditar" in regs[0]
     pent, rev = tmp_path / "p.txt", tmp_path / "r.json"
     pent.write_text("sem achados\n")
     rev.write_text(json.dumps({"veredicto": "CORRIGIR"}))
-    rc, _, m = fechar_perfil(tmp_path, lambda r, p: None, pentest_relatorio=str(pent), review_estado=str(rev))
+    rc, _, m = fechar_perfil(tmp_path, lambda r, p: None, auditoria_relatorio=str(pent), review_estado=str(rev))
     assert rc == 11 and m == [] and "review" in regs[-1]
     rev.write_text(json.dumps({"veredicto": "APROVADO"}))
-    rc, _, m = fechar_perfil(tmp_path, lambda r, p: None, pentest_relatorio=str(pent), review_estado=str(rev))
+    rc, _, m = fechar_perfil(tmp_path, lambda r, p: None, auditoria_relatorio=str(pent), review_estado=str(rev))
     assert rc == 0 and m == ["squash"]
 
 

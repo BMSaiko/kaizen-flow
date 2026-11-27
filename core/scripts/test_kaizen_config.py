@@ -96,4 +96,4 @@ def test_qualidade_perfil_limpa_e_defeitos(tmp_path):
     (tmp_path / "kaizen.config.json").write_text(json.dumps(conf))
     assert cfg.qualidade(tmp_path) == {"bloqueantes": ["a", "b"], "consultivos": ["c"], "fases": ["review"]}
     (tmp_path / "kaizen.config.json").write_text(json.dumps({"qualidade": {"consultivos": ["c"]}}))
-    assert cfg.qualidade(tmp_path) == {"bloqueantes": [], "consultivos": ["c"], "fases": ["pentest", "review"]}
+    assert cfg.qualidade(tmp_path) == {"bloqueantes": [], "consultivos": ["c"], "fases": ["auditar", "review"]}
