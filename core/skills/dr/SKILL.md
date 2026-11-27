@@ -29,7 +29,7 @@ Fase 0 do DP: evidência antes de assunções. Planear sem pesquisa repete erros
 3. **Código:** estrutura, `git log --oneline -10`, TODO/FIXME, `git status --short`.
 4. **Erros:** padrões no MISTAKE_LOG por projeto, stack e tipo de tarefa (nunca bloqueia).
 5. **Temporal:** daily notes de hoje e ontem, sessões dos últimos 3 dias (feito, em curso, bloqueios).
-6. **Brief:** `knowledge/projects/<projeto>/research/YYYY-MM-DD-<tópico>-brief.md`.
+6. **Brief:** `knowledge/projects/<projeto>/dr/YYYY-MM-DD-<tópico>-brief.md`.
 
 Fases 2-5 são independentes: chamadas paralelas na mesma resposta. Falha de uma fase = registar em Lacunas e continuar; o DR não aborta por uma fase.
 

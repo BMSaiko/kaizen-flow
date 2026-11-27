@@ -26,7 +26,7 @@ version: 2.7
 | 11 | Reflect | `/reflect final` | A/B/C proposto; o {{userName}} aplica | {{userName}} |
 | 12 | Commit | `/commit-msg` → `/commit` | `COMMIT_*.md` aprovado | {{userName}} |
 
-Sem a skill de um passo, faz-se à mão; fase **2b Spike** (só com `spike: incerto`): `michi-orquestracao.md`, `michi-spike.md`.
+Fases `dr`, `dp`, `da`: carregar a skill com a ferramenta `Skill` (escrever `/dr` não a carrega; o hook `skill-fase-aviso.py` avisa). Sem a skill de um passo, faz-se à mão; fase **2b Spike** (só com `spike: incerto`): `michi-orquestracao.md`, `michi-spike.md`.
 
 `skip <fase>` salta essa fase (`skip harden|pentest|review`; nunca os gates). SP completo: `sp-fechar.py <slug>` com `## Prova de done`. Nunca omitir a linha `PRÓXIMO FILHO`/`ÚLTIMO FILHO`: manual = `AskUserQuestion`, auto ou fila = sem perguntar (`--seguinte` abre o próximo; `fechar-mae` no fim) e fechar a mãe numa worktree (`michi-lifecycle.md` §Fecho).
 
