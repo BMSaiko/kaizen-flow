@@ -15,7 +15,7 @@ A Fase 1 vem primeiro; as Fases 2-5 são independentes e correm em paralelo; a F
 3. **Pesquisa no código.** Estrutura, padrões, commits recentes, TODOs. Ferramentas: `bash` (`ls`, `rg`, `git log`), `win_git` (repos Windows, fallback de caminho), `git_status`. Caminho resolvido dinamicamente via `sb_resolve` a partir do MOC (não hardcoded, porque os repos mudam de sítio; fallback `sb_search`). Verificações: `ls` de `src/ lib/ config/ docs/`; `git log --oneline -10`; `rg "TODO|FIXME|HACK|XXX"`; `git status --short`. Sem git: «not checked» nos Research Gaps; caminho não resolvido: «path unresolved» e saltar para a Fase 6.
 4. **Padrões de erro.** Procurar no MISTAKE_LOG (`sb_search` em escopo de projeto e `knowledge/infra/` (se existir); fallback `find`) padrões do domínio, stack e tipo de tarefa, filtrando por nome do projeto (substring ≥3 chars), stack («Next.js», «Supabase», «Python») e tipo de tarefa («deployment», «RLS», «migration»). Saída: padrões com passos de prevenção, ou `_None relevant_`; MISTAKE_LOG ausente: `_MISTAKE_LOG not found_` nos Gaps. Não bloqueia o DR.
 5. **Contexto temporal.** Daily notes de hoje e ontem e sessões dos últimos 3 dias: feito, em curso, bloqueado. Pré-requisito: `sync_daily_notes(dryRun=true)` e, se houver pendentes, `sync_daily_notes()`. Ferramentas: `sync_sessions`, `sb_read` (`knowledge/YYYY-MM-DD.md`), `sb_list`. Extrair itens de hoje, concluído/em curso de ontem, bloqueios e decisões pendentes, flags (WIP, abandonado, escalado).
-6. **Compilar o Brief.** Escrever em `knowledge/projects/<projeto>/research/YYYY-MM-DD-<tópico>-brief.md` com todas as secções; fases saltadas ou com erro preenchem a secção com a lacuna/razão.
+6. **Compilar o Brief.** Escrever em `knowledge/projects/<projeto>/dr/YYYY-MM-DD-<tópico>-brief.md` com todas as secções; fases saltadas ou com erro preenchem a secção com a lacuna/razão.
 
 ## Template do Research Brief
 
@@ -79,7 +79,7 @@ A Fase 1 vem primeiro; as Fases 2-5 são independentes e correm em paralelo; a F
 
 ## Handoff DR → DP
 
-1. O Brief fica gravado. 2. O «Analyze» do DP **lê o Brief**, não repete a pesquisa. 3. O plano cita-o: `> Research: knowledge/projects/<projeto>/research/YYYY-MM-DD-<tópico>-brief.md`. 4. Secções de baixa confiança viram riscos no plano. 5. O Scope Gate (Full/Delta/Skipped) ajusta a profundidade do plano. 6. Cada Research Gap é endereçado ou aceite explicitamente como risco.
+1. O Brief fica gravado. 2. O «Analyze» do DP **lê o Brief**, não repete a pesquisa. 3. O plano cita-o: `> Research: knowledge/projects/<projeto>/dr/YYYY-MM-DD-<tópico>-brief.md`. 4. Secções de baixa confiança viram riscos no plano. 5. O Scope Gate (Full/Delta/Skipped) ajusta a profundidade do plano. 6. Cada Research Gap é endereçado ou aceite explicitamente como risco.
 
 ## Erros
 

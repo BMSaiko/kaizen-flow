@@ -25,15 +25,15 @@ Regras que saíram do `SKILL.md` sem alteração de contrato. Prova, reflect por
 
 ## Fase 2 — DR
 
-`/dr <projeto> <área tocada>`: caminhos de código reais, restrições, prior art, pontos de integração; fontes primárias (ficheiros do repo, docs oficiais). Fim: síntese de 1 ecrã — onde a mudança cai, o que tem de respeitar, o que é arriscado.
+Chamar a ferramenta `Skill` (`skill=dr`), não só escrever `/dr`: `/dr <projeto> <área tocada>`: caminhos de código reais, restrições, prior art, pontos de integração; fontes primárias (ficheiros do repo, docs oficiais). Fim: síntese de 1 ecrã — onde a mudança cai, o que tem de respeitar, o que é arriscado.
 
 ## Fase 3 — DP
 
-`/dp <objetivo + achados do DR>`: assunções, 3-7 fases (o quê / âmbito / done-when), riscos, fora de âmbito; cada fase é um ciclo TDD (Seams confirmados → Red → Green → tautology check; refactor fica na review). **Antes do sign-off: tabela de auditoria por fase `phase | existe hoje | muda depois | redundant?` (redundant=yes sai do plano) e pattern-fit check (`michi-patterns.md`).** Detalhe: `michi-fases-detalhe.md` §Fase 3.
+Chamar `Skill` (`skill=dp`): `/dp <objetivo + achados do DR>`: assunções, 3-7 fases (o quê / âmbito / done-when), riscos, fora de âmbito; cada fase é um ciclo TDD (Seams confirmados → Red → Green → tautology check; refactor fica na review). **Antes do sign-off: tabela de auditoria por fase `phase | existe hoje | muda depois | redundant?` (redundant=yes sai do plano) e pattern-fit check (`michi-patterns.md`).** Detalhe: `michi-fases-detalhe.md` §Fase 3.
 
 ## Fase 4 — DA
 
-`/da <plano assinado>`: fase a fase pelo plano TDD, bloqueios cedo, `todo` para acompanhar. Sem «done» sem evidência (RC, output de teste, lint). Por fase de entrega: prova (`michi-prova.md`) e `/reflect fase <SP>` antes do handoff.
+Chamar `Skill` (`skill=da`): `/da <plano assinado>`: fase a fase pelo plano TDD, bloqueios cedo, `todo` para acompanhar. Sem «done» sem evidência (RC, output de teste, lint). Por fase de entrega: prova (`michi-prova.md`) e `/reflect fase <SP>` antes do handoff.
 
 ## Fase 5 — Gates
 

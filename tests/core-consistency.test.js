@@ -6,7 +6,7 @@ const { loadCore } = require("../bin/core.js");
 const core = loadCore();
 const scripts = new Set(core.filter((f) => f.rel.startsWith("scripts/")).map((f) => f.rel.slice("scripts/".length)));
 // scripts fora de core/scripts que o core/ cita como opcionais (test-fast.py do vault; kaizen_usage.py vive em usage/ e o orçamento ignora-o se faltar)
-const OPTIONAL = new Set(["test-fast.py", "kaizen_usage.py"]);
+const OPTIONAL = new Set(["test-fast.py", "kaizen_usage.py", "skill-fase-aviso.py"]);
 
 test("todo o script .py referido em core/ existe em core/scripts", () => {
   const missing = [];
@@ -37,7 +37,7 @@ const VAULT_SCRIPTS = new Set(["sb-worktree.py", "sb.py", "test-fast.py"]);
 // skills e comandos do vault, opcionais no pacote (o michi diz o que fazer sem eles)
 const VAULT_SKILLS = new Set(["reflect", "harden", "report", "commit-msg", "commit"]);
 // comandos do harness (Claude Code) e do vault que o pacote cita sem os trazer
-const HARNESS = new Set(["clear", "usage", "compact", "model", "kaizen-sync", "rever", "quit", "help", "stop", "rename", "resume"]);
+const HARNESS = new Set(["clear", "usage", "compact", "model", "kaizen-sync", "quit", "help", "stop", "rename", "resume"]);
 // falsos positivos: caminhos e exemplos em prosa, não comandos
 const NOT_COMMANDS = new Set(["ausente", "reflog", "tmp", "login"]);
 
