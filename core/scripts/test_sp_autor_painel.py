@@ -358,3 +358,53 @@ def test_prompt_commita_e_envia_so_o_sp_antes_do_done(sp_vazio, tmp_path):
     assert "git add -A &&" not in t and "git add . &&" not in t
     assert "sem fazer o trabalho do SP" in t and "sem abrir outros painéis" in t
     assert t.index("git add") < t.index("--avisar") < t.index("sp-estado.py") < t.index("--fechar")
+
+
+def _sp(tmp_path, nome):
+    p = tmp_path / f"{nome}.md"
+    p.write_text(f"---\nslug: {nome}\n---\n# Super Prompt\n", encoding="utf-8")
+    s = tmp_path / f"{nome}.semente"
+    s.write_text("x", encoding="utf-8")
+    return p, s
+
+
+def test_lote_um_de_cada_vez_e_espera_pelo_fim(modelos_json, tmp_path):
+    pares = [_sp(tmp_path, "a-2026"), _sp(tmp_path, "b-2026")]
+    b, root = FakeBackend(), tmp_path / "estado"
+    saidas = []
+
+    def sleep(_):  # cada "espera" faz o painel ativo terminar
+        for k in ("sp-autor-a-2026", "sp-autor-b-2026"):
+            try:
+                if pe.ler(pe.fila_id(sa.FILA), k, root=root)["estado"] == "a-correr":
+                    pe.transitar(k, "done", fila=pe.fila_id(sa.FILA), root=root)
+                    assert len(b.abertos) <= 2
+            except pe.ErroEstado:
+                pass
+
+    res = sa.lote(pares, b, tmp_path, estado_root=root, sleep=sleep, intervalo=1, out=saidas.append)
+    assert res == [("a-2026", "done"), ("b-2026", "done")]
+    assert len(b.abertos) == 2
+    assert saidas.index("sp-autor-a-2026 · done") < [i for i, x in enumerate(saidas) if x.startswith("sp-autor-b-2026 · a-correr")][0]
+
+
+def test_lote_painel_falhado_nao_para_o_lote(modelos_json, tmp_path):
+    pares = [_sp(tmp_path, "a-2026"), _sp(tmp_path, "b-2026")]
+    b = FakeBackend(enviar_ok=False)
+    res = sa.lote(pares, b, tmp_path, estado_root=tmp_path / "e", sleep=lambda _: None, intervalo=1, out=lambda _: None)
+    assert [e for _, e in res] == ["falhou", "falhou"]
+
+
+def test_lote_tempo_esgotado(modelos_json, tmp_path):
+    pares = [_sp(tmp_path, "a-2026")]
+    res = sa.lote(pares, FakeBackend(), tmp_path, estado_root=tmp_path / "e", sleep=lambda _: None, intervalo=10, max_espera=20, out=lambda _: None)
+    assert res == [("a-2026", "tempo-esgotado")]
+
+
+def test_manifesto_ignora_comentarios_e_valida(tmp_path):
+    m = tmp_path / "m.txt"
+    m.write_text("# c\n\na.md | s1\nb.md|s2\n", encoding="utf-8")
+    assert sa.ler_manifesto(m) == [("a.md", "s1"), ("b.md", "s2")]
+    m.write_text("so-sp\n", encoding="utf-8")
+    with pytest.raises(sa.SpAutorErro):
+        sa.ler_manifesto(m)

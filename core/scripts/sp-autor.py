@@ -192,6 +192,54 @@ def lancar(sp, semente, backend, cwd, estado_root=None, run=None, sleep=time.sle
     return {**res, "estado": "a-correr", "pane": str(pane)}
 
 
+TERMINAIS = frozenset({"done", "falhou", "bloqueado"})
+
+
+def ler_manifesto(path):
+    """Linhas `sp|semente` (vazias e `#` ignoradas) -> [(sp, semente)] pela ordem do ficheiro."""
+    pares = []
+    for n, linha in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
+        linha = linha.strip()
+        if not linha or linha.startswith("#"):
+            continue
+        sp, sep, semente = (x.strip() for x in linha.partition("|"))
+        if not sep or not sp or not semente:
+            raise SpAutorErro(f"manifesto {path}:{n}: esperado `sp|semente`")
+        pares.append((sp, semente))
+    return pares
+
+
+def lote(pares, backend, cwd, estado_root=None, run=None, sleep=time.sleep, intervalo=20, max_espera=3600, out=print, **kw):
+    """Preenche os SPs um de cada vez: lança, espera que o painel termine (done|falhou|bloqueado) e só então lança o seguinte; sem vaga, volta a tentar. Devolve [(slug, estado final)]; um painel que falha ou excede `max_espera` s não pára o lote."""
+    res = []
+    for sp, semente in pares:
+        slug, k = slug_de(sp), chave(slug_de(sp))
+        espera = 0
+        while True:
+            r = lancar(sp, semente, backend, cwd, estado_root=estado_root, run=run, sleep=sleep, **kw)
+            if r["estado"] != "pendente":
+                break
+            if espera >= max_espera:
+                break
+            sleep(intervalo)
+            espera += intervalo
+        out(f"{k} · {r['estado']}" + (f" · {r['msg']}" if r["msg"] else ""))
+        final = r["estado"]
+        if final == "a-correr":
+            fila = pe.fila_id(FILA)
+            while espera < max_espera:
+                final = pe.ler(fila, k, root=estado_root)["estado"]
+                if final in TERMINAIS:
+                    break
+                sleep(intervalo)
+                espera += intervalo
+            else:
+                final = "tempo-esgotado"
+            out(f"{k} · {final}")
+        res.append((slug, final))
+    return res
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Preenche um SP vazio num painel sp-autor (sem Agent).")
     ap.add_argument("--sp", help="SP vazio (.md) a preencher")
@@ -204,6 +252,8 @@ def main(argv=None):
     ap.add_argument("--cwd", default=str(Path(__file__).resolve().parent.parent), help="pasta do painel (defeito: o repo)")
     ap.add_argument("--backend", default="auto", help="auto (usa painelBackend)|herdr|wezterm|tmux|background")
     ap.add_argument("--modelos", help="modelos.json alternativo")
+    ap.add_argument("--lote", metavar="MANIFESTO", help="ficheiro com linhas `sp|semente`: preenche-os um de cada vez, lançando o seguinte quando o painel termina")
+    ap.add_argument("--max-espera", type=int, default=3600, help="com --lote: segundos máximos por SP (defeito 3600)")
     ap.add_argument("--dry-run", action="store_true", help="mostra título, modelo e prompt sem abrir")
     args = ap.parse_args(argv)
     global MODELOS
@@ -226,6 +276,13 @@ def main(argv=None):
         if args.consume:
             consume(args.consume)
             return 0
+        if args.lote:
+            pares = ler_manifesto(args.lote)
+            if args.dry_run:
+                print("\n".join(f"{i}. {titulo(slug_de(sp))}" for i, (sp, _) in enumerate(pares, 1)))
+                return 0
+            res = lote(pares, painel_backend.escolher_por_config(args.backend), args.cwd, run=painel_backend.run_hidden, max_espera=args.max_espera)
+            return 0 if all(e == "done" for _, e in res) else 1
         if not (args.sp and args.semente):
             ap.error("indicar --sp e --semente (ou --consume)")
         if args.dry_run:
