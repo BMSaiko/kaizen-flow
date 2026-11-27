@@ -239,12 +239,25 @@ def _copy(text):
     raise OSError("nenhuma ferramenta de área de transferência")
 
 
+DIM_SPAN = re.compile(r"\x1b\[2m.*?(?=\x1b\[0m|\x1b\[22m|$)", re.M)  # texto esmaecido: a sugestão fantasma do prompt
+ANSI = re.compile(r"\x1b\[[0-9;:?]*[A-Za-z]")
+
+
+def strip_ghost(ansi):
+    """Ecrã em texto simples sem o texto esmaecido (`\\e[2m`): a sugestão de prompt do Claude Code não é texto escrito."""
+    return ANSI.sub("", DIM_SPAN.sub("", ansi))
+
+
 def read_screen(backend, pane, run=run_hidden):
-    """Texto do ecrã do painel (`wezterm cli get-text`, `tmux capture-pane` ou `herdr pane read`)."""
+    """Texto do ecrã do painel (`wezterm cli get-text`, `tmux capture-pane` ou `herdr pane read`).
+
+    No herdr lê com `--ansi` e descarta a sugestão fantasma, senão `prompt_has_text` toma-a por texto do {{userName}}.
+    """
     argv = {"wezterm": ["wezterm", "cli", "get-text", "--pane-id", str(pane)],
-            "herdr": ["herdr", "pane", "read", str(pane), "--source", "visible"]}.get(
+            "herdr": ["herdr", "pane", "read", str(pane), "--source", "visible", "--ansi"]}.get(
         backend, ["tmux", "capture-pane", "-p", "-t", str(pane)])
-    return run(argv, check=True, capture_output=True, text=True, encoding="utf-8").stdout
+    out = run(argv, check=True, capture_output=True, text=True, encoding="utf-8").stdout
+    return strip_ghost(out) if backend == "herdr" else out
 
 
 def send_confirmed(pane, text, text_argv, key_argv, screen, run=run_hidden, sleep=time.sleep, enter_gap=ENTER_GAP,
@@ -271,14 +284,17 @@ def send_confirmed(pane, text, text_argv, key_argv, screen, run=run_hidden, slee
     raise HandoffError(f"painel {pane}: o Enter não submeteu {text!r}")
 
 
-BUSY = "esc to interrupt"  # linha de estado do Claude Code enquanto o turno corre (o Enter só enfileirava o /clear)
+BUSY = ("esc to interrupt", "Enter to select")  # turno a correr, ou diálogo AskUserQuestion à espera (o Enter só enfileirava o /clear)
 IDLE_TIMEOUT = 180.0
 
 
 def wait_idle(pane, screen, sleep=time.sleep, timeout=IDLE_TIMEOUT, step=2.0):
     """Espera que o Claude Code acabe o turno (hooks Stop incluídos) antes de escrever; esgotado o tempo, segue."""
     waited = 0.0
-    while waited < timeout and BUSY in screen(pane):
+    while waited < timeout:
+        ecra = screen(pane)
+        if not any(marca in ecra for marca in BUSY):
+            return
         sleep(PROMPT_PASSO)
         waited += PROMPT_PASSO
 

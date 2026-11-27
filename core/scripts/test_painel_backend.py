@@ -364,7 +364,7 @@ def test_herdr_listar_titulos_foco_enviar_fechar(monkeypatch):
     assert b.enviar("w1:p1", "/michi a") is True
     assert ["herdr", "pane", "send-text", "w1:p1", "/michi a"] in chamadas
     assert ["herdr", "pane", "send-keys", "w1:p1", "Enter"] in chamadas
-    assert chamadas.index(["herdr", "pane", "send-keys", "w1:p1", "Enter"]) > chamadas.index(["herdr", "pane", "read", "w1:p1", "--source", "visible"])
+    assert chamadas.index(["herdr", "pane", "send-keys", "w1:p1", "Enter"]) > chamadas.index(["herdr", "pane", "read", "w1:p1", "--source", "visible", "--ansi"])
     assert b.enviar("w9:p9", "x") is False
     assert b.fechar("w1:p1") is True and ["herdr", "pane", "close", "w1:p1"] in chamadas
     assert b.fechar("w9:p9") is False
