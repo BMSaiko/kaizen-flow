@@ -1,6 +1,6 @@
 ---
 name: orq
-description: Orquestra painéis do terminal a partir de um só chat: lista, lê, responde, lança e mata, com confirmação nas escritas. Usar para gerir várias sessões em painéis.
+description: "Orquestra painéis do terminal a partir de um só chat: lista, lê, responde, lança e mata, com confirmação nas escritas. Usar para gerir várias sessões em painéis."
 version: 1.0.0
 ---
 # orq

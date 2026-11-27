@@ -10,7 +10,8 @@ SCRIPTS = Path(__file__).resolve().parent
 
 
 def _projeto(tmp_path):
-    shutil.copytree(SCRIPTS, tmp_path / "scripts", ignore=shutil.ignore_patterns("__pycache__"))
+    """Repo de exemplo com os scripts do motor; sem `sb-worktree.py` (só do vault), o `sp-move` não cria worktrees."""
+    shutil.copytree(SCRIPTS, tmp_path / "scripts", ignore=shutil.ignore_patterns("__pycache__", "sb-worktree.py"))
     subprocess.run(["git", "init", "-q"], cwd=str(tmp_path), check=True)
     return tmp_path
 
