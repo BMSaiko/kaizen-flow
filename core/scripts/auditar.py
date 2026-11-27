@@ -159,7 +159,7 @@ def contextos(repo, ficheiros, sp):
     return ctx or ["codigo"]
 
 
-def achado(sev, tipo, onde, problema, correcao, evidencia):
+def achado(sev, tipo, onde, problema, correcao, evidencia):  # noqa: PLR0913 (um campo por coluna do relatório)
     return {"sev": sev, "tipo": tipo, "onde": onde, "problema": problema, "correcao": correcao, "evidencia": evidencia}
 
 

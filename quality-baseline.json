@@ -164,7 +164,6 @@
   "PLR0913": 2
  },
  "core/scripts/sp_vigia.py": {
-  "PLR0911": 1,
   "PLR0913": 1
  },
  "core/scripts/sp_vigia_reacao.py": {
