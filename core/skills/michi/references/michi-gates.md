@@ -15,7 +15,7 @@ Ordem fixa: **gates → auditar → review**. Cada passo só corre se o anterior
 
 ## Perfil `qualidade`
 
-Se `kaizen.config.json` tem `qualidade: {bloqueantes, consultivos, fases}`, correr `sp-gates.py <SP> --repo <repo-alvo>`: junta os gates do perfil aos do SP (sem duplicar); `bloqueantes` travam como os do SP, `consultivos` correm no fim e só registam (`consultivo aviso` na tabela). `--perfil <repo>` sugere o bloco. O SP não desliga o perfil. No fecho, `pr_fechar.py <PR> --sp <slug> --auditoria-relatorio F --review-estado F` volta a correr os bloqueantes e exige pentest «sem achados» e review `APROVADO`; falha = rc 11, sem merge, SP `bloqueado` com o motivo. Detalhe: `docs/config.md`.
+Se `kaizen.config.json` tem `qualidade: {bloqueantes, consultivos, fases}`, correr `sp-gates.py <SP> --repo <repo-alvo>`: junta os gates do perfil aos do SP (sem duplicar); `bloqueantes` travam como os do SP, `consultivos` correm no fim e só registam (`consultivo aviso` na tabela). `--perfil <repo>` sugere o bloco. O SP não desliga o perfil. No fecho, `pr_fechar.py <PR> --sp <slug> --auditoria-relatorio F --review-estado F` volta a correr os bloqueantes e exige auditar «sem achados» e review `APROVADO`; falha = rc 11, sem merge, SP `bloqueado` com o motivo. Detalhe: `docs/config.md`.
 
 ## Execução e resumo
 

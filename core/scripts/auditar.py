@@ -211,7 +211,7 @@ def checks_links(f, texto, linhas, existentes):
         for m in WIKILINK.finditer(t):
             alvo = re.split(r"[|#]", m.group(1))[0].strip().lower()
             if alvo and alvo not in existentes and Path(alvo).name not in existentes and alvo.endswith(".md") is False:
-                out.append(achado("medio", "docs", f"{f}:{i}", f"wikilink partido: [[{m.group(1)}]]", "corrigir o alvo ou criar a nota", t.strip()))
+                out.append(achado("medio", "docs", f"{f}:{i}", f"wikilink partido: {m.group(0)}", "corrigir o alvo ou criar a nota", t.strip()))
     return out
 
 

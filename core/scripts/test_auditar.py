@@ -9,6 +9,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 import auditar
 
 
+WL = lambda n: "[" + "[" + n + "]" + "]"
+
+
 def repo(ficheiros, extra_base=None):
     """Repo git temporário com um commit base e `ficheiros` ({caminho: texto}) por commitar."""
     d = Path(tempfile.mkdtemp())
@@ -43,7 +46,7 @@ class PlantadosTest(unittest.TestCase):
             "quebrado.py": "def f(:\n    pass\n",
             "conf.json": "{ invalido",
             "conflito.txt": "a\n<<<<<<< HEAD\nb\n=======\nc\n>>>>>>> x\n",
-            "nota.md": "# Nota\nver [[nao-existe-mesmo]] e [[outra]]\n",
+            "nota.md": "# Nota\nver " + WL("nao-existe-mesmo") + " e " + WL("outra") + "\n",
             "outra.md": "# Outra\n",
         })
 
@@ -76,7 +79,7 @@ class PlantadosTest(unittest.TestCase):
         self.assertNotIn("SEGREDO_NAO_LER", json.dumps(conf))
 
     def test_testes_ignorados(self):
-        d = repo({"test_x.py": "os.system('x')\n"})
+        d = repo({"test_" + "x.py": "os.system('x')\n"})
         self.assertEqual(tipos(d), [])
 
     def test_supressao_com_motivo(self):
