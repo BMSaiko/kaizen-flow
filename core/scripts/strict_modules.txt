@@ -32,3 +32,4 @@ core/scripts/kf_guard.py
 core/scripts/sp_vigia.py
 core/scripts/kf_quality.py
 core/scripts/sp-fechar.py
+~core/scripts/sp-autor.py

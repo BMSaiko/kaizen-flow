@@ -209,14 +209,16 @@ def ler_manifesto(path):
     return pares
 
 
-def lote(pares, backend, cwd, estado_root=None, run=None, sleep=time.sleep, intervalo=20, max_espera=3600, out=print, **kw):
-    """Preenche os SPs um de cada vez: lança, espera que o painel termine (done|falhou|bloqueado) e só então lança o seguinte; sem vaga, volta a tentar. Devolve [(slug, estado final)]; um painel que falha ou excede `max_espera` s não pára o lote."""
+def lote(pares, backend, cwd, intervalo=20, max_espera=3600, **kw):
+    """Preenche os SPs um de cada vez: lança, espera que o painel termine (done|falhou|bloqueado) e só então lança o seguinte; sem vaga, volta a tentar. Devolve [(slug, estado final)]; um painel que falha ou excede `max_espera` s não pára o lote. `kw`: `out` (defeito print), `sleep`, `estado_root`, `run` e o resto de `lancar`."""
+    out = kw.pop("out", print)
+    sleep, estado_root = kw.get("sleep", time.sleep), kw.get("estado_root")
     res = []
     for sp, semente in pares:
         slug, k = slug_de(sp), chave(slug_de(sp))
         espera = 0
         while True:
-            r = lancar(sp, semente, backend, cwd, estado_root=estado_root, run=run, sleep=sleep, **kw)
+            r = lancar(sp, semente, backend, cwd, **kw)
             if r["estado"] != "pendente":
                 break
             if espera >= max_espera:
